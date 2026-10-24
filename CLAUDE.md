@@ -53,7 +53,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 
 ## Datenbank
 - Nur eine Datenbank; alle Tabellen mit Präfix `fe_` (z. B. `fe_tenants`, `fe_users`,
-  `fe_devices`, `fe_device_events`). Zeichensatz utf8mb4.
+  `fe_devices`, `fe_device_events`).
+- Zeichensatz und Kollation: Alle Tabellen und die Verbindung verwenden utf8mb4 mit
+  `utf8mb4_unicode_ci`. Die Verbindung läuft mit Sitzungs-Zeitzone UTC (`+00:00`).
 - Mandantendaten tragen immer eine Mandanten-Spalte; jede Abfrage filtert danach.
 - Schemaänderungen nur über versionierte Migrationen.
 - Tests laufen nur gegen Datenbanken, deren Name auf `_test` endet
@@ -62,7 +64,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - `config/config.test.php`: Zugang nur für Tests; existiert nur lokal und nie auf dem
   Server. Der Datenbankname muss auf `_test` enden.
 - Format beider Dateien wie `config/config.example.php` (Gruppe `db` mit `host`, `name`,
-  `user`, `pass`); den Zeichensatz utf8mb4 setzt der Code.
+  `user`, `pass`); den Zeichensatz utf8mb4 setzt der Code. Unbekannte Schlüssel in `db`
+  sind ein Fehler, ein leeres `pass` ist erlaubt.
+- Tests: Testsuiten `unit` und `integration` (`composer test`, `composer test:unit`,
+  `composer test:integration`). Integrationstests werden übersprungen, wenn
+  `config/config.test.php` fehlt; dauerhafte Tabellen legen sie nicht an.
 - Agenten öffnen, zeigen oder ändern `config.local.php` und `config.test.php` niemals;
   nur PHP-Code darf sie laden.
 
