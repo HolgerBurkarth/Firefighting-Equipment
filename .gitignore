@@ -3,6 +3,7 @@
 
 # Zugangsdaten – niemals committen
 /config/config.local.php
+/config/config.test.php
 
 # PHPUnit
 /.phpunit.cache/

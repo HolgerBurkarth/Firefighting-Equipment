@@ -58,6 +58,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Schemaänderungen nur über versionierte Migrationen.
 - Tests laufen nur gegen Datenbanken, deren Name auf `_test` endet
   (lokal: `firefighting_test`). Der Testcode bricht sonst ab.
+- `config/config.local.php`: Zugang der Anwendung (auf dem Server: Produktiv-DB).
+- `config/config.test.php`: Zugang nur für Tests; existiert nur lokal und nie auf dem
+  Server. Der Datenbankname muss auf `_test` enden.
+- Format beider Dateien wie `config/config.example.php` (Gruppe `db` mit `host`, `name`,
+  `user`, `pass`); den Zeichensatz utf8mb4 setzt der Code.
+- Agenten öffnen, zeigen oder ändern `config.local.php` und `config.test.php` niemals;
+  nur PHP-Code darf sie laden.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen: Super-Admin (verwaltet Mandanten), Mandanten-Admin (Geräte, Standorte, Benutzer),
