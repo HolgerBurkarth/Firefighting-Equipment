@@ -166,9 +166,15 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `php85 bin/migrate.php check` auf offene Migrationen und prüft zum Schluss den
   Health-Endpunkt. Bei Fehlern springt es nicht automatisch zurück, sondern zeigt die
   Befehle für den Rücksprung an.
+- Selbst-Neustart: Hat `git merge` `scripts/deploy.sh` geändert, startet sich das Skript direkt
+  nach dem Merge per `exec` mit der neuen Fassung neu. Alter Commit und Pfad der Sicherung gehen
+  über `FF_DEPLOY_RESUME_OLD_COMMIT` und `FF_DEPLOY_RESUME_BACKUP_FILE` mit; die neue Fassung
+  überspringt Sicherung und Merge. Alles bis einschließlich Merge läuft beim nächsten Deployment
+  noch in der alten Fassung.
 - Sind Migrationen offen: zuerst Datenbanksicherung mit
   `php85 bin/db-dump.php --suffix=vor-migration-<alter Commit>`; schlägt sie fehl, bricht das
-  Skript ab, ohne zu migrieren. Danach `php85 bin/migrate.php run`. Schlägt die Migration
+  Skript ab, ohne zu migrieren. Exit-Code 4 (keine Tabellen `fe_*`, nichts zu sichern) gilt als
+  OK: Hinweis, dann Migration ohne Sicherung. Danach `php85 bin/migrate.php run`. Schlägt die Migration
   fehl, zeigt das Skript den Pfad der Sicherung und die Anleitung zum Zurückspielen
   (README, "Sicherung zurückspielen"). Eine Sicherung wird nie automatisch zurückgespielt.
 - Auf dem Server ist das Kommandozeilen-`php` Version 8.4; immer `php85` verwenden
@@ -176,21 +182,26 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Der Server holt nur von GitHub (nie `git push` vom Server). Änderungen nie direkt auf
   dem Server machen.
 - Sicherungen nur unter `~/htdocs/apps/_backup/` (gesperrt per `.htaccess`); das Skript
-  behält die 5 neuesten `ff-deploy-*.tar.gz`. Der Bereich außerhalb von `~/htdocs/apps/`
-  wird nicht verwendet.
+  behält die 5 neuesten `ff-deploy-*.tar.gz` (`scripts/prune-deploy-backups.sh`). Der Bereich
+  außerhalb von `~/htdocs/apps/` wird nicht verwendet.
 - Zeitstempel in Namen von Sicherungen immer in UTC mit Kennzeichen `Z`
   (`JJJJMMTT-HHMMSSZ`, in Bash `date -u +%Y%m%d-%H%M%SZ`). Die Aufräumregel für
   `ff-deploy-*` erkennt zusätzlich ältere Namen ohne `Z` (Ortszeit).
+- Aufräumen (`ff-deploy-*` und `ff-db-*`) sortiert nach dem Änderungsdatum der Datei (bei
+  Gleichstand nach Namen), nie nach dem Zeitstempel im Namen (alte Namen: Ortszeit, neue: UTC).
+  Die gerade erzeugte Sicherung wird nie gelöscht und zählt zu den behaltenen.
 
 ## Datenbanksicherung
 - `bin/db-dump.php` (nur CLI, Code in `src/Backup/` und `src/Cli/DbDumpCommand.php`):
   `[--config=PFAD] [--target-dir=PFAD] [--suffix=ZUSATZ] [--mysqldump=PROGRAMM]`.
   Standard: `config/config.local.php`, Zielordner `~/htdocs/apps/_backup` (neben dem
-  Projektordner), `mysqldump` aus dem PATH. Exit-Codes 0/1/2 wie bei den anderen CLIs.
+  Projektordner), `mysqldump` aus dem PATH. Exit-Codes 0/1/2 wie bei den anderen CLIs, dazu
+  4 = nichts zu sichern (`DbDumpCommand::EXIT_NOTHING_TO_DUMP`).
   Bei Erfolg steht auf stdout nur der Pfad der Sicherung, alles andere auf stderr.
 - Gesichert werden nur Tabellen `fe_*` (Liste per PDO aus `information_schema`), ohne
-  `CREATE DATABASE`. Ist keine Tabelle `fe_*` vorhanden, ist das ein Fehler (sonst würde
-  mysqldump die ganze Datenbank sichern).
+  `CREATE DATABASE`. Ist keine Tabelle `fe_*` vorhanden, endet der Aufruf mit Exit-Code 4,
+  ohne Datei, ohne Aufräumen und ohne mysqldump aufzurufen (ohne Tabellenliste würde
+  mysqldump die ganze Datenbank sichern). `DatabaseDumper` lehnt eine leere Liste weiterhin ab.
 - Datei: `ff-db-JJJJMMTT-HHMMSSZ[-zusatz].sql.gz`, gzip, Rechte 600. Zusatz nur `a-z`, `0-9`,
   Bindestrich (nicht am Anfang/Ende, nicht doppelt), höchstens 60 Zeichen.
 - Der Zielordner muss existieren und eine `.htaccess` enthalten, sonst Abbruch.
@@ -202,8 +213,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   MariaDB-Client (10.5); kein `--column-statistics` verwenden.
 - Geschrieben wird zuerst nach `*.part`. Vollständig ist eine Sicherung nur bei Exit-Code 0
   und der Abschlusszeile `-- Dump completed`; sonst wird die Datei gelöscht.
-- Nach einer erfolgreichen Sicherung bleiben die 10 neuesten `ff-db-*.sql.gz`; ältere werden
-  gelöscht. Andere Dateien (auch `ff-deploy-*`) werden nie angefasst.
+- Nach einer erfolgreichen Sicherung bleiben die 10 neuesten `ff-db-*.sql.gz` (nach
+  Änderungsdatum, die neue nie gelöscht); ältere werden gelöscht. Andere Dateien (auch `ff-deploy-*`) werden nie angefasst.
 - Zurückspielen nur von Hand (README, "Sicherung zurückspielen"), nie automatisch.
 
 ## Lokale Entwicklungsumgebung

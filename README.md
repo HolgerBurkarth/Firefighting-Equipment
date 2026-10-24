@@ -25,11 +25,17 @@ Ablauf:
 
 1. Abbruch, wenn versionierte Dateien auf dem Server geändert sind.
 2. Sicherung des Projektordners (ohne `vendor/`) nach
-   `~/htdocs/apps/_backup/ff-deploy-JJJJMMTT-HHMMSSZ-<commit>.tar.gz`; die 5 neuesten bleiben.
-3. `git fetch` und `git merge --ff-only origin/main`, danach `composer install`.
+   `~/htdocs/apps/_backup/ff-deploy-JJJJMMTT-HHMMSSZ-<commit>.tar.gz`; die 5 neuesten (nach
+   Änderungsdatum der Datei) bleiben, die gerade erzeugte wird nie gelöscht
+   (`scripts/prune-deploy-backups.sh`).
+3. `git fetch` und `git merge --ff-only origin/main`. Hat der Merge `scripts/deploy.sh` geändert,
+   startet sich das Skript sofort mit der neuen Fassung neu und setzt dort fort, ohne Sicherung
+   und Merge zu wiederholen. Danach `composer install`.
 4. `php85 bin/migrate.php check`. Sind Migrationen offen:
    1. Datenbanksicherung mit `php85 bin/db-dump.php --suffix=vor-migration-<alter Commit>`.
-      Schlägt sie fehl, bricht das Skript ab, **ohne** zu migrieren.
+      Schlägt sie fehl, bricht das Skript ab, **ohne** zu migrieren. Gibt es noch keine Tabelle
+      `fe_*` (erste Migration), gibt es nichts zu sichern: Das Skript zeigt einen Hinweis und
+      migriert ohne Sicherung.
    2. `php85 bin/migrate.php run`. Schlägt die Migration fehl, zeigt das Skript den Pfad der
       Sicherung und die Befehle zum Zurückspielen an. Es spielt **nichts** automatisch zurück.
 5. Health-Check `https://www.prodad.de/firefighting/service/api/v1/health`.
@@ -53,11 +59,15 @@ php bin/db-dump.php --config=PFAD                     # andere Konfiguration
 - Gesichert werden alle Tabellen `fe_*` der Datenbank aus der Konfiguration.
 - Speicherort: `~/htdocs/apps/_backup/ff-db-JJJJMMTT-HHMMSSZ[-zusatz].sql.gz` (UTC, gzip,
   Rechte 600). Der Ordner muss existieren und eine `.htaccess` enthalten.
-- Es bleiben die 10 neuesten `ff-db-*.sql.gz`; ältere werden nach jeder erfolgreichen Sicherung
-  gelöscht. Andere Dateien im Ordner werden nicht angefasst.
+- Es bleiben die 10 neuesten `ff-db-*.sql.gz` (nach Änderungsdatum der Datei, nicht nach Namen);
+  ältere werden nach jeder erfolgreichen Sicherung gelöscht, die gerade erzeugte nie. Andere
+  Dateien im Ordner werden nicht angefasst.
+- Gibt es keine Tabelle `fe_*` (z. B. vor der ersten Migration), wird nichts gesichert, keine
+  Datei angelegt und mysqldump nicht aufgerufen (Exit-Code 4).
 - Die Zugangsdaten stehen nie in der Befehlszeile, sondern nur kurz in einer Datei mit Rechten
   600, die danach gelöscht wird.
-- Ausgabe bei Erfolg: nur der Pfad der Sicherung. Exit-Codes: 0 OK, 1 Fehler, 2 falscher Aufruf.
+- Ausgabe bei Erfolg: nur der Pfad der Sicherung. Exit-Codes: 0 OK, 1 Fehler, 2 falscher Aufruf,
+  4 nichts zu sichern (keine Tabellen `fe_*`).
 
 Auf dem Server immer `php85` statt `php` verwenden.
 

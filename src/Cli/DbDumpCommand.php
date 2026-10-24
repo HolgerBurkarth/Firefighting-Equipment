@@ -14,19 +14,23 @@ use FirefightingEquipment\Config\ConfigException;
 use FirefightingEquipment\Config\ConfigLoader;
 use FirefightingEquipment\Database\ConnectionException;
 use FirefightingEquipment\Database\ConnectionFactory;
+use FirefightingEquipment\Database\DatabaseConfig;
 use FirefightingEquipment\Database\DatabaseError;
 
 /**
  * Kommandozeile für Datenbanksicherungen (bin/db-dump.php). Gesichert werden nur Tabellen fe_*.
  *
  * Auf stdout steht bei Erfolg ausschließlich der Pfad der Sicherung (für deploy.sh);
- * alle anderen Meldungen gehen nach stderr.
+ * alle anderen Meldungen gehen nach stderr. Gibt es keine Tabelle fe_* (z. B. vor der ersten
+ * Migration), endet der Aufruf mit EXIT_NOTHING_TO_DUMP, ohne Datei und ohne mysqldump aufzurufen:
+ * Ohne Tabellenliste würde mysqldump die ganze Datenbank sichern.
  */
 final readonly class DbDumpCommand
 {
     public const int EXIT_OK = 0;
     public const int EXIT_ERROR = 1;
     public const int EXIT_USAGE = 2;
+    public const int EXIT_NOTHING_TO_DUMP = 4;
 
     private const string USAGE = <<<'TXT'
         Aufruf:
@@ -40,7 +44,8 @@ final readonly class DbDumpCommand
           --suffix=ZUSATZ     a-z, 0-9 und Bindestrich, z. B. vor-migration-81a0d4c
           --mysqldump=PFAD    Programm mysqldump (Standard: mysqldump aus PATH)
 
-        Exit-Codes: 0 OK, 1 Fehler, 2 falscher Aufruf.
+        Exit-Codes: 0 OK, 1 Fehler, 2 falscher Aufruf,
+                    4 nichts zu sichern (keine Tabellen fe_*; keine Datei angelegt).
         Auf dem Server immer php85 statt php verwenden.
 
         TXT;
@@ -50,12 +55,15 @@ final readonly class DbDumpCommand
     /**
      * @param resource $out
      * @param resource $err
+     * @param (\Closure(DatabaseConfig): list<string>)|null $listTables ermittelt die Tabellen fe_*;
+     *        Standard: BackupTables::list über eine neue Verbindung (für Tests austauschbar)
      */
     public function __construct(
         private string $defaultConfigPath,
         private string $defaultTargetDir,
         private mixed $out,
         private mixed $err,
+        private ?\Closure $listTables = null,
     ) {
     }
 
@@ -86,13 +94,18 @@ final readonly class DbDumpCommand
             }
 
             $config = new ConfigLoader()->loadDatabaseConfig($options['config'] ?? $this->defaultConfigPath);
-            $tables = BackupTables::list(new ConnectionFactory()->create($config));
+            $tables = ($this->listTables ?? self::listTables(...))($config);
+            if ($tables === []) {
+                fwrite($this->err, 'Hinweis: Keine Tabellen fe_* vorhanden – nichts zu sichern, keine Datei angelegt.' . PHP_EOL);
+
+                return self::EXIT_NOTHING_TO_DUMP;
+            }
 
             $filename = BackupFileName::create(new \DateTimeImmutable('now'), $options['suffix']);
             $dumper = new DatabaseDumper([$options['mysqldump'] ?? 'mysqldump']);
             $path = $dumper->dump($config, $tables, $directory, $filename);
 
-            foreach (BackupRotation::prune($directory) as $deleted) {
+            foreach (BackupRotation::prune($directory, BackupRotation::KEEP, basename($path)) as $deleted) {
                 fwrite($this->err, sprintf('Lösche alte Sicherung: %s', $deleted) . PHP_EOL);
             }
         } catch (BackupException | ConfigException | ConnectionException $e) {
@@ -108,6 +121,16 @@ final readonly class DbDumpCommand
         fwrite($this->out, $path . PHP_EOL);
 
         return self::EXIT_OK;
+    }
+
+    /**
+     * @return list<string>
+     *
+     * @throws BackupException
+     */
+    private static function listTables(DatabaseConfig $config): array
+    {
+        return BackupTables::list(new ConnectionFactory()->create($config));
     }
 
     /**

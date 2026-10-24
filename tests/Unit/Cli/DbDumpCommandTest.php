@@ -7,9 +7,12 @@ namespace FirefightingEquipment\Tests\Unit\Cli;
 use FirefightingEquipment\Backup\BackupDirectory;
 use FirefightingEquipment\Backup\BackupException;
 use FirefightingEquipment\Backup\BackupFileName;
+use FirefightingEquipment\Backup\DatabaseDumper;
+use FirefightingEquipment\Backup\MysqlDefaultsFile;
 use FirefightingEquipment\Cli\DbDumpCommand;
 use FirefightingEquipment\Config\ConfigException;
 use FirefightingEquipment\Config\ConfigLoader;
+use FirefightingEquipment\Database\DatabaseConfig;
 use FirefightingEquipment\Tests\Support\TempDirectory;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -22,6 +25,9 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(BackupFileName::class)]
 #[UsesClass(ConfigLoader::class)]
 #[UsesClass(ConfigException::class)]
+#[UsesClass(DatabaseConfig::class)]
+#[UsesClass(DatabaseDumper::class)]
+#[UsesClass(MysqlDefaultsFile::class)]
 final class DbDumpCommandTest extends TestCase
 {
     private const string PROJECT_DIR = __DIR__ . '/../../..';
@@ -171,13 +177,70 @@ final class DbDumpCommandTest extends TestCase
         self::assertStringNotContainsString('nicht-ausgeben', $this->read($this->err));
     }
 
-    private function command(): DbDumpCommand
+    public function testNoFeTablesGivesExitCode4WithoutFileAndWithoutMysqldump(): void
+    {
+        $this->dir->write('.htaccess', 'Require all denied');
+        // Würde rotiert, wenn nach "nichts zu sichern" trotzdem aufgeräumt würde.
+        for ($i = 0; $i <= 10; $i++) {
+            $this->dir->write(sprintf('ff-db-20261024-0900%02dZ.sql.gz', $i), 'alt');
+        }
+        $before = scandir($this->dir->path);
+        $calls = 0;
+
+        $exitCode = $this->command(static function (DatabaseConfig $config) use (&$calls): array {
+            $calls++;
+
+            return [];
+        })->run([
+            '--target-dir=' . $this->dir->path,
+            '--config=' . self::PROJECT_DIR . '/tests/Fixtures/config/valid.php',
+            // Würde mysqldump aufgerufen, gäbe es Exit-Code 1 statt 4.
+            '--mysqldump=' . $this->dir->file('mysqldump-gibt-es-nicht'),
+        ]);
+
+        self::assertSame(DbDumpCommand::EXIT_NOTHING_TO_DUMP, $exitCode);
+        self::assertSame(4, DbDumpCommand::EXIT_NOTHING_TO_DUMP);
+        self::assertSame(1, $calls);
+        self::assertSame('', $this->read($this->out));
+        self::assertStringContainsString('Keine Tabellen fe_* vorhanden – nichts zu sichern', $this->read($this->err));
+        self::assertStringNotContainsString('FEHLER', $this->read($this->err));
+        self::assertSame($before, scandir($this->dir->path));
+    }
+
+    public function testWithFeTablesMysqldumpIsCalled(): void
+    {
+        $this->dir->write('.htaccess', 'Require all denied');
+
+        $exitCode = $this->command(static fn (DatabaseConfig $config): array => ['fe_tenants'])->run([
+            '--target-dir=' . $this->dir->path,
+            '--config=' . self::PROJECT_DIR . '/tests/Fixtures/config/valid.php',
+            '--mysqldump=' . $this->dir->file('mysqldump-gibt-es-nicht'),
+        ]);
+
+        self::assertSame(DbDumpCommand::EXIT_ERROR, $exitCode);
+        self::assertStringContainsString('FEHLER: mysqldump', $this->read($this->err));
+        self::assertSame('', $this->read($this->out));
+        self::assertSame(['.', '..', '.htaccess'], scandir($this->dir->path));
+    }
+
+    public function testUsageNamesExitCode4(): void
+    {
+        $this->command()->run(['--help']);
+
+        self::assertStringContainsString('4 nichts zu sichern', $this->read($this->out));
+    }
+
+    /**
+     * @param (\Closure(DatabaseConfig): list<string>)|null $listTables
+     */
+    private function command(?\Closure $listTables = null): DbDumpCommand
     {
         return new DbDumpCommand(
             self::PROJECT_DIR . '/config/gibt-es-nicht.php',
             $this->dir->file('standard-ziel-gibt-es-nicht'),
             $this->out,
             $this->err,
+            $listTables,
         );
     }
 

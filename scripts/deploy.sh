@@ -8,6 +8,8 @@
 # git fetch + fast-forward auf origin/main, composer install,
 # bei offenen Migrationen: Datenbanksicherung (bin/db-dump.php), dann
 # bin/migrate.php run; zum Schluss Health-Check.
+# Hat der Merge dieses Skript geändert, startet es sich direkt danach mit der neuen
+# Fassung neu (exec) und setzt dort fort, ohne Sicherung und Merge zu wiederholen.
 # Bei einem Fehler wird NICHT automatisch zurückgesprungen und keine
 # Sicherung zurückgespielt; das Skript gibt die nötigen Befehle aus.
 #
@@ -53,6 +55,13 @@ print_migration_failure() {
     echo "==================================================================" >&2
     echo " MIGRATION FEHLGESCHLAGEN – es wurde NICHTS zurückgespielt." >&2
     echo "==================================================================" >&2
+    if [ -z "$DB_BACKUP_FILE" ]; then
+        echo " Es gibt keine Datenbanksicherung: Vor der Migration war keine" >&2
+        echo " Tabelle fe_* vorhanden. Tabellen, die die fehlgeschlagene Migration" >&2
+        echo " angelegt hat, von Hand löschen (Fehlermeldung oben lesen)." >&2
+        print_rollback
+        return
+    fi
     echo " Datenbanksicherung vor der Migration:" >&2
     echo "   $DB_BACKUP_FILE" >&2
     echo "" >&2
@@ -91,46 +100,64 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     fail "Versionierte Dateien sind lokal geändert. Änderungen nie direkt auf dem Server machen."
 fi
 
-OLD_COMMIT="$(git rev-parse HEAD)"
-OLD_SHORT="$(git rev-parse --short HEAD)"
-echo "Projektordner:   $PROJECT_DIR"
-echo "Aktueller Stand: $OLD_COMMIT"
+# Fortsetzung nach einem Selbst-Neustart (siehe unten): alter Commit und Sicherung kommen
+# aus der Umgebung; Sicherung und Merge sind bereits erledigt.
+RESUME_OLD_COMMIT="${FF_DEPLOY_RESUME_OLD_COMMIT:-}"
+RESUME_BACKUP_FILE="${FF_DEPLOY_RESUME_BACKUP_FILE:-}"
+unset FF_DEPLOY_RESUME_OLD_COMMIT FF_DEPLOY_RESUME_BACKUP_FILE
 
-# --- Sicherung -------------------------------------------------------------
+if [ -n "$RESUME_OLD_COMMIT" ]; then
+    [[ "$RESUME_OLD_COMMIT" =~ ^[0-9a-f]{40}$ ]] && git merge-base --is-ancestor "$RESUME_OLD_COMMIT" HEAD \
+        || fail "Fortsetzung: ungültiger alter Commit '$RESUME_OLD_COMMIT'."
+    [[ "$RESUME_BACKUP_FILE" == "$BACKUP_DIR"/ff-deploy-*.tar.gz && -f "$RESUME_BACKUP_FILE" ]] \
+        || fail "Fortsetzung: Sicherung '$RESUME_BACKUP_FILE' fehlt."
+    OLD_COMMIT="$RESUME_OLD_COMMIT"
+    OLD_SHORT="$(git rev-parse --short "$OLD_COMMIT")"
+    BACKUP_FILE="$RESUME_BACKUP_FILE"
+    echo "Fortsetzung mit der neuen Fassung von scripts/deploy.sh."
+    echo "Projektordner:   $PROJECT_DIR"
+    echo "Alter Stand:     $OLD_COMMIT"
+    echo "Sicherung:       $BACKUP_FILE"
+else
+    OLD_COMMIT="$(git rev-parse HEAD)"
+    OLD_SHORT="$(git rev-parse --short HEAD)"
+    echo "Projektordner:   $PROJECT_DIR"
+    echo "Aktueller Stand: $OLD_COMMIT"
 
-# Zeitstempel in UTC mit Kennzeichen Z.
-BACKUP_FILE="$BACKUP_DIR/ff-deploy-$(date -u +%Y%m%d-%H%M%SZ)-$OLD_SHORT.tar.gz"
-echo "Sicherung:       $BACKUP_FILE"
-(
-    umask 077
-    tar -czf "$BACKUP_FILE" --exclude=./vendor -C "$PROJECT_DIR" .
-)
-chmod 600 "$BACKUP_FILE"
+    # --- Sicherung ---------------------------------------------------------
 
-# Nur die neuesten Sicherungen behalten. Erkannt werden alte Namen (Ortszeit, ohne Z) und
-# neue (UTC, mit Z); sortiert wird nach dem Zeitstempel im Namen. Andere Dateien bleiben.
-mapfile -t backups < <(
-    for f in "$BACKUP_DIR"/ff-deploy-*.tar.gz; do
-        name="${f##*/}"
-        if [[ -f "$f" && "$name" =~ ^ff-deploy-([0-9]{8}-[0-9]{6})Z?-[0-9a-f]+\.tar\.gz$ ]]; then
-            printf '%s	%s
-' "${BASH_REMATCH[1]}" "$f"
-        fi
-    done | LC_ALL=C sort | cut -f2-
-)
-if [ "${#backups[@]}" -gt "$BACKUP_KEEP" ]; then
-    for old in "${backups[@]:0:${#backups[@]}-BACKUP_KEEP}"; do
-        echo "Lösche alte Sicherung: $old"
-        rm -f -- "$old"
-    done
+    # Zeitstempel in UTC mit Kennzeichen Z.
+    BACKUP_FILE="$BACKUP_DIR/ff-deploy-$(date -u +%Y%m%d-%H%M%SZ)-$OLD_SHORT.tar.gz"
+    echo "Sicherung:       $BACKUP_FILE"
+    (
+        umask 077
+        tar -czf "$BACKUP_FILE" --exclude=./vendor -C "$PROJECT_DIR" .
+    )
+    chmod 600 "$BACKUP_FILE"
+
+    # Nur die neuesten Sicherungen behalten (nach Änderungsdatum, nicht nach Namen); die gerade
+    # erzeugte wird nie gelöscht. Andere Dateien bleiben.
+    bash "$SCRIPT_DIR/prune-deploy-backups.sh" "$BACKUP_DIR" "$BACKUP_KEEP" "$BACKUP_FILE"
 fi
 
 # --- Aktualisieren ---------------------------------------------------------
 
 trap print_rollback ERR
 
-git fetch origin
-git merge --ff-only "origin/$BRANCH"
+if [ -z "$RESUME_OLD_COMMIT" ]; then
+    git fetch origin
+    git merge --ff-only "origin/$BRANCH"
+
+    # Die laufende Fassung dieses Skripts ist veraltet, wenn der Merge es geändert hat:
+    # sofort mit der neuen Fassung neu starten und dort fortsetzen.
+    if ! git diff --quiet "$OLD_COMMIT" HEAD -- scripts/deploy.sh; then
+        echo "scripts/deploy.sh wurde geändert – Neustart mit der neuen Fassung."
+        trap - ERR
+        export FF_DEPLOY_RESUME_OLD_COMMIT="$OLD_COMMIT"
+        export FF_DEPLOY_RESUME_BACKUP_FILE="$BACKUP_FILE"
+        exec "$BASH" "$PROJECT_DIR/scripts/deploy.sh"
+    fi
+fi
 NEW_COMMIT="$(git rev-parse HEAD)"
 
 "${COMPOSER_CMD[@]}"
@@ -148,16 +175,22 @@ case "$CHECK_STATUS" in
         ;;
     3)
         echo "Datenbanksicherung vor der Migration ..."
+        # db-dump: 0 = Sicherung erstellt, 4 = keine Tabellen fe_* (nichts zu sichern, z. B. vor
+        # der ersten Migration; keine Datei), sonst Fehler.
         DUMP_STATUS=0
         DB_BACKUP_FILE="$("$PHP_BIN" bin/db-dump.php --target-dir="$BACKUP_DIR" --suffix="vor-migration-$OLD_SHORT")" || DUMP_STATUS=$?
-        if [ "$DUMP_STATUS" -ne 0 ] || [ ! -f "$DB_BACKUP_FILE" ]; then
+        if [ "$DUMP_STATUS" -eq 4 ]; then
+            DB_BACKUP_FILE=""
+            echo "Hinweis: Keine Tabellen fe_* vorhanden – keine Datenbanksicherung nötig."
+        elif [ "$DUMP_STATUS" -ne 0 ] || [ ! -f "$DB_BACKUP_FILE" ]; then
             trap - ERR
             echo "FEHLER: Datenbanksicherung fehlgeschlagen. Migrationen wurden NICHT ausgeführt." >&2
             echo "        Der neue Code ist eingespielt, die Datenbank hat noch das alte Schema." >&2
             print_rollback
             exit 1
+        else
+            echo "Datenbanksicherung: $DB_BACKUP_FILE"
         fi
-        echo "Datenbanksicherung: $DB_BACKUP_FILE"
 
         MIGRATE_STATUS=0
         "$PHP_BIN" bin/migrate.php run || MIGRATE_STATUS=$?

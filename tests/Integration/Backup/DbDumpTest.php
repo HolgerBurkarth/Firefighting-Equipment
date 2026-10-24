@@ -109,16 +109,20 @@ final class DbDumpTest extends DomainTestCase
 
     public function testOldBackupsAreRotated(): void
     {
+        // Die Namen sortieren alle hinter der neuen Sicherung; maßgeblich ist das ältere Änderungsdatum.
         for ($day = 1; $day <= BackupRotation::KEEP; $day++) {
-            $this->dir->write(sprintf('ff-db-200001%02d-000000Z.sql.gz', $day), 'alt');
+            $name = sprintf('ff-db-209901%02d-000000Z.sql.gz', $day);
+            $this->dir->write($name, 'alt');
+            touch($this->dir->file($name), time() - 86_400 * (20 - $day));
         }
         $this->dir->write('fremd.txt', 'bleibt');
 
         [$exitCode, $out, $err] = $this->runCommand([]);
 
         self::assertSame(DbDumpCommand::EXIT_OK, $exitCode, $err);
-        self::assertFileDoesNotExist($this->dir->file('ff-db-20000101-000000Z.sql.gz'));
-        self::assertFileExists($this->dir->file('ff-db-20000102-000000Z.sql.gz'));
+        self::assertFileDoesNotExist($this->dir->file('ff-db-20990101-000000Z.sql.gz'));
+        self::assertFileExists($this->dir->file('ff-db-20990102-000000Z.sql.gz'));
+        self::assertFileExists($this->dir->file('ff-db-20990110-000000Z.sql.gz'));
         self::assertFileExists($this->dir->file('fremd.txt'));
         self::assertFileExists(trim($out));
         self::assertStringContainsString('Lösche alte Sicherung:', $err);
