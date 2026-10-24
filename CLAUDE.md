@@ -31,6 +31,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   - REST-API: `/firefighting/<stadt>/api/v1/...`
   - Super-Admin: `/firefighting/service/`
 - Der Mandant wird aus dem URL-Pfad abgeleitet. Das Kürzel einer Stadt ist unveränderlich.
+- Städte sind keine Ordner: Das Kürzel im Pfad ist virtuell und wird über `fe_tenants`
+  in der Datenbank aufgelöst.
+- `service` ist ein reserviertes Kürzel (Super-Admin) und darf nie als Stadt-Kürzel
+  vergeben werden.
+- `/api/v1/health` ist mandantenunabhängig und muss unter `/firefighting/service/` immer
+  erreichbar sein (wird vom Deploy-Skript geprüft).
 
 ## Server und .htaccess
 - Die `.htaccess` in der Hauptebene des Webspace (`htdocs/.htaccess`) gehört NICHT zum
@@ -72,6 +78,21 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Übersicht "überfällig" und "in 30 Tagen fällig".
 - CSV-Export (Semikolon, UTF-8, Umlaute korrekt) und CSV-Import mit Prüfung und Fehleranzeige.
 - Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
+
+## Deployment
+- Ablauf: lokal testen (alle Tests grün), committen, zu GitHub synchronisieren, dann auf
+  dem Server per SSH: `cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh`.
+- Das Skript bricht bei lokal geänderten Dateien ab, legt eine Sicherung an, holt per
+  `git fetch` + `git merge --ff-only origin/main`, führt `composer install` aus und prüft
+  den Health-Endpunkt. Bei Fehlern springt es nicht automatisch zurück, sondern zeigt die
+  Befehle für den Rücksprung an.
+- Auf dem Server ist das Kommandozeilen-`php` Version 8.4; immer `php85` verwenden
+  (z. B. `php85 /usr/bin/composer install --no-dev --optimize-autoloader --no-cache`).
+- Der Server holt nur von GitHub (nie `git push` vom Server). Änderungen nie direkt auf
+  dem Server machen.
+- Sicherungen nur unter `~/htdocs/apps/_backup/` (gesperrt per `.htaccess`); das Skript
+  behält die 5 neuesten `ff-deploy-*.tar.gz`. Der Bereich außerhalb von `~/htdocs/apps/`
+  wird nicht verwendet.
 
 ## Lokale Entwicklungsumgebung
 - Windows 10, PowerShell, PHP 8.5 CLI, Composer, Git, MariaDB 10.11 (Port 3306).
