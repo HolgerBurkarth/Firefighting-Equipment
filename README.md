@@ -190,6 +190,41 @@ Anfang oder Ende, nicht doppelt), höchstens 50 Zeichen; `service` ist reservier
 werden nicht gelöscht, sondern gesperrt; ihre Daten bleiben erhalten. Auf dem Server
 `php85` statt `php` verwenden.
 
+## Super-Admins und Benutzer verwalten
+
+```
+php bin/user.php superadmin:create --email=chef@example.org --name="Erika Musterfrau"
+php bin/user.php superadmin:list                                  # alle Super-Admins
+php bin/user.php superadmin:password --email=chef@example.org     # neues Passwort setzen
+php bin/user.php superadmin:lock --email=chef@example.org         # sperren
+php bin/user.php superadmin:unlock --email=chef@example.org       # entsperren
+php bin/user.php list --tenant=immendingen                        # Konten einer Stadt
+php bin/user.php superadmin:list --config=PFAD                    # andere Konfiguration
+```
+
+Auf dem Server:
+
+```
+cd ~/htdocs/apps/firefighting-equipment && php85 bin/user.php superadmin:create --email=… --name="…"
+```
+
+- Das Passwort wird **verdeckt** abgefragt und muss wiederholt werden; es wird nie als Argument
+  übergeben. Ein neuer Super-Admin ist sofort aktiv, seine E-Mail-Adresse gilt als bestätigt.
+- Die verdeckte Eingabe funktioniert nur in einem Linux-Terminal (z. B. per SSH auf dem Server).
+  Unter Windows bricht der Befehl mit einem Hinweis ab; Super-Admins daher auf dem Server anlegen.
+- `--password-stdin` liest das Passwort aus der Standardeingabe. Das ist **nur für Tests und
+  Skripte** gedacht. Nicht von Hand per `echo "…" | php bin/user.php …` verwenden: Das Passwort
+  landet sonst in der Befehlshistorie der Shell.
+- Passwortregeln: 10 bis 128 Zeichen, keine Pflicht zu Sonderzeichen. Abgelehnt werden häufige
+  Passwörter aus `resources/password-blocklist.txt`, auch mit angehängten Ziffern oder Zeichen
+  (z. B. "Feuerwehr2025!"), sowie Passwörter mit Teilen der E-Mail-Adresse, des Namens, des
+  Ortsnamens oder des Kürzels der Stadt. Allgemeine Wörter wie "Feuerwehr" im Stadtnamen
+  zählen dabei nicht als persönliche Daten.
+- Sperren und ein neues Passwort beenden alle Sitzungen des Kontos. Der letzte aktive, nicht
+  gesperrte Super-Admin kann nicht gesperrt werden; zuerst einen weiteren anlegen.
+- `list` zeigt alle Konten einer Stadt (auch gelöschte als "Gelöschter Benutzer #ID"), nie
+  Passwort-Hashes.
+
 ## Tests
 
 ```

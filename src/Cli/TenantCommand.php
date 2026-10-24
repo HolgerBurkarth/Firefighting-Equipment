@@ -182,20 +182,8 @@ final readonly class TenantCommand
             ];
         }
 
-        $widths = [];
-        foreach ($rows as $row) {
-            foreach ($row as $i => $cell) {
-                $widths[$i] = max($widths[$i] ?? 0, mb_strlen($cell));
-            }
-        }
-
-        foreach ($rows as $row) {
-            $cells = [];
-            foreach ($row as $i => $cell) {
-                // Die letzte Spalte (Name) wird nicht aufgefüllt.
-                $cells[] = $i === count($row) - 1 ? $cell : mb_str_pad($cell, $widths[$i]);
-            }
-            $this->line(implode('  ', $cells));
+        foreach (TextTable::render($rows) as $line) {
+            $this->line($line);
         }
 
         $this->line(count($tenants) === 1 ? '1 Stadt.' : sprintf('%d Städte.', count($tenants)));

@@ -224,6 +224,48 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (IPv4 /24, IPv6 /48, binär). Einträge werden nach 24 Stunden beim Aufruf gelöscht (kein Cron).
 - E-Mail-Absender: `"Feuerwehr Geräteverwaltung" <feuerwehr-app@prodad.de>`.
 
+## Benutzerverwaltung im Code
+- Code in `src/User/`: `EmailAddress` (getrimmt, kleingeschrieben, mindestens so streng wie
+  `chk_fe_users_email`, zusätzlich Domain mit Punkt), `PersonName` (für `name` und
+  `display_name`, Regeln wie `TenantName`), Enums `UserRole` und `UserStatus` (Werte wie die
+  CHECK-Regeln), `User` (bewusst ohne Passwort-Hash), `UserRepository`. Fachliche Fehler erben
+  von `UserException` (deutsche Meldung für Benutzer).
+- Passwörter (`src/User/Password/`): `PasswordPolicy::check()` mit `PasswordContext` (E-Mail,
+  Namen, Stadt). Länge per `mb_strlen`, nicht getrimmt, keine Steuerzeichen. Verglichen wird in
+  der Vergleichsform `PasswordPolicy::fold()` (zerlegte Umlaute zusammensetzen, Case-Folding, ß = ss;
+  ohne intl keine vollständige Unicode-Normalisierung).
+  - Sperrliste `resources/password-blocklist.txt`: ein Eintrag je Zeile, in Vergleichsform,
+    `#` = Kommentar, ohne Duplikate, LF (per Test geprüft). Gesperrt ist ein exakter Treffer und ein
+    Grundwort mit angehängten Ziffern/Sonderzeichen ("Feuerwehr2025!" → `feuerwehr`).
+  - Persönliche Daten: Teile ab 4 Zeichen (`MIN_FRAGMENT_LENGTH`) aus dem lokalen Teil der E-Mail
+    (ganz und in Wörtern), den Namen, dem Kürzel (ganz und in Wörtern) und dem Stadtnamen.
+    Allgemeine Wörter aus Stadtname und Kürzel (`TENANT_STOPWORDS`, z. B. feuerwehr, stadt,
+    löschzug) zählen nicht; Ortsname und vollständiges Kürzel bleiben gesperrt.
+  - Meldungen enthalten nie das Passwort; Parameter mit Passwort oder Hash tragen
+    `#[\SensitiveParameter]`. `PasswordHasher`: `hash()`, `verify()`, `needsRehash()` (Argon2id).
+- `UserRepository`: ändernde Methoden (`lock`, `unlock`, `changeRole`, `setPassword`,
+  `anonymize`) öffnen eine eigene Transaktion (eine bereits offene ist ein Fehler) und sperren
+  zuerst alle Konten derselben Stadt bzw. alle Super-Admins (`FOR UPDATE` über
+  `FORCE INDEX (uq_fe_users_tenant_email)`, immer dieselbe Abfrage → gleiche Sperrreihenfolge,
+  andere Städte unberührt). Danach Regeln prüfen, dann schreiben.
+  - Der letzte aktive (`status = active`), nicht gesperrte Admin einer Stadt bzw. Super-Admin wird
+    nicht gesperrt, herabgestuft oder anonymisiert (`UserRuleViolationException`).
+  - Die Rolle `superadmin` wird per `changeRole` weder vergeben noch entzogen. `setPassword` nicht
+    für `invited` (eigener Ablauf). Gelöschte Konten werden nicht mehr geändert.
+  - Sperren, Rollenwechsel, Passwort setzen und Anonymisieren löschen alle `fe_sessions` des
+    Kontos; Anonymisieren zusätzlich alle `fe_user_tokens`. Abgelehnte Änderungen lassen alles
+    unverändert (Rollback).
+  - Keine Methode zum `DELETE` von Benutzern hinzufügen.
+- Kommandozeile `bin/user.php` (Code `src/Cli/UserCommand.php`): `superadmin:create --email=…
+  --name=…`, `superadmin:list`, `superadmin:password --email=…`, `superadmin:lock --email=…`,
+  `superadmin:unlock --email=…`, `list --tenant=…`, `--config=PFAD`; Exit-Codes 0/1/2.
+  Auf dem Server: `cd ~/htdocs/apps/firefighting-equipment && php85 bin/user.php superadmin:list`.
+  - Passwörter nie als Argument (`--password=…` wird abgelehnt, ohne den Wert auszugeben).
+    Verdeckte Eingabe mit Wiederholung per `stty` (`TerminalPasswordPrompt`); unter Windows oder
+    ohne Terminal Abbruch mit Hinweis auf `--password-stdin`. Keine PowerShell-Lösung.
+  - `--password-stdin` nur für Tests und Skripte (entfernt genau ein Zeilenende).
+  - Ausgaben enthalten nie Hashes. Tabellen über `TextTable` (auch `bin/tenant.php`).
+
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".
 - Neue Stadt: Super-Admin legt Name, Kürzel und E-Mail des ersten Admins an (siehe
