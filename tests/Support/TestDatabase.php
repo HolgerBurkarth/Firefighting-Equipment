@@ -36,6 +36,27 @@ final class TestDatabase
         return new ConnectionFactory()->create(self::config());
     }
 
+    /**
+     * Löscht alle Tabellen mit Präfix fe_test_ – ausschließlich in einer Datenbank mit Endung _test.
+     * Andere Tabellen (z. B. fe_schema_migrations) werden nie angefasst.
+     */
+    public static function dropTestTables(\PDO $pdo): void
+    {
+        $database = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        self::assertIsTestDatabaseName(is_string($database) ? $database : '');
+
+        $stmt = $pdo->query(
+            "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()"
+            . " AND TABLE_NAME LIKE 'fe\\_test\\_%'",
+        );
+        foreach ($stmt->fetchAll(\PDO::FETCH_COLUMN) as $table) {
+            if (!is_string($table) || preg_match('/^fe_test_[a-z0-9_]+$/D', $table) !== 1) {
+                throw new \RuntimeException(sprintf('Unerwarteter Tabellenname beim Aufräumen: %s', (string) $table));
+            }
+            $pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
+        }
+    }
+
     public static function isTestDatabaseName(string $name): bool
     {
         return preg_match('/^.+_test$/D', $name) === 1;

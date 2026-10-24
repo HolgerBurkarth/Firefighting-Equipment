@@ -1,5 +1,17 @@
 # Firefighting-Equipment
 
+## Datenbank-Migrationen
+
+```
+php bin/migrate.php status                 # ausgeführte und offene Migrationen
+php bin/migrate.php run --dry-run          # zeigt nur, was passieren würde
+php bin/migrate.php run                    # führt offene Migrationen aus
+php bin/migrate.php status --config=PFAD   # andere Konfiguration (Standard: config/config.local.php)
+```
+
+Auf dem Server immer `php85` statt `php` verwenden. Regeln für Migrationen stehen in
+`CLAUDE.md`.
+
 ## Tests
 
 ```

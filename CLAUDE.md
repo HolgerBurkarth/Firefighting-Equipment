@@ -68,9 +68,35 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   sind ein Fehler, ein leeres `pass` ist erlaubt.
 - Tests: Testsuiten `unit` und `integration` (`composer test`, `composer test:unit`,
   `composer test:integration`). Integrationstests werden übersprungen, wenn
-  `config/config.test.php` fehlt; dauerhafte Tabellen legen sie nicht an.
+  `config/config.test.php` fehlt. Dauerhafte Tabellen legen sie nur mit Präfix `fe_test_`
+  an und löschen sie wieder; aufgeräumt wird ausschließlich `fe_test_*` und nur in einer
+  Datenbank mit Endung `_test` (`TestDatabase::dropTestTables`).
 - Agenten öffnen, zeigen oder ändern `config.local.php` und `config.test.php` niemals;
   nur PHP-Code darf sie laden.
+
+## Migrationen
+- Migrationen sind SQL-Dateien in `migrations/` mit dem Namen `NNNN_beschreibung.sql`
+  (vierstellig, ab `0001` lückenlos aufsteigend, Beschreibung nur `a-z`, `0-9`, `_`).
+  Dateien sind UTF-8 ohne BOM mit LF-Zeilenenden (`.gitattributes`).
+- Bereits ausgeführte Migrationen werden **nie** geändert, umbenannt oder gelöscht
+  (geprüft per SHA-256-Prüfsumme). Korrekturen immer als neue Migration.
+- Nur vorwärts, keine Down-Migrationen.
+- Klein halten: höchstens eine DDL-Anweisung (CREATE/ALTER/DROP) pro Migration, weil
+  MariaDB DDL nicht zurücknimmt. Zusätzliche DML-Anweisungen (z. B. INSERT von
+  Startwerten) sind erlaubt.
+- Neue Tabellen: Präfix `fe_`, `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci`.
+- Kein `DELIMITER`, keine Trigger oder gespeicherten Prozeduren.
+- Protokoll in `fe_schema_migrations` (wird von `run` automatisch angelegt). Der Name ist im
+  `Migrator` konfigurierbar; Tests verwenden `fe_test_schema_migrations`. Die echte
+  `fe_schema_migrations` wird von Tests nie angefasst.
+- Aufruf (nur Kommandozeile): `php bin/migrate.php status`, `php bin/migrate.php run`,
+  `php bin/migrate.php run --dry-run`; andere Konfiguration mit `--config=PFAD`
+  (Standard `config/config.local.php`). `status` und `--dry-run` ändern nichts.
+- Auf dem Server immer mit `php85` ausführen:
+  `cd ~/htdocs/apps/firefighting-equipment && php85 bin/migrate.php run`.
+- Integrationstests für Migrationen verwenden eigene Test-Migrationen aus
+  `tests/Fixtures/migrations/`, die nur Tabellen `fe_test_*` anlegen.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen: Super-Admin (verwaltet Mandanten), Mandanten-Admin (Geräte, Standorte, Benutzer),

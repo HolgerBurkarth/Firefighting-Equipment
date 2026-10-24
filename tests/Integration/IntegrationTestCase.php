@@ -29,6 +29,11 @@ abstract class IntegrationTestCase extends TestCase
         $this->pdo = null;
     }
 
+    protected function hasConnection(): bool
+    {
+        return $this->pdo !== null;
+    }
+
     protected function pdo(): \PDO
     {
         return $this->pdo ?? throw new \LogicException('Keine Datenbankverbindung.');
