@@ -56,6 +56,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `fe_devices`, `fe_device_events`).
 - Zeichensatz und Kollation: Alle Tabellen und die Verbindung verwenden utf8mb4 mit
   `utf8mb4_unicode_ci`. Die Verbindung läuft mit Sitzungs-Zeitzone UTC (`+00:00`).
+- `sql_mode` setzt `ConnectionFactory` ausdrücklich und vollständig, damit lokal und STRATO
+  identisch sind: `STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,
+  NO_ENGINE_SUBSTITUTION,ONLY_FULL_GROUP_BY`. Zu lange Werte führen daher zu einem Fehler statt
+  zu stiller Kürzung. Nicht auf den Server-Standard verlassen und nicht abschwächen.
+- Zeitstempel als `DATETIME` in UTC; der Code schreibt sie ausdrücklich mit `UTC_TIMESTAMP()`.
 - Mandantendaten tragen immer eine Mandanten-Spalte; jede Abfrage filtert danach.
 - Schemaänderungen nur über versionierte Migrationen.
 - Tests laufen nur gegen Datenbanken, deren Name auf `_test` endet
@@ -71,6 +76,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `config/config.test.php` fehlt. Dauerhafte Tabellen legen sie nur mit Präfix `fe_test_`
   an und löschen sie wieder; aufgeräumt wird ausschließlich `fe_test_*` und nur in einer
   Datenbank mit Endung `_test` (`TestDatabase::dropTestTables`).
+- Fachliche Integrationstests erben von `tests/Integration/DomainTestCase.php`: Diese führt
+  einmal pro Testlauf die echten Migrationen aus `migrations/` in der Testdatenbank aus
+  (Protokoll in deren `fe_schema_migrations`) und leert vor jedem Test alle Tabellen `fe_*`
+  außer `fe_schema_migrations` und `fe_test_*` (`TestDatabase::truncateDomainTables`, nur in
+  einer Datenbank mit Endung `_test`).
 - Agenten öffnen, zeigen oder ändern `config.local.php` und `config.test.php` niemals;
   nur PHP-Code darf sie laden.
 
@@ -88,8 +98,15 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   COLLATE=utf8mb4_unicode_ci`.
 - Kein `DELIMITER`, keine Trigger oder gespeicherten Prozeduren.
 - Protokoll in `fe_schema_migrations` (wird von `run` automatisch angelegt). Der Name ist im
-  `Migrator` konfigurierbar; Tests verwenden `fe_test_schema_migrations`. Die echte
-  `fe_schema_migrations` wird von Tests nie angefasst.
+  `Migrator` konfigurierbar; die Migrationstests verwenden `fe_test_schema_migrations` und
+  fassen die echte `fe_schema_migrations` nie an. Einzige Ausnahme: `DomainTestCase` führt die
+  echten Migrationen in der Testdatenbank (Endung `_test`) mit `fe_schema_migrations` aus.
+- Wurde eine Migration lokal geändert, nachdem sie in der Testdatenbank lief, schlägt die
+  Prüfsumme an. Dann die Testdatenbank neu anlegen (README), nie die Prüfung umgehen.
+- CHECK-Bedingungen sind erlaubt und erwünscht (MariaDB 10.11 prüft sie). Bei `REGEXP` auf
+  `_ci`-Spalten `COLLATE utf8mb4_bin` verwenden (sonst wird Groß-/Kleinschreibung ignoriert)
+  und `\z` statt `$` als Ende, im SQL-String als `'…\\z'` geschrieben (PCRE-`$` passt auch
+  vor einem abschließenden Zeilenumbruch).
 - Aufruf (nur Kommandozeile): `php bin/migrate.php status`, `php bin/migrate.php run`,
   `php bin/migrate.php run --dry-run`; andere Konfiguration mit `--config=PFAD`
   (Standard `config/config.local.php`). `status` und `--dry-run` ändern nichts.
@@ -97,6 +114,26 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `cd ~/htdocs/apps/firefighting-equipment && php85 bin/migrate.php run`.
 - Integrationstests für Migrationen verwenden eigene Test-Migrationen aus
   `tests/Fixtures/migrations/`, die nur Tabellen `fe_test_*` anlegen.
+
+## Mandanten (Städte)
+- Tabelle `fe_tenants` (Migration `0001`): `id`, `slug`, `name`, `active`, `created_at`,
+  `updated_at` (UTC). Code in `src/Tenant/` (`TenantSlug`, `TenantName`, `Tenant`,
+  `TenantRepository`).
+- Kürzel (`TenantSlug`): nur `a-z`, `0-9` und Bindestrich, Bindestrich nicht am Anfang/Ende
+  und nicht doppelt, höchstens 50 Zeichen, eindeutig. Großbuchstaben werden abgelehnt (mit
+  Vorschlag der kleingeschriebenen Form), nie still umgewandelt. `service` ist reserviert
+  (`TenantSlug::RESERVED`). Dieselben Regeln prüft die Datenbank per CHECK; beide Stellen
+  immer gemeinsam ändern.
+- Name (`TenantName`): Leerraum am Rand wird entfernt, nicht leer, höchstens 100 Zeichen,
+  keine Steuerzeichen.
+- Das Kürzel ist nach dem Anlegen unveränderlich, Städte werden nie gelöscht, nur gesperrt
+  (`active = 0`, Daten bleiben erhalten). Da Trigger verboten sind, sichert das der Code:
+  `TenantRepository` hat bewusst keine Methode zum Ändern des Kürzels oder zum Löschen; eine
+  solche nicht hinzufügen.
+- Verwaltung nur per Kommandozeile `bin/tenant.php` (`list`, `create --slug=… --name=…`,
+  `deactivate --slug=…`, `activate --slug=…`, `--config=PFAD` wie bei `migrate.php`).
+  Auf dem Server: `cd ~/htdocs/apps/firefighting-equipment && php85 bin/tenant.php list`.
+  Exit-Codes: 0 OK, 1 Fehler (z. B. ungültiges oder doppeltes Kürzel), 2 falscher Aufruf.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen: Super-Admin (verwaltet Mandanten), Mandanten-Admin (Geräte, Standorte, Benutzer),

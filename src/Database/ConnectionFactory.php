@@ -13,6 +13,13 @@ final readonly class ConnectionFactory
     public const string COLLATION = 'utf8mb4_unicode_ci';
 
     /**
+     * Ausdrücklich und vollständig gesetzt, damit lokal und auf dem Server dieselben Regeln gelten
+     * (z. B. Fehler statt stiller Kürzung zu langer Werte).
+     */
+    public const string SQL_MODE = 'STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,'
+        . 'NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION,ONLY_FULL_GROUP_BY';
+
+    /**
      * @throws ConnectionException
      */
     public function create(DatabaseConfig $config): \PDO
@@ -26,9 +33,10 @@ final readonly class ConnectionFactory
                 \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
                 // Zeitzone als Offset, da benannte Zeitzonen auf dem Server evtl. nicht geladen sind.
                 \Pdo\Mysql::ATTR_INIT_COMMAND => sprintf(
-                    "SET NAMES %s COLLATE %s, time_zone = '+00:00'",
+                    "SET NAMES %s COLLATE %s, time_zone = '+00:00', sql_mode = '%s'",
                     self::CHARSET,
                     self::COLLATION,
+                    self::SQL_MODE,
                 ),
             ]);
         } catch (\PDOException $e) {

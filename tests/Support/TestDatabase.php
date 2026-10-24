@@ -42,8 +42,7 @@ final class TestDatabase
      */
     public static function dropTestTables(\PDO $pdo): void
     {
-        $database = $pdo->query('SELECT DATABASE()')->fetchColumn();
-        self::assertIsTestDatabaseName(is_string($database) ? $database : '');
+        self::assertConnectedToTestDatabase($pdo);
 
         $stmt = $pdo->query(
             "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()"
@@ -55,6 +54,46 @@ final class TestDatabase
             }
             $pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $table));
         }
+    }
+
+    /**
+     * Leert alle fachlichen Tabellen (fe_*) – ausschließlich in einer Datenbank mit Endung _test.
+     * Nie angefasst werden die Protokolltabelle fe_schema_migrations und Tabellen fe_test_*.
+     */
+    public static function truncateDomainTables(\PDO $pdo): void
+    {
+        self::assertConnectedToTestDatabase($pdo);
+
+        $stmt = $pdo->query(
+            "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()"
+            . " AND TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME LIKE 'fe\\_%'"
+            . " AND TABLE_NAME NOT LIKE 'fe\\_test\\_%' AND TABLE_NAME <> 'fe_schema_migrations'",
+        );
+        $tables = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        foreach ($tables as $table) {
+            if (!is_string($table) || preg_match('/^fe_[a-z0-9_]+$/D', $table) !== 1) {
+                throw new \RuntimeException(sprintf('Unerwarteter Tabellenname beim Leeren: %s', (string) $table));
+            }
+        }
+
+        // Fremdschlüssel kurz aus, damit die Reihenfolge der Tabellen keine Rolle spielt.
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        try {
+            foreach ($tables as $table) {
+                $pdo->exec(sprintf('TRUNCATE TABLE `%s`', $table));
+            }
+        } finally {
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+        }
+    }
+
+    /**
+     * @throws \RuntimeException wenn die Verbindung nicht auf eine Datenbank mit Endung _test zeigt
+     */
+    public static function assertConnectedToTestDatabase(\PDO $pdo): void
+    {
+        $database = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        self::assertIsTestDatabaseName(is_string($database) ? $database : '');
     }
 
     public static function isTestDatabaseName(string $name): bool

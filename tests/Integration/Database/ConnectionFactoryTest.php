@@ -50,6 +50,36 @@ final class ConnectionFactoryTest extends IntegrationTestCase
         self::assertSame('+00:00', $this->pdo()->query('SELECT @@session.time_zone')->fetchColumn());
     }
 
+    public function testSqlModeIsSetCompletely(): void
+    {
+        $mode = $this->pdo()->query('SELECT @@session.sql_mode')->fetchColumn();
+        self::assertIsString($mode);
+
+        $actual = explode(',', $mode);
+        $expected = explode(',', ConnectionFactory::SQL_MODE);
+        sort($actual);
+        sort($expected);
+        self::assertSame($expected, $actual);
+    }
+
+    public function testTooLongValueFailsInsteadOfBeingTruncated(): void
+    {
+        $pdo = $this->pdo();
+        $pdo->exec(
+            'CREATE TEMPORARY TABLE fe_tmp_strict (id INT AUTO_INCREMENT PRIMARY KEY, text VARCHAR(5) NOT NULL)'
+            . ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
+        );
+
+        try {
+            $pdo->prepare('INSERT INTO fe_tmp_strict (text) VALUES (?)')->execute(['zu lang']);
+            self::fail('PDOException erwartet.');
+        } catch (\PDOException $e) {
+            // 1406: Data too long for column
+            self::assertSame(1406, $e->errorInfo[1] ?? null);
+        }
+        self::assertSame(0, $pdo->query('SELECT COUNT(*) FROM fe_tmp_strict')->fetchColumn());
+    }
+
     public function testPreparesAreNotEmulated(): void
     {
         self::assertFalse($this->pdo()->getAttribute(\PDO::ATTR_EMULATE_PREPARES));
