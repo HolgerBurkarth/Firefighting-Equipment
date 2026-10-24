@@ -90,6 +90,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `fe_devices`, `fe_device_events`).
 - Zeichensatz und Kollation: Alle Tabellen und die Verbindung verwenden utf8mb4 mit
   `utf8mb4_unicode_ci`. Die Verbindung läuft mit Sitzungs-Zeitzone UTC (`+00:00`).
+  Dokumentierte Ausnahmen auf Spaltenebene: `fe_users.email` ist `utf8mb4_bin`, damit z. B.
+  "ß"/"ss" oder "é"/"e" nicht als gleich gelten (Kleinschreibung erzwingt ein CHECK); feste
+  Werte (`role`, `status`, `purpose`, `action`) und `password_hash` sind `ascii`/`ascii_bin`,
+  damit `IN (...)` bzw. `LIKE` Groß- und Kleinschreibung unterscheiden.
 - `sql_mode` setzt `ConnectionFactory` ausdrücklich und vollständig, damit lokal und STRATO
   identisch sind: `STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,
   NO_ENGINE_SUBSTITUTION,ONLY_FULL_GROUP_BY`. Zu lange Werte führen daher zu einem Fehler statt
@@ -172,14 +176,58 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Auf dem Server: `cd ~/htdocs/apps/firefighting-equipment && php85 bin/tenant.php list`.
   Exit-Codes: 0 OK, 1 Fehler (z. B. ungültiges oder doppeltes Kürzel), 2 falscher Aufruf.
 
+## Benutzer und Anmeldung
+- Anmeldung per Sitzungs-Cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, Pfad
+  `/firefighting/<kürzel>/` bzw. `/firefighting/service/`). Die Sitzung liegt in der Datenbank
+  (`fe_sessions`); im Cookie steht nur ein zufälliges Token, gespeichert wird nur dessen Hash.
+  Zur Sitzung wird nur eine grobe Gerätebezeichnung (`device_label`, z. B. "Chrome auf Android")
+  gespeichert, beim Anmelden aus dem User-Agent abgeleitet; nie den vollständigen User-Agent.
+- Ein Konto je Stadt; dieselbe E-Mail darf in mehreren Städten als getrennte Konten existieren.
+  Der Super-Admin hat keine Stadt und meldet sich nur unter `/firefighting/service/` an.
+  Interner Schlüssel ist immer die ID. E-Mail-Adressen werden kleingeschrieben gespeichert und
+  binär verglichen (`utf8mb4_bin`; "strasse@…" und "straße@…" sind verschiedene Adressen).
+- Rollen: `superadmin` (verwaltet Mandanten), `admin` (Geräte, Standorte, Benutzer der Stadt),
+  `user` (bucht um, setzt Status).
+- Status eines Kontos (`fe_users.status`): `invited` (erster Admin, Passwort noch nicht gesetzt)
+  → `unverified` (registriert, E-Mail unbestätigt) → `pending` (wartet auf Freischaltung) →
+  `active`; dazu `deleted` (anonymisiert). Sperren ist davon getrennt (`locked_at`).
+- Passwörter: mindestens 10, höchstens 128 Zeichen, keine Komplexitätspflicht, Sperrliste
+  häufiger Passwörter, kein Bestandteil von E-Mail, Name oder Stadtname. Hash mit Argon2id
+  (`PASSWORD_ARGON2ID`, Standardparameter; auf STRATO in CLI und Web verfügbar).
+- Sitzungsdauer (Inaktivität / Höchstdauer): `user` 30 Tage / 90 Tage, `admin` 7 Tage / 30 Tage,
+  `superadmin` 1 Stunde / 12 Stunden. Die Inaktivitätsgrenze wird zur Laufzeit aus Rolle und
+  `last_seen_at` berechnet. Passwortänderung, Rollenwechsel, Sperren oder Löschen beenden alle
+  Sitzungen des Kontos.
+- Einladung: Admin erzeugt einen Code (Gültigkeit höchstens 90 Tage, maximale Nutzungen,
+  widerrufbar) → Registrierung mit Code, E-Mail, Passwort und Name → Bestätigungslink per E-Mail
+  → Admin schaltet frei und legt Anzeigenamen und Rolle fest. Einladungscodes legen nur Admins
+  ihrer eigenen Stadt an, nicht der Super-Admin.
+- Einladungscodes: 12 Zeichen aus `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (ohne 0/O/1/I/L), Anzeige
+  als `XXXX-XXXX-XXXX`. Bei der Eingabe werden Groß-/Kleinschreibung, Leerzeichen und
+  Bindestriche ignoriert; gespeichert wird nur der SHA-256 der normalisierten Form (12 Zeichen,
+  Großbuchstaben).
+- Erster Admin einer Stadt: Der Super-Admin legt ihn an (Status `invited`), dieser erhält einen
+  Einmal-Link zum Setzen des Passworts und gibt dabei seinen Namen an; daraus werden `name` und
+  `display_name`. Der Super-Admin selbst wird per Skript angelegt.
+- Einmal-Links (`fe_user_tokens`): kurz gültig (Bestätigung/Passwort setzen 24 h, Passwort
+  zurücksetzen 1 h), nur einmal nutzbar, nur als Hash gespeichert. Einlösen löscht die Zeile;
+  je Benutzer und Zweck gibt es höchstens einen offenen Link, ein neuer ersetzt den alten.
+- Tokens (Sitzung, Einmal-Links) haben mindestens 32 zufällige Bytes und werden als SHA-256
+  (32 Byte) gespeichert; wegen der hohen Zufälligkeit genügt ein schneller Hash. Die Regel gilt
+  nicht für Einladungscodes (siehe oben).
+- Löschen = Anonymisieren: persönliche Daten (E-Mail, Namen, Passwort-Hash, Sitzungen, Tokens)
+  werden entfernt, der Datensatz bleibt für die Historie ("Gelöschter Benutzer #ID"). Benutzer
+  werden nie per `DELETE` entfernt; Fremdschlüssel auf `fe_users` kaskadieren nicht.
+- Gebremst werden Anmeldung, Registrierung, Passwort zurücksetzen und E-Mail-Bestätigung
+  (`fe_auth_attempts`, `action` = `login`, `register`, `password_reset`, `verify_email`).
+  E-Mail nur als SHA-256 (bei `verify_email` ohne E-Mail möglich), IP-Adressen nur gekürzt
+  (IPv4 /24, IPv6 /48, binär). Einträge werden nach 24 Stunden beim Aufruf gelöscht (kein Cron).
+- E-Mail-Absender: `"Feuerwehr Geräteverwaltung" <feuerwehr-app@prodad.de>`.
+
 ## Fachliche Entscheidungen (Version 1)
-- Rollen: Super-Admin (verwaltet Mandanten), Mandanten-Admin (Geräte, Standorte, Benutzer),
-  Benutzer (bucht um, setzt Status).
-- Login mit E-Mail und Passwort (`password_hash`). Anzeigename vergibt der Admin, interner
-  Schlüssel ist immer die ID. Registrierung nur mit Einladungscode, Admin schaltet frei,
-  kann sperren/löschen. "Passwort vergessen" per E-Mail.
-- Neue Stadt: Super-Admin legt Name, Kürzel und E-Mail des ersten Admins an; dieser erhält
-  einen einmal nutzbaren Link zum Setzen des Passworts. Der Super-Admin wird per Skript angelegt.
+- Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".
+- Neue Stadt: Super-Admin legt Name, Kürzel und E-Mail des ersten Admins an (siehe
+  "Benutzer und Anmeldung").
 - Gerät: Pflicht Kennung, Gerätetyp, Standort, Status; optional Seriennummer,
   Hersteller/Modell, Beschaffungsdatum, Notiz, "nächste Prüfung fällig".
 - Gerätetypen vom Admin pflegbar (Start: Atemschutzmaske, Atemschutzgerät, Funkgerät,
