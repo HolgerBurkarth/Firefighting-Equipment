@@ -9,10 +9,21 @@ https://www.prodad.de/firefighting/<kürzel>/<pfad>    # Stadt
 https://www.prodad.de/firefighting/service/<pfad>     # Super-Admin
 ```
 
-| Methode | Pfad            | unter `service` | unter einer Stadt | Antwort                                      |
-|---------|-----------------|-----------------|-------------------|----------------------------------------------|
-| GET     | `api/v1/health` | ja              | ja                | `{"status":"ok","database":"ok"}`            |
-| GET     | `api/v1/tenant` | nein (404)      | ja                | `{"slug":"immendingen","name":"Feuerwehr …"}` |
+| Methode | Pfad                                 | Zugriff    | Antwort                                        |
+|---------|--------------------------------------|------------|------------------------------------------------|
+| GET     | `api/v1/health`                      | öffentlich | `{"status":"ok","database":"ok"}`              |
+| GET     | `api/v1/tenant`                      | öffentlich | `{"slug":"immendingen","name":"Feuerwehr …"}`  |
+| POST    | `api/v1/auth/login`                  | öffentlich | `{"user":…,"tenant":…,"session":…}` + Cookie   |
+| POST    | `api/v1/auth/logout`                 | öffentlich | `{"logged_out":true}`, Cookie wird gelöscht    |
+| GET     | `api/v1/auth/me`                     | angemeldet | wie Login                                      |
+| GET     | `api/v1/auth/sessions`               | angemeldet | `{"sessions":[{"id":…,"current":true,…}]}`     |
+| DELETE  | `api/v1/auth/sessions/{id}`          | angemeldet | `{"deleted":true,"current":false}`             |
+| POST    | `api/v1/auth/sessions/logout-others` | angemeldet | `{"ended_sessions":2}`                         |
+| POST    | `api/v1/auth/password`               | angemeldet | wie Login, mit neuem Cookie                    |
+
+`api/v1/tenant` gibt es nur unter einer Stadt (unter `service`: 404), alle anderen Routen unter
+`service` und unter jeder Stadt. Super-Admins melden sich nur unter `service` an, Konten einer Stadt
+nur unter ihrer Stadt; ein Cookie gilt nur dort.
 
 Unter einer Stadt antwortet die API nur, wenn die Stadt existiert und aktiv ist. Der Health-Check
 prüft die Datenbankverbindung; bei einer Störung antwortet er mit 503 und
@@ -22,25 +33,70 @@ prüft die Datenbankverbindung; bei einer Störung antwortet er mit 503 und
 
 Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`:
 
-| HTTP | `error`                | Bedeutung                                              |
-|------|------------------------|--------------------------------------------------------|
-| 404  | `not_found`            | Adresse oder Kürzel ungültig, Pfad unbekannt           |
-| 404  | `tenant_not_found`     | Kürzel gültig, aber keine Stadt dazu                   |
-| 403  | `tenant_inactive`      | Stadt gesperrt                                         |
-| 405  | `method_not_allowed`   | Methode nicht erlaubt (erlaubte im Header `Allow`)     |
-| 503  | `database_unavailable` | Datenbank beim Laden der Stadt nicht erreichbar        |
-| 500  | `internal_error`       | unerwarteter Fehler; Details nur im Server-Log         |
+| HTTP | `error`                    | Bedeutung                                                  |
+|------|----------------------------|------------------------------------------------------------|
+| 400  | `invalid_request`          | Body kein JSON-Objekt, zu groß (> 16 KiB), Feld fehlt      |
+| 401  | `not_authenticated`        | keine oder abgelaufene Sitzung                             |
+| 401  | `invalid_credentials`      | E-Mail oder Passwort falsch (bewusst nicht unterschieden)  |
+| 403  | `forbidden`                | angemeldet, aber die Rolle reicht nicht                    |
+| 403  | `origin_not_allowed`       | Header `Origin` nicht erlaubt (Schutz gegen CSRF)          |
+| 403  | `account_locked`           | Passwort richtig, Konto gesperrt                           |
+| 403  | `email_not_verified`       | Passwort richtig, E-Mail-Adresse noch nicht bestätigt      |
+| 403  | `pending_approval`         | Passwort richtig, Freischaltung durch Admin steht aus      |
+| 403  | `invalid_current_password` | Passwort ändern: aktuelles Passwort falsch                 |
+| 403  | `tenant_inactive`          | Stadt gesperrt                                             |
+| 404  | `not_found`                | Adresse oder Kürzel ungültig, Pfad unbekannt               |
+| 404  | `tenant_not_found`         | Kürzel gültig, aber keine Stadt dazu                       |
+| 405  | `method_not_allowed`       | Methode nicht erlaubt (erlaubte im Header `Allow`)         |
+| 415  | `unsupported_media_type`   | ändernde Anfrage ohne `Content-Type: application/json`     |
+| 422  | `weak_password`            | neues Passwort verletzt die Passwortregeln                 |
+| 429  | `too_many_attempts`        | zu viele Fehlversuche (Wartezeit im Header `Retry-After`)  |
+| 503  | `database_unavailable`     | Datenbank nicht erreichbar                                 |
+| 500  | `internal_error`           | unerwarteter Fehler; Details nur im Server-Log             |
 
 Alle Antworten tragen `Cache-Control: no-store` und `X-Content-Type-Options: nosniff`.
+
+### Anmeldung und Sitzungen
+
+- Nach dem Login steht die Sitzung im Cookie `ff_session` (`HttpOnly`, `Secure`,
+  `SameSite=Strict`, Pfad `/firefighting/<kürzel>/` bzw. `/firefighting/service/`, `Max-Age` =
+  Höchstdauer der Rolle). Die Datenbank kennt nur den SHA-256 des Tokens.
+- Sitzungsdauer (Inaktivität / Höchstdauer): `user` 30 / 90 Tage, `admin` 7 / 30 Tage,
+  `superadmin` 1 / 12 Stunden.
+- Ändernde Anfragen (POST, DELETE) brauchen `Content-Type: application/json` und einen JSON-Body,
+  auch wenn er leer ist (`{}`). Ein mitgesendeter `Origin` muss `https://www.prodad.de` sein; lokal
+  lassen sich weitere über `http.allowed_origins` in `config/config.local.php` erlauben (siehe
+  `config/config.example.php`).
+- Bremse: 5 Fehlversuche je E-Mail und Stadt oder 30 je IP-Bereich (/24 bzw. /48) innerhalb von
+  15 Minuten führen zu 429. Eine erfolgreiche Anmeldung setzt nur den Zähler der E-Mail zurück.
+- Passwort ändern beendet alle anderen Sitzungen und ersetzt die aktuelle (neues Cookie).
 
 ### Lokal starten
 
 ```
-php -S 127.0.0.1:8000 public/index.php
+php -S localhost:8000 public/index.php
 ```
 
-Dann z. B. `http://127.0.0.1:8000/firefighting/service/api/v1/health`. Die Anwendung verwendet
+Dann z. B. `http://localhost:8000/firefighting/service/api/v1/health`. Die Anwendung verwendet
 `config/config.local.php`; fehlt sie, antwortet der Health-Check mit 503.
+
+Zum Anmelden `localhost` verwenden, nicht `127.0.0.1`: Browser und curl nehmen das
+`Secure`-Cookie über `http://` nur für `localhost` an.
+
+Beispiel mit curl und Cookie-Datei (in PowerShell `curl.exe` schreiben, nicht `curl`). Die
+Zugangsdaten stehen in einer Datei, damit das Passwort nicht im Befehlsverlauf landet:
+
+```
+# login.json enthält: {"email":"admin@example.org","password":"…"}
+curl.exe -c cookies.txt -H "Content-Type: application/json" --data-binary "@login.json" http://localhost:8000/firefighting/immendingen/api/v1/auth/login
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/auth/me
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/auth/sessions
+curl.exe -b cookies.txt -X DELETE -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/auth/sessions/12
+curl.exe -b cookies.txt -c cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/auth/logout
+```
+
+`login.json` und `cookies.txt` (enthält das Sitzungs-Token im Klartext) danach löschen und nie
+committen.
 
 ### Neuen Endpunkt anlegen
 
@@ -49,13 +105,19 @@ Dann z. B. `http://127.0.0.1:8000/firefighting/service/api/v1/health`. Die Anwen
    - `$context->tenant`: die aktive Stadt (unter `service`: `null`); jede Abfrage nach deren ID
      filtern.
    - `$context->db->get()`: die PDO-Verbindung; sie wird erst hier aufgebaut.
+   - `$context->auth()`: angemeldetes Konto und Sitzung (nur bei Routen, die nicht öffentlich sind).
+   - `$context->param('id')`: Wert eines Platzhalters; `$context->stringField('name')`: Textfeld aus
+     dem JSON-Body (fehlt es, folgt 400).
    - Bekannte Fehler als `HttpException` werfen (Fabriken in `src/Http/HttpException.php`, neue
      Codes dort ergänzen); alles andere wird automatisch zu 500.
-2. Route in `src/Http/Routes.php` eintragen, z. B.
-   `->add('GET', 'api/v1/devices', new DevicesHandler())` in `tenant()` (Städte) oder
-   `service()` (Super-Admin). Pfad ohne Slash am Anfang und Ende.
+2. Route in `src/Http/Routes.php` mit Zugriffsstufe eintragen, z. B.
+   `->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceHandler())` in `tenant()`
+   (Städte) oder `service()` (Super-Admin). Stufen: `Public`, `Authenticated`, `Admin` (nur Städte),
+   `SuperAdmin` (nur `service`). Pfad ohne Slash am Anfang und Ende; ein Platzhalter `{name}` passt
+   nur auf positive Ganzzahlen.
 3. Tests: Unit-Test für die Logik, Integrationstest in `tests/Integration/Http/` (erbt von
-   `DomainTestCase`) für die Antworten mit echter Datenbank.
+   `DomainTestCase`) bzw. `tests/Integration/Auth/` (erbt von `AuthTestCase`, mit Anmeldung) für die
+   Antworten mit echter Datenbank.
 4. Endpunkt in der Tabelle oben eintragen.
 
 ## Datenbank-Migrationen

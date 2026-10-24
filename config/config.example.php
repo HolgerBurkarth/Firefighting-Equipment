@@ -10,4 +10,9 @@ return [
         'user' => 'BENUTZER',
         'pass' => 'PASSWORT',
     ],
+    // Optional, nur lokal: weitere Origins für ändernde API-Anfragen (https://www.prodad.de ist immer
+    // erlaubt). Auf dem Server weglassen.
+    // 'http' => [
+    //     'allowed_origins' => ['http://localhost:8000'],
+    // ],
 ];

@@ -16,6 +16,9 @@ final readonly class ConfigLoader
     /** Schlüssel, die nicht leer sein dürfen; ein leeres Passwort ist erlaubt. */
     private const array NON_EMPTY_DB_KEYS = ['host', 'name', 'user'];
 
+    /** Origin wie ihn Browser senden: Schema, Host (klein), optional Port, ohne Pfad. */
+    private const string ORIGIN_PATTERN = '/^https?:\/\/[a-z0-9.-]+(:[0-9]{1,5})?$/D';
+
     /**
      * @throws ConfigException
      */
@@ -51,6 +54,47 @@ final readonly class ConfigLoader
         }
 
         return new DatabaseConfig($db['host'], $db['name'], $db['user'], $db['pass']);
+    }
+
+    /**
+     * Zusätzlich erlaubte Origins aus der optionalen Gruppe 'http' (Schlüssel 'allowed_origins'),
+     * z. B. ['http://localhost:8000'] für die lokale Entwicklung. Fehlt die Gruppe: keine.
+     *
+     * @return list<string>
+     *
+     * @throws ConfigException
+     */
+    public function loadAllowedOrigins(string $path): array
+    {
+        $config = $this->loadFile($path);
+        if (!array_key_exists('http', $config)) {
+            return [];
+        }
+
+        $http = $config['http'];
+        if (!is_array($http)) {
+            throw new ConfigException(sprintf("'http' muss in %s ein Array sein.", $path));
+        }
+        foreach (array_keys($http) as $key) {
+            if ($key !== 'allowed_origins') {
+                throw new ConfigException(sprintf("Unbekannter Schlüssel 'http.%s' in %s.", $key, $path));
+            }
+        }
+
+        $origins = $http['allowed_origins'] ?? [];
+        if (!is_array($origins) || !array_is_list($origins)) {
+            throw new ConfigException(sprintf("'http.allowed_origins' muss in %s eine Liste sein.", $path));
+        }
+        foreach ($origins as $origin) {
+            if (!is_string($origin) || preg_match(self::ORIGIN_PATTERN, $origin) !== 1) {
+                throw new ConfigException(sprintf(
+                    "'http.allowed_origins' in %s enthält einen ungültigen Eintrag (erwartet z. B. http://localhost:8000).",
+                    $path,
+                ));
+            }
+        }
+
+        return $origins;
     }
 
     /**

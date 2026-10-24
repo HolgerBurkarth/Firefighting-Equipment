@@ -83,6 +83,50 @@ final class ConfigLoaderTest extends TestCase
         }
     }
 
+    public function testAllowedOriginsAreLoaded(): void
+    {
+        self::assertSame(
+            ['http://localhost:8000', 'https://test.example'],
+            new ConfigLoader()->loadAllowedOrigins(self::FIXTURES . 'http-valid.php'),
+        );
+    }
+
+    public function testAllowedOriginsAreEmptyWithoutHttpGroup(): void
+    {
+        self::assertSame([], new ConfigLoader()->loadAllowedOrigins(self::FIXTURES . 'valid.php'));
+        self::assertSame([], new ConfigLoader()->loadAllowedOrigins(self::FIXTURES . 'http-empty.php'));
+    }
+
+    public function testDatabaseConfigIgnoresHttpGroup(): void
+    {
+        self::assertSame('pass-nicht-ausgeben', $this->load('http-valid')->pass);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function invalidHttpFiles(): iterable
+    {
+        yield 'http kein Array' => ['http-not-array', "'http' muss"];
+        yield 'unbekannter Schlüssel' => ['http-unknown-key', "Unbekannter Schlüssel 'http.allowed_origin'"];
+        yield 'keine Liste' => ['http-origins-not-list', 'eine Liste sein'];
+        yield 'mit Pfad' => ['http-origin-with-path', 'ungültigen Eintrag'];
+        yield 'Großbuchstaben' => ['http-origin-uppercase', 'ungültigen Eintrag'];
+        yield 'kein Text' => ['http-origin-not-string', 'ungültigen Eintrag'];
+    }
+
+    #[DataProvider('invalidHttpFiles')]
+    public function testInvalidHttpGroupIsReported(string $fixture, string $expectedMessage): void
+    {
+        try {
+            new ConfigLoader()->loadAllowedOrigins(self::FIXTURES . $fixture . '.php');
+            self::fail('ConfigException erwartet.');
+        } catch (ConfigException $e) {
+            self::assertStringContainsString($expectedMessage, $e->getMessage());
+            self::assertStringNotContainsString(self::SECRET_MARKER, $e->getMessage());
+        }
+    }
+
     private function load(string $fixture): DatabaseConfig
     {
         return new ConfigLoader()->loadDatabaseConfig(self::FIXTURES . $fixture . '.php');

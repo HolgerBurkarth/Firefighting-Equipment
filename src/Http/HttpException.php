@@ -23,6 +23,57 @@ final class HttpException extends \RuntimeException
         parent::__construct($message, 0, $previous);
     }
 
+    /**
+     * @param string $message deutscher Hinweis, was an der Anfrage falsch ist
+     */
+    public static function invalidRequest(string $message = 'Die Anfrage ist ungültig.'): self
+    {
+        return new self('invalid_request', $message, 400);
+    }
+
+    /**
+     * @param array<string, string> $headers z. B. Set-Cookie zum Löschen eines ungültigen Cookies
+     */
+    public static function notAuthenticated(array $headers = []): self
+    {
+        return new self('not_authenticated', 'Bitte zuerst anmelden.', 401, $headers);
+    }
+
+    public static function invalidCredentials(): self
+    {
+        return new self('invalid_credentials', 'E-Mail-Adresse oder Passwort ist falsch.', 401);
+    }
+
+    public static function forbidden(): self
+    {
+        return new self('forbidden', 'Für diese Aktion fehlt die Berechtigung.', 403);
+    }
+
+    public static function originNotAllowed(): self
+    {
+        return new self('origin_not_allowed', 'Anfragen von dieser Herkunft sind nicht erlaubt.', 403);
+    }
+
+    public static function accountLocked(): self
+    {
+        return new self('account_locked', 'Dieses Konto ist gesperrt.', 403);
+    }
+
+    public static function emailNotVerified(): self
+    {
+        return new self('email_not_verified', 'Die E-Mail-Adresse ist noch nicht bestätigt.', 403);
+    }
+
+    public static function pendingApproval(): self
+    {
+        return new self('pending_approval', 'Das Konto wartet noch auf die Freischaltung durch einen Admin.', 403);
+    }
+
+    public static function invalidCurrentPassword(): self
+    {
+        return new self('invalid_current_password', 'Das aktuelle Passwort ist falsch.', 403);
+    }
+
     public static function notFound(): self
     {
         return new self('not_found', 'Die Adresse wurde nicht gefunden.', 404);
@@ -48,6 +99,29 @@ final class HttpException extends \RuntimeException
             'Diese Methode ist für die Adresse nicht erlaubt.',
             405,
             ['Allow' => implode(', ', $allowedMethods)],
+        );
+    }
+
+    public static function unsupportedMediaType(): self
+    {
+        return new self('unsupported_media_type', 'Erwartet wird Content-Type: application/json.', 415);
+    }
+
+    /**
+     * @param string $message Meldung der Passwortregeln (enthält nie das Passwort)
+     */
+    public static function weakPassword(string $message): self
+    {
+        return new self('weak_password', $message, 422);
+    }
+
+    public static function tooManyAttempts(int $retryAfterSeconds): self
+    {
+        return new self(
+            'too_many_attempts',
+            'Zu viele Fehlversuche. Bitte später erneut versuchen.',
+            429,
+            ['Retry-After' => (string) max(1, $retryAfterSeconds)],
         );
     }
 

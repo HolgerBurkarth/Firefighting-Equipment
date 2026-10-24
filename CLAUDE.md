@@ -9,6 +9,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - In kleinen Schritten arbeiten. Vor größeren Änderungen erst einen Plan vorlegen.
 - Bestehende Funktionen dürfen nicht kaputtgehen: Jede Änderung bekommt Tests,
   vor jedem Commit müssen alle Tests grün sein.
+- Agenten committen und pushen nie; das macht der Nutzer.
 - Das Repository ist öffentlich: niemals Passwörter, Zugangsdaten oder
   `config/config.local.php` committen.
 - Code und Bezeichner auf Englisch, Dokumentation und Oberflächentexte auf Deutsch.
@@ -42,26 +43,52 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Code in `src/Http/` (Ablauf, Router, Fehler) und `src/Api/V1/` (Handler). `public/index.php`
   bleibt dünn: nur `Application::create(...)->handle(Request::fromGlobals())->send()`.
 - Präfix `/firefighting` nur in `AppPath::PREFIX`; lokal gilt dasselbe Schema mit
-  `php -S 127.0.0.1:8000 public/index.php`.
+  `php -S localhost:8000 public/index.php` (`localhost`, nicht `127.0.0.1`: nur dort nehmen
+  Browser und curl das `Secure`-Cookie über `http://` an).
 - Adresse `/firefighting/<bereich>/<rest>` (`AppPath::parse`): Query-String wird ignoriert, ein
   abschließender `/` toleriert; leere Segmente, fehlendes Präfix oder ein Bereich außerhalb
   `[a-z0-9-]+` → 404. Der Pfad wird nicht URL-dekodiert.
 - Reihenfolge in `Application::handle` (nicht ändern): Adresse zerlegen → Route suchen
-  (404/405) → erst dann die Stadt laden → Handler. Unbekannte Adressen verbinden sich so nie mit
-  der Datenbank.
+  (404/405) → ändernde Anfrage prüfen (`RequestGuard`, ohne Datenbank; 415/403/400) → erst dann
+  die Stadt laden → Sitzung und Zugriffsstufe prüfen (nur bei nicht öffentlichen Routen; 401/403)
+  → Handler. Unbekannte Adressen und abgelehnte ändernde Anfragen verbinden sich so nie mit der
+  Datenbank.
 - Bereich `service` (`AppPath::SERVICE_SCOPE`): Super-Admin, keine Stadt, eigene Routen.
   Sonst Kürzel per `TenantSlug` (ungültig → 404 `not_found`), Stadt per `TenantRepository`
   (unbekannt → 404 `tenant_not_found`, gesperrt → 403 `tenant_inactive`, Datenbankstörung →
   503 `database_unavailable`), alles in `TenantResolver`.
-- Router (`Router`): exakte Pfade relativ zum Bereich, ohne Slash am Anfang/Ende, keine
-  Platzhalter. Falsche Methode → 405 mit `Allow` (sortiert). `HEAD` wird nicht wie `GET`
-  behandelt. Alle Routen stehen in `Routes::service()` und `Routes::tenant()`.
+- Router (`Router::forService()` / `Router::forTenant()`): Pfade relativ zum Bereich, ohne Slash
+  am Anfang/Ende. Ein ganzes Segment darf ein Platzhalter `{name}` sein; er passt nur auf positive
+  Ganzzahlen ohne führende Null (höchstens 18 Stellen, also immer `int`), sonst 404. Exakte Pfade
+  haben Vorrang vor Platzhaltern. Falsche Methode → 405 mit `Allow` (sortiert). `HEAD` wird nicht
+  wie `GET` behandelt. Alle Routen stehen in `Routes::service()` und `Routes::tenant()`.
+- Zugriffsregeln: Jede Route deklariert ihre Stufe (`Access`): `Public`, `Authenticated`,
+  `Admin` (nur unter einer Stadt), `SuperAdmin` (nur unter `service`); eine falsche Kombination
+  wirft beim Anlegen eine `LogicException`. Geprüft wird zentral in `Application`, nie im Handler:
+  keine oder ungültige Sitzung → 401 `not_authenticated` (ein mitgesendetes ungültiges Cookie
+  wird gelöscht), Rolle reicht nicht → 403 `forbidden`. Bei `Public` wird keine Sitzung geladen.
+  `health` und `tenant` bleiben öffentlich.
 - Handler implementieren `RequestHandler` und erhalten `RequestContext` (Anfrage, Stadt oder
-  `null` unter `service`, `LazyConnection`, `ErrorReporter`). Die Datenbankverbindung (und das
-  Laden der Konfiguration) erfolgt erst beim ersten `$context->db->get()`.
+  `null` unter `service`, `LazyConnection`, `ErrorReporter`, Platzhalter `param()`, JSON-Body
+  `body`/`stringField()`, Sitzung `auth()` bei nicht öffentlichen Routen). Die Datenbankverbindung
+  (und das Laden der Konfiguration) erfolgt erst beim ersten `$context->db->get()`; schlägt sie im
+  Handler fehl, antwortet `Application` mit 503 `database_unavailable`.
+- CSRF-Schutz (`RequestGuard`) für alle ändernden Anfragen (alles außer GET, HEAD, OPTIONS):
+  `Content-Type` muss `application/json` sein (optional `charset=utf-8`), sonst 415
+  `unsupported_media_type`; ist ein `Origin`-Header vorhanden, muss er erlaubt sein, sonst 403
+  `origin_not_allowed`. Erlaubt ist immer `https://www.prodad.de` (`AllowedOrigins::DEFAULT`);
+  weitere nur lokal über die optionale Gruppe `http` → `allowed_origins` in der
+  Konfigurationsdatei (wird nur geladen, wenn ein anderer Origin kommt). Der Body muss ein
+  JSON-Objekt sein, auch `{}` (z. B. bei Logout und DELETE); höchstens 16 KiB
+  (`Request::MAX_BODY_BYTES`, größere werden nicht gelesen). Sonst 400 `invalid_request`.
 - Fehlerformat immer `{"error":"code","message":"deutscher Text"}`, erzeugt über die Fabriken in
-  `HttpException`; Codes: `not_found` 404, `tenant_not_found` 404, `tenant_inactive` 403,
-  `method_not_allowed` 405, `database_unavailable` 503, `internal_error` 500. Neue Codes nur dort.
+  `HttpException`; Codes: `invalid_request` 400, `not_authenticated` 401, `invalid_credentials`
+  401, `forbidden` 403, `origin_not_allowed` 403, `account_locked` 403, `email_not_verified` 403,
+  `pending_approval` 403, `invalid_current_password` 403, `tenant_inactive` 403, `not_found` 404,
+  `tenant_not_found` 404, `method_not_allowed` 405, `unsupported_media_type` 415, `weak_password`
+  422, `too_many_attempts` 429 (mit `Retry-After`), `database_unavailable` 503, `internal_error`
+  500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
+  Passwort beim Ändern 403, nicht 401.
 - Einzige Ausnahme vom Fehlerformat: `GET api/v1/health` liefert `{"status":"ok","database":"ok"}`
   (200) bzw. `{"status":"error","database":"error"}` (503). Unter einer Stadt gilt vorher die
   Stadtprüfung (403/404/503 im Fehlerformat).
@@ -108,9 +135,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Server. Der Datenbankname muss auf `_test` enden.
 - Format beider Dateien wie `config/config.example.php` (Gruppe `db` mit `host`, `name`,
   `user`, `pass`); den Zeichensatz utf8mb4 setzt der Code. Unbekannte Schlüssel in `db`
-  sind ein Fehler, ein leeres `pass` ist erlaubt.
+  sind ein Fehler, ein leeres `pass` ist erlaubt. Optional (nur lokal) Gruppe `http` mit
+  `allowed_origins` (Liste wie `http://localhost:8000`, ohne Pfad, kleingeschrieben); andere
+  Schlüssel in `http` sind ein Fehler.
 - Tests: Testsuiten `unit` und `integration` (`composer test`, `composer test:unit`,
-  `composer test:integration`). Integrationstests werden übersprungen, wenn
+  `composer test:integration`). Die ganze Suite dauert wegen echter Argon2id-Hashes rund
+  5 Minuten; daher `process-timeout` 900 in `composer.json` (Standard wäre 300 s). Integrationstests werden übersprungen, wenn
   `config/config.test.php` fehlt. Dauerhafte Tabellen legen sie nur mit Präfix `fe_test_`
   an und löschen sie wieder; aufgeräumt wird ausschließlich `fe_test_*` und nur in einer
   Datenbank mit Endung `_test` (`TestDatabase::dropTestTables`).
@@ -198,6 +228,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `superadmin` 1 Stunde / 12 Stunden. Die Inaktivitätsgrenze wird zur Laufzeit aus Rolle und
   `last_seen_at` berechnet. Passwortänderung, Rollenwechsel, Sperren oder Löschen beenden alle
   Sitzungen des Kontos.
+  - Präzisierung für das Ändern des eigenen Passworts (`POST auth/password`): Alle anderen
+    Sitzungen werden beendet; die aktuelle wird durch eine neue ersetzt (neues Token, neues Cookie,
+    gleiche Gerätebezeichnung). Angemeldet bleibt also nur das Gerät, auf dem geändert wurde. Ein
+    gestohlenes Cookie ist danach in jedem Fall ungültig.
 - Einladung: Admin erzeugt einen Code (Gültigkeit höchstens 90 Tage, maximale Nutzungen,
   widerrufbar) → Registrierung mit Code, E-Mail, Passwort und Name → Bestätigungslink per E-Mail
   → Admin schaltet frei und legt Anzeigenamen und Rolle fest. Einladungscodes legen nur Admins
@@ -256,6 +290,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     Kontos; Anonymisieren zusätzlich alle `fe_user_tokens`. Abgelehnte Änderungen lassen alles
     unverändert (Rollback).
   - Keine Methode zum `DELETE` von Benutzern hinzufügen.
+  - Ausnahme ohne Sperre der Stadt: `rehashPassword` (nur nach erfolgreicher Anmeldung) schreibt
+    den neuen Hash nur, wenn noch der alte gespeichert ist, und beendet keine Sitzungen.
+    `passwordHash()` liefert den Hash nur für die Anmeldung; `User` enthält ihn weiterhin nicht.
 - Kommandozeile `bin/user.php` (Code `src/Cli/UserCommand.php`): `superadmin:create --email=…
   --name=…`, `superadmin:list`, `superadmin:password --email=…`, `superadmin:lock --email=…`,
   `superadmin:unlock --email=…`, `list --tenant=…`, `--config=PFAD`; Exit-Codes 0/1/2.
@@ -265,6 +302,50 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     ohne Terminal Abbruch mit Hinweis auf `--password-stdin`. Keine PowerShell-Lösung.
   - `--password-stdin` nur für Tests und Skripte (entfernt genau ein Zeilenende).
   - Ausgaben enthalten nie Hashes. Tabellen über `TextTable` (auch `bin/tenant.php`).
+
+## Anmeldung und Sitzungen im Code
+- Code in `src/Auth/`, Endpunkte in `src/Api/V1/Auth/` (alle unter `service` und unter jeder
+  Stadt): `POST auth/login` und `POST auth/logout` (öffentlich; Logout wiederholbar, löscht das
+  Cookie immer), `GET auth/me`, `GET auth/sessions`, `DELETE auth/sessions/{id}`,
+  `POST auth/sessions/logout-others`, `POST auth/password` (angemeldet). Noch nicht umgesetzt:
+  Registrierung, Einladungen, Einmal-Links, E-Mail-Versand.
+- Token (`SessionToken`): 32 Zufallsbytes, im Cookie base64url ohne Auffüllung (43 Zeichen, nur
+  kanonische Form), in `fe_sessions.token_hash` nur SHA-256. Cookie (`SessionCookie`):
+  `ff_session`, `HttpOnly; Secure; SameSite=Strict`, `Path=/firefighting/<kürzel>/` bzw.
+  `/firefighting/service/`, `Max-Age` = Höchstdauer der Rolle; Löschen mit `Max-Age=0`.
+- Prüfung bei jeder Anfrage (`SessionManager::resume`): Höchstdauer (`expires_at`) und
+  Inaktivität je Rolle (`SessionLifetime`), Konto `active` und nicht gesperrt, Konto passt zum
+  Bereich (Super-Admin nur unter `service`, Stadt-Konto nur unter seiner Stadt; sonst 401, die
+  Sitzung bleibt bestehen). Alle Zeitvergleiche rechnet die Datenbank mit `UTC_TIMESTAMP()`.
+  Abgelaufene Sitzungen werden beim Antreffen gelöscht. `last_seen_at` wird höchstens alle
+  5 Minuten geschrieben (`SessionLifetime::TOUCH_INTERVAL_SECONDS`).
+- Aufräumen ohne Cron bei jedem Login: abgelaufene Sitzungen (`SessionRepository::deleteExpired`,
+  Inaktivität je Rolle) und `fe_auth_attempts` älter als 24 Stunden (`LoginThrottle::deleteOld`).
+- Anmeldung (`Authenticator::login`): Unter einer Stadt werden nur Konten dieser Stadt gesucht,
+  unter `service` nur Super-Admins. Das Passwort wird immer mit Argon2id geprüft, ohne Konto oder
+  ohne Hash (`invited`, `deleted`) gegen `Authenticator::DUMMY_HASH` (Standardparameter, per Test
+  gesichert): gleiche Meldung (401 `invalid_credentials`) und gleiche Laufzeit für unbekannte
+  E-Mail und falsches Passwort. Erst bei richtigem Passwort, ohne Sitzung und in dieser
+  Reihenfolge: gesperrt → 403 `account_locked`, `unverified` → 403 `email_not_verified`,
+  `pending` → 403 `pending_approval`. `needsRehash` → `rehashPassword`. Eine ältere Sitzung
+  desselben Browsers (mitgesendetes Cookie) wird beim Login ersetzt.
+- Bremse (`LoginThrottle`, `action = login`, `tenant_id NULL` = `service`), Zeitfenster
+  15 Minuten: 5 Fehlversuche je E-Mail-Hash und Stadt (nur Fehlversuche nach dem letzten Erfolg
+  zählen) oder 30 Fehlversuche je IP-Präfix über alle Städte (Erfolg setzt nichts zurück) → 429
+  `too_many_attempts`, `Retry-After` = Sekunden, bis der älteste zählende Fehlversuch aus dem
+  Fenster fällt. Gezählt wird vor der Passwortprüfung; abgewiesene Anfragen werden nicht
+  gespeichert. Falsche aktuelle Passwörter bei `auth/password` zählen in dieselbe Bremse.
+  IP-Adresse nur aus `REMOTE_ADDR` (`IpPrefix`, IPv4 /24, IPv6 /48, IPv4 in IPv6 als IPv4).
+- Gerätebezeichnung (`DeviceLabel`): nur feste Wörter (Browser, System), z. B. "Chrome auf
+  Android", sonst "Unbekanntes Gerät"; nie Teile des User-Agents übernehmen.
+- Eigene Sitzungen: `DELETE auth/sessions/{id}` nur für eigene (fremd oder unbekannt → 404
+  `not_found`); die aktuelle zu beenden wirkt wie Logout (Cookie wird gelöscht).
+- Passwort ändern: aktuelles Passwort prüfen (falsch → 403 `invalid_current_password`), dann
+  `PasswordPolicy` mit Kontext E-Mail, Name, Anzeigename und Stadt (Verstoß → 422
+  `weak_password` mit der Meldung der Regeln), dann `UserRepository::setPassword` (beendet alle
+  Sitzungen) und neue Sitzung für das aktuelle Gerät.
+- Tests: `tests/Integration/Auth/AuthTestCase.php` (zwei Städte, Konten mit echtem Hash, Anfragen
+  über die ganze Anwendung, `ageSession()` zum Zurückdatieren von Sitzungen).
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".

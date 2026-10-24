@@ -26,6 +26,7 @@
         "test:integration": "phpunit --testsuite integration"
     },
     "config": {
+        "process-timeout": 900,
         "sort-packages": true
     },
     "require-dev": {

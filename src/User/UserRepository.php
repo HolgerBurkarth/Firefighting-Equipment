@@ -47,6 +47,32 @@ final readonly class UserRepository
     }
 
     /**
+     * Passwort-Hash eines Kontos (nur für die Anmeldung; User enthält ihn bewusst nicht).
+     *
+     * @return string|null null, wenn das Konto fehlt oder kein Passwort hat (invited, deleted)
+     */
+    public function passwordHash(int $id): ?string
+    {
+        $stmt = $this->pdo->prepare('SELECT password_hash FROM fe_users WHERE id = ?');
+        $stmt->execute([$id]);
+        $hash = $stmt->fetchColumn();
+
+        return is_string($hash) ? $hash : null;
+    }
+
+    /**
+     * Ersetzt den Hash nach erfolgreicher Anmeldung durch einen mit aktuellen Parametern
+     * (needsRehash). Das Passwort bleibt gleich, daher bleiben die Sitzungen bestehen. Geschrieben
+     * wird nur, wenn noch der alte Hash gespeichert ist; so überschreibt das nie eine gleichzeitige
+     * Passwortänderung. Braucht deshalb keine Sperre der Stadt.
+     */
+    public function rehashPassword(int $id, #[\SensitiveParameter] string $oldHash, #[\SensitiveParameter] string $newHash): void
+    {
+        $this->pdo->prepare("UPDATE fe_users SET password_hash = ? WHERE id = ? AND status <> 'deleted' AND password_hash = ?")
+            ->execute([$newHash, $id, $oldHash]);
+    }
+
+    /**
      * @return list<User> nach ID sortiert, einschließlich anonymisierter Konten
      */
     public function listByTenant(Tenant $tenant): array

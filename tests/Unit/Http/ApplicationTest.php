@@ -9,6 +9,8 @@ use FirefightingEquipment\Api\V1\TenantHandler;
 use FirefightingEquipment\Database\ConnectionException;
 use FirefightingEquipment\Database\DatabaseError;
 use FirefightingEquipment\Database\LazyConnection;
+use FirefightingEquipment\Http\Access;
+use FirefightingEquipment\Http\AllowedOrigins;
 use FirefightingEquipment\Http\AppPath;
 use FirefightingEquipment\Http\Application;
 use FirefightingEquipment\Http\ErrorReporter;
@@ -16,7 +18,9 @@ use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\Request;
 use FirefightingEquipment\Http\RequestContext;
+use FirefightingEquipment\Http\RequestGuard;
 use FirefightingEquipment\Http\RequestHandler;
+use FirefightingEquipment\Http\RouteMatch;
 use FirefightingEquipment\Http\Router;
 use FirefightingEquipment\Http\Routes;
 use FirefightingEquipment\Http\TenantResolver;
@@ -35,6 +39,9 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(HealthHandler::class)]
 #[CoversClass(TenantResolver::class)]
 #[CoversClass(Routes::class)]
+#[CoversClass(RequestGuard::class)]
+#[UsesClass(Access::class)]
+#[UsesClass(AllowedOrigins::class)]
 #[UsesClass(AppPath::class)]
 #[UsesClass(DatabaseError::class)]
 #[UsesClass(ErrorReporter::class)]
@@ -44,6 +51,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(LazyConnection::class)]
 #[UsesClass(Request::class)]
 #[UsesClass(RequestContext::class)]
+#[UsesClass(RouteMatch::class)]
 #[UsesClass(Router::class)]
 #[UsesClass(TenantHandler::class)]
 #[UsesClass(TenantSlug::class)]
@@ -115,6 +123,22 @@ final class ApplicationTest extends TestCase
         self::assertSame(0, $this->connectAttempts);
     }
 
+    public function testServiceLoginWithBrokenDatabaseIs503(): void
+    {
+        $request = new Request(
+            'POST',
+            '/firefighting/service/api/v1/auth/login',
+            ['content-type' => 'application/json'],
+            body: '{"email":"chef@example.org","password":"geheim-geheim"}',
+        );
+
+        $response = $this->application(Routes::service(), Routes::tenant())->handle($request);
+
+        self::assertSame(503, $response->statusCode());
+        self::assertSame('database_unavailable', json_decode($response->body(), true)['error']);
+        self::assertStringNotContainsString('geheim', implode("\n", $this->log));
+    }
+
     public function testUnexpectedErrorIs500WithGenericMessage(): void
     {
         $handler = new class implements RequestHandler {
@@ -123,7 +147,7 @@ final class ApplicationTest extends TestCase
                 throw new \RuntimeException("Access denied for user 'geheim'@'db.example' in /pfad/datei.php");
             }
         };
-        $app = $this->application(new Router()->add('GET', 'boom', $handler), new Router());
+        $app = $this->application(Router::forService()->add('GET', 'boom', Access::Public, $handler), Router::forTenant());
 
         $response = $app->handle(new Request('GET', '/firefighting/service/boom'));
 
@@ -143,7 +167,7 @@ final class ApplicationTest extends TestCase
                 return new JsonResponse(['kaputt' => "\xB1\x31"]);
             }
         };
-        $app = $this->application(new Router()->add('GET', 'kaputt', $handler), new Router());
+        $app = $this->application(Router::forService()->add('GET', 'kaputt', Access::Public, $handler), Router::forTenant());
 
         $response = $app->handle(new Request('GET', '/firefighting/service/kaputt'));
 
@@ -172,6 +196,123 @@ final class ApplicationTest extends TestCase
         self::assertSame('application/json; charset=utf-8', $headers['Content-Type']);
     }
 
+    /**
+     * @return iterable<string, array{Request, int, string}>
+     */
+    public static function rejectedMutatingRequests(): iterable
+    {
+        $json = ['content-type' => 'application/json'];
+
+        yield 'ohne Content-Type' => [self::post('/firefighting/service/echo/1', [], '{}'), 415, 'unsupported_media_type'];
+        yield 'Formular' => [
+            self::post('/firefighting/immendingen/echo/1', ['content-type' => 'application/x-www-form-urlencoded'], 'a=1'),
+            415,
+            'unsupported_media_type',
+        ];
+        yield 'text/plain' => [self::post('/firefighting/service/echo/1', ['content-type' => 'text/plain'], '{}'), 415, 'unsupported_media_type'];
+        yield 'fremder Origin' => [
+            self::post('/firefighting/immendingen/echo/1', [...$json, 'origin' => 'https://evil.example'], '{}'),
+            403,
+            'origin_not_allowed',
+        ];
+        yield 'Origin null' => [self::post('/firefighting/service/echo/1', [...$json, 'origin' => 'null'], '{}'), 403, 'origin_not_allowed'];
+        yield 'leerer Body' => [self::post('/firefighting/service/echo/1', $json, ''), 400, 'invalid_request'];
+        yield 'Body zu groß' => [
+            new Request('POST', '/firefighting/service/echo/1', $json, bodyTooLarge: true),
+            400,
+            'invalid_request',
+        ];
+        yield 'kaputtes JSON' => [self::post('/firefighting/service/echo/1', $json, '{"a":'), 400, 'invalid_request'];
+        yield 'JSON-Liste' => [self::post('/firefighting/service/echo/1', $json, '[]'), 400, 'invalid_request'];
+        yield 'DELETE ohne Content-Type' => [
+            new Request('DELETE', '/firefighting/service/echo/1', [], body: '{}'),
+            415,
+            'unsupported_media_type',
+        ];
+    }
+
+    #[DataProvider('rejectedMutatingRequests')]
+    public function testMutatingRequestIsRejectedBeforeDatabase(Request $request, int $status, string $code): void
+    {
+        $response = $this->echoApplication()->handle($request);
+
+        self::assertSame($status, $response->statusCode());
+        self::assertSame($code, json_decode($response->body(), true)['error']);
+        self::assertSame(0, $this->connectAttempts);
+    }
+
+    public function testValidMutatingRequestPassesBodyAndParamsToHandler(): void
+    {
+        $request = self::post(
+            '/firefighting/service/echo/12',
+            ['content-type' => 'Application/JSON; Charset=UTF-8', 'origin' => 'https://www.prodad.de'],
+            ' {"name":"Süd","n":3}',
+        );
+
+        $response = $this->echoApplication()->handle($request);
+
+        self::assertSame(200, $response->statusCode());
+        self::assertSame('{"params":{"id":12},"body":{"name":"Süd","n":3}}', $response->body());
+    }
+
+    public function testEmptyJsonObjectIsAccepted(): void
+    {
+        $response = $this->echoApplication()->handle(self::post('/firefighting/service/echo/1', ['content-type' => 'application/json'], '{}'));
+
+        self::assertSame('{"params":{"id":1},"body":[]}', $response->body());
+    }
+
+    public function testConfiguredOriginIsAllowedAndLoadedOnlyWhenNeeded(): void
+    {
+        $loads = 0;
+        $origins = new AllowedOrigins(static function () use (&$loads): array {
+            $loads++;
+
+            return ['http://localhost:8000'];
+        });
+        $app = $this->echoApplication(new RequestGuard($origins));
+        $json = ['content-type' => 'application/json'];
+
+        self::assertSame(200, $app->handle(self::post('/firefighting/service/echo/1', $json, '{}'))->statusCode());
+        self::assertSame(200, $app->handle(self::post('/firefighting/service/echo/1', [...$json, 'origin' => 'https://www.prodad.de'], '{}'))->statusCode());
+        self::assertSame(0, $loads);
+
+        self::assertSame(200, $app->handle(self::post('/firefighting/service/echo/1', [...$json, 'origin' => 'http://localhost:8000'], '{}'))->statusCode());
+        self::assertSame(403, $app->handle(self::post('/firefighting/service/echo/1', [...$json, 'origin' => 'http://localhost:8001'], '{}'))->statusCode());
+        self::assertSame(1, $loads);
+    }
+
+    public function testUnknownPathIs404EvenForInvalidMutatingRequest(): void
+    {
+        $response = $this->echoApplication()->handle(self::post('/firefighting/service/unbekannt', [], 'x'));
+
+        self::assertSame(404, $response->statusCode());
+    }
+
+    /**
+     * @param array<string, string> $headers
+     */
+    private static function post(string $uri, array $headers, string $body): Request
+    {
+        return new Request('POST', $uri, $headers, body: $body);
+    }
+
+    private function echoApplication(RequestGuard $guard = new RequestGuard()): Application
+    {
+        $echo = new class implements RequestHandler {
+            public function handle(RequestContext $context): JsonResponse
+            {
+                return new JsonResponse(['params' => $context->params, 'body' => $context->body]);
+            }
+        };
+        $service = Router::forService()
+            ->add('POST', 'echo/{id}', Access::Public, $echo)
+            ->add('DELETE', 'echo/{id}', Access::Public, $echo);
+        $tenant = Router::forTenant()->add('POST', 'echo/{id}', Access::Public, $echo);
+
+        return new Application($service, $tenant, $this->failingDb(), $this->errorReporter(), guard: $guard);
+    }
+
     private function handle(string $method, string $uri): JsonResponse
     {
         return $this->application(Routes::service(), Routes::tenant())->handle(new Request($method, $uri));
@@ -179,14 +320,21 @@ final class ApplicationTest extends TestCase
 
     private function application(Router $service, Router $tenant): Application
     {
-        $db = new LazyConnection(function (): \PDO {
+        return new Application($service, $tenant, $this->failingDb(), $this->errorReporter());
+    }
+
+    private function failingDb(): LazyConnection
+    {
+        return new LazyConnection(function (): \PDO {
             $this->connectAttempts++;
             throw new ConnectionException('Verbindung zur Datenbank fehlgeschlagen (SQLSTATE HY000, Fehler 2002).');
         });
-        $errors = new ErrorReporter(function (string $line): void {
+    }
+
+    private function errorReporter(): ErrorReporter
+    {
+        return new ErrorReporter(function (string $line): void {
             $this->log[] = $line;
         });
-
-        return new Application($service, $tenant, $db, $errors);
     }
 }

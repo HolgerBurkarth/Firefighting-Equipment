@@ -16,3 +16,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Lokale Tests der API mit curl (Sitzungs-Token, Zugangsdaten)
+/cookies.txt
+/login.json

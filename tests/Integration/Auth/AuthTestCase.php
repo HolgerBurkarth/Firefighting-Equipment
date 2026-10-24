@@ -1,0 +1,212 @@
+<?php
+
+declare(strict_types=1);
+
+namespace FirefightingEquipment\Tests\Integration\Auth;
+
+use FirefightingEquipment\Database\LazyConnection;
+use FirefightingEquipment\Http\Application;
+use FirefightingEquipment\Http\ErrorReporter;
+use FirefightingEquipment\Http\JsonResponse;
+use FirefightingEquipment\Http\Request;
+use FirefightingEquipment\Http\Router;
+use FirefightingEquipment\Http\Routes;
+use FirefightingEquipment\Tenant\Tenant;
+use FirefightingEquipment\Tenant\TenantRepository;
+use FirefightingEquipment\Tenant\TenantSlug;
+use FirefightingEquipment\Tests\Integration\User\AuthSchemaTestCase;
+
+/**
+ * Basis für Tests von Anmeldung und Sitzungen: zwei aktive Städte (immendingen, tuttlingen),
+ * Konten mit echtem Argon2id-Hash von PASSWORD und Anfragen über die ganze Anwendung.
+ */
+abstract class AuthTestCase extends AuthSchemaTestCase
+{
+    protected const string PASSWORD = 'Korrekt-Pferd-Batterie-42';
+    protected const string IP = '192.0.2.10';
+
+    private static ?string $passwordHash = null;
+
+    /** @var list<string> */
+    protected array $log = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->createTenant('immendingen');
+        $this->createTenant('tuttlingen');
+    }
+
+    protected function tenant(string $slug): Tenant
+    {
+        return new TenantRepository($this->pdo())->findBySlug(TenantSlug::fromString($slug))
+            ?? throw new \LogicException('Stadt nicht gefunden.');
+    }
+
+    /**
+     * Konto mit Passwort PASSWORD; Standard: aktiver Benutzer.
+     *
+     * @param string|null                $slug null = Super-Admin
+     * @param array<string, scalar|null> $overrides
+     */
+    protected function account(?string $slug, string $email, array $overrides = []): int
+    {
+        $values = ['email' => $email, 'password_hash' => self::passwordHash(), 'name' => 'Erika Musterfrau', 'display_name' => 'Erika'];
+        if ($slug === null) {
+            $values['role'] = 'superadmin';
+        }
+
+        return $this->createUser($slug === null ? null : $this->tenant($slug)->id, [...$values, ...$overrides]);
+    }
+
+    /**
+     * Registriertes Konto im Status unverified oder pending (braucht einen Einladungscode).
+     */
+    protected function registeredAccount(string $slug, string $email, string $status): int
+    {
+        $tenantId = $this->tenant($slug)->id;
+        $admin = $this->account($slug, 'einlader-' . $status . '@example.org', ['role' => 'admin']);
+        $code = $this->createInvitationCode($tenantId, $admin);
+
+        return $this->account($slug, $email, [
+            'status' => $status,
+            'invitation_code_id' => $code,
+            'email_verified_at' => $status === 'unverified' ? null : self::CREATED_AT,
+            'display_name' => null,
+        ]);
+    }
+
+    protected static function passwordHash(): string
+    {
+        return self::$passwordHash ??= password_hash(self::PASSWORD, PASSWORD_ARGON2ID);
+    }
+
+    protected function app(?Router $service = null, ?Router $tenant = null): Application
+    {
+        $errors = new ErrorReporter(function (string $line): void {
+            $this->log[] = $line;
+        });
+
+        return new Application(
+            $service ?? Routes::service(),
+            $tenant ?? Routes::tenant(),
+            new LazyConnection(fn (): \PDO => $this->pdo()),
+            $errors,
+        );
+    }
+
+    /**
+     * @param array<string, mixed>|string|null $body Array wird als JSON gesendet; null = ohne Body
+     * @param array<string, string>            $headers
+     */
+    protected function send(
+        string $method,
+        string $uri,
+        array|string|null $body = null,
+        ?string $cookie = null,
+        array $headers = [],
+        ?Application $app = null,
+    ): JsonResponse {
+        if (is_array($body)) {
+            $body = json_encode($body === [] ? new \stdClass() : $body, JSON_THROW_ON_ERROR);
+        }
+        if ($body !== null) {
+            $headers += ['content-type' => 'application/json'];
+        }
+        $headers += ['user-agent' => 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36'];
+
+        $request = new Request(
+            $method,
+            $uri,
+            $headers,
+            $cookie === null ? [] : ['ff_session' => $cookie],
+            $body,
+            remoteAddress: self::IP,
+        );
+
+        return ($app ?? $this->app())->handle($request);
+    }
+
+    /**
+     * @param string|null $slug null = service
+     */
+    protected function login(?string $slug, string $email, string $password = self::PASSWORD): JsonResponse
+    {
+        return $this->send('POST', self::url($slug, 'auth/login'), ['email' => $email, 'password' => $password]);
+    }
+
+    /**
+     * Meldet an und liefert das Cookie (schlägt fehl, wenn die Anmeldung nicht klappt).
+     */
+    protected function loginCookie(?string $slug, string $email): string
+    {
+        $response = $this->login($slug, $email);
+        self::assertSame(200, $response->statusCode(), $response->body());
+
+        return self::cookieValue($response) ?? self::fail('Kein Cookie gesetzt.');
+    }
+
+    protected static function url(?string $slug, string $rest): string
+    {
+        return '/firefighting/' . ($slug ?? 'service') . '/api/v1/' . $rest;
+    }
+
+    /**
+     * Wert von ff_session aus Set-Cookie; "" beim Löschen, null ohne Set-Cookie.
+     */
+    protected static function cookieValue(JsonResponse $response): ?string
+    {
+        $header = $response->headers()['Set-Cookie'] ?? null;
+        if ($header === null) {
+            return null;
+        }
+        self::assertSame(1, preg_match('/^ff_session=([^;]*);/', $header, $m), $header);
+
+        return $m[1];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected static function json(JsonResponse $response): array
+    {
+        return json_decode($response->body(), true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    protected static function assertError(int $status, string $code, JsonResponse $response): void
+    {
+        self::assertSame($status, $response->statusCode(), $response->body());
+        self::assertSame($code, self::json($response)['error'] ?? null, $response->body());
+    }
+
+    /**
+     * Verschiebt die Zeitstempel einer Sitzung um $seconds in die Vergangenheit. Mit
+     * $keepLastSeen bleibt last_seen_at (Sitzung gerade benutzt, aber alt: Höchstdauer).
+     */
+    protected function ageSession(int $sessionId, int $seconds, bool $keepLastSeen = false): void
+    {
+        $this->pdo()->prepare(
+            'UPDATE fe_sessions SET created_at = created_at - INTERVAL ? SECOND,'
+            . ' expires_at = expires_at - INTERVAL ? SECOND'
+            . ($keepLastSeen ? '' : ', last_seen_at = last_seen_at - INTERVAL ? SECOND')
+            . ' WHERE id = ?',
+        )->execute($keepLastSeen ? [$seconds, $seconds, $sessionId] : [$seconds, $seconds, $seconds, $sessionId]);
+    }
+
+    protected function sessionIdOf(int $userId): int
+    {
+        $stmt = $this->pdo()->prepare('SELECT MAX(id) FROM fe_sessions WHERE user_id = ?');
+        $stmt->execute([$userId]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    protected function sessionCountOf(int $userId): int
+    {
+        $stmt = $this->pdo()->prepare('SELECT COUNT(*) FROM fe_sessions WHERE user_id = ?');
+        $stmt->execute([$userId]);
+
+        return (int) $stmt->fetchColumn();
+    }
+}
