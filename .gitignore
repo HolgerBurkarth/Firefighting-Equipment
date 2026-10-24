@@ -1,0 +1,17 @@
+# Abhängigkeiten
+/vendor/
+
+# Zugangsdaten – niemals committen
+/config/config.local.php
+
+# PHPUnit
+/.phpunit.cache/
+
+# Editoren und Betriebssystem
+/.idea/
+/.vscode/
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
