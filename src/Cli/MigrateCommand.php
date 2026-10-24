@@ -23,12 +23,18 @@ final readonly class MigrateCommand
     public const int EXIT_OK = 0;
     public const int EXIT_ERROR = 1;
     public const int EXIT_USAGE = 2;
+    /** Nur bei check: Es gibt offene Migrationen. */
+    public const int EXIT_PENDING = 3;
 
     private const string USAGE = <<<'TXT'
         Aufruf:
           php bin/migrate.php status [--config=PFAD]           ausgeführte und offene Migrationen
           php bin/migrate.php run [--config=PFAD]              offene Migrationen ausführen
           php bin/migrate.php run --dry-run [--config=PFAD]    nur anzeigen, was passieren würde
+          php bin/migrate.php check [--config=PFAD]            nur prüfen, ob Migrationen offen sind
+
+        Exit-Codes: 0 OK (bei check: nichts offen), 1 Fehler, 2 falscher Aufruf,
+        3 nur bei check: Migrationen offen.
 
         Standard-Konfiguration: config/config.local.php
         Auf dem Server immer php85 statt php verwenden.
@@ -71,6 +77,10 @@ final readonly class MigrateCommand
             $config = new ConfigLoader()->loadDatabaseConfig($options['config'] ?? $this->defaultConfigPath);
             $migrator = new Migrator(new ConnectionFactory()->create($config), $this->migrationsDir, $this->table);
 
+            if ($options['command'] === 'check') {
+                return $this->check($migrator->status());
+            }
+
             if ($options['command'] === 'status') {
                 $this->printStatus($migrator->status());
             } elseif ($options['dryRun']) {
@@ -94,7 +104,7 @@ final readonly class MigrateCommand
     /**
      * @param list<string> $args
      *
-     * @return array{command: 'status'|'run'|'help', dryRun: bool, config: ?string}
+     * @return array{command: 'status'|'run'|'check'|'help', dryRun: bool, config: ?string}
      *
      * @throws \InvalidArgumentException bei falschem Aufruf
      */
@@ -126,7 +136,7 @@ final readonly class MigrateCommand
                 throw new \InvalidArgumentException(sprintf('Unbekannte Option: %s', $arg));
             } elseif ($command !== null) {
                 throw new \InvalidArgumentException(sprintf('Unerwartetes Argument: %s', $arg));
-            } elseif ($arg === 'status' || $arg === 'run') {
+            } elseif ($arg === 'status' || $arg === 'run' || $arg === 'check') {
                 $command = $arg;
             } else {
                 throw new \InvalidArgumentException(sprintf('Unbekannter Befehl: %s', $arg));
@@ -141,6 +151,23 @@ final readonly class MigrateCommand
         }
 
         return ['command' => $command, 'dryRun' => $dryRun, 'config' => $config];
+    }
+
+    /**
+     * Rein lesend; Ergebnis für Skripte (z. B. deploy.sh) im Exit-Code.
+     */
+    private function check(MigrationStatus $status): int
+    {
+        $count = count($status->pending);
+        if ($count === 0) {
+            $this->line('Keine offenen Migrationen.');
+
+            return self::EXIT_OK;
+        }
+
+        $this->line(sprintf('%d offene Migration(en).', $count));
+
+        return self::EXIT_PENDING;
     }
 
     private function printStatus(MigrationStatus $status): void

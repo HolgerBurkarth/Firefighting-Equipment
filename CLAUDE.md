@@ -108,8 +108,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   und `\z` statt `$` als Ende, im SQL-String als `'…\\z'` geschrieben (PCRE-`$` passt auch
   vor einem abschließenden Zeilenumbruch).
 - Aufruf (nur Kommandozeile): `php bin/migrate.php status`, `php bin/migrate.php run`,
-  `php bin/migrate.php run --dry-run`; andere Konfiguration mit `--config=PFAD`
-  (Standard `config/config.local.php`). `status` und `--dry-run` ändern nichts.
+  `php bin/migrate.php run --dry-run`, `php bin/migrate.php check`; andere Konfiguration
+  mit `--config=PFAD` (Standard `config/config.local.php`). `status`, `check` und
+  `--dry-run` ändern nichts.
+- `check` ist für Skripte: Exit-Code 0 = nichts offen, 3 = Migrationen offen (`EXIT_PENDING`),
+  1 = Fehler (z. B. Prüfsumme, Verbindung), 2 = falscher Aufruf.
 - Auf dem Server immer mit `php85` ausführen:
   `cd ~/htdocs/apps/firefighting-equipment && php85 bin/migrate.php run`.
 - Integrationstests für Migrationen verwenden eigene Test-Migrationen aus
@@ -159,9 +162,15 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Ablauf: lokal testen (alle Tests grün), committen, zu GitHub synchronisieren, dann auf
   dem Server per SSH: `cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh`.
 - Das Skript bricht bei lokal geänderten Dateien ab, legt eine Sicherung an, holt per
-  `git fetch` + `git merge --ff-only origin/main`, führt `composer install` aus und prüft
-  den Health-Endpunkt. Bei Fehlern springt es nicht automatisch zurück, sondern zeigt die
+  `git fetch` + `git merge --ff-only origin/main`, führt `composer install` aus, prüft mit
+  `php85 bin/migrate.php check` auf offene Migrationen und prüft zum Schluss den
+  Health-Endpunkt. Bei Fehlern springt es nicht automatisch zurück, sondern zeigt die
   Befehle für den Rücksprung an.
+- Sind Migrationen offen: zuerst Datenbanksicherung mit
+  `php85 bin/db-dump.php --suffix=vor-migration-<alter Commit>`; schlägt sie fehl, bricht das
+  Skript ab, ohne zu migrieren. Danach `php85 bin/migrate.php run`. Schlägt die Migration
+  fehl, zeigt das Skript den Pfad der Sicherung und die Anleitung zum Zurückspielen
+  (README, "Sicherung zurückspielen"). Eine Sicherung wird nie automatisch zurückgespielt.
 - Auf dem Server ist das Kommandozeilen-`php` Version 8.4; immer `php85` verwenden
   (z. B. `php85 /usr/bin/composer install --no-dev --optimize-autoloader --no-cache`).
 - Der Server holt nur von GitHub (nie `git push` vom Server). Änderungen nie direkt auf
@@ -169,6 +178,33 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Sicherungen nur unter `~/htdocs/apps/_backup/` (gesperrt per `.htaccess`); das Skript
   behält die 5 neuesten `ff-deploy-*.tar.gz`. Der Bereich außerhalb von `~/htdocs/apps/`
   wird nicht verwendet.
+- Zeitstempel in Namen von Sicherungen immer in UTC mit Kennzeichen `Z`
+  (`JJJJMMTT-HHMMSSZ`, in Bash `date -u +%Y%m%d-%H%M%SZ`). Die Aufräumregel für
+  `ff-deploy-*` erkennt zusätzlich ältere Namen ohne `Z` (Ortszeit).
+
+## Datenbanksicherung
+- `bin/db-dump.php` (nur CLI, Code in `src/Backup/` und `src/Cli/DbDumpCommand.php`):
+  `[--config=PFAD] [--target-dir=PFAD] [--suffix=ZUSATZ] [--mysqldump=PROGRAMM]`.
+  Standard: `config/config.local.php`, Zielordner `~/htdocs/apps/_backup` (neben dem
+  Projektordner), `mysqldump` aus dem PATH. Exit-Codes 0/1/2 wie bei den anderen CLIs.
+  Bei Erfolg steht auf stdout nur der Pfad der Sicherung, alles andere auf stderr.
+- Gesichert werden nur Tabellen `fe_*` (Liste per PDO aus `information_schema`), ohne
+  `CREATE DATABASE`. Ist keine Tabelle `fe_*` vorhanden, ist das ein Fehler (sonst würde
+  mysqldump die ganze Datenbank sichern).
+- Datei: `ff-db-JJJJMMTT-HHMMSSZ[-zusatz].sql.gz`, gzip, Rechte 600. Zusatz nur `a-z`, `0-9`,
+  Bindestrich (nicht am Anfang/Ende, nicht doppelt), höchstens 60 Zeichen.
+- Der Zielordner muss existieren und eine `.htaccess` enthalten, sonst Abbruch.
+- Zugangsdaten nie in der Befehlszeile: kurzlebige `--defaults-extra-file` (`.ff-db-*.cnf`,
+  Rechte 600) im Zielordner, wird in jedem Fall gelöscht. Fehlermeldungen werden maskiert
+  (Passwort, Benutzer, Host).
+- mysqldump-Optionen: `--single-transaction --skip-lock-tables --no-tablespaces
+  --default-character-set=utf8mb4 --quick --hex-blob`. Auf dem Server ist mysqldump ein
+  MariaDB-Client (10.5); kein `--column-statistics` verwenden.
+- Geschrieben wird zuerst nach `*.part`. Vollständig ist eine Sicherung nur bei Exit-Code 0
+  und der Abschlusszeile `-- Dump completed`; sonst wird die Datei gelöscht.
+- Nach einer erfolgreichen Sicherung bleiben die 10 neuesten `ff-db-*.sql.gz`; ältere werden
+  gelöscht. Andere Dateien (auch `ff-deploy-*`) werden nie angefasst.
+- Zurückspielen nur von Hand (README, "Sicherung zurückspielen"), nie automatisch.
 
 ## Lokale Entwicklungsumgebung
 - Windows 10, PowerShell, PHP 8.5 CLI, Composer, Git, MariaDB 10.11 (Port 3306).

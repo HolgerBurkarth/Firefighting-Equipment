@@ -87,6 +87,37 @@ final class MigrateCommandTest extends MigrationTestCase
         self::assertStringContainsString('Keine offenen Migrationen.', $out);
     }
 
+    public function testCheckReportsPendingWithExitCode3AndCreatesNothing(): void
+    {
+        [$exitCode, $out, $err] = $this->runCommand('valid', ['check']);
+
+        self::assertSame(MigrateCommand::EXIT_PENDING, $exitCode);
+        self::assertSame('2 offene Migration(en).' . PHP_EOL, $out);
+        self::assertSame('', $err);
+        self::assertFalse($this->tableExists(self::TABLE));
+        self::assertFalse($this->tableExists('fe_test_items'));
+    }
+
+    public function testCheckAfterRunGivesExitCode0(): void
+    {
+        $this->runCommand('valid', ['run']);
+
+        [$exitCode, $out] = $this->runCommand('valid', ['check']);
+
+        self::assertSame(MigrateCommand::EXIT_OK, $exitCode);
+        self::assertSame('Keine offenen Migrationen.' . PHP_EOL, $out);
+    }
+
+    public function testCheckAfterPartialRunGivesExitCode3(): void
+    {
+        $this->runCommand('broken', ['run']);
+
+        [$exitCode, $out] = $this->runCommand('broken', ['check']);
+
+        self::assertSame(MigrateCommand::EXIT_PENDING, $exitCode);
+        self::assertSame('2 offene Migration(en).' . PHP_EOL, $out);
+    }
+
     public function testFailingMigrationGivesExitCode1(): void
     {
         [$exitCode, $out, $err] = $this->runCommand('broken', ['run']);

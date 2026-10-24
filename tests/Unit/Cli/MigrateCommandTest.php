@@ -53,6 +53,14 @@ final class MigrateCommandTest extends TestCase
         );
     }
 
+    public function testParseCheck(): void
+    {
+        self::assertSame(
+            ['command' => 'check', 'dryRun' => false, 'config' => 'a.php'],
+            MigrateCommand::parseArguments(['check', '--config=a.php']),
+        );
+    }
+
     public function testParseHelp(): void
     {
         self::assertSame('help', MigrateCommand::parseArguments(['--help'])['command']);
@@ -70,6 +78,8 @@ final class MigrateCommandTest extends TestCase
         yield 'zwei Befehle' => [['status', 'run'], 'Unerwartetes Argument: run'];
         yield 'unbekannte Option' => [['run', '--force'], 'Unbekannte Option: --force'];
         yield 'dry-run bei status' => [['status', '--dry-run'], '--dry-run ist nur mit run möglich.'];
+        yield 'dry-run bei check' => [['check', '--dry-run'], '--dry-run ist nur mit run möglich.'];
+        yield 'check und run' => [['check', 'run'], 'Unerwartetes Argument: run'];
         yield 'dry-run doppelt' => [['run', '--dry-run', '--dry-run'], '--dry-run ist doppelt angegeben.'];
         yield 'leerer Pfad' => [['status', '--config='], '--config= braucht einen Pfad.'];
         yield 'config doppelt' => [['status', '--config=a', '--config=b'], '--config ist doppelt angegeben.'];
@@ -109,6 +119,14 @@ final class MigrateCommandTest extends TestCase
 
         self::assertSame(MigrateCommand::EXIT_ERROR, $exitCode);
         self::assertStringContainsString('FEHLER: Konfigurationsdatei nicht gefunden', $this->read($this->err));
+    }
+
+    public function testCheckWithMissingConfigGivesExitCode1NotPending(): void
+    {
+        $exitCode = $this->command()->run(['check']);
+
+        self::assertSame(MigrateCommand::EXIT_ERROR, $exitCode);
+        self::assertNotSame(MigrateCommand::EXIT_PENDING, $exitCode);
     }
 
     public function testDefaultConfigPathIsUsed(): void
