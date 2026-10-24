@@ -32,6 +32,19 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   - Super-Admin: `/firefighting/service/`
 - Der Mandant wird aus dem URL-Pfad abgeleitet. Das Kürzel einer Stadt ist unveränderlich.
 
+## Server und .htaccess
+- Die `.htaccess` in der Hauptebene des Webspace (`htdocs/.htaccess`) gehört NICHT zum
+  Projekt. Sie steuert ganz www.prodad.de und darf von Agenten niemals angelegt,
+  verändert oder vorgeschlagen werden.
+- Sie enthält die Regel
+  `RewriteRule ^firefighting/[a-z0-9-]+(/.*)?$ apps/firefighting-equipment/public/index.php [L]`.
+  Daher braucht `public/` keine Rewrite-Regel; alle Anfragen landen bei `public/index.php`.
+- Stadt-Kürzel bestehen nur aus Kleinbuchstaben, Ziffern und Bindestrich.
+- Projektordner (`.htaccess`) und `config/` (`config/.htaccess`) sind per `.htaccess`
+  gesperrt, `public/` ist freigegeben (`public/.htaccess`). Diese Dateien nur nach
+  Rückfrage ändern; die Freigabe in `public/.htaccess` nie entfernen.
+- Nur Dateien in `public/` sind von außen erreichbar; dort nichts Geheimes ablegen.
+
 ## Datenbank
 - Nur eine Datenbank; alle Tabellen mit Präfix `fe_` (z. B. `fe_tenants`, `fe_users`,
   `fe_devices`, `fe_device_events`). Zeichensatz utf8mb4.
