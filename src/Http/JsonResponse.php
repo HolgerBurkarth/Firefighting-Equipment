@@ -11,13 +11,32 @@ final readonly class JsonResponse
 {
     public const string CONTENT_TYPE = 'application/json; charset=utf-8';
 
+    /** Header, die jede Antwort der API trägt. */
+    public const array DEFAULT_HEADERS = [
+        'Content-Type' => self::CONTENT_TYPE,
+        'Cache-Control' => 'no-store',
+        'X-Content-Type-Options' => 'nosniff',
+    ];
+
     /**
      * @param array<array-key, mixed> $data
+     * @param array<string, string> $headers zusätzliche Header (z. B. Allow)
      */
     public function __construct(
         private array $data,
         private int $statusCode = 200,
+        private array $headers = [],
     ) {
+    }
+
+    /**
+     * Antwort im einheitlichen Fehlerformat {"error":"code","message":"deutscher Text"}.
+     *
+     * @param array<string, string> $headers
+     */
+    public static function error(string $code, string $message, int $statusCode, array $headers = []): self
+    {
+        return new self(['error' => $code, 'message' => $message], $statusCode, $headers);
     }
 
     public function statusCode(): int
@@ -28,6 +47,14 @@ final readonly class JsonResponse
     public function contentType(): string
     {
         return self::CONTENT_TYPE;
+    }
+
+    /**
+     * @return array<string, string> alle Header einschließlich der Standard-Header
+     */
+    public function headers(): array
+    {
+        return [...$this->headers, ...self::DEFAULT_HEADERS];
     }
 
     /**
@@ -46,8 +73,9 @@ final readonly class JsonResponse
         $body = $this->body();
 
         http_response_code($this->statusCode);
-        header('Content-Type: ' . self::CONTENT_TYPE);
-        header('Cache-Control: no-store');
+        foreach ($this->headers() as $name => $value) {
+            header($name . ': ' . $value);
+        }
 
         echo $body;
     }

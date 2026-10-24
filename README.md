@@ -1,5 +1,63 @@
 # Firefighting-Equipment
 
+## REST-API
+
+### Adressen
+
+```
+https://www.prodad.de/firefighting/<kürzel>/<pfad>    # Stadt
+https://www.prodad.de/firefighting/service/<pfad>     # Super-Admin
+```
+
+| Methode | Pfad            | unter `service` | unter einer Stadt | Antwort                                      |
+|---------|-----------------|-----------------|-------------------|----------------------------------------------|
+| GET     | `api/v1/health` | ja              | ja                | `{"status":"ok","database":"ok"}`            |
+| GET     | `api/v1/tenant` | nein (404)      | ja                | `{"slug":"immendingen","name":"Feuerwehr …"}` |
+
+Unter einer Stadt antwortet die API nur, wenn die Stadt existiert und aktiv ist. Der Health-Check
+prüft die Datenbankverbindung; bei einer Störung antwortet er mit 503 und
+`{"status":"error","database":"error"}`. Das Deploy-Skript ruft ihn unter `service` auf.
+
+### Fehler
+
+Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`:
+
+| HTTP | `error`                | Bedeutung                                              |
+|------|------------------------|--------------------------------------------------------|
+| 404  | `not_found`            | Adresse oder Kürzel ungültig, Pfad unbekannt           |
+| 404  | `tenant_not_found`     | Kürzel gültig, aber keine Stadt dazu                   |
+| 403  | `tenant_inactive`      | Stadt gesperrt                                         |
+| 405  | `method_not_allowed`   | Methode nicht erlaubt (erlaubte im Header `Allow`)     |
+| 503  | `database_unavailable` | Datenbank beim Laden der Stadt nicht erreichbar        |
+| 500  | `internal_error`       | unerwarteter Fehler; Details nur im Server-Log         |
+
+Alle Antworten tragen `Cache-Control: no-store` und `X-Content-Type-Options: nosniff`.
+
+### Lokal starten
+
+```
+php -S 127.0.0.1:8000 public/index.php
+```
+
+Dann z. B. `http://127.0.0.1:8000/firefighting/service/api/v1/health`. Die Anwendung verwendet
+`config/config.local.php`; fehlt sie, antwortet der Health-Check mit 503.
+
+### Neuen Endpunkt anlegen
+
+1. Handler in `src/Api/V1/` anlegen, der `FirefightingEquipment\Http\RequestHandler` implementiert.
+   Er bekommt einen `RequestContext`:
+   - `$context->tenant`: die aktive Stadt (unter `service`: `null`); jede Abfrage nach deren ID
+     filtern.
+   - `$context->db->get()`: die PDO-Verbindung; sie wird erst hier aufgebaut.
+   - Bekannte Fehler als `HttpException` werfen (Fabriken in `src/Http/HttpException.php`, neue
+     Codes dort ergänzen); alles andere wird automatisch zu 500.
+2. Route in `src/Http/Routes.php` eintragen, z. B.
+   `->add('GET', 'api/v1/devices', new DevicesHandler())` in `tenant()` (Städte) oder
+   `service()` (Super-Admin). Pfad ohne Slash am Anfang und Ende.
+3. Tests: Unit-Test für die Logik, Integrationstest in `tests/Integration/Http/` (erbt von
+   `DomainTestCase`) für die Antworten mit echter Datenbank.
+4. Endpunkt in der Tabelle oben eintragen.
+
 ## Datenbank-Migrationen
 
 ```
@@ -38,7 +96,9 @@ Ablauf:
       migriert ohne Sicherung.
    2. `php85 bin/migrate.php run`. Schlägt die Migration fehl, zeigt das Skript den Pfad der
       Sicherung und die Befehle zum Zurückspielen an. Es spielt **nichts** automatisch zurück.
-5. Health-Check `https://www.prodad.de/firefighting/service/api/v1/health`.
+5. Health-Check `https://www.prodad.de/firefighting/service/api/v1/health` (erwartet HTTP 200;
+   prüft auch die Datenbankverbindung, scheitert also z. B. bei fehlender
+   `config/config.local.php`).
 
 Bei einem Fehler zeigt das Skript außerdem die Befehle für den Rücksprung auf den vorherigen
 Commit. Wichtig: Schlagen Sicherung oder Migration fehl, ist der neue Code bereits eingespielt,

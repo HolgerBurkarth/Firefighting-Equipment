@@ -53,4 +53,38 @@ final class JsonResponseTest extends TestCase
 
         self::assertSame('application/json; charset=utf-8', $response->contentType());
     }
+
+    public function testEveryResponseHasSecurityAndCacheHeaders(): void
+    {
+        $response = new JsonResponse(['status' => 'ok']);
+
+        self::assertSame([
+            'Content-Type' => 'application/json; charset=utf-8',
+            'Cache-Control' => 'no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ], $response->headers());
+    }
+
+    public function testAdditionalHeadersAreKept(): void
+    {
+        $response = new JsonResponse([], 405, ['Allow' => 'GET']);
+
+        self::assertSame('GET', $response->headers()['Allow']);
+        self::assertSame('nosniff', $response->headers()['X-Content-Type-Options']);
+    }
+
+    public function testDefaultHeadersCannotBeOverridden(): void
+    {
+        $response = new JsonResponse([], 200, ['Cache-Control' => 'max-age=3600']);
+
+        self::assertSame('no-store', $response->headers()['Cache-Control']);
+    }
+
+    public function testErrorUsesUniformFormat(): void
+    {
+        $response = JsonResponse::error('not_found', 'Die Adresse wurde nicht gefunden.', 404);
+
+        self::assertSame(404, $response->statusCode());
+        self::assertSame('{"error":"not_found","message":"Die Adresse wurde nicht gefunden."}', $response->body());
+    }
 }

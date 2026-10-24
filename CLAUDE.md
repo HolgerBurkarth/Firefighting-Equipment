@@ -38,6 +38,40 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - `/api/v1/health` ist mandantenunabhängig und muss unter `/firefighting/service/` immer
   erreichbar sein (wird vom Deploy-Skript geprüft).
 
+## HTTP und REST-API
+- Code in `src/Http/` (Ablauf, Router, Fehler) und `src/Api/V1/` (Handler). `public/index.php`
+  bleibt dünn: nur `Application::create(...)->handle(Request::fromGlobals())->send()`.
+- Präfix `/firefighting` nur in `AppPath::PREFIX`; lokal gilt dasselbe Schema mit
+  `php -S 127.0.0.1:8000 public/index.php`.
+- Adresse `/firefighting/<bereich>/<rest>` (`AppPath::parse`): Query-String wird ignoriert, ein
+  abschließender `/` toleriert; leere Segmente, fehlendes Präfix oder ein Bereich außerhalb
+  `[a-z0-9-]+` → 404. Der Pfad wird nicht URL-dekodiert.
+- Reihenfolge in `Application::handle` (nicht ändern): Adresse zerlegen → Route suchen
+  (404/405) → erst dann die Stadt laden → Handler. Unbekannte Adressen verbinden sich so nie mit
+  der Datenbank.
+- Bereich `service` (`AppPath::SERVICE_SCOPE`): Super-Admin, keine Stadt, eigene Routen.
+  Sonst Kürzel per `TenantSlug` (ungültig → 404 `not_found`), Stadt per `TenantRepository`
+  (unbekannt → 404 `tenant_not_found`, gesperrt → 403 `tenant_inactive`, Datenbankstörung →
+  503 `database_unavailable`), alles in `TenantResolver`.
+- Router (`Router`): exakte Pfade relativ zum Bereich, ohne Slash am Anfang/Ende, keine
+  Platzhalter. Falsche Methode → 405 mit `Allow` (sortiert). `HEAD` wird nicht wie `GET`
+  behandelt. Alle Routen stehen in `Routes::service()` und `Routes::tenant()`.
+- Handler implementieren `RequestHandler` und erhalten `RequestContext` (Anfrage, Stadt oder
+  `null` unter `service`, `LazyConnection`, `ErrorReporter`). Die Datenbankverbindung (und das
+  Laden der Konfiguration) erfolgt erst beim ersten `$context->db->get()`.
+- Fehlerformat immer `{"error":"code","message":"deutscher Text"}`, erzeugt über die Fabriken in
+  `HttpException`; Codes: `not_found` 404, `tenant_not_found` 404, `tenant_inactive` 403,
+  `method_not_allowed` 405, `database_unavailable` 503, `internal_error` 500. Neue Codes nur dort.
+- Einzige Ausnahme vom Fehlerformat: `GET api/v1/health` liefert `{"status":"ok","database":"ok"}`
+  (200) bzw. `{"status":"error","database":"error"}` (503). Unter einer Stadt gilt vorher die
+  Stadtprüfung (403/404/503 im Fehlerformat).
+- Unerwartete Fehler → 500 `internal_error` mit allgemeiner Meldung. Details nur über
+  `ErrorReporter` ins `error_log`: maskiert (`DatabaseError`), ohne Stack-Trace (enthält
+  Argumente wie Zugangsdaten). Nie Details oder Zugangsdaten in die Antwort.
+- Jede API-Antwort trägt `Content-Type: application/json; charset=utf-8`,
+  `Cache-Control: no-store` und `X-Content-Type-Options: nosniff` (`JsonResponse::DEFAULT_HEADERS`,
+  nicht überschreibbar).
+
 ## Server und .htaccess
 - Die `.htaccess` in der Hauptebene des Webspace (`htdocs/.htaccess`) gehört NICHT zum
   Projekt. Sie steuert ganz www.prodad.de und darf von Agenten niemals angelegt,
