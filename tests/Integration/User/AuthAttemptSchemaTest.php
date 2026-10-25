@@ -33,6 +33,7 @@ final class AuthAttemptSchemaTest extends AuthSchemaTestCase
         yield 'Passwort zurücksetzen' => ['password_reset'];
         yield 'Link zum Zurücksetzen einlösen' => ['reset_confirm'];
         yield 'E-Mail bestätigen' => ['verify_email'];
+        yield 'Bestätigungslink neu anfordern' => ['verify_resend'];
     }
 
     #[DataProvider('actions')]
@@ -77,6 +78,8 @@ final class AuthAttemptSchemaTest extends AuthSchemaTestCase
         yield 'Registrierung ohne E-Mail-Hash' => [['action' => 'register', 'email_hash' => null]];
         yield 'Passwort zurücksetzen ohne E-Mail-Hash' => [['action' => 'password_reset', 'email_hash' => null]];
         yield 'Einlösen groß' => [['action' => 'RESET_CONFIRM', 'email_hash' => null]];
+        yield 'Neu anfordern ohne E-Mail-Hash' => [['action' => 'verify_resend', 'email_hash' => null]];
+        yield 'Neu anfordern groß' => [['action' => 'VERIFY_RESEND']];
         yield 'Einlösen mit zu kurzem E-Mail-Hash' => [['action' => 'reset_confirm', 'email_hash' => str_repeat("\x01", 31)]];
         yield 'E-Mail-Hash zu kurz' => [['email_hash' => str_repeat("\x01", 31)]];
         yield 'vollständige IPv4-Adresse' => [['ip_prefix' => (string) inet_pton('192.0.2.17')]];

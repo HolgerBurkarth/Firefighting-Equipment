@@ -73,12 +73,13 @@ abstract class AuthTestCase extends AuthSchemaTestCase
     }
 
     /**
-     * Registriertes Konto im Status unverified oder pending (braucht einen Einladungscode).
+     * Registriertes Konto im Status unverified oder pending (braucht einen Einladungscode; dazu
+     * wird ein aktiver Admin "einlader-<status>-<lokaler Teil>@example.org" angelegt).
      */
     protected function registeredAccount(string $slug, string $email, string $status): int
     {
         $tenantId = $this->tenant($slug)->id;
-        $admin = $this->account($slug, 'einlader-' . $status . '@example.org', ['role' => 'admin']);
+        $admin = $this->account($slug, 'einlader-' . $status . '-' . strtok($email, '@') . '@example.org', ['role' => 'admin']);
         $code = $this->createInvitationCode($tenantId, $admin);
 
         return $this->account($slug, $email, [

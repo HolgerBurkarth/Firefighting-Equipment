@@ -48,6 +48,19 @@ final class HttpException extends \RuntimeException
         return new self('invalid_token', 'Der Link ist ungültig oder abgelaufen. Bitte fordern Sie einen neuen an.', 400);
     }
 
+    /**
+     * Einladungscode unbekannt, abgelaufen, aufgebraucht oder widerrufen (bewusst eine gemeinsame
+     * Meldung; sie verrät nichts über Konten).
+     */
+    public static function invalidInvitationCode(): self
+    {
+        return new self(
+            'invalid_invitation_code',
+            'Der Einladungscode ist ungültig, abgelaufen, aufgebraucht oder widerrufen. Bitte wenden Sie sich an Ihre Feuerwehr.',
+            400,
+        );
+    }
+
     public static function invalidCredentials(): self
     {
         return new self('invalid_credentials', 'E-Mail-Adresse oder Passwort ist falsch.', 401);
@@ -109,6 +122,16 @@ final class HttpException extends \RuntimeException
             405,
             ['Allow' => implode(', ', $allowedMethods)],
         );
+    }
+
+    /**
+     * Eine Änderung verletzt eine Geschäftsregel (z. B. letzter Admin, sich selbst sperren).
+     *
+     * @param string $message Meldung der Regel (deutsch, für Benutzer)
+     */
+    public static function ruleViolation(string $message): self
+    {
+        return new self('rule_violation', $message, 409);
     }
 
     public static function unsupportedMediaType(): self

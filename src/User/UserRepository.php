@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\User;
 
+use FirefightingEquipment\Invitation\InvitationCodeNotUsableException;
+use FirefightingEquipment\Invitation\InvitationCodeRepository;
+use FirefightingEquipment\Invitation\InvitationCodeValue;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -17,6 +20,9 @@ use FirefightingEquipment\Tenant\Tenant;
  */
 final readonly class UserRepository
 {
+    /** Nie bestätigte Registrierungen werden nach so vielen Tagen anonymisiert. */
+    public const int UNVERIFIED_RETENTION_DAYS = 7;
+
     private const int ER_DUP_ENTRY = 1062;
     private const string COLUMNS = 'id, tenant_id, role, status, email, name, display_name, email_verified_at,'
         . ' locked_at, deleted_at, created_at, updated_at';
@@ -36,6 +42,14 @@ final readonly class UserRepository
             'SELECT ' . self::COLUMNS . ' FROM fe_users WHERE tenant_id = ? AND email = ?',
             [$tenant->id, $email->value],
         );
+    }
+
+    /**
+     * Konto mit dieser ID, nur wenn es zur Stadt gehört (sonst null wie bei einer unbekannten ID).
+     */
+    public function findByTenantAndId(Tenant $tenant, int $id): ?User
+    {
+        return $this->fetchOne('SELECT ' . self::COLUMNS . ' FROM fe_users WHERE id = ? AND tenant_id = ?', [$id, $tenant->id]);
     }
 
     public function findSuperAdminByEmail(EmailAddress $email): ?User
@@ -73,11 +87,15 @@ final readonly class UserRepository
     }
 
     /**
-     * @return list<User> nach ID sortiert, einschließlich anonymisierter Konten
+     * @param UserStatus|null $status nur Konten mit diesem Status; null = alle
+     *
+     * @return list<User> nach ID sortiert, ohne Filter einschließlich anonymisierter Konten
      */
-    public function listByTenant(Tenant $tenant): array
+    public function listByTenant(Tenant $tenant, ?UserStatus $status = null): array
     {
-        return $this->fetchAll('SELECT ' . self::COLUMNS . ' FROM fe_users WHERE tenant_id = ? ORDER BY id', [$tenant->id]);
+        return $status === null
+            ? $this->fetchAll('SELECT ' . self::COLUMNS . ' FROM fe_users WHERE tenant_id = ? ORDER BY id', [$tenant->id])
+            : $this->fetchAll('SELECT ' . self::COLUMNS . ' FROM fe_users WHERE tenant_id = ? AND status = ? ORDER BY id', [$tenant->id, $status->value]);
     }
 
     /**
@@ -190,6 +208,70 @@ final readonly class UserRepository
     }
 
     /**
+     * Freischalten durch einen Admin: nur aus pending (E-Mail bestätigt), setzt Anzeigename und Rolle
+     * (admin oder user) und den Status active.
+     *
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException nicht pending, Rolle Super-Admin
+     */
+    public function approve(int $id, PersonName $displayName, UserRole $role): User
+    {
+        $this->transaction($id, function (User $user) use ($displayName, $role): void {
+            if ($role === UserRole::SuperAdmin) {
+                throw UserRuleViolationException::superAdminRole();
+            }
+            if ($user->status !== UserStatus::Pending) {
+                throw UserRuleViolationException::notPending($user->id);
+            }
+
+            $this->update($user->id, "status = 'active', display_name = ?, role = ?", [$displayName->value, $role->value]);
+        });
+
+        return $this->findById($id) ?? throw UserNotFoundException::forId($id);
+    }
+
+    /**
+     * Registrierung ablehnen: nur unverified oder pending; das Konto wird anonymisiert.
+     *
+     * @return User das Konto vor dem Anonymisieren (für die Benachrichtigung)
+     *
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException keine offene Registrierung
+     */
+    public function reject(int $id): User
+    {
+        return $this->transaction($id, function (User $user): User {
+            if ($user->status !== UserStatus::Unverified && $user->status !== UserStatus::Pending) {
+                throw UserRuleViolationException::notARegistration($user->id);
+            }
+
+            $this->anonymizeLocked($user->id);
+
+            return $user;
+        });
+    }
+
+    /**
+     * @return bool ob sich etwas geändert hat (false: hatte den Anzeigenamen bereits)
+     *
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException gelöschtes Konto
+     */
+    public function changeDisplayName(int $id, PersonName $displayName): bool
+    {
+        return $this->transaction($id, function (User $user) use ($displayName): bool {
+            self::assertNotDeleted($user);
+            if ($user->displayName?->value === $displayName->value) {
+                return false;
+            }
+
+            $this->update($user->id, 'display_name = ?', [$displayName->value]);
+
+            return true;
+        });
+    }
+
+    /**
      * Setzt einen neuen Passwort-Hash (die Regeln prüft der Aufrufer mit PasswordPolicy).
      * Nicht für eingeladene Konten: Deren Einladung schließt ein eigener Ablauf ab.
      *
@@ -262,15 +344,122 @@ final readonly class UserRepository
             }
             self::assertNotLastAdministrator($user, $group);
 
-            $this->endSessions($user->id);
-            $this->pdo->prepare('DELETE FROM fe_user_tokens WHERE user_id = ?')->execute([$user->id]);
-            $this->update(
-                $user->id,
-                "status = 'deleted', email = NULL, email_verified_at = NULL, password_hash = NULL, name = NULL,"
-                . ' display_name = NULL, deleted_at = UTC_TIMESTAMP()',
-            );
+            $this->anonymizeLocked($user->id);
 
             return true;
+        });
+    }
+
+    /**
+     * Registrierung mit Einladungscode, in einer Transaktion: Stadt sperren, Code sperren und prüfen,
+     * dann entweder (E-Mail schon vergeben) nichts ändern oder eine Nutzung zählen und das Konto
+     * anlegen (Status unverified, Rolle user). Gleichzeitige Registrierungen können einen Code so
+     * nicht über max_uses hinaus nutzen. Die Passwortregeln prüft der Aufrufer.
+     *
+     * @throws InvitationCodeNotUsableException Code unbekannt, aus einer anderen Stadt, abgelaufen,
+     *                                          aufgebraucht oder widerrufen (auch wenn die E-Mail
+     *                                          schon vergeben ist)
+     */
+    public function register(
+        Tenant $tenant,
+        InvitationCodeValue $code,
+        EmailAddress $email,
+        PersonName $name,
+        #[\SensitiveParameter] string $passwordHash,
+    ): Registration {
+        return $this->tenantTransaction($tenant, function (array $group) use ($tenant, $code, $email, $name, $passwordHash): Registration {
+            $codes = new InvitationCodeRepository($this->pdo);
+            $codeId = $codes->lockUsableId($tenant, $code) ?? throw InvitationCodeNotUsableException::create();
+
+            $existing = array_find($group, static fn (User $u): bool => $u->email?->value === $email->value);
+            if ($existing !== null) {
+                return new Registration($existing, false);
+            }
+
+            $codes->countUse($codeId);
+            $this->pdo->prepare(
+                'INSERT INTO fe_users (tenant_id, role, status, email, password_hash, name, invitation_code_id,'
+                . " created_at, updated_at) VALUES (?, 'user', 'unverified', ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            )->execute([$tenant->id, $email->value, $passwordHash, $name->value, $codeId]);
+            $id = (int) $this->pdo->lastInsertId();
+
+            return new Registration($this->findById($id) ?? throw new \LogicException('Angelegtes Konto nicht gefunden.'), true);
+        });
+    }
+
+    /**
+     * E-Mail-Adresse bestätigen über einen Einmal-Link: löst den Link (verify_email, nicht
+     * abgelaufen) ein und setzt in derselben Transaktion den Status pending (wartet auf
+     * Freischaltung). Wird der Link gleichzeitig zweimal eingelöst, gewinnt nur einer.
+     *
+     * @param string $tokenHash SHA-256 des Tokens (32 Byte)
+     *
+     * @return bool false, wenn der Link nicht (mehr) gültig ist oder das Konto nicht unverified
+     *              bzw. gesperrt ist; dann bleibt alles unverändert
+     *
+     * @throws UserNotFoundException
+     */
+    public function verifyEmail(int $id, string $tokenHash): bool
+    {
+        return $this->transaction($id, function (User $user) use ($tokenHash): bool {
+            if ($user->status !== UserStatus::Unverified || $user->isLocked()) {
+                return false;
+            }
+
+            $stmt = $this->pdo->prepare(
+                "DELETE FROM fe_user_tokens WHERE user_id = ? AND purpose = 'verify_email' AND token_hash = ?"
+                . ' AND expires_at > UTC_TIMESTAMP()',
+            );
+            $stmt->execute([$user->id, $tokenHash]);
+            if ($stmt->rowCount() !== 1) {
+                return false;
+            }
+
+            $this->update($user->id, "status = 'pending', email_verified_at = UTC_TIMESTAMP()");
+
+            return true;
+        });
+    }
+
+    /**
+     * @return list<User> aktive, nicht gesperrte Admins der Stadt (Empfänger von Hinweisen), nach ID
+     */
+    public function listActiveAdmins(Tenant $tenant): array
+    {
+        return $this->fetchAll(
+            'SELECT ' . self::COLUMNS . " FROM fe_users WHERE tenant_id = ? AND role = 'admin' AND status = 'active'"
+            . ' AND locked_at IS NULL ORDER BY id',
+            [$tenant->id],
+        );
+    }
+
+    /**
+     * Anonymisiert Konten der Stadt, deren E-Mail-Adresse UNVERIFIED_RETENTION_DAYS nach der
+     * Registrierung noch nicht bestätigt ist (Ersatz für einen Cronjob). Danach ist die Adresse
+     * wieder frei. Die Nutzung des Einladungscodes wird nicht zurückgegeben.
+     *
+     * @return int Anzahl anonymisierter Konten
+     */
+    public function anonymizeStaleUnverified(Tenant $tenant): int
+    {
+        $stale = "SELECT id FROM fe_users WHERE tenant_id = ? AND status = 'unverified'"
+            . ' AND created_at < UTC_TIMESTAMP() - INTERVAL ? DAY';
+        // Erst ohne Sperre nachsehen: Meist gibt es nichts zu tun, dann bleibt die Stadt ungesperrt.
+        $stmt = $this->pdo->prepare($stale);
+        $stmt->execute([$tenant->id, self::UNVERIFIED_RETENTION_DAYS]);
+        if ($stmt->fetchColumn() === false) {
+            return 0;
+        }
+
+        return $this->tenantTransaction($tenant, function () use ($stale, $tenant): int {
+            $stmt = $this->pdo->prepare($stale);
+            $stmt->execute([$tenant->id, self::UNVERIFIED_RETENTION_DAYS]);
+            $ids = array_map(intval(...), $stmt->fetchAll(\PDO::FETCH_COLUMN));
+            foreach ($ids as $id) {
+                $this->anonymizeLocked($id);
+            }
+
+            return count($ids);
         });
     }
 
@@ -288,12 +477,7 @@ final readonly class UserRepository
      */
     private function transaction(int $id, \Closure $work): mixed
     {
-        if ($this->pdo->inTransaction()) {
-            throw new \LogicException('UserRepository startet eigene Transaktionen; keine offene Transaktion erlaubt.');
-        }
-
-        $this->pdo->beginTransaction();
-        try {
+        return $this->atomically(function () use ($id, $work): mixed {
             // tenant_key ändert sich nie, daher darf er vor dem Sperren gelesen werden.
             $stmt = $this->pdo->prepare('SELECT tenant_key FROM fe_users WHERE id = ?');
             $stmt->execute([$id]);
@@ -302,17 +486,62 @@ final readonly class UserRepository
                 throw UserNotFoundException::forId($id);
             }
 
-            // Immer dieselbe Abfrage über denselben Index: gleichzeitige Aufrufe sperren in derselben
-            // Reihenfolge, und es werden nur Konten dieser Stadt gesperrt (kein Tabellen-Scan).
-            $group = $this->fetchAll(
-                'SELECT ' . self::COLUMNS . ' FROM fe_users FORCE INDEX (uq_fe_users_tenant_email)'
-                . ' WHERE tenant_key = ? ORDER BY id FOR UPDATE',
-                [$tenantKey],
-            );
+            $group = $this->lockGroup((int) $tenantKey);
             $user = array_find($group, static fn (User $u): bool => $u->id === $id)
                 ?? throw UserNotFoundException::forId($id);
 
-            $result = $work($user, $group);
+            return $work($user, $group);
+        });
+    }
+
+    /**
+     * Wie transaction(), aber ohne Zielkonto: sperrt alle Konten der Stadt (auch wenn es noch keine
+     * gibt, sperrt das den Indexbereich der Stadt) und übergibt sie an $work.
+     *
+     * @template T
+     *
+     * @param \Closure(list<User>): T $work
+     *
+     * @return T
+     */
+    private function tenantTransaction(Tenant $tenant, \Closure $work): mixed
+    {
+        return $this->atomically(fn (): mixed => $work($this->lockGroup($tenant->id)));
+    }
+
+    /**
+     * Immer dieselbe Abfrage über denselben Index: gleichzeitige Aufrufe sperren in derselben
+     * Reihenfolge, und es werden nur Konten dieser Stadt gesperrt (kein Tabellen-Scan).
+     *
+     * @param int $tenantKey ID der Stadt, 0 = Super-Admins
+     *
+     * @return list<User>
+     */
+    private function lockGroup(int $tenantKey): array
+    {
+        return $this->fetchAll(
+            'SELECT ' . self::COLUMNS . ' FROM fe_users FORCE INDEX (uq_fe_users_tenant_email)'
+            . ' WHERE tenant_key = ? ORDER BY id FOR UPDATE',
+            [$tenantKey],
+        );
+    }
+
+    /**
+     * @template T
+     *
+     * @param \Closure(): T $work
+     *
+     * @return T
+     */
+    private function atomically(\Closure $work): mixed
+    {
+        if ($this->pdo->inTransaction()) {
+            throw new \LogicException('UserRepository startet eigene Transaktionen; keine offene Transaktion erlaubt.');
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $result = $work();
             $this->pdo->commit();
 
             return $result;
@@ -364,6 +593,20 @@ final readonly class UserRepository
     {
         $this->pdo->prepare('UPDATE fe_users SET ' . $assignments . ', updated_at = UTC_TIMESTAMP() WHERE id = ?')
             ->execute([...$params, $id]);
+    }
+
+    /**
+     * Entfernt persönliche Daten, Sitzungen und Einmal-Links (Konto ist bereits gesperrt, Regeln geprüft).
+     */
+    private function anonymizeLocked(int $id): void
+    {
+        $this->endSessions($id);
+        $this->pdo->prepare('DELETE FROM fe_user_tokens WHERE user_id = ?')->execute([$id]);
+        $this->update(
+            $id,
+            "status = 'deleted', email = NULL, email_verified_at = NULL, password_hash = NULL, name = NULL,"
+            . ' display_name = NULL, deleted_at = UTC_TIMESTAMP()',
+        );
     }
 
     private function endSessions(int $userId): void

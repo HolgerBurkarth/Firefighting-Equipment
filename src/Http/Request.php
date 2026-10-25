@@ -80,6 +80,22 @@ final readonly class Request
         return $this->headers[strtolower($name)] ?? null;
     }
 
+    /**
+     * Parameter des Query-Strings. Nur einfache Werte; Arrays wie "status[]=x" werden ignoriert.
+     *
+     * @return array<string, string>
+     */
+    public function query(): array
+    {
+        $position = strpos($this->uri, '?');
+        if ($position === false) {
+            return [];
+        }
+        parse_str(substr($this->uri, $position + 1), $values);
+
+        return array_filter($values, static fn (mixed $v, mixed $k): bool => is_string($k) && is_string($v), ARRAY_FILTER_USE_BOTH);
+    }
+
     public function isMutating(): bool
     {
         return !in_array($this->method, self::SAFE_METHODS, true);

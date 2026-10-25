@@ -35,6 +35,37 @@ final class UserRuleViolationException extends UserException
         return new self('Die Rolle Super-Admin kann weder vergeben noch entzogen werden.');
     }
 
+    public static function notPending(int $id): self
+    {
+        return new self(sprintf(
+            'Das Konto #%d wartet nicht auf Freischaltung (E-Mail-Adresse noch nicht bestätigt oder bereits freigeschaltet).',
+            $id,
+        ));
+    }
+
+    public static function notARegistration(int $id): self
+    {
+        return new self(sprintf(
+            'Das Konto #%d ist keine offene Registrierung. Nur unbestätigte oder wartende Registrierungen können abgelehnt werden.',
+            $id,
+        ));
+    }
+
+    public static function selfLock(): self
+    {
+        return new self('Sie können Ihr eigenes Konto nicht sperren.');
+    }
+
+    public static function selfDemote(): self
+    {
+        return new self('Sie können Ihrem eigenen Konto die Admin-Rolle nicht entziehen.');
+    }
+
+    public static function selfDelete(): self
+    {
+        return new self('Sie können Ihr eigenes Konto nicht löschen.');
+    }
+
     public static function noPasswordYet(int $id): self
     {
         return new self(sprintf(

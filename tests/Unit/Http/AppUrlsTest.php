@@ -45,6 +45,15 @@ final class AppUrlsTest extends TestCase
         self::assertSame('http://localhost:8000/firefighting/immendingen/passwort-zuruecksetzen#token=' . $token->value(), $link);
     }
 
+    public function testVerifyEmailLinkHasTokenInFragment(): void
+    {
+        $token = OneTimeToken::generate();
+
+        $link = AppUrls::fixed('https://www.prodad.de')->verifyEmail(self::tenant(), $token);
+
+        self::assertSame('https://www.prodad.de/firefighting/immendingen/email-bestaetigen#token=' . $token->value(), $link);
+    }
+
     public function testBaseUrlFromConfigIsLoadedOnceAndOnlyWhenNeeded(): void
     {
         $loads = 0;

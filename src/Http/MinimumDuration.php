@@ -18,13 +18,17 @@ final readonly class MinimumDuration
 
     /**
      * @param (\Closure(): float)|null       $now   Sekunden (monoton); Standard hrtime()
-     * @param (\Closure(float): void)|null   $sleep Standard usleep()
+     * @param (\Closure(float): void)|null   $sleep Standard usleep() bis zum Ziel (hrtime())
      */
     public function __construct(public float $seconds, ?\Closure $now = null, ?\Closure $sleep = null)
     {
         $this->now = $now ?? static fn (): float => hrtime(true) / 1e9;
         $this->sleep = $sleep ?? static function (float $seconds): void {
-            usleep((int) ceil($seconds * 1e6));
+            // usleep kehrt unter Windows mitunter etwas zu früh zurück; daher bis zum Ziel nachschlafen.
+            $until = hrtime(true) + (int) ceil($seconds * 1e9);
+            while (($left = $until - hrtime(true)) > 0) {
+                usleep(max(1, intdiv($left + 999, 1000)));
+            }
         };
     }
 

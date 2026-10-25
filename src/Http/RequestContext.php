@@ -72,6 +72,37 @@ final readonly class RequestContext
         return $value;
     }
 
+    /**
+     * Optionales Feld des JSON-Bodys als Text; fehlt es oder ist es null, dann null.
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public function optionalStringField(string $name): ?string
+    {
+        $value = $this->body[$name] ?? null;
+        if ($value !== null && !is_string($value)) {
+            throw HttpException::invalidRequest(sprintf('Das Feld "%s" ist kein Text.', $name));
+        }
+
+        return $value;
+    }
+
+    /**
+     * Pflichtfeld des JSON-Bodys als Ganzzahl im Bereich $min bis $max. Nur echte JSON-Zahlen ohne
+     * Nachkommastellen; "5", 5.0 und true werden abgelehnt.
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public function intField(string $name, int $min, int $max): int
+    {
+        $value = $this->body[$name] ?? null;
+        if (!is_int($value) || $value < $min || $value > $max) {
+            throw HttpException::invalidRequest(sprintf('Das Feld "%s" muss eine ganze Zahl von %d bis %d sein.', $name, $min, $max));
+        }
+
+        return $value;
+    }
+
     public function param(string $name): int
     {
         return $this->params[$name] ?? throw new \LogicException(sprintf('Platzhalter fehlt: %s', $name));

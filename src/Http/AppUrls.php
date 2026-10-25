@@ -16,6 +16,7 @@ use FirefightingEquipment\Tenant\Tenant;
 final class AppUrls
 {
     public const string PASSWORD_RESET_PAGE = 'passwort-zuruecksetzen';
+    public const string VERIFY_EMAIL_PAGE = 'email-bestaetigen';
 
     private ?string $baseUrl = null;
 
@@ -57,5 +58,13 @@ final class AppUrls
     public function passwordReset(?Tenant $tenant, OneTimeToken $token): string
     {
         return $this->area($tenant) . self::PASSWORD_RESET_PAGE . '#token=' . $token->value();
+    }
+
+    /**
+     * Link zum Bestätigen der E-Mail-Adresse (nur unter einer Stadt); Token hinter # wie oben.
+     */
+    public function verifyEmail(Tenant $tenant, OneTimeToken $token): string
+    {
+        return $this->area($tenant) . self::VERIFY_EMAIL_PAGE . '#token=' . $token->value();
     }
 }

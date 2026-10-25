@@ -49,6 +49,19 @@ final class RequestTest extends TestCase
         self::assertSame([], $request->headers);
     }
 
+    public function testQueryReturnsOnlySimpleValues(): void
+    {
+        $request = new Request('GET', '/firefighting/immendingen/api/v1/users?status=pending&a[]=1&b[x]=2&leer=&status2=x%20y');
+
+        self::assertSame(['status' => 'pending', 'leer' => '', 'status2' => 'x y'], $request->query());
+    }
+
+    public function testQueryWithoutQueryString(): void
+    {
+        self::assertSame([], new Request('GET', '/firefighting/immendingen/api/v1/users')->query());
+        self::assertSame([], new Request('GET', '/firefighting/immendingen/api/v1/users?')->query());
+    }
+
     public function testBodyOfMutatingRequestIsRead(): void
     {
         $request = self::post('{"a":1}', null);

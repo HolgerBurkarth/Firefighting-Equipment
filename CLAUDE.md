@@ -71,7 +71,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `health` und `tenant` bleiben öffentlich.
 - Handler implementieren `RequestHandler` und erhalten `RequestContext` (Anfrage, Stadt oder
   `null` unter `service`, `LazyConnection`, `ErrorReporter`, Platzhalter `param()`, JSON-Body
-  `body`/`stringField()`, Sitzung `auth()` bei nicht öffentlichen Routen, Mails über `notifier()`,
+  `body`/`stringField()`/`optionalStringField()`/`intField(name, min, max)` (nur echte
+  JSON-Ganzzahlen), Query-String über `request->query()` (nur einfache Werte), Sitzung `auth()` bei nicht öffentlichen Routen, Mails über `notifier()`,
   absolute Links über `urls`). Die Datenbankverbindung
   (und das Laden der Konfiguration) erfolgt erst beim ersten `$context->db->get()`; schlägt sie im
   Handler fehl, antwortet `Application` mit 503 `database_unavailable`.
@@ -84,10 +85,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   JSON-Objekt sein, auch `{}` (z. B. bei Logout und DELETE); höchstens 16 KiB
   (`Request::MAX_BODY_BYTES`, größere werden nicht gelesen). Sonst 400 `invalid_request`.
 - Fehlerformat immer `{"error":"code","message":"deutscher Text"}`, erzeugt über die Fabriken in
-  `HttpException`; Codes: `invalid_request` 400, `invalid_token` 400, `not_authenticated` 401, `invalid_credentials`
+  `HttpException`; Codes: `invalid_request` 400, `invalid_token` 400, `invalid_invitation_code`
+  400, `not_authenticated` 401, `invalid_credentials`
   401, `forbidden` 403, `origin_not_allowed` 403, `account_locked` 403, `email_not_verified` 403,
   `pending_approval` 403, `invalid_current_password` 403, `tenant_inactive` 403, `not_found` 404,
-  `tenant_not_found` 404, `method_not_allowed` 405, `unsupported_media_type` 415, `weak_password`
+  `tenant_not_found` 404, `method_not_allowed` 405, `rule_violation` 409 (Meldung der verletzten
+  Regel), `unsupported_media_type` 415, `weak_password`
   422, `too_many_attempts` 429 (mit `Retry-After`), `database_unavailable` 503, `internal_error`
   500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
   Passwort beim Ändern 403, nicht 401.
@@ -271,7 +274,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   werden nie per `DELETE` entfernt; Fremdschlüssel auf `fe_users` kaskadieren nicht.
 - Gebremst werden Anmeldung, Registrierung, Passwort zurücksetzen und E-Mail-Bestätigung
   (`fe_auth_attempts`, `action` = `login`, `register`, `password_reset`, `reset_confirm`,
-  `verify_email`; `reset_confirm` seit Migration `0008`).
+  `verify_email`, `verify_resend`; `reset_confirm` seit Migration `0008`, `verify_resend` seit
+  `0009`, mit E-Mail-Hash).
   E-Mail nur als SHA-256 (bei `verify_email` und `reset_confirm` ohne E-Mail möglich), IP-Adressen nur gekürzt
   (IPv4 /24, IPv6 /48, binär). Einträge werden nach 24 Stunden beim Aufruf gelöscht (kein Cron).
 - E-Mail-Absender: `"Feuerwehr Geräteverwaltung" <feuerwehr-app@prodad.de>`.
@@ -299,7 +303,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     "Argon2id in Tests"). Anwendung und CLI reichen ihn weiter (`Application` →
     `RequestContext::$hasher`, `UserCommand`); Handler erzeugen keinen eigenen.
 - `UserRepository`: ändernde Methoden (`lock`, `unlock`, `changeRole`, `setPassword`,
-  `anonymize`) öffnen eine eigene Transaktion (eine bereits offene ist ein Fehler) und sperren
+  `anonymize`, `register`, `verifyEmail`, `approve`, `reject`, `changeDisplayName`,
+  `anonymizeStaleUnverified`) öffnen eine eigene Transaktion (eine bereits offene ist ein Fehler) und sperren
   zuerst alle Konten derselben Stadt bzw. alle Super-Admins (`FOR UPDATE` über
   `FORCE INDEX (uq_fe_users_tenant_email)`, immer dieselbe Abfrage → gleiche Sperrreihenfolge,
   andere Städte unberührt). Danach Regeln prüfen, dann schreiben.
@@ -333,8 +338,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Cookie immer), `GET auth/me`, `GET auth/sessions`, `DELETE auth/sessions/{id}`,
   `POST auth/sessions/logout-others`, `POST auth/password` (angemeldet),
   `POST auth/password-reset/request` und `POST auth/password-reset/confirm` (öffentlich, siehe
-  "Passwort vergessen"). Noch nicht umgesetzt: Registrierung, Einladungen, Einmal-Links für
-  E-Mail-Bestätigung und erstes Passwort.
+  "Passwort vergessen"). Nur unter Städten: `POST auth/register`, `POST auth/email/verify`,
+  `POST auth/email/resend` (öffentlich, siehe "Einladung, Registrierung und E-Mail-Bestätigung").
+  Noch nicht umgesetzt: erster Admin einer Stadt (Status `invited`, Einmal-Link `set_password`).
 - Token (`SessionToken`): 32 Zufallsbytes, im Cookie base64url ohne Auffüllung (43 Zeichen, nur
   kanonische Form), in `fe_sessions.token_hash` nur SHA-256. Cookie (`SessionCookie`):
   `ff_session`, `HttpOnly; Secure; SameSite=Strict`, `Path=/firefighting/<kürzel>/` bzw.
@@ -374,7 +380,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Tests: `tests/Integration/Auth/AuthTestCase.php` (zwei Städte, Konten mit echtem Hash, Anfragen
   über die ganze Anwendung, beides mit `TestPasswordHasher` außer bei `app(hasher: …)`, `ageSession()` zum Zurückdatieren von Sitzungen;
   Mails landen in `$this->mailer` (`FakeMailer`), Links beginnen mit `BASE_URL`, die Mindestdauer
-  von `password-reset/request` ist 0).
+  von `password-reset/request`, `register` und `email/resend` ist 0; `registeredAccount()` legt
+  Konten im Status `unverified`/`pending` samt Einlader und Code an). Rechte aller Admin-Routen
+  prüft `AdminRoutesAccessTest` (neue Admin-Routen dort eintragen).
 
 ## E-Mail-Versand
 - Code in `src/Mail/`: `MailMessage` (Empfänger, Name, Betreff, Text), Schnittstelle `Mailer`
@@ -464,6 +472,63 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Bremse der Anmeldung für dieses Konto auf. Abgelaufene Links werden beim Aufruf gelöscht.
 - Nach jeder Passwortänderung geht die Mail "Ihr Passwort wurde geändert" an das Konto:
   `POST auth/password`, `password-reset/confirm` und `bin/user.php superadmin:password`.
+
+## Einladung, Registrierung und E-Mail-Bestätigung
+- Nur unter Städten (unter `service` gibt es die Routen nicht, 404). Code in `src/Invitation/`
+  (`InvitationCodeValue` Klartext/Normalisierung/Hash, `InvitationCodeLabel`, `InvitationCode`,
+  `InvitationCodeStatus`, `InvitationCodeRepository`), Endpunkte in `src/Api/V1/Invitation/` und
+  `src/Api/V1/Auth/` (`RegisterHandler`, `EmailVerifyHandler`, `EmailResendHandler`), Bremse
+  `RegistrationThrottle`.
+- Einladungscodes (Admin): `POST invitation-codes {label?, valid_days 1–90, max_uses 1–500}` → 201
+  mit `code` (Klartext `XXXX-XXXX-XXXX`, nur in dieser Antwort; leere Bezeichnung = keine),
+  `GET invitation-codes` (neueste zuerst, nie Klartext oder Hash), `POST invitation-codes/{id}/revoke
+  {}` (wiederholbar; fremd/unbekannt 404). Status wird berechnet (Zeitvergleich in der Datenbank),
+  Vorrang: `revoked`, `exhausted`, `expired`, `active`. Codes bleiben gültig, wenn ihr Ersteller
+  gesperrt oder gelöscht wird.
+- `POST auth/register {code, email, password, name}`: Reihenfolge Schreibweise (400), Bremse (429),
+  Code (400 `invalid_invitation_code`, eine gemeinsame Meldung, zählt als Fehlversuch),
+  `PasswordPolicy` mit E-Mail, Name und Stadt (422, wird nicht gezählt), dann
+  `UserRepository::register` in einer Transaktion: Stadt sperren, Code `FOR UPDATE` erneut prüfen,
+  bei schon vergebener E-Mail nichts ändern (keine Nutzung), sonst `use_count + 1` und Konto
+  `unverified`/`user` anlegen. Neues Konto: Link `verify_email` (24 h), Mail
+  `<base_url>/firefighting/<kürzel>/email-bestaetigen#token=…`. Vorhandene E-Mail: Hinweis-Mail an
+  den Besitzer. Beides gleiche Antwort (202, Argon2id in beiden Fällen, je eine Mail, Mindestdauer
+  1,5 s, Überschreitung als `registration_slow` im Protokoll).
+- `POST auth/email/verify {token}`: ungültig (Format, unbekannt, anderer Zweck, abgelaufen, benutzt,
+  Konto nicht `unverified` oder gesperrt, andere Stadt) → 400 `invalid_token`, zählt in die Bremse.
+  `UserRepository::verifyEmail` löst den Link ein und setzt `pending` (eine Transaktion). Danach
+  Mail "Neue Registrierung wartet auf Freischaltung" an jeden aktiven, nicht gesperrten Admin der
+  Stadt (`listActiveAdmins`).
+- `POST auth/email/resend {email}`: immer 202 mit derselben Meldung (Mindestdauer 1,5 s); Mail nur an
+  Konten der Stadt mit `unverified`, nicht gesperrt; neuer Link ersetzt den alten.
+- Bremse (`RegistrationThrottle`): `register` höchstens 10 ungültige Codes je IP-Präfix in 15 Minuten,
+  angenommene Registrierungen (auch mit vorhandener E-Mail) 3 je E-Mail-Hash und Stadt und 30 je
+  IP-Präfix (alle Städte; Dienstabend im WLAN der Wache) pro Stunde. `verify_email` 10 Fehlversuche
+  je IP-Präfix in 15 Minuten. `verify_resend` jede angenommene Anfrage, 3 je E-Mail-Hash und Stadt,
+  20 je IP-Präfix pro Stunde. Abgewiesene Anfragen werden nicht gespeichert.
+- Aufräumen ohne Cron: Konten, die `UserRepository::UNVERIFIED_RETENTION_DAYS` (7) Tage nach der
+  Registrierung noch `unverified` sind, werden anonymisiert (`anonymizeStaleUnverified`, nur die
+  aktuelle Stadt, erst ohne Sperre geprüft) bei `register`, `email/verify`, `email/resend` und
+  `GET users`. Die Code-Nutzung wird nicht zurückgegeben. `pending` bleibt, bis ein Admin handelt.
+- Mails zu Registrierung und Bestätigung (Bestätigungslink, Hinweis bei vorhandener Adresse,
+  Freischaltung) enthalten den Hinweis, `feuerwehr-app@prodad.de` zu den Kontakten hinzuzufügen.
+
+## Benutzerverwaltung durch den Admin
+- Nur Admins, nur Konten der eigenen Stadt (`Access::Admin`; Admin einer anderen Stadt und
+  Super-Admin unter einem Stadt-Pfad: 401, `user`: 403). Code: `UserAdministration` (Stadt-Bezug:
+  fremde/unbekannte IDs → `UserNotFoundException` → 404; Selbstschutz) über `UserRepository` (alle
+  Regeln dort gelten weiter), Endpunkte `src/Api/V1/Users/` (`UserListHandler`,
+  `UserActionHandler` mit `UserAction`, `UserJson`).
+- `GET users[?status=…]` (ohne Filter alle außer `deleted`; unbekannter Status 400),
+  `GET users/{id}`, `POST users/{id}/approve {display_name, role}` (nur `pending` → `active`, Rolle
+  `user`/`admin`; Mail "Ihr Konto wurde freigeschaltet"), `POST users/{id}/reject {}` (nur
+  `unverified`/`pending`; anonymisiert, danach Mail "Ihre Registrierung wurde nicht freigegeben" an
+  die vorher gespeicherte Adresse), `POST users/{id}/lock`/`unlock {}`, `POST users/{id}/role
+  {role}`, `POST users/{id}/display-name {display_name}`, `DELETE users/{id} {}` (anonymisieren).
+  Antwort immer `{"user": …}` mit dem Stand danach.
+- Ein Admin darf sich nicht selbst sperren, herabstufen (eigene Rolle ändern) oder löschen →
+  409 `rule_violation`; ebenso Regelverstöße des Repositorys (letzter Admin, falscher Status,
+  gelöschtes Konto). Unveränderte Rolle und eigener Anzeigename sind erlaubt.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".

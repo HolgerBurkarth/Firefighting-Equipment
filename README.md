@@ -22,9 +22,24 @@ https://www.prodad.de/firefighting/service/<pfad>     # Super-Admin
 | POST    | `api/v1/auth/password`                | angemeldet | wie Login, mit neuem Cookie                    |
 | POST    | `api/v1/auth/password-reset/request`  | öffentlich | 202 `{"message":"Falls zu dieser Adresse …"}`  |
 | POST    | `api/v1/auth/password-reset/confirm`  | öffentlich | `{"message":"Das Passwort wurde geändert. …"}` |
+| POST    | `api/v1/auth/register`                | öffentlich | 202 `{"message":"Bitte prüfen Sie Ihr …"}`     |
+| POST    | `api/v1/auth/email/verify`            | öffentlich | `{"message":"Ihre E-Mail-Adresse ist …"}`      |
+| POST    | `api/v1/auth/email/resend`            | öffentlich | 202 `{"message":"Falls zu dieser Adresse …"}`  |
+| GET     | `api/v1/invitation-codes`             | Admin      | `{"invitation_codes":[…]}` (ohne Klartext)     |
+| POST    | `api/v1/invitation-codes`             | Admin      | 201 `{"invitation_code":…,"code":"ABCD-…"}`    |
+| POST    | `api/v1/invitation-codes/{id}/revoke` | Admin      | `{"invitation_code":…}`                        |
+| GET     | `api/v1/users[?status=…]`             | Admin      | `{"users":[…]}`                                |
+| GET     | `api/v1/users/{id}`                   | Admin      | `{"user":…}`                                   |
+| POST    | `api/v1/users/{id}/approve`           | Admin      | `{"user":…}`                                   |
+| POST    | `api/v1/users/{id}/reject`            | Admin      | `{"user":…}` (anonymisiert)                    |
+| POST    | `api/v1/users/{id}/lock`, `…/unlock`  | Admin      | `{"user":…}`                                   |
+| POST    | `api/v1/users/{id}/role`              | Admin      | `{"user":…}`                                   |
+| POST    | `api/v1/users/{id}/display-name`      | Admin      | `{"user":…}`                                   |
+| DELETE  | `api/v1/users/{id}`                   | Admin      | `{"user":…}` (anonymisiert)                    |
 
-`api/v1/tenant` gibt es nur unter einer Stadt (unter `service`: 404), alle anderen Routen unter
-`service` und unter jeder Stadt. Super-Admins melden sich nur unter `service` an, Konten einer Stadt
+`api/v1/tenant`, Registrierung, E-Mail-Bestätigung, Einladungscodes und Benutzerverwaltung gibt es
+nur unter einer Stadt (unter `service`: 404), alle anderen Routen unter `service` und unter jeder
+Stadt. Super-Admins melden sich nur unter `service` an, Konten einer Stadt
 nur unter ihrer Stadt; ein Cookie gilt nur dort.
 
 Unter einer Stadt antwortet die API nur, wenn die Stadt existiert und aktiv ist. Der Health-Check
@@ -38,7 +53,8 @@ Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`:
 | HTTP | `error`                    | Bedeutung                                                  |
 |------|----------------------------|------------------------------------------------------------|
 | 400  | `invalid_request`          | Body kein JSON-Objekt, zu groß (> 16 KiB), Feld fehlt      |
-| 400  | `invalid_token`            | Link zum Zurücksetzen ungültig, abgelaufen oder benutzt    |
+| 400  | `invalid_token`            | Link (Zurücksetzen, Bestätigen) ungültig, abgelaufen, benutzt |
+| 400  | `invalid_invitation_code`  | Einladungscode ungültig, abgelaufen, aufgebraucht, widerrufen |
 | 401  | `not_authenticated`        | keine oder abgelaufene Sitzung                             |
 | 401  | `invalid_credentials`      | E-Mail oder Passwort falsch (bewusst nicht unterschieden)  |
 | 403  | `forbidden`                | angemeldet, aber die Rolle reicht nicht                    |
@@ -51,6 +67,7 @@ Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`:
 | 404  | `not_found`                | Adresse oder Kürzel ungültig, Pfad unbekannt               |
 | 404  | `tenant_not_found`         | Kürzel gültig, aber keine Stadt dazu                       |
 | 405  | `method_not_allowed`       | Methode nicht erlaubt (erlaubte im Header `Allow`)         |
+| 409  | `rule_violation`           | Regel verletzt (letzter Admin, sich selbst sperren, …)     |
 | 415  | `unsupported_media_type`   | ändernde Anfrage ohne `Content-Type: application/json`     |
 | 422  | `weak_password`            | neues Passwort verletzt die Passwortregeln                 |
 | 429  | `too_many_attempts`        | zu viele Fehlversuche (Wartezeit im Header `Retry-After`)  |
@@ -107,6 +124,86 @@ curl.exe -H "Content-Type: application/json" --data-binary "@reset.json" http://
 
 `request.json` und `reset.json` danach löschen (nie committen).
 
+### Einladung und Registrierung
+
+Ablauf (nur unter einer Stadt):
+
+1. Ein Admin legt einen Einladungscode an (`POST api/v1/invitation-codes` mit
+   `{"label":"Dienstabend März","valid_days":14,"max_uses":25}`; `label` optional, `valid_days`
+   1–90, `max_uses` 1–500). Den Code (`XXXX-XXXX-XXXX`) gibt es nur in dieser Antwort; gespeichert
+   wird nur sein Hash. Die Liste zeigt Status (`active`, `expired`, `exhausted`, `revoked`),
+   Nutzungen und Ersteller; `…/revoke` widerruft einen Code.
+2. Die neue Person registriert sich: `POST api/v1/auth/register` mit
+   `{"code":"…","email":"…","password":"…","name":"…"}`. Beim Code zählen Groß-/Kleinschreibung,
+   Leerzeichen und Bindestriche nicht. Das Konto ist danach `unverified`, die Person bekommt einen
+   Bestätigungslink `<base_url>/firefighting/<kürzel>/email-bestaetigen#token=…` (24 Stunden
+   gültig). Gibt es die Adresse in der Stadt schon, entsteht kein Konto und der Code wird nicht
+   verbraucht; die Antwort ist dieselbe (202, frühestens nach 1,5 s), der Besitzer der Adresse
+   bekommt einen Hinweis.
+3. Die Seite hinter dem Link (Frontend, noch nicht gebaut) schickt `POST api/v1/auth/email/verify`
+   mit `{"token":"…"}`. Das Konto wartet dann auf Freischaltung (`pending`); alle aktiven, nicht
+   gesperrten Admins der Stadt bekommen eine Mail. Einen neuen Link gibt es mit
+   `POST api/v1/auth/email/resend` und `{"email":"…"}` (immer 202, gleiche Meldung).
+4. Ein Admin schaltet frei (`POST api/v1/users/{id}/approve` mit
+   `{"display_name":"…","role":"user"}`, Rolle `user` oder `admin`; Mail "Ihr Konto wurde
+   freigeschaltet") oder lehnt ab (`…/reject`; das Konto wird anonymisiert, die Person bekommt
+   "Ihre Registrierung wurde nicht freigegeben").
+
+Nie bestätigte Registrierungen werden 7 Tage nach der Registrierung anonymisiert (beim nächsten
+Aufruf von Registrierung, Bestätigung, Neu-Anfordern oder Benutzerliste der Stadt; kein Cronjob).
+Die Nutzung des Einladungscodes wird dabei nicht zurückgegeben.
+
+| Fall                                                                       | Antwort                       |
+|----------------------------------------------------------------------------|-------------------------------|
+| Code falsch, aus einer anderen Stadt, abgelaufen, aufgebraucht, widerrufen | 400 `invalid_invitation_code` |
+| Passwort verletzt die Regeln (Code wird nicht verbraucht)                  | 422 `weak_password`           |
+| > 10 ungültige Codes je IP-Bereich in 15 Minuten                           | 429 `too_many_attempts`       |
+| > 3 Registrierungen je Adresse und Stadt, > 30 je IP-Bereich pro Stunde    | 429 `too_many_attempts`       |
+| Bestätigungslink ungültig, abgelaufen, benutzt, Konto gesperrt             | 400 `invalid_token`           |
+| > 10 ungültige Bestätigungslinks je IP-Bereich in 15 Minuten               | 429 `too_many_attempts`       |
+| > 3 neue Links je Adresse und Stadt, > 20 je IP-Bereich pro Stunde         | 429 `too_many_attempts`       |
+
+Benutzerverwaltung (nur Admins, nur Konten der eigenen Stadt; fremde IDs: 404):
+
+- `GET api/v1/users` listet alle Konten außer gelöschten, `?status=pending` (bzw. `invited`,
+  `unverified`, `active`, `deleted`) filtert.
+- Sperren, Rollenwechsel und Löschen (= Anonymisieren) beenden alle Sitzungen des Kontos. Der letzte
+  aktive Admin bleibt geschützt; ein Admin kann sich nicht selbst sperren, herabstufen oder löschen
+  (409 `rule_violation`).
+
+Lokal ausprobieren (Admin angemeldet wie unter "Lokal starten", Mails in `var/mail/`). In PowerShell
+JSON mit Inhalt aus einer Datei senden (`--data-binary "@datei.json"`), weil PowerShell 5.1
+Anführungszeichen nicht unverändert an `curl.exe` weitergibt:
+
+```
+# code.json:     {"label":"Dienstabend","valid_days":14,"max_uses":25}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@code.json" http://localhost:8000/firefighting/immendingen/api/v1/invitation-codes
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/invitation-codes
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/invitation-codes/3/revoke
+
+# register.json: {"code":"ABCD-EFGH-JKMN","email":"max@example.org","password":"…","name":"Max Mustermann"}
+curl.exe -H "Content-Type: application/json" --data-binary "@register.json" http://localhost:8000/firefighting/immendingen/api/v1/auth/register
+# verify.json:   {"token":"<Token aus der Mail in var/mail/>"}
+curl.exe -H "Content-Type: application/json" --data-binary "@verify.json" http://localhost:8000/firefighting/immendingen/api/v1/auth/email/verify
+# resend.json:   {"email":"max@example.org"}
+curl.exe -H "Content-Type: application/json" --data-binary "@resend.json" http://localhost:8000/firefighting/immendingen/api/v1/auth/email/resend
+
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/users?status=pending"
+# approve.json:  {"display_name":"Max","role":"user"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@approve.json" http://localhost:8000/firefighting/immendingen/api/v1/users/7/approve
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/users/7/reject
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/users/7/lock
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/users/7/unlock
+# role.json:     {"role":"admin"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@role.json" http://localhost:8000/firefighting/immendingen/api/v1/users/7/role
+# name.json:     {"display_name":"Max M."}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@name.json" http://localhost:8000/firefighting/immendingen/api/v1/users/7/display-name
+curl.exe -b cookies.txt -X DELETE -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/users/7
+```
+
+Die JSON-Dateien danach löschen (`register.json` enthält ein Passwort, `verify.json` ein Token; nie
+committen).
+
 ### Lokal starten
 
 ```
@@ -143,7 +240,9 @@ committen.
    - `$context->db->get()`: die PDO-Verbindung; sie wird erst hier aufgebaut.
    - `$context->auth()`: angemeldetes Konto und Sitzung (nur bei Routen, die nicht öffentlich sind).
    - `$context->param('id')`: Wert eines Platzhalters; `$context->stringField('name')`: Textfeld aus
-     dem JSON-Body (fehlt es, folgt 400).
+     dem JSON-Body (fehlt es, folgt 400); `optionalStringField('label')` (fehlt oder `null` →
+     `null`); `intField('max_uses', 1, 500)` (nur echte JSON-Ganzzahlen im Bereich, sonst 400);
+     `$context->request->query()`: Parameter des Query-Strings (nur einfache Werte).
    - `$context->notifier()->send('zweck', $userId, fn () => MailTemplates::…)`: Mail senden
      (Vorlage in `src/Mail/MailTemplates.php`); ein Versandfehler wird nur protokolliert.
    - Bekannte Fehler als `HttpException` werfen (Fabriken in `src/Http/HttpException.php`, neue
