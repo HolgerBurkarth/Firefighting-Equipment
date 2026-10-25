@@ -139,16 +139,26 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `allowed_origins` (Liste wie `http://localhost:8000`, ohne Pfad, kleingeschrieben); andere
   Schlüssel in `http` sind ein Fehler.
 - Tests: Testsuiten `unit` und `integration` (`composer test`, `composer test:unit`,
-  `composer test:integration`). Die ganze Suite dauert wegen echter Argon2id-Hashes rund
-  5 Minuten; daher `process-timeout` 900 in `composer.json` (Standard wäre 300 s). Integrationstests werden übersprungen, wenn
+  `composer test:integration`). Die ganze Suite dauert lokal unter einer Minute;
+  `process-timeout` 900 in `composer.json` bleibt als Reserve. Integrationstests werden übersprungen, wenn
   `config/config.test.php` fehlt. Dauerhafte Tabellen legen sie nur mit Präfix `fe_test_`
   an und löschen sie wieder; aufgeräumt wird ausschließlich `fe_test_*` und nur in einer
   Datenbank mit Endung `_test` (`TestDatabase::dropTestTables`).
 - Fachliche Integrationstests erben von `tests/Integration/DomainTestCase.php`: Diese führt
   einmal pro Testlauf die echten Migrationen aus `migrations/` in der Testdatenbank aus
   (Protokoll in deren `fe_schema_migrations`) und leert vor jedem Test alle Tabellen `fe_*`
-  außer `fe_schema_migrations` und `fe_test_*` (`TestDatabase::truncateDomainTables`, nur in
-  einer Datenbank mit Endung `_test`).
+  außer `fe_schema_migrations` und `fe_test_*` (`TestDatabase::clearDomainTables`, nur in
+  einer Datenbank mit Endung `_test`). Geleert wird per `DELETE`, nicht `TRUNCATE` (DDL, legt
+  jede Tabelle neu an, lokal rund 125 ms je Tabelle und Test); `AUTO_INCREMENT` läuft daher
+  weiter, Tests dürfen sich nicht auf bestimmte IDs verlassen.
+- Argon2id in Tests: Tests verwenden schwache Parameter (`tests/Support/TestPasswordHasher`,
+  memory_cost 1024, time_cost 1, threads 1), Produktion nie. Die Anwendung
+  (`Application::create`) und die Kommandozeile (`bin/user.php`) erzeugen `PasswordHasher` immer
+  ohne Argumente (Standardparameter von PHP); die Konfigurationsdatei kennt keine Hash-Parameter,
+  und es darf keinen Weg geben, sie darüber oder anders von außen zu schwächen (per Test
+  gesichert). Andere Parameter nur per Konstruktor in Testcode. Mit Standardparametern bleiben
+  gezielte Tests: Hash-Format, `needsRehash`, Dummy-Hash und dessen Laufzeit
+  (`PasswordHasherTest`, `LoginTest::testUnknownEmailTakesAboutAsLongAsWrongPassword`).
 - Agenten öffnen, zeigen oder ändern `config.local.php` und `config.test.php` niemals;
   nur PHP-Code darf sie laden.
 
@@ -276,7 +286,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     Allgemeine Wörter aus Stadtname und Kürzel (`TENANT_STOPWORDS`, z. B. feuerwehr, stadt,
     löschzug) zählen nicht; Ortsname und vollständiges Kürzel bleiben gesperrt.
   - Meldungen enthalten nie das Passwort; Parameter mit Passwort oder Hash tragen
-    `#[\SensitiveParameter]`. `PasswordHasher`: `hash()`, `verify()`, `needsRehash()` (Argon2id).
+    `#[\SensitiveParameter]`. `PasswordHasher`: `hash()`, `verify()`, `needsRehash()`,
+    `dummyHash()` (Argon2id; ohne Argumente Standardparameter, andere nur für Tests, siehe
+    "Argon2id in Tests"). Anwendung und CLI reichen ihn weiter (`Application` →
+    `RequestContext::$hasher`, `UserCommand`); Handler erzeugen keinen eigenen.
 - `UserRepository`: ändernde Methoden (`lock`, `unlock`, `changeRole`, `setPassword`,
   `anonymize`) öffnen eine eigene Transaktion (eine bereits offene ist ein Fehler) und sperren
   zuerst alle Konten derselben Stadt bzw. alle Super-Admins (`FOR UPDATE` über
@@ -323,8 +336,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Inaktivität je Rolle) und `fe_auth_attempts` älter als 24 Stunden (`LoginThrottle::deleteOld`).
 - Anmeldung (`Authenticator::login`): Unter einer Stadt werden nur Konten dieser Stadt gesucht,
   unter `service` nur Super-Admins. Das Passwort wird immer mit Argon2id geprüft, ohne Konto oder
-  ohne Hash (`invited`, `deleted`) gegen `Authenticator::DUMMY_HASH` (Standardparameter, per Test
-  gesichert): gleiche Meldung (401 `invalid_credentials`) und gleiche Laufzeit für unbekannte
+  ohne Hash (`invited`, `deleted`) gegen `PasswordHasher::dummyHash()`: immer mit den Parametern
+  des verwendeten Hashers, bei Standardparametern die Konstante `DEFAULT_DUMMY_HASH` (per Test
+  gesichert), sonst einmal berechnet, und zwar vor der Kontosuche: gleiche Meldung (401 `invalid_credentials`) und gleiche Laufzeit für unbekannte
   E-Mail und falsches Passwort. Erst bei richtigem Passwort, ohne Sitzung und in dieser
   Reihenfolge: gesperrt → 403 `account_locked`, `unverified` → 403 `email_not_verified`,
   `pending` → 403 `pending_approval`. `needsRehash` → `rehashPassword`. Eine ältere Sitzung
@@ -345,7 +359,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `weak_password` mit der Meldung der Regeln), dann `UserRepository::setPassword` (beendet alle
   Sitzungen) und neue Sitzung für das aktuelle Gerät.
 - Tests: `tests/Integration/Auth/AuthTestCase.php` (zwei Städte, Konten mit echtem Hash, Anfragen
-  über die ganze Anwendung, `ageSession()` zum Zurückdatieren von Sitzungen).
+  über die ganze Anwendung, beides mit `TestPasswordHasher` außer bei `app(hasher: …)`, `ageSession()` zum Zurückdatieren von Sitzungen).
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".

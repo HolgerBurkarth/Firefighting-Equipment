@@ -17,7 +17,6 @@ use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
 use FirefightingEquipment\User\Password\PasswordContext;
-use FirefightingEquipment\User\Password\PasswordHasher;
 use FirefightingEquipment\User\Password\PasswordPolicy;
 use FirefightingEquipment\User\Password\WeakPasswordException;
 use FirefightingEquipment\User\PersonName;
@@ -42,7 +41,7 @@ final readonly class PasswordChangeHandler implements RequestHandler
         $pdo = $context->db->get();
 
         try {
-            new Authenticator($pdo)->verifyCurrentPassword(
+            new Authenticator($pdo, $context->hasher)->verifyCurrentPassword(
                 $user,
                 $context->tenant,
                 $current,
@@ -62,7 +61,7 @@ final readonly class PasswordChangeHandler implements RequestHandler
         }
 
         // Beendet alle Sitzungen des Kontos, auch die aktuelle.
-        new UserRepository($pdo)->setPassword($user->id, new PasswordHasher()->hash($new));
+        new UserRepository($pdo)->setPassword($user->id, $context->hasher->hash($new));
 
         $label = $auth->session->deviceLabel ?? DeviceLabel::fromUserAgent($context->request->header('User-Agent'));
         $started = new SessionManager($pdo)->start($user, $label);

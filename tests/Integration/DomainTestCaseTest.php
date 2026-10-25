@@ -26,7 +26,7 @@ final class DomainTestCaseTest extends DomainTestCase
         self::assertSame($files, $applied);
     }
 
-    public function testTruncateEmptiesDomainTablesOnly(): void
+    public function testClearEmptiesDomainTablesOnly(): void
     {
         $pdo = $this->pdo();
         $pdo->exec("INSERT INTO fe_tenants (slug, name) VALUES ('immendingen', 'Feuerwehr Immendingen')");
@@ -36,7 +36,7 @@ final class DomainTestCaseTest extends DomainTestCase
             $pdo->exec('INSERT INTO fe_test_keep (id) VALUES (1)');
             $migrations = $pdo->query('SELECT COUNT(*) FROM fe_schema_migrations')->fetchColumn();
 
-            TestDatabase::truncateDomainTables($pdo);
+            TestDatabase::clearDomainTables($pdo);
 
             self::assertSame(0, $pdo->query('SELECT COUNT(*) FROM fe_tenants')->fetchColumn());
             self::assertSame(1, $pdo->query('SELECT COUNT(*) FROM fe_test_keep')->fetchColumn());

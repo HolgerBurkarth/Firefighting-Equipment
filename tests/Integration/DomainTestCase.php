@@ -28,6 +28,6 @@ abstract class DomainTestCase extends IntegrationTestCase
             self::$migrated = true;
         }
 
-        TestDatabase::truncateDomainTables($this->pdo());
+        TestDatabase::clearDomainTables($this->pdo());
     }
 }

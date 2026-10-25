@@ -12,6 +12,7 @@ use FirefightingEquipment\Auth\Authenticator;
 use FirefightingEquipment\Auth\InvalidCredentialsException;
 use FirefightingEquipment\Auth\LoginThrottle;
 use FirefightingEquipment\Auth\SessionLifetime;
+use FirefightingEquipment\Tests\Support\TestPasswordHasher;
 use FirefightingEquipment\User\Password\PasswordHasher;
 use FirefightingEquipment\User\UserRole;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -139,12 +140,16 @@ final class LoginTest extends AuthTestCase
 
     public function testUnknownEmailTakesAboutAsLongAsWrongPassword(): void
     {
-        $this->account('immendingen', 'user@example.org');
-        $measure = function (string $email): float {
+        // Mit den Standardparametern wie in Produktion (Hash des Kontos und Dummy-Hash).
+        $hasher = new PasswordHasher();
+        $app = $this->app(hasher: $hasher);
+        $this->account('immendingen', 'user@example.org', ['password_hash' => $hasher->hash(self::PASSWORD)]);
+        $measure = function (string $email) use ($app): float {
             $times = [];
             for ($i = 0; $i < 3; $i++) {
                 $start = hrtime(true);
-                $this->login('immendingen', $email, 'Falsches-Passwort-99');
+                $body = ['email' => $email, 'password' => 'Falsches-Passwort-99'];
+                $this->send('POST', self::url('immendingen', 'auth/login'), $body, app: $app);
                 $times[] = hrtime(true) - $start;
             }
             sort($times);
@@ -158,15 +163,6 @@ final class LoginTest extends AuthTestCase
         // Argon2id dominiert die Laufzeit; ohne Dummy-Hash wäre die Antwort um ein Vielfaches schneller.
         self::assertGreaterThan(0.5, $unknown / $known);
         self::assertLessThan(2.0, $unknown / $known);
-    }
-
-    public function testDummyHashUsesCurrentParameters(): void
-    {
-        $hasher = new PasswordHasher();
-
-        self::assertFalse($hasher->needsRehash(Authenticator::DUMMY_HASH));
-        self::assertFalse($hasher->verify('', Authenticator::DUMMY_HASH));
-        self::assertFalse($hasher->verify(self::PASSWORD, Authenticator::DUMMY_HASH));
     }
 
     public function testInvitedAccountCannotLogIn(): void
@@ -229,13 +225,14 @@ final class LoginTest extends AuthTestCase
 
     public function testOutdatedHashIsReplacedWithoutEndingSessions(): void
     {
-        $weak = password_hash(self::PASSWORD, PASSWORD_ARGON2ID, ['memory_cost' => 1024, 'time_cost' => 1, 'threads' => 1]);
+        // Andere Parameter als die der Anwendung im Test (TestPasswordHasher).
+        $weak = password_hash(self::PASSWORD, PASSWORD_ARGON2ID, ['memory_cost' => 2048, 'time_cost' => 1, 'threads' => 1]);
         $id = $this->account('immendingen', 'user@example.org', ['password_hash' => $weak]);
         $first = $this->loginCookie('immendingen', 'user@example.org');
 
         $hash = (string) $this->pdo()->query('SELECT password_hash FROM fe_users WHERE id = ' . $id)->fetchColumn();
         self::assertNotSame($weak, $hash);
-        self::assertFalse(new PasswordHasher()->needsRehash($hash));
+        self::assertFalse(TestPasswordHasher::fast()->needsRehash($hash));
         self::assertTrue(password_verify(self::PASSWORD, $hash));
         self::assertSame(1, $this->sessionCountOf($id));
         self::assertSame(200, $this->send('POST', self::url('immendingen', 'auth/logout'), [], $first)->statusCode());

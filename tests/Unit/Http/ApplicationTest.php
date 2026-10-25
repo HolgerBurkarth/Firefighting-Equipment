@@ -26,6 +26,7 @@ use FirefightingEquipment\Http\Routes;
 use FirefightingEquipment\Http\TenantResolver;
 use FirefightingEquipment\Tenant\InvalidTenantValueException;
 use FirefightingEquipment\Tenant\TenantSlug;
+use FirefightingEquipment\User\Password\PasswordHasher;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -55,12 +56,23 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Router::class)]
 #[UsesClass(TenantHandler::class)]
 #[UsesClass(TenantSlug::class)]
+#[UsesClass(PasswordHasher::class)]
 final class ApplicationTest extends TestCase
 {
     private int $connectAttempts = 0;
 
     /** @var list<string> */
     private array $log = [];
+
+    public function testCreateUsesDefaultArgon2idParameters(): void
+    {
+        // create() lädt die Konfiguration erst bei Bedarf; Hash-Parameter liest es nie daraus.
+        $hasher = new \ReflectionProperty(Application::class, 'hasher')->getValue(Application::create('gibt-es-nicht.php'));
+
+        self::assertInstanceOf(PasswordHasher::class, $hasher);
+        self::assertFalse($hasher->needsRehash(PasswordHasher::DEFAULT_DUMMY_HASH));
+        self::assertSame(PasswordHasher::DEFAULT_DUMMY_HASH, $hasher->dummyHash());
+    }
 
     public function testServiceHealthWithBrokenDatabaseIs503InStatusFormat(): void
     {

@@ -16,20 +16,12 @@ use FirefightingEquipment\User\UserStatus;
  * Prüft Anmeldedaten mit Bremse (LoginThrottle).
  *
  * Unbekannte E-Mail und falsches Passwort sind von außen nicht unterscheidbar: gleiche Meldung und
- * gleiche Laufzeit, weil ohne Konto (oder ohne Passwort, z. B. invited) gegen DUMMY_HASH geprüft
- * wird. Erst bei richtigem Passwort wird ein gesperrtes oder noch nicht freigeschaltetes Konto
- * genauer gemeldet.
+ * gleiche Laufzeit, weil ohne Konto (oder ohne Passwort, z. B. invited) gegen den Dummy-Hash des
+ * Hashers (PasswordHasher::dummyHash(), gleiche Parameter wie echte Hashes) geprüft wird. Erst bei
+ * richtigem Passwort wird ein gesperrtes oder noch nicht freigeschaltetes Konto genauer gemeldet.
  */
 final readonly class Authenticator
 {
-    /**
-     * Argon2id-Hash eines zufälligen, nirgends gespeicherten Werts mit den Standardparametern von PHP
-     * (m=65536, t=4, p=1). Ein Test stellt sicher, dass needsRehash() dafür false ist, die Prüfung
-     * also so lange dauert wie bei echten Hashes.
-     */
-    public const string DUMMY_HASH =
-        '$argon2id$v=19$m=65536,t=4,p=1$eURMbkxoQjJEQTBra1FiUA$YLx4XIlhhaFshRwq9hnrnrH7EsOjmvCGsO8cDYaMq5U';
-
     private UserRepository $users;
     private LoginThrottle $throttle;
 
@@ -57,6 +49,8 @@ final readonly class Authenticator
         }
         $emailHash = LoginThrottle::emailHash($address?->value ?? $email);
         $this->assertNotThrottled($tenant, $emailHash, $ipPrefix);
+        // Vor der Suche, damit ein erstmals berechneter Dummy-Hash nicht nur ohne Konto Zeit kostet.
+        $dummyHash = $this->hasher->dummyHash();
 
         $user = match (true) {
             $address === null => null,
@@ -65,7 +59,7 @@ final readonly class Authenticator
         };
         // Auch ohne Konto abfragen und prüfen: gleiche Laufzeit.
         $hash = $this->users->passwordHash($user?->id ?? 0);
-        $valid = $this->hasher->verify($password, $hash ?? self::DUMMY_HASH) && $user !== null && $hash !== null;
+        $valid = $this->hasher->verify($password, $hash ?? $dummyHash) && $user !== null && $hash !== null;
 
         $this->throttle->record($tenant?->id, $emailHash, $ipPrefix, $valid);
         if (!$valid) {
@@ -104,7 +98,7 @@ final readonly class Authenticator
         $this->assertNotThrottled($tenant, $emailHash, $ipPrefix);
 
         $hash = $this->users->passwordHash($user->id);
-        $valid = $this->hasher->verify($password, $hash ?? self::DUMMY_HASH) && $hash !== null;
+        $valid = $this->hasher->verify($password, $hash ?? $this->hasher->dummyHash()) && $hash !== null;
 
         $this->throttle->record($tenant?->id, $emailHash, $ipPrefix, $valid);
         if (!$valid) {

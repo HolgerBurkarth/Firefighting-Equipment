@@ -7,6 +7,7 @@ namespace FirefightingEquipment\Http;
 use FirefightingEquipment\Auth\AuthSession;
 use FirefightingEquipment\Database\LazyConnection;
 use FirefightingEquipment\Tenant\Tenant;
+use FirefightingEquipment\User\Password\PasswordHasher;
 
 /**
  * Alles, was ein Handler über die Anfrage wissen darf.
@@ -28,6 +29,8 @@ final readonly class RequestContext
         public array $body = [],
         /** Angemeldetes Konto; null bei öffentlichen Routen (Access::Public). */
         public ?AuthSession $auth = null,
+        /** Argon2id für Anmeldung und Passwortänderung (in Produktion Standardparameter). */
+        public PasswordHasher $hasher = new PasswordHasher(),
     ) {
     }
 

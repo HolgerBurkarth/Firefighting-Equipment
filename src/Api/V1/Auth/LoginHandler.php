@@ -37,7 +37,7 @@ final readonly class LoginHandler implements RequestHandler
         new SessionRepository($pdo)->deleteExpired();
 
         try {
-            $user = new Authenticator($pdo)->login(
+            $user = new Authenticator($pdo, $context->hasher)->login(
                 $context->tenant,
                 $email,
                 $password,

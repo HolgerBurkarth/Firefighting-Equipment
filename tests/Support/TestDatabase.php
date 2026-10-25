@@ -59,8 +59,12 @@ final class TestDatabase
     /**
      * Leert alle fachlichen Tabellen (fe_*) – ausschließlich in einer Datenbank mit Endung _test.
      * Nie angefasst werden die Protokolltabelle fe_schema_migrations und Tabellen fe_test_*.
+     *
+     * DELETE statt TRUNCATE: TRUNCATE ist DDL und legt jede Tabelle neu an (lokal rund 125 ms je
+     * Tabelle, vor jedem Test). AUTO_INCREMENT wird daher nicht zurückgesetzt; Tests dürfen sich
+     * nicht auf bestimmte IDs verlassen.
      */
-    public static function truncateDomainTables(\PDO $pdo): void
+    public static function clearDomainTables(\PDO $pdo): void
     {
         self::assertConnectedToTestDatabase($pdo);
 
@@ -80,7 +84,7 @@ final class TestDatabase
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         try {
             foreach ($tables as $table) {
-                $pdo->exec(sprintf('TRUNCATE TABLE `%s`', $table));
+                $pdo->exec(sprintf('DELETE FROM `%s`', $table));
             }
         } finally {
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');

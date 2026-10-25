@@ -10,6 +10,7 @@ use FirefightingEquipment\Auth\SessionManager;
 use FirefightingEquipment\Database\ConnectionException;
 use FirefightingEquipment\Database\LazyConnection;
 use FirefightingEquipment\Tenant\Tenant;
+use FirefightingEquipment\User\Password\PasswordHasher;
 
 /**
  * Bearbeitet eine Anfrage vollständig und liefert immer eine JSON-Antwort.
@@ -28,9 +29,13 @@ final readonly class Application
         private ErrorReporter $errors = new ErrorReporter(),
         private TenantResolver $tenants = new TenantResolver(),
         private RequestGuard $guard = new RequestGuard(),
+        private PasswordHasher $hasher = new PasswordHasher(),
     ) {
     }
 
+    /**
+     * Produktion: Argon2id immer mit den Standardparametern, nie aus der Konfigurationsdatei.
+     */
     public static function create(string $configPath): self
     {
         return new self(
@@ -58,7 +63,7 @@ final readonly class Application
                 }
             }
 
-            $context = new RequestContext($request, $tenant, $this->db, $this->errors, $route->params, $body, $auth);
+            $context = new RequestContext($request, $tenant, $this->db, $this->errors, $route->params, $body, $auth, $this->hasher);
             $response = $route->handler->handle($context);
             // Kodierfehler hier abfangen, nicht erst beim Senden.
             $response->body();

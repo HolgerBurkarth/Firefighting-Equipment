@@ -19,6 +19,7 @@ use FirefightingEquipment\Tenant\TenantRepository;
 use FirefightingEquipment\Tenant\TenantSlug;
 use FirefightingEquipment\Tests\Support\FakePasswordPrompt;
 use FirefightingEquipment\Tests\Support\TestDatabase;
+use FirefightingEquipment\Tests\Support\TestPasswordHasher;
 use FirefightingEquipment\User\DuplicateUserEmailException;
 use FirefightingEquipment\User\EmailAddress;
 use FirefightingEquipment\User\Password\PasswordBlocklist;
@@ -302,7 +303,7 @@ final class UserCommandTest extends AuthSchemaTestCase
         rewind($in);
 
         try {
-            $exitCode = new UserCommand(TestDatabase::CONFIG_PATH, $in, $out, $err, $prompt)->run($args);
+            $exitCode = new UserCommand(TestDatabase::CONFIG_PATH, $in, $out, $err, $prompt, TestPasswordHasher::fast())->run($args);
 
             rewind($out);
             rewind($err);

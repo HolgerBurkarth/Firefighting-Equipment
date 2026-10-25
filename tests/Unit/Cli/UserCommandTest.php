@@ -12,6 +12,7 @@ use FirefightingEquipment\Tenant\InvalidTenantValueException;
 use FirefightingEquipment\Tenant\TenantSlug;
 use FirefightingEquipment\User\EmailAddress;
 use FirefightingEquipment\User\InvalidUserValueException;
+use FirefightingEquipment\User\Password\PasswordHasher;
 use FirefightingEquipment\User\PersonName;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -27,6 +28,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(PersonName::class)]
 #[UsesClass(TenantSlug::class)]
 #[UsesClass(TerminalPasswordPrompt::class)]
+#[UsesClass(PasswordHasher::class)]
 final class UserCommandTest extends TestCase
 {
     /** @var resource */
@@ -50,6 +52,14 @@ final class UserCommandTest extends TestCase
         fclose($this->in);
         fclose($this->out);
         fclose($this->err);
+    }
+
+    public function testUsesDefaultArgon2idParametersLikeBinUser(): void
+    {
+        $hasher = new \ReflectionProperty(UserCommand::class, 'hasher')->getValue($this->command());
+
+        self::assertInstanceOf(PasswordHasher::class, $hasher);
+        self::assertFalse($hasher->needsRehash(PasswordHasher::DEFAULT_DUMMY_HASH));
     }
 
     public function testParseCreate(): void

@@ -15,10 +15,14 @@ use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Tenant\TenantRepository;
 use FirefightingEquipment\Tenant\TenantSlug;
 use FirefightingEquipment\Tests\Integration\User\AuthSchemaTestCase;
+use FirefightingEquipment\Tests\Support\TestPasswordHasher;
+use FirefightingEquipment\User\Password\PasswordHasher;
 
 /**
  * Basis für Tests von Anmeldung und Sitzungen: zwei aktive Städte (immendingen, tuttlingen),
- * Konten mit echtem Argon2id-Hash von PASSWORD und Anfragen über die ganze Anwendung.
+ * Konten mit echtem Argon2id-Hash von PASSWORD und Anfragen über die ganze Anwendung. Hash und
+ * Anwendung verwenden minimale Argon2id-Parameter (TestPasswordHasher), außer ein Test übergibt
+ * ausdrücklich einen anderen Hasher.
  */
 abstract class AuthTestCase extends AuthSchemaTestCase
 {
@@ -79,10 +83,10 @@ abstract class AuthTestCase extends AuthSchemaTestCase
 
     protected static function passwordHash(): string
     {
-        return self::$passwordHash ??= password_hash(self::PASSWORD, PASSWORD_ARGON2ID);
+        return self::$passwordHash ??= TestPasswordHasher::fast()->hash(self::PASSWORD);
     }
 
-    protected function app(?Router $service = null, ?Router $tenant = null): Application
+    protected function app(?Router $service = null, ?Router $tenant = null, ?PasswordHasher $hasher = null): Application
     {
         $errors = new ErrorReporter(function (string $line): void {
             $this->log[] = $line;
@@ -93,6 +97,7 @@ abstract class AuthTestCase extends AuthSchemaTestCase
             $tenant ?? Routes::tenant(),
             new LazyConnection(fn (): \PDO => $this->pdo()),
             $errors,
+            hasher: $hasher ?? TestPasswordHasher::fast(),
         );
     }
 

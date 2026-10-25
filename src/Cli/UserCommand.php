@@ -90,6 +90,8 @@ final readonly class UserCommand
         private mixed $out,
         private mixed $err,
         ?PasswordPrompt $prompt = null,
+        /** bin/user.php übergibt keinen: Standardparameter (nur Tests verwenden andere). */
+        private PasswordHasher $hasher = new PasswordHasher(),
     ) {
         $this->prompt = $prompt ?? new TerminalPasswordPrompt($in, $err);
     }
@@ -231,7 +233,7 @@ final readonly class UserCommand
         }
 
         $password = $this->readNewPassword(new PasswordContext($email, [$name]), $stdin);
-        $user = $users->createSuperAdmin($email, $name, new PasswordHasher()->hash($password));
+        $user = $users->createSuperAdmin($email, $name, $this->hasher->hash($password));
 
         $this->line(sprintf('Super-Admin angelegt: %s (ID %d)', $email->value, $user->id));
     }
@@ -246,7 +248,7 @@ final readonly class UserCommand
 
         $names = array_values(array_filter([$user->name, $user->displayName]));
         $password = $this->readNewPassword(new PasswordContext($email, $names), $stdin);
-        $users->setPassword($user->id, new PasswordHasher()->hash($password));
+        $users->setPassword($user->id, $this->hasher->hash($password));
 
         $this->line(sprintf('Passwort geändert: %s. Alle Sitzungen des Kontos wurden beendet.', $email->value));
     }
