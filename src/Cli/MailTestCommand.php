@@ -31,7 +31,9 @@ final readonly class MailTestCommand
         Weitere Optionen:
           --config=PFAD   andere Konfiguration (Standard: config/config.local.php)
 
-        Transport laut Gruppe 'mail' der Konfiguration: sendmail (Standard) oder file (.eml-Datei).
+        Transport laut Gruppe 'mail' der Konfiguration: sendmail (Standard), smtp (Postfach, z. B.
+        smtp.strato.de) oder file (.eml-Datei). Angezeigt werden Transport, Server, Message-ID und
+        Dauer, bei Fehlern die Meldung des Servers (ohne Zugangsdaten).
         Auf dem Server immer php85 statt php verwenden.
 
         TXT;
@@ -73,21 +75,31 @@ final readonly class MailTestCommand
             $to = EmailAddress::fromString($options['to']);
             $config = new ConfigLoader()->loadMailConfig($options['config'] ?? $this->defaultConfigPath);
             $mailer = $this->mailerFactory === null ? $config->createMailer($this->projectDir) : ($this->mailerFactory)($config);
-
-            $started = hrtime(true);
-            $messageId = $mailer->send(MailTemplates::testMail($to, new \DateTimeImmutable('now', new \DateTimeZone('UTC'))));
-            $seconds = (hrtime(true) - $started) / 1e9;
         } catch (ConfigException | MailException | UserException $e) {
             fwrite($this->err, 'FEHLER: ' . $e->getMessage() . PHP_EOL);
 
             return self::EXIT_ERROR;
         }
 
-        $this->line(sprintf('Testmail an %s übergeben (Transport: %s, Dauer: %.2f s).', $to->value, $config->transport->value, $seconds));
+        $started = hrtime(true);
+        try {
+            $messageId = $mailer->send(MailTemplates::testMail($to, new \DateTimeImmutable('now', new \DateTimeZone('UTC'))));
+        } catch (MailException $e) {
+            // Meldungen von MailException enthalten nie Zugangsdaten (bei SMTP: Schritt und Antwort des Servers).
+            fwrite($this->err, 'FEHLER: ' . $e->getMessage() . PHP_EOL);
+            fwrite($this->err, sprintf('(%s, Dauer: %.2f s)', self::describeTransport($config), (hrtime(true) - $started) / 1e9) . PHP_EOL);
+
+            return self::EXIT_ERROR;
+        }
+        $seconds = (hrtime(true) - $started) / 1e9;
+
+        $this->line(sprintf('Testmail an %s übergeben (%s, Dauer: %.2f s).', $to->value, self::describeTransport($config), $seconds));
         $this->line('Message-ID: ' . $messageId);
         $this->line(match ($config->transport) {
             MailTransport::Sendmail => 'sendmail hat die Mail angenommen; ob sie ankommt, zeigt erst das Postfach'
                 . ' (dort Kopfzeilen anzeigen: SPF, DKIM, Return-Path).',
+            MailTransport::Smtp => 'Der SMTP-Server hat die Mail angenommen; ob sie ankommt, zeigt erst das Postfach'
+                . ' (dort Kopfzeilen anzeigen: SPF, DKIM, DMARC).',
             MailTransport::File => 'Abgelegt in: ' . $config->fileDirectory($this->projectDir),
         });
 
@@ -128,6 +140,18 @@ final readonly class MailTestCommand
         }
 
         return ['to' => $values['to'], 'config' => $values['config']];
+    }
+
+    /**
+     * z. B. "Transport: smtp, Server: smtp.strato.de:465 (ssl)"; nie mit Benutzer oder Passwort.
+     */
+    private static function describeTransport(MailConfig $config): string
+    {
+        $text = 'Transport: ' . $config->transport->value;
+
+        return $config->transport === MailTransport::Smtp && $config->smtp !== null
+            ? $text . ', Server: ' . $config->smtp->describe()
+            : $text;
     }
 
     private function line(string $text): void

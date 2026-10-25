@@ -336,14 +336,82 @@ Die Anwendung verschickt nur Klartext-Mails (UTF-8) von
 steht `mail_failed` im Fehlerprotokoll (ohne Empfänger und ohne Link); die Anfrage selbst läuft
 normal weiter.
 
-Konfiguration in `config/config.local.php` (siehe `config/config.example.php`). Auf dem Server
-beide Gruppen weglassen: Dann wird über `mail()` (sendmail) versendet, und Links beginnen mit
-`https://www.prodad.de`.
+Konfiguration in `config/config.local.php` (siehe `config/config.example.php`). Ohne Gruppe `mail`
+wird über `mail()` (sendmail) versendet; ohne Gruppe `app` beginnen Links mit
+`https://www.prodad.de` (auf dem Server weglassen).
 
 ```php
 'app'  => ['base_url' => 'http://localhost:8000'],                  // Anfang der Links in Mails
 'mail' => ['transport' => 'file', 'file_dir' => 'var/mail'],        // lokal: Mails als Dateien
 ```
+
+Transporte (`mail.transport`):
+
+| Wert       | Versand                                                                     |
+|------------|-----------------------------------------------------------------------------|
+| `sendmail` | Standard: `mail()` direkt vom Webserver (SPF ja, aber ohne DKIM)              |
+| `smtp`     | über das Postfach `feuerwehr-app@prodad.de` bei STRATO, mit DKIM-Signatur     |
+| `file`     | lokal: jede Mail als `.eml`-Datei, nichts wird verschickt                    |
+
+### Versand über SMTP (STRATO-Postfach, mit DKIM)
+
+Mails direkt vom Webserver (`sendmail`) tragen keine DKIM-Signatur und landen z. B. bei Outlook.com
+im Junk-Ordner. Über das STRATO-Postfach per SMTP signiert STRATO automatisch mit DKIM
+(`d=prodad.de`); getestet: `dkim=pass`, `dmarc=pass`, Posteingang.
+
+```php
+'mail' => [
+    'transport' => 'smtp',
+    'smtp' => [
+        'username' => 'feuerwehr-app@prodad.de',   // Pflicht, genau die Absenderadresse
+        'password' => 'PASSWORT-DES-POSTFACHS',    // Pflicht
+        // Optional, Standardwerte:
+        // 'host'       => 'smtp.strato.de',
+        // 'port'       => 465,
+        // 'encryption' => 'ssl',                  // implizites TLS; oder 'starttls' (dann Port 587)
+        // 'timeout'    => 10,                     // Sekunden für den ganzen Versand (1–60)
+    ],
+],
+```
+
+- Envelope-Absender (`MAIL FROM`) und `From` sind immer `feuerwehr-app@prodad.de`; ein anderer
+  Benutzername wird abgelehnt.
+- Das Zertifikat des Servers wird immer geprüft (Aussteller und Hostname, mindestens TLS 1.2); das
+  lässt sich nicht abschalten. Angemeldet wird nur über die verschlüsselte Verbindung (AUTH PLAIN,
+  sonst LOGIN).
+- Das Passwort erscheint nie in Meldungen, Protokollen oder Ausnahmen. Fehlermeldungen nennen
+  Schritt, Server und Antwort des Servers; E-Mail-Adressen darin werden durch `<Adresse>` ersetzt.
+- Die Gruppe `mail.smtp` wird auch bei einem anderen Transport geprüft, aber nur bei `smtp`
+  verwendet. Lokal lässt sich so zwischen `file` und `smtp` umschalten.
+- Lokal unter Windows: Meldet `mail-test.php` `certificate verify failed`, fehlt PHP eine Liste
+  vertrauenswürdiger Stellen. Dann in der `php.ini` `openssl.cafile` auf eine aktuelle
+  `cacert.pem` setzen, nie die Prüfung abschalten.
+
+#### Auf dem Server einrichten
+
+`config/config.local.php` liegt nur auf dem Server und nie im Repository. Das Passwort des Postfachs
+nur mit einem Editor eintragen, nicht per `echo` oder `sed` (sonst steht es in der Shell-History):
+
+```
+cd ~/htdocs/apps/firefighting-equipment
+umask 077
+cp -p config/config.local.php ~/htdocs/apps/_backup/config.local.php.vor-smtp-$(date -u +%Y%m%d-%H%M%SZ)
+nano config/config.local.php            # Gruppe 'mail' wie oben ergänzen (oder vi)
+php85 -l config/config.local.php        # Syntax prüfen
+php85 bin/mail-test.php --to=ich@example.org
+```
+
+- Steht im Passwort ein `'` oder `\`, im PHP-String als `\'` bzw. `\\` schreiben.
+- Die Datei sollte nur für das eigene Konto lesbar sein: `ls -l config/config.local.php` zeigt
+  `-rw-------`, sonst `chmod 600 config/config.local.php`. Danach prüfen, dass die Anwendung sie
+  noch lesen kann: `https://www.prodad.de/firefighting/service/api/v1/health` liefert
+  `{"status":"ok","database":"ok"}`.
+- Kommt die Testmail an (Kopfzeilen: `dkim=pass`, `dmarc=pass`), die Kopie in
+  `~/htdocs/apps/_backup/` löschen; sie enthält die Zugangsdaten der Datenbank. Das Deploy-Skript
+  räumt nur `ff-deploy-*` und `ff-db-*` auf, nicht diese Datei.
+- Zurück zu sendmail: in der Gruppe `mail` die Zeile `'transport' => 'smtp'` entfernen (die Gruppe
+  `smtp` darf stehen bleiben) und `php85 bin/mail-test.php` erneut aufrufen.
+- Änderungen an `config.local.php` brauchen kein Deployment; sie gelten ab der nächsten Anfrage.
 
 ### Mails lokal ansehen
 
@@ -364,12 +432,22 @@ php bin/mail-test.php --to=ich@example.org                   # lokal (Transport 
 cd ~/htdocs/apps/firefighting-equipment && php85 bin/mail-test.php --to=ich@example.org   # Server
 ```
 
-Das Skript zeigt Transport, Message-ID und Dauer. "übergeben" heißt bei sendmail nur, dass der
-Server die Mail angenommen hat. Ob sie ankommt und nicht als Spam gilt, zeigt das Postfach: dort
-die Kopfzeilen bzw. den Quelltext anzeigen und prüfen, dass SPF und DKIM für `prodad.de` bestanden
-sind (`Authentication-Results: … spf=pass … dkim=pass`) und `Return-Path` auf
-`feuerwehr-app@prodad.de` steht. Die Dauer hilft beim Einstellen der Mindestdauer von
-"Passwort vergessen" (1,5 s): Sie muss deutlich über der üblichen Versanddauer liegen.
+Das Skript zeigt Transport, bei SMTP auch den Server (z. B. `smtp.strato.de:465 (ssl)`), Message-ID
+und Dauer. Bei einem Fehler zeigt es die Meldung mit Schritt und Antwort des Servers, z. B.
+`SMTP-Fehler bei AUTH: 535 5.7.8 Authentication credentials invalid` (falsches Passwort), dazu
+Transport, Server und Dauer, nie die Zugangsdaten.
+
+"übergeben" heißt nur, dass der Server (sendmail bzw. der SMTP-Server) die Mail angenommen hat. Ob
+sie ankommt und nicht als Spam gilt, zeigt das Postfach: dort die Kopfzeilen bzw. den Quelltext
+anzeigen und prüfen, dass SPF, DKIM und DMARC für `prodad.de` bestanden sind
+(`Authentication-Results: … spf=pass … dkim=pass … dmarc=pass`) und `Return-Path` auf
+`feuerwehr-app@prodad.de` steht.
+
+Die Dauer hilft beim Einstellen der Mindestdauer von "Passwort vergessen"
+(`PasswordResetRequestHandler::MIN_DURATION_SECONDS`, derzeit 1,5 s): Sie muss deutlich über der
+üblichen Versanddauer liegen, sonst verrät die Antwortzeit, ob ein Konto existiert (im Protokoll
+steht dann `password_reset_slow`). SMTP mit TLS und Anmeldung dauert länger als sendmail; nach dem
+Umstellen auf `smtp` daher auf dem Server mehrmals messen und den Wert anpassen.
 
 ## Tests
 

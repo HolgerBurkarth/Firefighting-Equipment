@@ -10,7 +10,7 @@ namespace FirefightingEquipment\Mail;
  * - Absender immer "Feuerwehr Geräteverwaltung" <feuerwehr-app@prodad.de>.
  * - Betreff und Namen mit Zeichen außerhalb von ASCII als RFC-2047-encoded-words (UTF-8, Base64),
  *   je Wort höchstens 75 Zeichen, nur an Zeichengrenzen geteilt, durch Leerzeichen getrennt
- *   (nicht gefaltet: mail() ersetzt Zeilenumbrüche im Betreff ohnehin).
+ *   (für mail() nicht gefaltet, es ersetzt Zeilenumbrüche im Betreff ohnehin; toString() faltet).
  * - Text als text/plain; charset=UTF-8, quoted-printable (auf der Leitung nur ASCII, Zeilen
  *   höchstens 76 Zeichen), Zeilenenden CRLF.
  * - Date (UTC), Message-ID und Auto-Submitted: auto-generated (keine Abwesenheitsnotizen).
@@ -22,6 +22,9 @@ final readonly class MimeMessage
     public const string MESSAGE_ID_DOMAIN = 'prodad.de';
 
     private const string CRLF = "\r\n";
+
+    /** Empfohlene Höchstlänge einer Kopfzeile ohne CRLF (RFC 5322, 2.1.1). */
+    private const int MAX_HEADER_LINE = 78;
 
     /** 45 Byte ergeben 60 Zeichen Base64; mit "=?UTF-8?B?" und "?=" also 72 ≤ 75 Zeichen. */
     private const int ENCODED_WORD_BYTES = 45;
@@ -61,16 +64,45 @@ final readonly class MimeMessage
     }
 
     /**
-     * Vollständige Nachricht (mit To und Subject), z. B. für eine .eml-Datei.
+     * Vollständige Nachricht (mit To und Subject), z. B. für eine .eml-Datei oder SMTP. Kopfzeilen
+     * über 78 Zeichen werden an Leerzeichen gefaltet (RFC 5322, 2.2.3); so bleibt auch ein langer,
+     * kodierter Betreff unter der SMTP-Grenze von 998 Zeichen je Zeile.
      */
     public function toString(): string
     {
-        $lines = ['To: ' . $this->to, 'Subject: ' . $this->subject];
+        $lines = [self::fold('To: ' . $this->to), self::fold('Subject: ' . $this->subject)];
         foreach ($this->headers as $name => $value) {
-            $lines[] = $name . ': ' . $value;
+            $lines[] = self::fold($name . ': ' . $value);
         }
 
         return implode(self::CRLF, $lines) . self::CRLF . self::CRLF . $this->body;
+    }
+
+    /**
+     * Faltet eine Kopfzeile vor Leerzeichen (CRLF + Leerzeichen); Wörter werden nie geteilt. Zwischen
+     * encoded-words zählt der Umbruch beim Dekodieren nicht, sonst wird er wieder zum Leerzeichen.
+     * Nie vor einem leeren Wort (mehrere Leerzeichen), damit keine Zeile nur aus Leerraum besteht.
+     */
+    private static function fold(string $line): string
+    {
+        if (strlen($line) <= self::MAX_HEADER_LINE) {
+            return $line;
+        }
+
+        $words = explode(' ', $line);
+        $folded = array_shift($words);
+        $current = strlen($folded);
+        foreach ($words as $word) {
+            if ($word !== '' && $current + 1 + strlen($word) > self::MAX_HEADER_LINE) {
+                $folded .= self::CRLF . ' ' . $word;
+                $current = 1 + strlen($word);
+            } else {
+                $folded .= ' ' . $word;
+                $current += 1 + strlen($word);
+            }
+        }
+
+        return $folded;
     }
 
     /**

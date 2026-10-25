@@ -10,6 +10,9 @@ use FirefightingEquipment\Config\AppConfig;
 use FirefightingEquipment\Database\DatabaseConfig;
 use FirefightingEquipment\Mail\MailConfig;
 use FirefightingEquipment\Mail\MailTransport;
+use FirefightingEquipment\Mail\Smtp\SmtpConfig;
+use FirefightingEquipment\Mail\Smtp\SmtpEncryption;
+use FirefightingEquipment\Tests\Support\TempDirectory;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -20,6 +23,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(AppConfig::class)]
 #[UsesClass(DatabaseConfig::class)]
 #[UsesClass(MailConfig::class)]
+#[UsesClass(SmtpConfig::class)]
 final class ConfigLoaderTest extends TestCase
 {
     private const string FIXTURES = __DIR__ . '/../../Fixtures/config/';
@@ -208,6 +212,88 @@ final class ConfigLoaderTest extends TestCase
         }
     }
 
+    public function testSmtpConfigIsLoaded(): void
+    {
+        $config = new ConfigLoader()->loadMailConfig(self::FIXTURES . 'mail-smtp.php');
+
+        self::assertSame(MailTransport::Smtp, $config->transport);
+        self::assertNotNull($config->smtp);
+        self::assertSame('mail.example.org', $config->smtp->host);
+        self::assertSame(587, $config->smtp->port);
+        self::assertSame(SmtpEncryption::StartTls, $config->smtp->encryption);
+        self::assertSame('feuerwehr-app@prodad.de', $config->smtp->username);
+        self::assertSame('smtp-pass-nicht-ausgeben', $config->smtp->password);
+        self::assertSame(2.5, $config->smtp->timeoutSeconds);
+    }
+
+    public function testSmtpConfigDefaultsToStrato(): void
+    {
+        $smtp = new ConfigLoader()->loadMailConfig(self::FIXTURES . 'mail-smtp-defaults.php')->smtp;
+
+        self::assertNotNull($smtp);
+        self::assertSame('smtp.strato.de', $smtp->host);
+        self::assertSame(465, $smtp->port);
+        self::assertSame(SmtpEncryption::Ssl, $smtp->encryption);
+        self::assertSame(10.0, $smtp->timeoutSeconds);
+    }
+
+    public function testSmtpGroupIsCheckedButNotUsedWithOtherTransport(): void
+    {
+        $config = $this->loadMail(['transport' => 'file', 'smtp' => self::smtp()]);
+
+        self::assertSame(MailTransport::File, $config->transport);
+        self::assertNotNull($config->smtp);
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage("'mail.smtp.port' muss");
+        $this->loadMail(['transport' => 'file', 'smtp' => self::smtp(['port' => 'x'])]);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function invalidSmtpGroups(): iterable
+    {
+        yield 'smtp fehlt' => [['transport' => 'smtp'], "Gruppe 'mail.smtp' fehlt"];
+        yield 'smtp kein Array' => [['transport' => 'smtp', 'smtp' => 'smtp.strato.de'], "'mail.smtp' muss"];
+        yield 'Prüfung abschalten' => [['transport' => 'smtp', 'smtp' => self::smtp(['verify_peer' => false])], "Unbekannter Schlüssel 'mail.smtp.verify_peer'"];
+        yield 'eigene CA' => [['transport' => 'smtp', 'smtp' => self::smtp(['cafile' => '/tmp/ca.pem'])], "Unbekannter Schlüssel 'mail.smtp.cafile'"];
+        yield 'Host mit Schema' => [['transport' => 'smtp', 'smtp' => self::smtp(['host' => 'ssl://smtp.strato.de'])], "'mail.smtp.host' muss"];
+        yield 'Host mit Port' => [['transport' => 'smtp', 'smtp' => self::smtp(['host' => 'smtp.strato.de:465'])], "'mail.smtp.host' muss"];
+        yield 'Host großgeschrieben' => [['transport' => 'smtp', 'smtp' => self::smtp(['host' => 'SMTP.strato.de'])], "'mail.smtp.host' muss"];
+        yield 'Host leer' => [['transport' => 'smtp', 'smtp' => self::smtp(['host' => ''])], "'mail.smtp.host' muss"];
+        yield 'Port als String' => [['transport' => 'smtp', 'smtp' => self::smtp(['port' => '465'])], "'mail.smtp.port' muss"];
+        yield 'Port 0' => [['transport' => 'smtp', 'smtp' => self::smtp(['port' => 0])], "'mail.smtp.port' muss"];
+        yield 'Port zu groß' => [['transport' => 'smtp', 'smtp' => self::smtp(['port' => 65536])], "'mail.smtp.port' muss"];
+        yield 'unverschlüsselt' => [['transport' => 'smtp', 'smtp' => self::smtp(['encryption' => 'none'])], "'mail.smtp.encryption' muss"];
+        yield 'tls statt ssl' => [['transport' => 'smtp', 'smtp' => self::smtp(['encryption' => 'tls'])], "'mail.smtp.encryption' muss"];
+        yield 'Verschlüsselung großgeschrieben' => [['transport' => 'smtp', 'smtp' => self::smtp(['encryption' => 'SSL'])], "'mail.smtp.encryption' muss"];
+        yield 'Benutzer fehlt' => [['transport' => 'smtp', 'smtp' => self::smtp(['username' => null])], "Schlüssel 'mail.smtp.username' fehlt"];
+        yield 'anderer Benutzer' => [['transport' => 'smtp', 'smtp' => self::smtp(['username' => 'info@prodad.de'])], "'mail.smtp.username' muss in"];
+        yield 'Benutzer großgeschrieben' => [['transport' => 'smtp', 'smtp' => self::smtp(['username' => 'Feuerwehr-App@prodad.de'])], 'genau die Absenderadresse feuerwehr-app@prodad.de'];
+        yield 'Passwort fehlt' => [['transport' => 'smtp', 'smtp' => self::smtp(['password' => null])], "Schlüssel 'mail.smtp.password' fehlt"];
+        yield 'Passwort leer' => [['transport' => 'smtp', 'smtp' => self::smtp(['password' => ''])], "'mail.smtp.password' muss"];
+        yield 'Passwort keine Zeichenkette' => [['transport' => 'smtp', 'smtp' => self::smtp(['password' => 12345])], "'mail.smtp.password' muss"];
+        yield 'Timeout 0' => [['transport' => 'smtp', 'smtp' => self::smtp(['timeout' => 0])], "'mail.smtp.timeout' muss"];
+        yield 'Timeout zu groß' => [['transport' => 'smtp', 'smtp' => self::smtp(['timeout' => 61])], "'mail.smtp.timeout' muss"];
+        yield 'Timeout als String' => [['transport' => 'smtp', 'smtp' => self::smtp(['timeout' => '10'])], "'mail.smtp.timeout' muss"];
+    }
+
+    /**
+     * @param array<string, mixed> $mail
+     */
+    #[DataProvider('invalidSmtpGroups')]
+    public function testInvalidSmtpGroupIsReportedWithoutValues(array $mail, string $expectedMessage): void
+    {
+        try {
+            $this->loadMail($mail);
+            self::fail('ConfigException erwartet.');
+        } catch (ConfigException $e) {
+            self::assertStringContainsString($expectedMessage, $e->getMessage());
+            self::assertStringNotContainsString(self::SECRET_MARKER, $e->getMessage());
+        }
+    }
+
     public function testOtherLoadersIgnoreAppAndMailGroups(): void
     {
         self::assertSame('pass-nicht-ausgeben', $this->load('mail-file')->pass);
@@ -217,5 +303,46 @@ final class ConfigLoaderTest extends TestCase
     private function load(string $fixture): DatabaseConfig
     {
         return new ConfigLoader()->loadDatabaseConfig(self::FIXTURES . $fixture . '.php');
+    }
+
+    /**
+     * Gültige Gruppe 'mail.smtp' mit Dummy-Passwort; null in $changes entfernt einen Schlüssel.
+     *
+     * @param array<string, mixed> $changes
+     *
+     * @return array<string, mixed>
+     */
+    private static function smtp(array $changes = []): array
+    {
+        $smtp = ['username' => 'feuerwehr-app@prodad.de', 'password' => 'smtp-pass-nicht-ausgeben'];
+        foreach ($changes as $key => $value) {
+            if ($value === null) {
+                unset($smtp[$key]);
+            } else {
+                $smtp[$key] = $value;
+            }
+        }
+
+        return $smtp;
+    }
+
+    /**
+     * Lädt eine temporäre Konfigurationsdatei mit gültiger Gruppe 'db' und der Gruppe 'mail'.
+     *
+     * @param array<string, mixed> $mail
+     */
+    private function loadMail(array $mail): MailConfig
+    {
+        $dir = new TempDirectory();
+        try {
+            $dir->write('config.php', "<?php\nreturn " . var_export([
+                'db' => ['host' => 'h', 'name' => 'n', 'user' => 'u', 'pass' => 'pass-nicht-ausgeben'],
+                'mail' => $mail,
+            ], true) . ";\n");
+
+            return new ConfigLoader()->loadMailConfig($dir->file('config.php'));
+        } finally {
+            $dir->remove();
+        }
     }
 }

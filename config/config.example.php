@@ -20,11 +20,27 @@ return [
     // 'app' => [
     //     'base_url' => 'http://localhost:8000',
     // ],
-    // Optional: Versand von Mails. Standard 'sendmail' (mail()); auf dem Server weglassen.
+    // Optional: Versand von Mails. Standard 'sendmail' (mail(), ohne DKIM).
     // Lokal 'file': jede Mail als .eml-Datei in file_dir (relativ zum Projektordner oder absolut,
     // Standard var/mail; steht in .gitignore).
     // 'mail' => [
     //     'transport' => 'file',
     //     'file_dir'  => 'var/mail',
+    // ],
+    // 'smtp': über das STRATO-Postfach (STRATO signiert mit DKIM). username muss genau
+    // feuerwehr-app@prodad.de sein; username und password sind Pflicht, der Rest optional
+    // (Standardwerte wie unten). encryption: 'ssl' (implizites TLS, Port 465) oder 'starttls'
+    // (Port 587). Das Zertifikat des Servers wird immer geprüft. Die Gruppe smtp wird auch bei
+    // einem anderen transport geprüft, aber nur bei 'smtp' verwendet.
+    // 'mail' => [
+    //     'transport' => 'smtp',
+    //     'smtp' => [
+    //         'username'   => 'feuerwehr-app@prodad.de',
+    //         'password'   => 'PASSWORT-DES-POSTFACHS',
+    //         'host'       => 'smtp.strato.de',
+    //         'port'       => 465,
+    //         'encryption' => 'ssl',
+    //         'timeout'    => 10,
+    //     ],
     // ],
 ];

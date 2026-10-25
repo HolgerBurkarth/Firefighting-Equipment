@@ -21,7 +21,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   zip, curl, openssl. Nicht verwenden: intl, sodium, xmlreader, xmlwriter, SQLite.
 - Keine Cronjobs: Fälligkeiten u. Ä. werden beim Aufruf berechnet.
 - Composer ist auf dem Server vorhanden.
-- E-Mail-Versand über `mail()` (sendmail).
+- E-Mail-Versand über `mail()` (sendmail) oder per SMTP über das STRATO-Postfach
+  `feuerwehr-app@prodad.de` (`smtp.strato.de`, signiert mit DKIM; siehe "E-Mail-Versand").
 
 ## Aufbau und URLs
 - Projektordner auf dem Server: `/apps/firefighting-equipment`
@@ -140,8 +141,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `allowed_origins` (Liste wie `http://localhost:8000`, ohne Pfad, kleingeschrieben); andere
   Schlüssel in `http` sind ein Fehler. Ebenso optional (Standardwerte = Produktion, auf dem Server
   weglassen): `app` → `base_url` (Standard `https://www.prodad.de`, Format wie ein Origin) und
-  `mail` → `transport` (`sendmail` Standard, `file`) und `file_dir` (Standard `var/mail`). Die
-  Gruppen werden erst geladen, wenn ein Link bzw. eine Mail gebraucht wird.
+  `mail` → `transport` (`sendmail` Standard, `smtp`, `file`), `file_dir` (Standard `var/mail`) und
+  `smtp` (Schlüssel siehe "E-Mail-Versand"; Pflicht bei `transport = smtp`, sonst geprüft, aber
+  nicht verwendet). Die Gruppen werden erst geladen, wenn ein Link bzw. eine Mail gebraucht wird.
+  Meldungen von `ConfigLoader` nennen nie Werte.
 - Tests: Testsuiten `unit` und `integration` (`composer test`, `composer test:unit`,
   `composer test:integration`). Die ganze Suite dauert lokal unter einer Minute;
   `process-timeout` 900 in `composer.json` bleibt als Reserve. Integrationstests werden übersprungen, wenn
@@ -398,9 +401,44 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - `FileMailer`: `JJJJMMTT-HHMMSSZ-<zufall>.eml`, Rechte 600, Ordner bei Bedarf mit 700 angelegt;
   Standard `var/mail` (in `.gitignore`, liegt außerhalb von `public/`).
 - `bin/mail-test.php --to=ADRESSE [--config=PFAD]` (Code `src/Cli/MailTestCommand.php`): Testmail
-  über den konfigurierten Transport, zeigt Transport, Message-ID und Dauer; Fehler werden hier
-  angezeigt. Exit-Codes 0/1/2. Auf dem Server:
+  über den konfigurierten Transport, zeigt Transport (bei SMTP mit Server), Message-ID und Dauer;
+  Fehler werden hier angezeigt (bei SMTP Schritt und Antwort des Servers, dazu Transport, Server
+  und Dauer, nie Zugangsdaten). Exit-Codes 0/1/2. Auf dem Server:
   `cd ~/htdocs/apps/firefighting-equipment && php85 bin/mail-test.php --to=…`.
+- `MimeMessage::toString()` (für `.eml` und SMTP) faltet Kopfzeilen über 78 Zeichen an Leerzeichen
+  (nie vor einem leeren Wort); `mail()` erhält `To`/`Subject` weiterhin ungefaltet.
+
+### SMTP (`src/Mail/Smtp/`)
+- Eigener Client ohne Bibliothek (nur `openssl`): `SmtpConfig`, `SmtpEncryption`, `SmtpMailer`
+  (Protokoll), `SmtpConnection` (Socket, TLS, Frist), `SmtpReply` (Antwort, Bereinigung). Keine
+  Bibliothek wie PHPMailer oder Symfony Mailer hinzufügen; `MimeMessage` bleibt die einzige Stelle,
+  an der Mails gebaut werden.
+- Konfiguration `mail.smtp`: `username` (Pflicht, genau `MimeMessage::FROM_ADDRESS`, sonst Fehler),
+  `password` (Pflicht, nicht leer), `host` (Standard `smtp.strato.de`, Hostname klein, ohne Schema
+  und Port), `port` (Standard 465, int), `encryption` (`ssl` Standard = implizites TLS, `starttls`;
+  unverschlüsselt gibt es nicht), `timeout` (Standard 10, 1–60 s, Frist für den ganzen Versand).
+  Unbekannte Schlüssel sind ein Fehler.
+- Zertifikat immer prüfen: `verify_peer`, `verify_peer_name`, `peer_name` = Host, keine
+  selbstsignierten, mindestens TLS 1.2. Es darf keine Einstellung geben, die das abschaltet (per
+  Test gesichert). Der Konstruktorparameter `caFile` von `SmtpMailer` ist nur für Tests (Test-CA)
+  und wird nie aus der Konfiguration gesetzt.
+- Ablauf je Mail: Verbindung, ggf. TLS, `220`, `EHLO prodad.de`, bei `starttls` `STARTTLS` (fehlt
+  es → Abbruch) und erneut `EHLO`, AUTH nur verschlüsselt (PLAIN, sonst LOGIN, sonst Abbruch),
+  `MAIL FROM:<feuerwehr-app@prodad.de>`, `RCPT TO`, `DATA` mit Dot-Stuffing, `QUIT` (Fehler dabei
+  zählen nicht mehr).
+- Passwort: `#[\SensitiveParameter]` überall, wo es oder die AUTH-Zeile übergeben wird;
+  `SmtpConfig::__debugInfo()` blendet es aus. Fehlermeldungen (`MailException`) enthalten nur
+  Schritt, Server und bereinigte Antwort bzw. PHP-Warnung (`SmtpReply::sanitize`: Steuerzeichen
+  entfernt, gekürzt, E-Mail-Adressen → `<Adresse>`, da sie ins `error_log` gelangen); nie gesendete
+  Daten.
+- Tests ohne echten Mailserver: `tests/Support/FakeSmtpServer` (startet
+  `tests/Support/fake-smtp-server.php` als eigenen Prozess auf `127.0.0.1` mit Szenario) und
+  `TestCertificates` (Test-CA zur Laufzeit, eigene minimale `openssl.cnf`; nichts committen).
+  Optionaler Live-Test `tests/Integration/Mail/SmtpLiveTest.php` nur mit Umgebungsvariable
+  `FF_SMTP_LIVE_TO` und `mail.transport = smtp` in `config/config.test.php`, sonst übersprungen.
+- Antwortzeit von "Passwort vergessen": SMTP dauert länger als sendmail. Nach dem Umstellen auf dem
+  Server mit `bin/mail-test.php` messen und `MIN_DURATION_SECONDS` anpassen; kein eigener kürzerer
+  Timeout für `password-reset/request`.
 
 ## Passwort vergessen
 - `POST auth/password-reset/request {email}` (öffentlich, unter `service` und jeder Stadt,

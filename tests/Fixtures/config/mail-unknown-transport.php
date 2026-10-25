@@ -8,6 +8,6 @@ return [
         'pass' => 'pass-nicht-ausgeben',
     ],
     'mail' => [
-        'transport' => 'smtp',
+        'transport' => 'pop3',
     ],
 ];

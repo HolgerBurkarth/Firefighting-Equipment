@@ -126,12 +126,46 @@ final class MimeMessageTest extends TestCase
 
         self::assertSame(
             "To: erika@example.org\r\nSubject: Betreff\r\n"
-            . "From: =?UTF-8?B?RmV1ZXJ3ZWhyIEdlcsOkdGV2ZXJ3YWx0dW5n?= <feuerwehr-app@prodad.de>\r\n"
+            . "From: =?UTF-8?B?RmV1ZXJ3ZWhyIEdlcsOkdGV2ZXJ3YWx0dW5n?=\r\n <feuerwehr-app@prodad.de>\r\n"
             . "Date: Sun, 25 Oct 2026 13:04:05 +0000\r\nMessage-ID: " . self::MESSAGE_ID . "\r\n"
             . "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n"
             . "Content-Transfer-Encoding: quoted-printable\r\nAuto-Submitted: auto-generated\r\n\r\nText\r\n",
             $mime->toString(),
         );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function longSubjects(): iterable
+    {
+        yield 'Emoji (4 Byte je Zeichen), ungefaltet über 998 Zeichen' => [str_repeat('🔥', MailMessage::MAX_SUBJECT_LENGTH)];
+        yield 'Umlaute' => [str_repeat('Prüfung € ', 20)];
+        yield 'ASCII mit Leerzeichen' => [str_repeat('Atemschutz ', 18)];
+    }
+
+    #[DataProvider('longSubjects')]
+    public function testLongHeaderLinesAreFoldedWithoutChangingTheirContent(string $subject): void
+    {
+        $mime = self::build(new MailMessage(self::to(), str_repeat('Brandmeisterin Weiß ', 4), $subject, 'Text'));
+
+        $headers = substr($mime->toString(), 0, (int) strpos($mime->toString(), "\r\n\r\n"));
+        foreach (explode("\r\n", $headers) as $line) {
+            self::assertLessThanOrEqual(78, strlen($line), $line);
+        }
+        // Entfalten (RFC 5322, 2.2.3): CRLF vor Leerzeichen entfernen ergibt die ursprünglichen Zeilen.
+        $unfolded = str_replace("\r\n ", ' ', $headers) . "\r\n";
+        self::assertStringStartsWith('To: ' . $mime->to . "\r\n", $unfolded);
+        self::assertStringContainsString("\r\nSubject: " . $mime->subject . "\r\n", $unfolded);
+        self::assertSame($subject, str_starts_with($mime->subject, '=?') ? self::decode($mime->subject) : $mime->subject);
+    }
+
+    public function testShortHeaderLinesAreNotFolded(): void
+    {
+        $mime = self::build(new MailMessage(self::to(), 'Erika Musterfrau', 'Ihr Passwort wurde geändert', 'Text'));
+
+        self::assertStringContainsString("\r\nSubject: " . $mime->subject . "\r\nFrom: ", $mime->toString());
+        self::assertStringStartsWith('To: "Erika Musterfrau" <erika@example.org>' . "\r\n", $mime->toString());
     }
 
     public function testMessageIdsAreUniqueAndWellFormed(): void

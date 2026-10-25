@@ -13,8 +13,15 @@ use FirefightingEquipment\Mail\MailException;
 use FirefightingEquipment\Mail\MailMessage;
 use FirefightingEquipment\Mail\MailTemplates;
 use FirefightingEquipment\Mail\MimeMessage;
+use FirefightingEquipment\Mail\Smtp\SmtpConfig;
+use FirefightingEquipment\Mail\Smtp\SmtpConnection;
+use FirefightingEquipment\Mail\Smtp\SmtpEncryption;
+use FirefightingEquipment\Mail\Smtp\SmtpMailer;
+use FirefightingEquipment\Mail\Smtp\SmtpReply;
 use FirefightingEquipment\Tests\Support\FakeMailer;
+use FirefightingEquipment\Tests\Support\FakeSmtpServer;
 use FirefightingEquipment\Tests\Support\TempDirectory;
+use FirefightingEquipment\Tests\Support\TestCertificates;
 use FirefightingEquipment\User\EmailAddress;
 use FirefightingEquipment\User\InvalidUserValueException;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -33,6 +40,10 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(MailMessage::class)]
 #[UsesClass(MailTemplates::class)]
 #[UsesClass(MimeMessage::class)]
+#[UsesClass(SmtpConfig::class)]
+#[UsesClass(SmtpConnection::class)]
+#[UsesClass(SmtpMailer::class)]
+#[UsesClass(SmtpReply::class)]
 final class MailTestCommandTest extends TestCase
 {
     private const string FIXTURES = __DIR__ . '/../../Fixtures/config/';
@@ -99,6 +110,62 @@ final class MailTestCommandTest extends TestCase
 
         self::assertSame(MailTestCommand::EXIT_ERROR, $command->run(['--to=test@example.org', '--config=' . self::FIXTURES . 'valid.php']));
         self::assertStringContainsString('FEHLER: Versand absichtlich fehlgeschlagen', $this->err());
+        self::assertMatchesRegularExpression('/^\(Transport: sendmail, Dauer: \d+\.\d\d s\)\r?$/m', $this->err());
+    }
+
+    public function testSmtpShowsServerButNoCredentials(): void
+    {
+        $command = new MailTestCommand('gibt-es-nicht.php', '/projekt', $this->out, $this->err, static fn (): FakeMailer => new FakeMailer());
+
+        $exitCode = $command->run(['--to=test@example.org', '--config=' . self::FIXTURES . 'mail-smtp.php']);
+
+        self::assertSame(MailTestCommand::EXIT_OK, $exitCode, $this->err());
+        self::assertMatchesRegularExpression(
+            '/^Testmail an test@example\.org übergeben \(Transport: smtp, Server: mail\.example\.org:587 \(starttls\), Dauer: \d+\.\d\d s\)\.\r?$/m',
+            $this->out(),
+        );
+        self::assertStringContainsString('SPF, DKIM, DMARC', $this->out());
+        self::assertStringNotContainsString('nicht-ausgeben', $this->out() . $this->err());
+    }
+
+    public function testSmtpErrorShowsServerReplyWithoutCredentials(): void
+    {
+        $dir = new TempDirectory();
+        $certificates = new TestCertificates($dir);
+        $server = FakeSmtpServer::start([
+            ['tls' => true],
+            ['send' => '220 fake.example ESMTP'],
+            ['read' => true],
+            ['send' => "250-fake.example\n250 AUTH PLAIN"],
+            ['read' => true],
+            ['send' => '535 5.7.8 Authentication credentials invalid'],
+        ], $certificates->server('IP:127.0.0.1'));
+        try {
+            $command = new MailTestCommand('gibt-es-nicht.php', '/projekt', $this->out, $this->err, static function (MailConfig $config) use ($server, $certificates): SmtpMailer {
+                self::assertNotNull($config->smtp);
+
+                // Wie konfiguriert, nur mit dem Fake-Server als Ziel und der Test-CA.
+                return new SmtpMailer(new SmtpConfig(
+                    $config->smtp->username,
+                    $config->smtp->password,
+                    '127.0.0.1',
+                    $server->port,
+                    SmtpEncryption::Ssl,
+                    $config->smtp->timeoutSeconds,
+                ), $certificates->caFile);
+            });
+
+            $exitCode = $command->run(['--to=test@example.org', '--config=' . self::FIXTURES . 'mail-smtp.php']);
+        } finally {
+            $server->remove();
+            $dir->remove();
+        }
+
+        self::assertSame(MailTestCommand::EXIT_ERROR, $exitCode);
+        self::assertStringContainsString('FEHLER: SMTP-Fehler bei AUTH: 535 5.7.8 Authentication credentials invalid', $this->err());
+        self::assertMatchesRegularExpression('/^\(Transport: smtp, Server: mail\.example\.org:587 \(starttls\), Dauer: \d+\.\d\d s\)\r?$/m', $this->err());
+        self::assertStringNotContainsString('nicht-ausgeben', $this->out() . $this->err());
+        self::assertStringNotContainsString(base64_encode("\0feuerwehr-app@prodad.de\0smtp-pass-nicht-ausgeben"), $this->out() . $this->err());
     }
 
     public function testInvalidAddressOrConfigGivesExitCode1(): void
