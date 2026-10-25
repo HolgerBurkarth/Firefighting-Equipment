@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tenant;
 
+use FirefightingEquipment\Device\DefaultDeviceTypes;
+
 /**
  * Zugriff auf fe_tenants. Es gibt bewusst weder Umbenennen des Kürzels noch Löschen:
  * Das Kürzel ist Teil der URL und unveränderlich, gesperrte Städte behalten ihre Daten.
@@ -62,11 +64,36 @@ final readonly class TenantRepository
     }
 
     /**
-     * Legt eine aktive Stadt an.
+     * Legt eine aktive Stadt mit den Start-Gerätetypen (DefaultDeviceTypes) an. Läuft in einer eigenen
+     * Transaktion oder, falls schon eine offen ist, in dieser (UserRepository::createTenantWithInvitedAdmin).
      *
      * @throws DuplicateTenantSlugException
      */
     public function create(TenantSlug $slug, TenantName $name): Tenant
+    {
+        $ownTransaction = !$this->pdo->inTransaction();
+        if ($ownTransaction) {
+            $this->pdo->beginTransaction();
+        }
+        try {
+            $tenant = $this->insert($slug, $name);
+            if ($ownTransaction) {
+                $this->pdo->commit();
+            }
+
+            return $tenant;
+        } catch (\Throwable $e) {
+            if ($ownTransaction && $this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * @throws DuplicateTenantSlugException
+     */
+    private function insert(TenantSlug $slug, TenantName $name): Tenant
     {
         try {
             $this->pdo->prepare(
@@ -81,7 +108,17 @@ final readonly class TenantRepository
             throw $e;
         }
 
-        return $this->findBySlug($slug) ?? throw new \LogicException('Angelegte Stadt nicht gefunden.');
+        $tenant = $this->findBySlug($slug) ?? throw new \LogicException('Angelegte Stadt nicht gefunden.');
+
+        $insertType = $this->pdo->prepare(
+            'INSERT INTO fe_device_types (tenant_id, name, active, created_at, updated_at)'
+            . ' VALUES (?, ?, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
+        );
+        foreach (DefaultDeviceTypes::NAMES as $typeName) {
+            $insertType->execute([$tenant->id, $typeName]);
+        }
+
+        return $tenant;
     }
 
     /**

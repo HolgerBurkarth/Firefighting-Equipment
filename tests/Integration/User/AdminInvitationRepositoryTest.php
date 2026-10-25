@@ -7,6 +7,7 @@ namespace FirefightingEquipment\Tests\Integration\User;
 use FirefightingEquipment\Auth\OneTimeToken;
 use FirefightingEquipment\Auth\TokenPurpose;
 use FirefightingEquipment\Auth\UserTokenRepository;
+use FirefightingEquipment\Device\DefaultDeviceTypes;
 use FirefightingEquipment\Tenant\DuplicateTenantSlugException;
 use FirefightingEquipment\Tenant\TenantName;
 use FirefightingEquipment\Tenant\TenantRepository;
@@ -65,6 +66,11 @@ final class AdminInvitationRepositoryTest extends AuthTestCase
         self::assertNull($invitation->user->name);
         self::assertSame($invitation->user->id, $this->tokens->findUserId(TokenPurpose::SetPassword, $invitation->token));
         self::assertSame(24, $this->tokenLifetimeHours($invitation->user->id), 'Link 24 h gültig');
+        self::assertSame(
+            count(DefaultDeviceTypes::NAMES),
+            (int) $this->pdo()->query('SELECT COUNT(*) FROM fe_device_types WHERE tenant_id = ' . $invitation->tenant->id)->fetchColumn(),
+            'Start-Gerätetypen',
+        );
     }
 
     public function testDuplicateSlugCreatesNothing(): void
@@ -91,6 +97,7 @@ final class AdminInvitationRepositoryTest extends AuthTestCase
     {
         // Der letzte Schritt (Link) scheitert: Eine zweite Verbindung sperrt fe_user_tokens ganz,
         // das Anlegen des Links läuft nach 1 s in einen Lock-Wait-Timeout.
+        $deviceTypes = $this->countRows('fe_device_types');
         $concurrent = TestDatabase::connect();
         $concurrent->beginTransaction();
         $concurrent->query('SELECT id FROM fe_user_tokens FOR UPDATE')->fetchAll();
@@ -111,6 +118,7 @@ final class AdminInvitationRepositoryTest extends AuthTestCase
         self::assertFalse($this->pdo()->inTransaction());
 
         self::assertNull(new TenantRepository($this->pdo())->findBySlug(TenantSlug::fromString('geisingen')));
+        self::assertSame($deviceTypes, $this->countRows('fe_device_types'), 'Start-Gerätetypen zurückgenommen');
         self::assertSame(0, (int) $this->pdo()->query("SELECT COUNT(*) FROM fe_users WHERE email = 'admin@example.org'")->fetchColumn());
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tests\Integration\Tenant;
 
+use FirefightingEquipment\Device\DefaultDeviceTypes;
 use FirefightingEquipment\Tenant\DuplicateTenantSlugException;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Tenant\TenantException;
@@ -12,6 +13,7 @@ use FirefightingEquipment\Tenant\TenantNotFoundException;
 use FirefightingEquipment\Tenant\TenantRepository;
 use FirefightingEquipment\Tenant\TenantSlug;
 use FirefightingEquipment\Tests\Integration\DomainTestCase;
+use FirefightingEquipment\Tests\Support\TestDatabase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
@@ -24,6 +26,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(TenantSlug::class)]
 final class TenantRepositoryTest extends DomainTestCase
 {
+    private const int ER_LOCK_WAIT_TIMEOUT = 1205;
+
     private TenantRepository $repository;
 
     protected function setUp(): void
@@ -44,6 +48,47 @@ final class TenantRepositoryTest extends DomainTestCase
         self::assertSame('UTC', $tenant->createdAt->getTimezone()->getName());
         self::assertEquals($tenant->createdAt, $tenant->updatedAt);
         self::assertLessThan(60, abs($tenant->createdAt->getTimestamp() - $before->getTimestamp()));
+    }
+
+    public function testCreateAddsDefaultDeviceTypes(): void
+    {
+        $tenant = $this->create('immendingen', 'Feuerwehr Immendingen');
+
+        self::assertSame(DefaultDeviceTypes::NAMES, $this->deviceTypeNames($tenant->id));
+        self::assertFalse($this->pdo()->inTransaction());
+    }
+
+    public function testCreateRunsInsideOpenTransaction(): void
+    {
+        $this->pdo()->beginTransaction();
+        $tenant = $this->create('immendingen', 'Feuerwehr Immendingen');
+        self::assertTrue($this->pdo()->inTransaction(), 'Die Transaktion des Aufrufers bleibt offen.');
+        $this->pdo()->rollBack();
+
+        self::assertNull($this->repository->findById($tenant->id));
+        self::assertSame([], $this->deviceTypeNames($tenant->id));
+    }
+
+    public function testFailingDeviceTypesRollBackTenant(): void
+    {
+        // Eine zweite Verbindung sperrt fe_device_types ganz; das Anlegen der Typen läuft nach 1 s in
+        // einen Lock-Wait-Timeout, die Stadt darf dann nicht bestehen bleiben.
+        $concurrent = TestDatabase::connect();
+        $concurrent->beginTransaction();
+        $concurrent->query('SELECT id FROM fe_device_types FOR UPDATE')->fetchAll();
+        $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = 1');
+        try {
+            $this->create('immendingen', 'Feuerwehr Immendingen');
+            self::fail('Fehler beim Anlegen der Gerätetypen wurde nicht gemeldet.');
+        } catch (\PDOException $e) {
+            self::assertSame(self::ER_LOCK_WAIT_TIMEOUT, $e->errorInfo[1] ?? null, $e->getMessage());
+        } finally {
+            $concurrent->rollBack();
+            $this->pdo()->exec('SET SESSION innodb_lock_wait_timeout = DEFAULT');
+        }
+
+        self::assertFalse($this->pdo()->inTransaction());
+        self::assertSame([], $this->repository->all());
     }
 
     public function testFindBySlug(): void
@@ -78,6 +123,8 @@ final class TenantRepositoryTest extends DomainTestCase
         $all = $this->repository->all();
         self::assertCount(1, $all);
         self::assertSame('Feuerwehr Immendingen', $all[0]->name->value);
+        self::assertCount(count(DefaultDeviceTypes::NAMES), $this->deviceTypeNames($all[0]->id));
+        self::assertFalse($this->pdo()->inTransaction());
     }
 
     public function testDeactivateAndActivate(): void
@@ -180,6 +227,17 @@ final class TenantRepositoryTest extends DomainTestCase
     public function testAllIsEmptyWithoutTenants(): void
     {
         self::assertSame([], $this->repository->all());
+    }
+
+    /**
+     * @return list<string> in der Reihenfolge des Anlegens
+     */
+    private function deviceTypeNames(int $tenantId): array
+    {
+        $stmt = $this->pdo()->prepare('SELECT name FROM fe_device_types WHERE tenant_id = ? AND active = 1 ORDER BY id');
+        $stmt->execute([$tenantId]);
+
+        return $stmt->fetchAll(\PDO::FETCH_COLUMN);
     }
 
     private function create(string $slug, string $name): Tenant

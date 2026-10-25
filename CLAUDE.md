@@ -124,9 +124,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Zeichensatz und Kollation: Alle Tabellen und die Verbindung verwenden utf8mb4 mit
   `utf8mb4_unicode_ci`. Die Verbindung läuft mit Sitzungs-Zeitzone UTC (`+00:00`).
   Dokumentierte Ausnahmen auf Spaltenebene: `fe_users.email` ist `utf8mb4_bin`, damit z. B.
-  "ß"/"ss" oder "é"/"e" nicht als gleich gelten (Kleinschreibung erzwingt ein CHECK); feste
-  Werte (`role`, `status`, `purpose`, `action`) und `password_hash` sind `ascii`/`ascii_bin`,
-  damit `IN (...)` bzw. `LIKE` Groß- und Kleinschreibung unterscheiden.
+  "ß"/"ss" oder "é"/"e" nicht als gleich gelten (Kleinschreibung erzwingt ein CHECK); ebenso
+  `fe_devices.identifier_key` sowie `fe_device_events.old_value`/`new_value` (siehe "Standorte und
+  Geräte"); feste Werte (`role`, `status`, `purpose`, `action`, `kind`, `event_type`, `field`) und
+  `password_hash` sind `ascii`/`ascii_bin`, damit `IN (...)` bzw. `LIKE` Groß- und
+  Kleinschreibung unterscheiden.
 - `sql_mode` setzt `ConnectionFactory` ausdrücklich und vollständig, damit lokal und STRATO
   identisch sind: `STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,
   NO_ENGINE_SUBSTITUTION,ONLY_FULL_GROUP_BY`. Zu lange Werte führen daher zu einem Fehler statt
@@ -218,6 +220,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   immer gemeinsam ändern.
 - Name (`TenantName`): Leerraum am Rand wird entfernt, nicht leer, höchstens 100 Zeichen,
   keine Steuerzeichen.
+- Neue Städte erhalten beim Anlegen die Start-Gerätetypen (siehe "Standorte und Geräte").
 - Das Kürzel ist nach dem Anlegen unveränderlich, Städte werden nie gelöscht, nur gesperrt
   (`active = 0`, Daten bleiben erhalten). Da Trigger verboten sind, sichert das der Code:
   `TenantRepository` hat bewusst keine Methode zum Ändern des Kürzels oder zum Löschen; eine
@@ -591,18 +594,66 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Gültigkeit 24 h und Kontakt-Hinweis; Benachrichtigung mit Stadt, Name, E-Mail und Zeit
   (Europe/Berlin). Zwecke im Protokoll: `admin_invitation`, `invitation_accepted`.
 
+## Standorte und Geräte
+- Stand: nur das Schema (Migrationen `0011`–`0015`) und die Start-Gerätetypen neuer Städte; Fachlogik
+  und API folgen. Schema-Tests in `tests/Integration/Device/` (`DeviceSchemaTestCase`).
+- Rechte: `user` darf ansehen, umbuchen, Status setzen (einsatzbereit, in Wartung, defekt) und CSV
+  exportieren. `admin` zusätzlich: aussondern und wieder aufnehmen, Prüfdatum ("nächste Prüfung
+  fällig") ändern, Geräte anlegen und Stammdaten bearbeiten, Gerätetypen und Standorte verwalten,
+  CSV importieren.
+- Gerät (`fe_devices`): Pflicht Kennung, Gerätetyp, Standort, Status; optional Seriennummer,
+  Hersteller, Modell (zwei Felder), Beschaffungsdatum, Notiz (höchstens 1000 Zeichen), nächste
+  Prüfung fällig. Datumsfelder sind `DATE` zwischen 1950-01-01 und 2099-12-31 (fängt Tippfehler wie
+  "0202" ab). Leere Texte werden als `NULL` gespeichert. Typ und Standort nur aus derselben Stadt.
+- Kennung: höchstens 30 Zeichen aus Buchstaben (alle Unicode-Buchstaben, zusammengesetzte Form),
+  Ziffern `0-9`, Leerzeichen, `-`, `/`, `.`; keine Leerzeichen am Rand, mehrere Leerzeichen fasst der
+  Code zu einem zusammen (die Datenbank lehnt doppelte ab). Angezeigt wie eingegeben, durch den Admin
+  änderbar. Eindeutig je Stadt über alle Gerätetypen, nur unter nicht ausgesonderten Geräten
+  (Wiederverwendung nach dem Aussondern erlaubt; Wiederaufnahme scheitert, wenn die Kennung
+  inzwischen vergeben ist). Groß-/Kleinschreibung zählt nicht, aber ß ≠ ss und é ≠ e: Die gespeicherte
+  Spalte `identifier_key` = `REPLACE(LOWER(identifier), 'ẞ', 'ß')` in `utf8mb4_bin`, bei
+  ausgesonderten Geräten `NULL`, mit UNIQUE-Index (`LOWER()` kennt unter `utf8mb4_unicode_ci` das
+  große ẞ nicht). Format per CHECK mit `REGEXP` und `\p{L}`.
+- Status (`status`, `ascii_bin`): `ready` (einsatzbereit), `maintenance` (in Wartung), `defective`
+  (defekt), `retired` (ausgesondert). Ausgesonderte Geräte sind aus normalen Listen und Prüffristen
+  ausgeblendet, nicht umbuchbar; der Admin kann sie wieder aufnehmen. Geräte werden nie gelöscht
+  (jedes hat ein Ereignis, der Fremdschlüssel verhindert das Löschen).
+- Gleichzeitige Änderungen: Versionszähler `fe_devices.version` (ab 1, jede Änderung erhöht ihn); eine
+  Änderung mit veralteter Version wird mit einem verständlichen Konflikt abgelehnt (Code und Status
+  werden mit der API festgelegt, vorgesehen 409 `version_conflict`).
+- Gerätetypen (`fe_device_types`): je Stadt, Name je Stadt eindeutig (ohne Groß-/Kleinschreibung),
+  vom Admin pflegbar, deaktivierbar (`active = 0`) statt löschbar. Start: Atemschutzmaske,
+  Atemschutzgerät, Funkgerät, Wärmebildkamera (`DefaultDeviceTypes::NAMES`); bestehende Städte per
+  Migration `0012`, neue in `TenantRepository::create` (eigene Transaktion oder die bereits offene
+  von `createTenantWithInvitedAdmin`). Beide Listen immer gemeinsam ändern.
+- Standorte (`fe_locations`): Art (`kind`) `vehicle` (Fahrzeug), `room` (Raum/Lager), `external`
+  (Extern). Höchstens zwei Ebenen; ein Unterstandort hat immer dieselbe Art wie sein übergeordneter
+  Standort. Die Datenbank erzwingt beides ohne Trigger über den Fremdschlüssel
+  `(parent_id, tenant_id, parent_level, kind)` → `(id, tenant_id, level, kind)` mit
+  `parent_level = 1` (CHECK mit `<=>`, sonst würde NULL die Prüfung umgehen). Folgen: kein
+  Unterstandort eines Unterstandorts, keine andere Art, keine andere Stadt; Art und Ebene eines
+  Standorts mit Unterstandorten sind nicht änderbar. Name je Stadt und übergeordnetem Standort
+  eindeutig (`utf8mb4_unicode_ci`, also auch "Straße" = "Strasse"; `parent_key` 0 = Ebene 1). Nie
+  gelöscht; sperrbar (`active = 0`) nur, wenn leer (keine nicht ausgesonderten Geräte, keine aktiven
+  Unterstandorte; prüft der Code). Gesperrt = kein Ziel für Umbuchungen, die Historie bleibt.
+- Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
+  `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden). Wer (`user_id`
+  aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann
+  (`created_at`, UTC), optionaler Kommentar (höchstens 500 Zeichen). Ereignisse (`event_type`):
+  `created` bzw. `imported` (Ziel-Standort und -Status, nicht ausgesondert), `state_changed`
+  (Umbuchung und/oder Statusänderung in EINEM Eintrag, Von/Nach je Paar, verschieden; auch Aussondern
+  und Wiederaufnehmen), `due_changed` (Prüfdatum alt/neu, je auch leer), `field_changed` (Stammdaten:
+  ein Eintrag je Feld `identifier`, `device_type`, `serial_number`, `manufacturer`, `model`,
+  `procured_on`, `note`, alter/neuer Wert als Text in `utf8mb4_bin`, beim Gerätetyp dessen Name zum
+  Zeitpunkt der Änderung). Welche Spalten je Ereignis gefüllt sind, prüfen CHECK-Bedingungen.
+- Was nur der Code sichert (ohne Trigger nicht möglich): Standort nur leer sperren, gesperrter Standort
+  und deaktivierter Gerätetyp sind kein Ziel, Ereignis passend zur Änderung am Gerät, Versionsprüfung.
+
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".
 - Neue Stadt: Super-Admin legt Name, Kürzel und E-Mail des ersten Admins an (siehe
   "Benutzer und Anmeldung").
-- Gerät: Pflicht Kennung, Gerätetyp, Standort, Status; optional Seriennummer,
-  Hersteller/Modell, Beschaffungsdatum, Notiz, "nächste Prüfung fällig".
-- Gerätetypen vom Admin pflegbar (Start: Atemschutzmaske, Atemschutzgerät, Funkgerät,
-  Wärmebildkamera).
-- Status: einsatzbereit, in Wartung, defekt, ausgesondert.
-- Standorte: Fahrzeug, Raum/Lager, Extern; optional mit übergeordnetem Standort; sperrbar,
-  Historie bleibt erhalten.
-- Jede Änderung von Standort oder Status wird mit Wer/Wann/Von/Nach protokolliert.
+- Geräte, Gerätetypen, Status, Standorte und Historie: siehe "Standorte und Geräte".
 - Übersicht "überfällig" und "in 30 Tagen fällig".
 - CSV-Export (Semikolon, UTF-8, Umlaute korrekt) und CSV-Import mit Prüfung und Fehleranzeige.
 - Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
