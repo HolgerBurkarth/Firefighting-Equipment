@@ -78,7 +78,7 @@ final class UserRepositoryTest extends AuthSchemaTestCase
     {
         $email = EmailAddress::fromString('chef@example.org');
         $this->users->createSuperAdmin($email, PersonName::fromString('Erika'), self::PASSWORD_HASH);
-        $this->users->createInvitedAdmin($this->tenant, $email);
+        $this->users->inviteAdmin($this->tenant, $email);
 
         $this->expectException(DuplicateUserEmailException::class);
         $this->expectExceptionMessageIsOrContains('Es gibt bereits ein Konto mit der E-Mail-Adresse „chef@example.org“.');
@@ -87,7 +87,7 @@ final class UserRepositoryTest extends AuthSchemaTestCase
 
     public function testCreateInvitedAdmin(): void
     {
-        $user = $this->users->createInvitedAdmin($this->tenant, EmailAddress::fromString('admin@example.org'));
+        $user = $this->users->inviteAdmin($this->tenant, EmailAddress::fromString('admin@example.org'))->user;
 
         self::assertSame($this->tenant->id, $user->tenantId);
         self::assertSame(UserRole::Admin, $user->role);
@@ -104,18 +104,18 @@ final class UserRepositoryTest extends AuthSchemaTestCase
         $email = EmailAddress::fromString('admin@example.org');
         $other = $this->tenant('tuttlingen');
 
-        $first = $this->users->createInvitedAdmin($this->tenant, $email);
-        $second = $this->users->createInvitedAdmin($other, $email);
+        $first = $this->users->inviteAdmin($this->tenant, $email)->user;
+        $second = $this->users->inviteAdmin($other, $email)->user;
         self::assertNotSame($first->id, $second->id);
 
         $this->expectException(DuplicateUserEmailException::class);
-        $this->users->createInvitedAdmin($this->tenant, $email);
+        $this->users->inviteAdmin($this->tenant, $email);
     }
 
     public function testFind(): void
     {
         $email = EmailAddress::fromString('admin@example.org');
-        $admin = $this->users->createInvitedAdmin($this->tenant, $email);
+        $admin = $this->users->inviteAdmin($this->tenant, $email)->user;
         $this->users->createSuperAdmin(EmailAddress::fromString('chef@example.org'), PersonName::fromString('Erika'), self::PASSWORD_HASH);
 
         self::assertSame($admin->id, $this->users->findById($admin->id)?->id);
@@ -129,10 +129,10 @@ final class UserRepositoryTest extends AuthSchemaTestCase
 
     public function testEmailIsComparedBinary(): void
     {
-        $this->users->createInvitedAdmin($this->tenant, EmailAddress::fromString('straße@example.org'));
+        $this->users->inviteAdmin($this->tenant, EmailAddress::fromString('straße@example.org'));
 
         self::assertNull($this->users->findByTenantAndEmail($this->tenant, EmailAddress::fromString('strasse@example.org')));
-        $this->users->createInvitedAdmin($this->tenant, EmailAddress::fromString('strasse@example.org'));
+        $this->users->inviteAdmin($this->tenant, EmailAddress::fromString('strasse@example.org'));
         self::assertCount(2, $this->users->listByTenant($this->tenant));
     }
 
@@ -331,7 +331,7 @@ final class UserRepositoryTest extends AuthSchemaTestCase
 
     public function testInvitedAccountGetsNoPasswordHere(): void
     {
-        $invited = $this->users->createInvitedAdmin($this->tenant, EmailAddress::fromString('admin@example.org'));
+        $invited = $this->users->inviteAdmin($this->tenant, EmailAddress::fromString('admin@example.org'))->user;
 
         $this->assertRuleViolation('Einladung ist nicht abgeschlossen', fn () => $this->users->setPassword($invited->id, self::PASSWORD_HASH));
         self::assertNull($this->passwordHash($invited->id));
@@ -376,11 +376,11 @@ final class UserRepositoryTest extends AuthSchemaTestCase
     public function testAnonymizedEmailCanBeUsedAgain(): void
     {
         $this->createAdmin();
-        $invited = $this->users->createInvitedAdmin($this->tenant, EmailAddress::fromString('admin@example.org'));
+        $invited = $this->users->inviteAdmin($this->tenant, EmailAddress::fromString('admin@example.org'))->user;
 
         $this->users->anonymize($invited->id);
 
-        $again = $this->users->createInvitedAdmin($this->tenant, EmailAddress::fromString('admin@example.org'));
+        $again = $this->users->inviteAdmin($this->tenant, EmailAddress::fromString('admin@example.org'))->user;
         self::assertNotSame($invited->id, $again->id);
     }
 

@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\User;
 
+use FirefightingEquipment\Auth\OneTimeToken;
+use FirefightingEquipment\Auth\TokenPurpose;
+use FirefightingEquipment\Auth\UserTokenRepository;
 use FirefightingEquipment\Invitation\InvitationCodeNotUsableException;
 use FirefightingEquipment\Invitation\InvitationCodeRepository;
 use FirefightingEquipment\Invitation\InvitationCodeValue;
+use FirefightingEquipment\Tenant\DuplicateTenantSlugException;
 use FirefightingEquipment\Tenant\Tenant;
+use FirefightingEquipment\Tenant\TenantName;
+use FirefightingEquipment\Tenant\TenantRepository;
+use FirefightingEquipment\Tenant\TenantSlug;
 
 /**
  * Zugriff auf fe_users. Konten werden nie per DELETE entfernt, sondern anonymisiert.
@@ -123,19 +130,91 @@ final readonly class UserRepository
     }
 
     /**
-     * Legt den ersten Admin einer Stadt an (Status invited, ohne Passwort und Namen). Beides setzt
-     * er später selbst über einen Einmal-Link.
+     * Legt eine Stadt mit eingeladenem Admin an, in einer Transaktion: Stadt (aktiv), Konto (Rolle
+     * admin, Status invited, ohne Passwort und Namen) und Link set_password. Schlägt ein Teil fehl,
+     * bleibt nichts davon bestehen.
      *
+     * @throws DuplicateTenantSlugException
      * @throws DuplicateUserEmailException
      */
-    public function createInvitedAdmin(Tenant $tenant, EmailAddress $email): User
+    public function createTenantWithInvitedAdmin(TenantSlug $slug, TenantName $name, EmailAddress $email): AdminInvitation
     {
-        return $this->insert(
-            'INSERT INTO fe_users (tenant_id, role, status, email, created_at, updated_at)'
-            . " VALUES (?, 'admin', 'invited', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-            [$tenant->id, $email->value],
-            $email,
-        );
+        return $this->atomically(function () use ($slug, $name, $email): AdminInvitation {
+            $tenant = new TenantRepository($this->pdo)->create($slug, $name);
+            $this->lockGroup($tenant->id);
+
+            return $this->insertInvitedAdmin($tenant, $email);
+        });
+    }
+
+    /**
+     * Lädt einen Admin in eine bestehende Stadt ein (Konto invited ohne Passwort und Namen, dazu der
+     * Link set_password, in einer Transaktion). Ob die Stadt gesperrt ist, prüft der Aufrufer.
+     *
+     * @throws DuplicateUserEmailException die Adresse hat in der Stadt schon ein Konto
+     */
+    public function inviteAdmin(Tenant $tenant, EmailAddress $email): AdminInvitation
+    {
+        return $this->tenantTransaction($tenant, fn (): AdminInvitation => $this->insertInvitedAdmin($tenant, $email));
+    }
+
+    /**
+     * Neuer Link set_password für eine offene Einladung; der alte wird ungültig.
+     *
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException keine offene Einladung oder Konto gesperrt
+     */
+    public function renewInvitation(int $id): OneTimeToken
+    {
+        return $this->transaction($id, function (User $user): OneTimeToken {
+            if ($user->status !== UserStatus::Invited) {
+                throw UserRuleViolationException::notInvited($user->id);
+            }
+            if ($user->isLocked()) {
+                throw UserRuleViolationException::invitationLocked($user->id);
+            }
+
+            return new UserTokenRepository($this->pdo)->replace($user->id, TokenPurpose::SetPassword);
+        });
+    }
+
+    /**
+     * Einladung annehmen über den Einmal-Link: löst den Link (set_password, nicht abgelaufen) ein
+     * und setzt in derselben Transaktion Name und Anzeigename, Passwort-Hash, bestätigte E-Mail und
+     * den Status active. Wird der Link gleichzeitig zweimal eingelöst, gewinnt nur einer. Die
+     * Passwortregeln prüft der Aufrufer.
+     *
+     * @param string $tokenHash SHA-256 des Tokens (32 Byte)
+     *
+     * @return bool false, wenn der Link nicht (mehr) gültig ist oder das Konto nicht invited bzw.
+     *              gesperrt ist; dann bleibt alles unverändert
+     *
+     * @throws UserNotFoundException
+     */
+    public function acceptInvitation(int $id, PersonName $name, #[\SensitiveParameter] string $passwordHash, string $tokenHash): bool
+    {
+        return $this->transaction($id, function (User $user) use ($name, $passwordHash, $tokenHash): bool {
+            if ($user->status !== UserStatus::Invited || $user->isLocked()) {
+                return false;
+            }
+
+            $stmt = $this->pdo->prepare(
+                "DELETE FROM fe_user_tokens WHERE user_id = ? AND purpose = 'set_password' AND token_hash = ?"
+                . ' AND expires_at > UTC_TIMESTAMP()',
+            );
+            $stmt->execute([$user->id, $tokenHash]);
+            if ($stmt->rowCount() !== 1) {
+                return false;
+            }
+
+            $this->update(
+                $user->id,
+                "status = 'active', name = ?, display_name = ?, password_hash = ?, email_verified_at = UTC_TIMESTAMP()",
+                [$name->value, $name->value, $passwordHash],
+            );
+
+            return true;
+        });
     }
 
     /**
@@ -434,6 +513,18 @@ final readonly class UserRepository
     }
 
     /**
+     * @return list<User> aktive, nicht gesperrte Super-Admins (Empfänger von Hinweisen), nach ID
+     */
+    public function listActiveSuperAdmins(): array
+    {
+        return $this->fetchAll(
+            'SELECT ' . self::COLUMNS . " FROM fe_users WHERE tenant_key = 0 AND status = 'active'"
+            . ' AND locked_at IS NULL ORDER BY id',
+            [],
+        );
+    }
+
+    /**
      * Anonymisiert Konten der Stadt, deren E-Mail-Adresse UNVERIFIED_RETENTION_DAYS nach der
      * Registrierung noch nicht bestätigt ist (Ersatz für einen Cronjob). Danach ist die Adresse
      * wieder frei. Die Nutzung des Einladungscodes wird nicht zurückgegeben.
@@ -607,6 +698,24 @@ final readonly class UserRepository
             "status = 'deleted', email = NULL, email_verified_at = NULL, password_hash = NULL, name = NULL,"
             . ' display_name = NULL, deleted_at = UTC_TIMESTAMP()',
         );
+    }
+
+    /**
+     * Konto invited und Link set_password (die Konten der Stadt sind bereits gesperrt).
+     *
+     * @throws DuplicateUserEmailException
+     */
+    private function insertInvitedAdmin(Tenant $tenant, EmailAddress $email): AdminInvitation
+    {
+        $user = $this->insert(
+            'INSERT INTO fe_users (tenant_id, role, status, email, created_at, updated_at)'
+            . " VALUES (?, 'admin', 'invited', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$tenant->id, $email->value],
+            $email,
+        );
+        $token = new UserTokenRepository($this->pdo)->replace($user->id, TokenPurpose::SetPassword);
+
+        return new AdminInvitation($tenant, $user, $token);
     }
 
     private function endSessions(int $userId): void

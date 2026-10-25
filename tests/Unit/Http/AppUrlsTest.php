@@ -54,6 +54,15 @@ final class AppUrlsTest extends TestCase
         self::assertSame('https://www.prodad.de/firefighting/immendingen/email-bestaetigen#token=' . $token->value(), $link);
     }
 
+    public function testAcceptInvitationLinkHasTokenInFragment(): void
+    {
+        $token = OneTimeToken::generate();
+
+        $link = AppUrls::fixed('https://www.prodad.de')->acceptInvitation(self::tenant(), $token);
+
+        self::assertSame('https://www.prodad.de/firefighting/immendingen/einladung-annehmen#token=' . $token->value(), $link);
+    }
+
     public function testBaseUrlFromConfigIsLoadedOnceAndOnlyWhenNeeded(): void
     {
         $loads = 0;

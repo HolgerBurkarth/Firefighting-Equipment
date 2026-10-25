@@ -90,7 +90,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   401, `forbidden` 403, `origin_not_allowed` 403, `account_locked` 403, `email_not_verified` 403,
   `pending_approval` 403, `invalid_current_password` 403, `tenant_inactive` 403, `not_found` 404,
   `tenant_not_found` 404, `method_not_allowed` 405, `rule_violation` 409 (Meldung der verletzten
-  Regel), `unsupported_media_type` 415, `weak_password`
+  Regel), `slug_taken` 409, `email_taken` 409 (beide nur für den Super-Admin; öffentliche Abläufe
+  verraten nie, ob eine Adresse existiert), `unsupported_media_type` 415, `weak_password`
   422, `too_many_attempts` 429 (mit `Retry-After`), `database_unavailable` 503, `internal_error`
   500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
   Passwort beim Ändern 403, nicht 401.
@@ -209,7 +210,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 ## Mandanten (Städte)
 - Tabelle `fe_tenants` (Migration `0001`): `id`, `slug`, `name`, `active`, `created_at`,
   `updated_at` (UTC). Code in `src/Tenant/` (`TenantSlug`, `TenantName`, `Tenant`,
-  `TenantRepository`).
+  `TenantRepository`, `TenantSummary`, `TenantAdministration`).
 - Kürzel (`TenantSlug`): nur `a-z`, `0-9` und Bindestrich, Bindestrich nicht am Anfang/Ende
   und nicht doppelt, höchstens 50 Zeichen, eindeutig. Großbuchstaben werden abgelehnt (mit
   Vorschlag der kleingeschriebenen Form), nie still umgewandelt. `service` ist reserviert
@@ -220,11 +221,23 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Das Kürzel ist nach dem Anlegen unveränderlich, Städte werden nie gelöscht, nur gesperrt
   (`active = 0`, Daten bleiben erhalten). Da Trigger verboten sind, sichert das der Code:
   `TenantRepository` hat bewusst keine Methode zum Ändern des Kürzels oder zum Löschen; eine
-  solche nicht hinzufügen.
-- Verwaltung nur per Kommandozeile `bin/tenant.php` (`list`, `create --slug=… --name=…`,
-  `deactivate --slug=…`, `activate --slug=…`, `--config=PFAD` wie bei `migrate.php`).
+  solche nicht hinzufügen. Umbenennen (`rename`) ändert nur den Namen.
+- Sperren einer Stadt (`TenantRepository::setActive(…, false)`) beendet in derselben Transaktion
+  alle Sitzungen der Konten dieser Stadt (auch wenn sie schon gesperrt war), damit nach dem
+  Entsperren keine alten Sitzungen wieder gelten. Entsperren lässt Sitzungen unberührt.
+  `setActive` öffnet eine eigene Transaktion (eine bereits offene ist ein Fehler).
+- Verwaltung über die API des Super-Admins (siehe "Städte verwalten und Admins einladen") oder per
+  Kommandozeile `bin/tenant.php` (`list`, `create --slug=… --name=…`, `rename --slug=… --name=…`,
+  `deactivate --slug=…`, `activate --slug=…`, `invite-admin --slug=… --email=… [--print-link]`,
+  `--config=PFAD` wie bei `migrate.php`). `create` per Kommandozeile legt keinen Admin an.
   Auf dem Server: `cd ~/htdocs/apps/firefighting-equipment && php85 bin/tenant.php list`.
   Exit-Codes: 0 OK, 1 Fehler (z. B. ungültiges oder doppeltes Kürzel), 2 falscher Aufruf.
+- `invite-admin` (Notfallweg ohne API): neue Adresse → Konto `invited` + Link, offene Einladung
+  (`invited`) → Link erneuern, anderes vorhandenes Konto oder gesperrte Stadt → Exit-Code 1. Mail
+  über den konfigurierten Transport (`AdminInvitationMail`); Versandfehler → Hinweis auf stderr,
+  Exit-Code 0. `--print-link` gibt den Link zusätzlich auf stdout aus (Warnung auf stderr); ohne
+  die Option erscheint er nie in der Ausgabe. Tests übergeben `FakeMailer` und einen eigenen
+  `ErrorReporter` (Konstruktor wie bei `UserCommand`).
 
 ## Benutzer und Anmeldung
 - Anmeldung per Sitzungs-Cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, Pfad
@@ -262,7 +275,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Großbuchstaben).
 - Erster Admin einer Stadt: Der Super-Admin legt ihn an (Status `invited`), dieser erhält einen
   Einmal-Link zum Setzen des Passworts und gibt dabei seinen Namen an; daraus werden `name` und
-  `display_name`. Der Super-Admin selbst wird per Skript angelegt.
+  `display_name`. Ebenso lädt der Super-Admin weitere Admins ein (siehe "Städte verwalten und
+  Admins einladen"). Der Super-Admin selbst wird per Skript angelegt.
 - Einmal-Links (`fe_user_tokens`): kurz gültig (Bestätigung/Passwort setzen 24 h, Passwort
   zurücksetzen 1 h), nur einmal nutzbar, nur als Hash gespeichert. Einlösen löscht die Zeile;
   je Benutzer und Zweck gibt es höchstens einen offenen Link, ein neuer ersetzt den alten.
@@ -272,11 +286,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Löschen = Anonymisieren: persönliche Daten (E-Mail, Namen, Passwort-Hash, Sitzungen, Tokens)
   werden entfernt, der Datensatz bleibt für die Historie ("Gelöschter Benutzer #ID"). Benutzer
   werden nie per `DELETE` entfernt; Fremdschlüssel auf `fe_users` kaskadieren nicht.
-- Gebremst werden Anmeldung, Registrierung, Passwort zurücksetzen und E-Mail-Bestätigung
-  (`fe_auth_attempts`, `action` = `login`, `register`, `password_reset`, `reset_confirm`,
-  `verify_email`, `verify_resend`; `reset_confirm` seit Migration `0008`, `verify_resend` seit
-  `0009`, mit E-Mail-Hash).
-  E-Mail nur als SHA-256 (bei `verify_email` und `reset_confirm` ohne E-Mail möglich), IP-Adressen nur gekürzt
+- Gebremst werden Anmeldung, Registrierung, Passwort zurücksetzen, E-Mail-Bestätigung und
+  Einladung annehmen (`fe_auth_attempts`, `action` = `login`, `register`, `password_reset`,
+  `reset_confirm`, `verify_email`, `verify_resend`, `invitation_accept`; `reset_confirm` seit
+  Migration `0008`, `verify_resend` seit `0009`, mit E-Mail-Hash, `invitation_accept` seit `0010`).
+  E-Mail nur als SHA-256 (bei `verify_email`, `reset_confirm` und `invitation_accept` ohne E-Mail möglich), IP-Adressen nur gekürzt
   (IPv4 /24, IPv6 /48, binär). Einträge werden nach 24 Stunden beim Aufruf gelöscht (kein Cron).
 - E-Mail-Absender: `"Feuerwehr Geräteverwaltung" <feuerwehr-app@prodad.de>`.
 
@@ -304,7 +318,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     `RequestContext::$hasher`, `UserCommand`); Handler erzeugen keinen eigenen.
 - `UserRepository`: ändernde Methoden (`lock`, `unlock`, `changeRole`, `setPassword`,
   `anonymize`, `register`, `verifyEmail`, `approve`, `reject`, `changeDisplayName`,
-  `anonymizeStaleUnverified`) öffnen eine eigene Transaktion (eine bereits offene ist ein Fehler) und sperren
+  `anonymizeStaleUnverified`, `createTenantWithInvitedAdmin`, `inviteAdmin`, `renewInvitation`,
+  `acceptInvitation`) öffnen eine eigene Transaktion (eine bereits offene ist ein Fehler) und sperren
   zuerst alle Konten derselben Stadt bzw. alle Super-Admins (`FOR UPDATE` über
   `FORCE INDEX (uq_fe_users_tenant_email)`, immer dieselbe Abfrage → gleiche Sperrreihenfolge,
   andere Städte unberührt). Danach Regeln prüfen, dann schreiben.
@@ -339,8 +354,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `POST auth/sessions/logout-others`, `POST auth/password` (angemeldet),
   `POST auth/password-reset/request` und `POST auth/password-reset/confirm` (öffentlich, siehe
   "Passwort vergessen"). Nur unter Städten: `POST auth/register`, `POST auth/email/verify`,
-  `POST auth/email/resend` (öffentlich, siehe "Einladung, Registrierung und E-Mail-Bestätigung").
-  Noch nicht umgesetzt: erster Admin einer Stadt (Status `invited`, Einmal-Link `set_password`).
+  `POST auth/email/resend` (öffentlich, siehe "Einladung, Registrierung und E-Mail-Bestätigung"),
+  `POST auth/invitation/accept` (öffentlich, siehe "Städte verwalten und Admins einladen").
 - Token (`SessionToken`): 32 Zufallsbytes, im Cookie base64url ohne Auffüllung (43 Zeichen, nur
   kanonische Form), in `fe_sessions.token_hash` nur SHA-256. Cookie (`SessionCookie`):
   `ff_session`, `HttpOnly; Secure; SameSite=Strict`, `Path=/firefighting/<kürzel>/` bzw.
@@ -529,6 +544,52 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Ein Admin darf sich nicht selbst sperren, herabstufen (eigene Rolle ändern) oder löschen →
   409 `rule_violation`; ebenso Regelverstöße des Repositorys (letzter Admin, falscher Status,
   gelöschtes Konto). Unveränderte Rolle und eigener Anzeigename sind erlaubt.
+
+## Städte verwalten und Admins einladen
+- Nur Super-Admins, nur unter `service` (`Access::SuperAdmin`; Konten einer Stadt haben dort keine
+  passende Sitzung: 401; unter einem Stadt-Pfad gibt es die Routen nicht: 404). Rechte aller Routen
+  prüft `SuperAdminRoutesAccessTest` (neue Super-Admin-Routen dort eintragen). Code:
+  `TenantAdministration` (Städte per ID, unbekannt → `TenantNotFoundException` → 404; Konten nur
+  der jeweiligen Stadt; keine Einladung in eine gesperrte Stadt) über `TenantRepository` und
+  `UserRepository`, Endpunkte `src/Api/V1/Tenants/` (`TenantListHandler`, `TenantCreateHandler`,
+  `TenantActionHandler` mit `TenantAction`, `AdminInvitationHandler`, `TenantUserListHandler`,
+  `TenantJson`, `TenantFields`).
+- Der Router kennt nur Ganzzahl-Platzhalter; Städte werden daher in der API über ihre ID
+  angesprochen, das Kürzel steht nur in den Antworten.
+- `GET tenants` (nach Kürzel, mit `counts`: `users_active` = Status `active` und nicht gesperrt,
+  `admins_active`, `admins_invited`), `GET tenants/{id}`, `POST tenants {slug, name, admin_email}`
+  → 201 `{tenant, user, mail_sent}`, `POST tenants/{id}/rename {name}`, `POST tenants/{id}/lock`
+  bzw. `unlock {}` (wiederholbar; Sperren beendet alle Sitzungen der Stadt), `POST
+  tenants/{id}/admins {email}` → 201 `{user, mail_sent}`, `POST
+  tenants/{id}/users/{user}/resend-invitation {}` → `{user, mail_sent}`, `GET
+  tenants/{id}/users[?status=…]` (nur lesend, kein Aufräumen; Filter wie `GET users`).
+- Anlegen: `UserRepository::createTenantWithInvitedAdmin` legt Stadt, Konto (`admin`, `invited`,
+  ohne Name und Passwort) und Link `set_password` (24 h) in EINER Transaktion an; danach Mail mit
+  `<base_url>/firefighting/<kürzel>/einladung-annehmen#token=…` (`AppUrls::acceptInvitation`).
+  Einladen in eine bestehende Stadt (`UserRepository::inviteAdmin`) ebenso. Erneut senden
+  (`renewInvitation`) nur für `invited` und nicht gesperrt; der neue Link ersetzt den alten.
+- `mail_sent` ist die Rückgabe von `Notifier::send` (false: Versand gescheitert, erneut senden).
+  Link und Token stehen nie in einer API-Antwort.
+- Fehler: Kürzel/Name/E-Mail ungültig → 400 (Meldung der Regel, z. B. Vorschlag in
+  Kleinbuchstaben); Kürzel vergeben → 409 `slug_taken`; Adresse hat in der Stadt schon ein Konto
+  (jeder Status außer `deleted`, auch `invited`) → 409 `email_taken` mit verständlicher Meldung
+  (der Aufrufer ist Super-Admin, es gibt nichts zu verbergen); gesperrte Stadt, keine offene
+  Einladung, gesperrtes Konto → 409 `rule_violation`; Konto einer anderen Stadt → 404.
+- `POST auth/invitation/accept {token, name, password}` (öffentlich, nur unter Städten,
+  `InvitationAcceptHandler`): Reihenfolge Schreibweise (400), Bremse (429), Link prüfen (Zweck
+  `set_password`, Konto der aktuellen Stadt, `invited`, nicht gesperrt; sonst 400 `invalid_token`,
+  zählt in die Bremse), `PersonName` (400), `PasswordPolicy` mit E-Mail, Name und Stadt (422; Name
+  und Passwort verbrauchen den Link nicht und zählen nicht), dann `UserRepository::acceptInvitation`
+  (Transaktion: Link löschen, `name` = `display_name` = Name, Hash, `email_verified_at` = jetzt,
+  `active`; gleichzeitiges Einlösen: nur einer gewinnt). Keine Sitzung (wie bei Passwort vergessen);
+  ein erfolgreicher `login`-Eintrag hebt die Bremse der Anmeldung für das Konto auf. Gesperrte
+  Stadt: 403 `tenant_inactive` (vor dem Handler, nicht gezählt). Danach Mail "Einladung
+  angenommen" an alle aktiven, nicht gesperrten Super-Admins (`listActiveSuperAdmins`).
+- Bremse (`InvitationAcceptThrottle`, `action = invitation_accept`, ohne E-Mail): höchstens 10
+  Fehlversuche je IP-Präfix in 15 Minuten; abgewiesene Anfragen werden nicht gespeichert.
+- Mails (`MailTemplates::adminInvitation`, `invitationAccepted`): Einladung mit Stadtname,
+  Gültigkeit 24 h und Kontakt-Hinweis; Benachrichtigung mit Stadt, Name, E-Mail und Zeit
+  (Europe/Berlin). Zwecke im Protokoll: `admin_invitation`, `invitation_accepted`.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".

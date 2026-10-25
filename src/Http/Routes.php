@@ -6,6 +6,7 @@ namespace FirefightingEquipment\Http;
 
 use FirefightingEquipment\Api\V1\Auth\EmailResendHandler;
 use FirefightingEquipment\Api\V1\Auth\EmailVerifyHandler;
+use FirefightingEquipment\Api\V1\Auth\InvitationAcceptHandler;
 use FirefightingEquipment\Api\V1\Auth\LoginHandler;
 use FirefightingEquipment\Api\V1\Auth\LogoutHandler;
 use FirefightingEquipment\Api\V1\Auth\LogoutOthersHandler;
@@ -21,6 +22,12 @@ use FirefightingEquipment\Api\V1\Invitation\InvitationCodeCreateHandler;
 use FirefightingEquipment\Api\V1\Invitation\InvitationCodeListHandler;
 use FirefightingEquipment\Api\V1\Invitation\InvitationCodeRevokeHandler;
 use FirefightingEquipment\Api\V1\TenantHandler;
+use FirefightingEquipment\Api\V1\Tenants\AdminInvitationHandler;
+use FirefightingEquipment\Api\V1\Tenants\TenantAction;
+use FirefightingEquipment\Api\V1\Tenants\TenantActionHandler;
+use FirefightingEquipment\Api\V1\Tenants\TenantCreateHandler;
+use FirefightingEquipment\Api\V1\Tenants\TenantListHandler;
+use FirefightingEquipment\Api\V1\Tenants\TenantUserListHandler;
 use FirefightingEquipment\Api\V1\Users\UserAction;
 use FirefightingEquipment\Api\V1\Users\UserActionHandler;
 use FirefightingEquipment\Api\V1\Users\UserListHandler;
@@ -42,7 +49,16 @@ final class Routes
     public static function service(?MinimumDuration $neutralDuration = null): Router
     {
         return self::auth(Router::forService(), $neutralDuration)
-            ->add('GET', 'api/v1/health', Access::Public, new HealthHandler());
+            ->add('GET', 'api/v1/health', Access::Public, new HealthHandler())
+            ->add('GET', 'api/v1/tenants', Access::SuperAdmin, new TenantListHandler())
+            ->add('POST', 'api/v1/tenants', Access::SuperAdmin, new TenantCreateHandler())
+            ->add('GET', 'api/v1/tenants/{id}', Access::SuperAdmin, new TenantActionHandler(TenantAction::Show))
+            ->add('POST', 'api/v1/tenants/{id}/rename', Access::SuperAdmin, new TenantActionHandler(TenantAction::Rename))
+            ->add('POST', 'api/v1/tenants/{id}/lock', Access::SuperAdmin, new TenantActionHandler(TenantAction::Lock))
+            ->add('POST', 'api/v1/tenants/{id}/unlock', Access::SuperAdmin, new TenantActionHandler(TenantAction::Unlock))
+            ->add('POST', 'api/v1/tenants/{id}/admins', Access::SuperAdmin, new AdminInvitationHandler(resend: false))
+            ->add('GET', 'api/v1/tenants/{id}/users', Access::SuperAdmin, new TenantUserListHandler())
+            ->add('POST', 'api/v1/tenants/{id}/users/{user}/resend-invitation', Access::SuperAdmin, new AdminInvitationHandler(resend: true));
     }
 
     /**
@@ -58,6 +74,7 @@ final class Routes
             ->add('POST', 'api/v1/auth/register', Access::Public, self::withDuration(RegisterHandler::class, $neutralDuration))
             ->add('POST', 'api/v1/auth/email/verify', Access::Public, new EmailVerifyHandler())
             ->add('POST', 'api/v1/auth/email/resend', Access::Public, self::withDuration(EmailResendHandler::class, $neutralDuration))
+            ->add('POST', 'api/v1/auth/invitation/accept', Access::Public, new InvitationAcceptHandler())
             ->add('GET', 'api/v1/invitation-codes', Access::Admin, new InvitationCodeListHandler())
             ->add('POST', 'api/v1/invitation-codes', Access::Admin, new InvitationCodeCreateHandler())
             ->add('POST', 'api/v1/invitation-codes/{id}/revoke', Access::Admin, new InvitationCodeRevokeHandler())

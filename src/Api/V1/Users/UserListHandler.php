@@ -22,14 +22,7 @@ final readonly class UserListHandler implements RequestHandler
     public function handle(RequestContext $context): JsonResponse
     {
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
-        $filter = $context->request->query()['status'] ?? null;
-        $status = $filter === null ? null : UserStatus::tryFrom($filter);
-        if ($filter !== null && $status === null) {
-            throw HttpException::invalidRequest(sprintf(
-                'Unbekannter Status. Erlaubt: %s.',
-                implode(', ', array_map(static fn (UserStatus $s): string => $s->value, UserStatus::cases())),
-            ));
-        }
+        $status = self::statusFilter($context);
 
         $users = new UserRepository($context->db->get());
         $users->anonymizeStaleUnverified($tenant);
@@ -39,5 +32,26 @@ final readonly class UserListHandler implements RequestHandler
         }
 
         return new JsonResponse(['users' => array_map(UserJson::user(...), $list)]);
+    }
+
+    /**
+     * Filter ?status=… (auch für die Benutzerliste einer Stadt beim Super-Admin).
+     *
+     * @return UserStatus|null null = ohne Filter
+     *
+     * @throws HttpException 400 invalid_request bei unbekanntem Status
+     */
+    public static function statusFilter(RequestContext $context): ?UserStatus
+    {
+        $filter = $context->request->query()['status'] ?? null;
+        $status = $filter === null ? null : UserStatus::tryFrom($filter);
+        if ($filter !== null && $status === null) {
+            throw HttpException::invalidRequest(sprintf(
+                'Unbekannter Status. Erlaubt: %s.',
+                implode(', ', array_map(static fn (UserStatus $s): string => $s->value, UserStatus::cases())),
+            ));
+        }
+
+        return $status;
     }
 }

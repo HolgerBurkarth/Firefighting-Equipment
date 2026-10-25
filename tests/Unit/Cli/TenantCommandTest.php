@@ -44,7 +44,7 @@ final class TenantCommandTest extends TestCase
     public function testParseList(): void
     {
         self::assertSame(
-            ['command' => 'list', 'slug' => null, 'name' => null, 'config' => null],
+            ['command' => 'list', 'slug' => null, 'name' => null, 'email' => null, 'config' => null, 'print_link' => false],
             TenantCommand::parseArguments(['list']),
         );
     }
@@ -52,7 +52,7 @@ final class TenantCommandTest extends TestCase
     public function testParseCreateWithConfig(): void
     {
         self::assertSame(
-            ['command' => 'create', 'slug' => 'immendingen', 'name' => 'Feuerwehr Immendingen', 'config' => 'pfad/zur config.php'],
+            ['command' => 'create', 'slug' => 'immendingen', 'name' => 'Feuerwehr Immendingen', 'email' => null, 'config' => 'pfad/zur config.php', 'print_link' => false],
             TenantCommand::parseArguments([
                 '--name=Feuerwehr Immendingen',
                 'create',
@@ -66,6 +66,23 @@ final class TenantCommandTest extends TestCase
     {
         self::assertSame('deactivate', TenantCommand::parseArguments(['deactivate', '--slug=a'])['command']);
         self::assertSame('activate', TenantCommand::parseArguments(['activate', '--slug=a'])['command']);
+    }
+
+    public function testParseRename(): void
+    {
+        self::assertSame(
+            ['command' => 'rename', 'slug' => 'a', 'name' => 'Neu', 'email' => null, 'config' => null, 'print_link' => false],
+            TenantCommand::parseArguments(['rename', '--slug=a', '--name=Neu']),
+        );
+    }
+
+    public function testParseInviteAdmin(): void
+    {
+        self::assertSame(
+            ['command' => 'invite-admin', 'slug' => 'a', 'name' => null, 'email' => 'x@example.org', 'config' => null, 'print_link' => false],
+            TenantCommand::parseArguments(['invite-admin', '--slug=a', '--email=x@example.org']),
+        );
+        self::assertTrue(TenantCommand::parseArguments(['--print-link', 'invite-admin', '--slug=a', '--email=x@example.org'])['print_link']);
     }
 
     public function testParseKeepsEqualsSignInValue(): void
@@ -87,7 +104,16 @@ final class TenantCommandTest extends TestCase
     {
         yield 'kein Befehl' => [[], 'Kein Befehl angegeben.'];
         yield 'unbekannter Befehl' => [['delete', '--slug=a'], 'Unbekannter Befehl: delete'];
-        yield 'umbenennen gibt es nicht' => [['rename', '--slug=a'], 'Unbekannter Befehl: rename'];
+        yield 'rename ohne name' => [['rename', '--slug=a'], 'rename braucht --name="NAME".'];
+        yield 'rename ohne slug' => [['rename', '--name=X'], 'rename braucht --slug=KÜRZEL.'];
+        yield 'invite-admin ohne email' => [['invite-admin', '--slug=a'], 'invite-admin braucht --email=ADRESSE.'];
+        yield 'invite-admin ohne slug' => [['invite-admin', '--email=x@example.org'], 'invite-admin braucht --slug=KÜRZEL.'];
+        yield 'invite-admin mit name' => [['invite-admin', '--slug=a', '--email=x@example.org', '--name=X'], '--name ist bei invite-admin nicht möglich.'];
+        yield 'create mit email' => [['create', '--slug=a', '--name=X', '--email=x@example.org'], '--email ist bei create nicht möglich.'];
+        yield 'print-link ohne invite-admin' => [['activate', '--slug=a', '--print-link'], '--print-link ist bei activate nicht möglich.'];
+        yield 'print-link doppelt' => [['invite-admin', '--slug=a', '--email=x@example.org', '--print-link', '--print-link'], '--print-link ist doppelt angegeben.'];
+        yield 'email leer' => [['invite-admin', '--slug=a', '--email='], '--email= braucht einen Wert.'];
+        yield 'unbekannte Option --link' => [['invite-admin', '--slug=a', '--email=x@example.org', '--link'], 'Unbekannte Option: --link'];
         yield 'zwei Befehle' => [['list', 'list'], 'Unerwartetes Argument: list'];
         yield 'unbekannte Option' => [['list', '--force'], 'Unbekannte Option: --force'];
         yield 'Option ohne =' => [['deactivate', '--slug', 'a'], 'Unbekannte Option: --slug'];
@@ -121,6 +147,8 @@ final class TenantCommandTest extends TestCase
     {
         self::assertSame(TenantCommand::EXIT_OK, $this->command()->run(['--help']));
         self::assertStringContainsString('php bin/tenant.php create --slug=KÜRZEL', $this->contents($this->out));
+        self::assertStringContainsString('php bin/tenant.php rename --slug=KÜRZEL', $this->contents($this->out));
+        self::assertStringContainsString('php bin/tenant.php invite-admin --slug=KÜRZEL --email=ADRESSE [--print-link]', $this->contents($this->out));
         self::assertSame('', $this->contents($this->err));
     }
 
@@ -138,6 +166,8 @@ final class TenantCommandTest extends TestCase
         yield 'reserviert' => [['create', '--slug=service', '--name=Service'], 'FEHLER: Das Kürzel „service“ ist reserviert.'];
         yield 'ungültiges Format' => [['deactivate', '--slug=a--b'], 'FEHLER: Ungültiges Kürzel'];
         yield 'Name nur Leerzeichen' => [['create', '--slug=a', '--name=   '], 'FEHLER: Der Name darf nicht leer sein.'];
+        yield 'neuer Name nur Leerzeichen' => [['rename', '--slug=a', '--name=   '], 'FEHLER: Der Name darf nicht leer sein.'];
+        yield 'ungültige E-Mail' => [['invite-admin', '--slug=a', '--email=keine-adresse'], 'FEHLER: Ungültige E-Mail-Adresse'];
     }
 
     /**

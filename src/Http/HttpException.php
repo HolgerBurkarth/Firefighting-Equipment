@@ -134,6 +134,27 @@ final class HttpException extends \RuntimeException
         return new self('rule_violation', $message, 409);
     }
 
+    /**
+     * Das Kürzel einer neuen Stadt ist bereits vergeben (nur Super-Admin).
+     *
+     * @param string $message Meldung mit dem Kürzel
+     */
+    public static function slugTaken(string $message): self
+    {
+        return new self('slug_taken', $message, 409);
+    }
+
+    /**
+     * Für die E-Mail-Adresse gibt es in der Stadt schon ein Konto. Nur, wo der Aufrufer das wissen
+     * darf (Einladung durch den Super-Admin); öffentliche Abläufe verraten es nie.
+     *
+     * @param string $message Meldung mit der Adresse
+     */
+    public static function emailTaken(string $message): self
+    {
+        return new self('email_taken', $message, 409);
+    }
+
     public static function unsupportedMediaType(): self
     {
         return new self('unsupported_media_type', 'Erwartet wird Content-Type: application/json.', 415);

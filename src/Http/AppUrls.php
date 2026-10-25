@@ -17,6 +17,7 @@ final class AppUrls
 {
     public const string PASSWORD_RESET_PAGE = 'passwort-zuruecksetzen';
     public const string VERIFY_EMAIL_PAGE = 'email-bestaetigen';
+    public const string ACCEPT_INVITATION_PAGE = 'einladung-annehmen';
 
     private ?string $baseUrl = null;
 
@@ -66,5 +67,13 @@ final class AppUrls
     public function verifyEmail(Tenant $tenant, OneTimeToken $token): string
     {
         return $this->area($tenant) . self::VERIFY_EMAIL_PAGE . '#token=' . $token->value();
+    }
+
+    /**
+     * Link zum Annehmen einer Einladung als Admin (nur unter einer Stadt); Token hinter # wie oben.
+     */
+    public function acceptInvitation(Tenant $tenant, OneTimeToken $token): string
+    {
+        return $this->area($tenant) . self::ACCEPT_INVITATION_PAGE . '#token=' . $token->value();
     }
 }

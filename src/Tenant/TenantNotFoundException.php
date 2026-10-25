@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Tenant;
 
 /**
- * Zu einem Kürzel gibt es keine Stadt.
+ * Zu einem Kürzel bzw. einer ID gibt es keine Stadt.
  */
 final class TenantNotFoundException extends TenantException
 {
     public static function for(TenantSlug $slug): self
     {
         return new self(sprintf('Keine Stadt mit dem Kürzel „%s“ gefunden.', $slug->value));
+    }
+
+    public static function forId(int $id): self
+    {
+        return new self(sprintf('Keine Stadt mit der ID %d gefunden.', $id));
     }
 }

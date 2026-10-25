@@ -73,4 +73,22 @@ final class UserRuleViolationException extends UserException
             $id,
         ));
     }
+
+    public static function notInvited(int $id): self
+    {
+        return new self(sprintf(
+            'Das Konto #%d ist keine offene Einladung. Erneut senden geht nur, solange die Einladung nicht angenommen ist.',
+            $id,
+        ));
+    }
+
+    public static function invitationLocked(int $id): self
+    {
+        return new self(sprintf('Das Konto #%d ist gesperrt. Zuerst entsperren, dann die Einladung erneut senden.', $id));
+    }
+
+    public static function tenantInactive(): self
+    {
+        return new self('Die Stadt ist gesperrt. Zuerst entsperren, dann einladen.');
+    }
 }

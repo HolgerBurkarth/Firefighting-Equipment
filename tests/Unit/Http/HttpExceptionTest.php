@@ -32,4 +32,15 @@ final class HttpExceptionTest extends TestCase
         self::assertSame(409, $response->statusCode());
         self::assertSame('{"error":"rule_violation","message":"Sie können sich nicht selbst sperren."}', $response->body());
     }
+
+    public function testSlugAndEmailTakenAreConflicts(): void
+    {
+        $slug = HttpException::slugTaken('Das Kürzel „immendingen“ ist bereits vergeben.')->toResponse();
+        $email = HttpException::emailTaken('Es gibt bereits ein Konto.')->toResponse();
+
+        self::assertSame(409, $slug->statusCode());
+        self::assertSame('{"error":"slug_taken","message":"Das Kürzel „immendingen“ ist bereits vergeben."}', $slug->body());
+        self::assertSame(409, $email->statusCode());
+        self::assertSame('{"error":"email_taken","message":"Es gibt bereits ein Konto."}', $email->body());
+    }
 }

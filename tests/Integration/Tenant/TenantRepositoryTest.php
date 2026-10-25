@@ -138,6 +138,45 @@ final class TenantRepositoryTest extends DomainTestCase
         );
     }
 
+    public function testFindById(): void
+    {
+        $tenant = $this->create('immendingen', 'Feuerwehr Immendingen');
+
+        self::assertSame('immendingen', $this->repository->findById($tenant->id)?->slug->value);
+        self::assertNull($this->repository->findById($tenant->id + 1000));
+    }
+
+    public function testRenameChangesOnlyName(): void
+    {
+        $slug = TenantSlug::fromString('immendingen');
+        $this->create('immendingen', 'Feuerwehr Immendingen');
+        $this->pdo()->exec("UPDATE fe_tenants SET updated_at = '2020-01-01 00:00:00'");
+
+        self::assertTrue($this->repository->rename($slug, TenantName::fromString('Freiwillige Feuerwehr Immendingen')));
+
+        $tenant = $this->repository->findBySlug($slug);
+        self::assertSame('Freiwillige Feuerwehr Immendingen', $tenant?->name->value);
+        self::assertSame('immendingen', $tenant->slug->value);
+        self::assertGreaterThan(new \DateTimeImmutable('2020-01-02', new \DateTimeZone('UTC')), $tenant->updatedAt);
+    }
+
+    public function testRenameToSameNameChangesNothingButCaseCounts(): void
+    {
+        $slug = TenantSlug::fromString('immendingen');
+        $this->create('immendingen', 'Feuerwehr Immendingen');
+
+        self::assertFalse($this->repository->rename($slug, TenantName::fromString('Feuerwehr Immendingen')));
+        self::assertTrue($this->repository->rename($slug, TenantName::fromString('FEUERWEHR Immendingen')));
+        self::assertSame('FEUERWEHR Immendingen', $this->repository->findBySlug($slug)?->name->value);
+    }
+
+    public function testRenameUnknownSlugThrows(): void
+    {
+        $this->expectException(TenantNotFoundException::class);
+
+        $this->repository->rename(TenantSlug::fromString('tuttlingen'), TenantName::fromString('Tuttlingen'));
+    }
+
     public function testAllIsEmptyWithoutTenants(): void
     {
         self::assertSame([], $this->repository->all());

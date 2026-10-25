@@ -36,10 +36,24 @@ https://www.prodad.de/firefighting/service/<pfad>     # Super-Admin
 | POST    | `api/v1/users/{id}/role`              | Admin      | `{"user":…}`                                   |
 | POST    | `api/v1/users/{id}/display-name`      | Admin      | `{"user":…}`                                   |
 | DELETE  | `api/v1/users/{id}`                   | Admin      | `{"user":…}` (anonymisiert)                    |
+| POST    | `api/v1/auth/invitation/accept`       | öffentlich | `{"message":"Ihr Konto ist eingerichtet. …"}`  |
 
-`api/v1/tenant`, Registrierung, E-Mail-Bestätigung, Einladungscodes und Benutzerverwaltung gibt es
-nur unter einer Stadt (unter `service`: 404), alle anderen Routen unter `service` und unter jeder
-Stadt. Super-Admins melden sich nur unter `service` an, Konten einer Stadt
+Nur unter `service` (Super-Admin, siehe "Städte verwalten und Admins einladen"):
+
+| Methode | Pfad                                                   | Antwort                                   |
+|---------|--------------------------------------------------------|-------------------------------------------|
+| GET     | `api/v1/tenants`                                       | `{"tenants":[…]}` mit Status und Zahlen   |
+| POST    | `api/v1/tenants`                                       | 201 `{"tenant":…,"user":…,"mail_sent":…}` |
+| GET     | `api/v1/tenants/{id}`                                  | `{"tenant":…}`                            |
+| POST    | `api/v1/tenants/{id}/rename`                           | `{"tenant":…}`                            |
+| POST    | `api/v1/tenants/{id}/lock`, `…/unlock`                 | `{"tenant":…}`                            |
+| POST    | `api/v1/tenants/{id}/admins`                           | 201 `{"user":…,"mail_sent":…}`            |
+| POST    | `api/v1/tenants/{id}/users/{user}/resend-invitation`   | `{"user":…,"mail_sent":…}`                |
+| GET     | `api/v1/tenants/{id}/users[?status=…]`                 | `{"users":[…]}` (nur lesend)              |
+
+`api/v1/tenant`, Registrierung, E-Mail-Bestätigung, Einladung annehmen, Einladungscodes und
+Benutzerverwaltung gibt es nur unter einer Stadt (unter `service`: 404), die Städteverwaltung nur
+unter `service`, alle anderen Routen unter `service` und unter jeder Stadt. Super-Admins melden sich nur unter `service` an, Konten einer Stadt
 nur unter ihrer Stadt; ein Cookie gilt nur dort.
 
 Unter einer Stadt antwortet die API nur, wenn die Stadt existiert und aktiv ist. Der Health-Check
@@ -53,7 +67,7 @@ Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`:
 | HTTP | `error`                    | Bedeutung                                                  |
 |------|----------------------------|------------------------------------------------------------|
 | 400  | `invalid_request`          | Body kein JSON-Objekt, zu groß (> 16 KiB), Feld fehlt      |
-| 400  | `invalid_token`            | Link (Zurücksetzen, Bestätigen) ungültig, abgelaufen, benutzt |
+| 400  | `invalid_token`            | Link (Zurücksetzen, Bestätigen, Einladung) ungültig, abgelaufen, benutzt |
 | 400  | `invalid_invitation_code`  | Einladungscode ungültig, abgelaufen, aufgebraucht, widerrufen |
 | 401  | `not_authenticated`        | keine oder abgelaufene Sitzung                             |
 | 401  | `invalid_credentials`      | E-Mail oder Passwort falsch (bewusst nicht unterschieden)  |
@@ -68,6 +82,8 @@ Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`:
 | 404  | `tenant_not_found`         | Kürzel gültig, aber keine Stadt dazu                       |
 | 405  | `method_not_allowed`       | Methode nicht erlaubt (erlaubte im Header `Allow`)         |
 | 409  | `rule_violation`           | Regel verletzt (letzter Admin, sich selbst sperren, …)     |
+| 409  | `slug_taken`               | Super-Admin: Kürzel einer neuen Stadt schon vergeben       |
+| 409  | `email_taken`              | Super-Admin: Adresse hat in der Stadt schon ein Konto      |
 | 415  | `unsupported_media_type`   | ändernde Anfrage ohne `Content-Type: application/json`     |
 | 422  | `weak_password`            | neues Passwort verletzt die Passwortregeln                 |
 | 429  | `too_many_attempts`        | zu viele Fehlversuche (Wartezeit im Header `Retry-After`)  |
@@ -203,6 +219,69 @@ curl.exe -b cookies.txt -X DELETE -H "Content-Type: application/json" --data-bin
 
 Die JSON-Dateien danach löschen (`register.json` enthält ein Passwort, `verify.json` ein Token; nie
 committen).
+
+### Städte verwalten und Admins einladen
+
+Nur Super-Admins, nur unter `/firefighting/service/` (Admins und Benutzer einer Stadt: 401). Städte
+werden über ihre ID angesprochen (siehe `GET api/v1/tenants`).
+
+1. Neue Stadt: `POST api/v1/tenants` mit `{"slug":"geisingen","name":"Feuerwehr Geisingen",
+   "admin_email":"kommandant@example.org"}`. In einer Transaktion entstehen die Stadt (aktiv), das
+   Konto des ersten Admins (Status `invited`, noch ohne Name und Passwort) und ein Einmal-Link. Der
+   Admin bekommt eine Mail mit `<base_url>/firefighting/<kürzel>/einladung-annehmen#token=…`
+   (24 Stunden gültig, nur einmal nutzbar). `mail_sent: false` heißt: Versand gescheitert, Einladung
+   erneut senden.
+2. Weitere Admins: `POST api/v1/tenants/{id}/admins` mit `{"email":"…"}` (gleicher Ablauf).
+3. Einladung erneut senden (nur Status `invited`): `POST api/v1/tenants/{id}/users/{user}/resend-invitation`
+   mit `{}`. Der neue Link ersetzt den alten.
+4. Die Seite hinter dem Link (Frontend, noch nicht gebaut) schickt
+   `POST /firefighting/<kürzel>/api/v1/auth/invitation/accept` mit
+   `{"token":"…","name":"Erika Musterfrau","password":"…"}`. Danach ist das Konto aktiv (Name =
+   Anzeigename, E-Mail gilt als bestätigt), eine Sitzung entsteht nicht: Anmeldung mit dem neuen
+   Passwort. Alle aktiven Super-Admins bekommen die Mail "Einladung angenommen".
+
+Außerdem: `…/rename` mit `{"name":"…"}` ändert nur den Namen (das Kürzel ist unveränderlich);
+`…/lock` sperrt die Stadt und beendet sofort alle Sitzungen ihrer Konten (nach dem Entsperren gelten
+keine alten Sitzungen); `…/unlock` entsperrt. `GET api/v1/tenants/{id}/users` zeigt die Konten einer
+Stadt nur lesend (Filter `?status=` wie bei `GET users`).
+
+| Fall                                                                 | Antwort                   |
+|----------------------------------------------------------------------|---------------------------|
+| Kürzel/Name/E-Mail ungültig (z. B. Großbuchstaben, `service`)         | 400 `invalid_request`     |
+| Kürzel schon vergeben                                                | 409 `slug_taken`          |
+| Adresse hat in der Stadt schon ein Konto (auch offene Einladung)     | 409 `email_taken`         |
+| Einladen oder erneut senden bei gesperrter Stadt                     | 409 `rule_violation`      |
+| Erneut senden für ein Konto, das nicht (mehr) `invited` ist oder gesperrt | 409 `rule_violation` |
+| Stadt oder Konto (der Stadt) unbekannt                               | 404 `not_found`           |
+| Link ungültig, abgelaufen, benutzt, andere Stadt, Konto gesperrt     | 400 `invalid_token`       |
+| Einladung annehmen bei gesperrter Stadt                              | 403 `tenant_inactive`     |
+| Passwort verletzt die Regeln (Link bleibt gültig)                    | 422 `weak_password`       |
+| > 10 ungültige Einladungslinks je IP-Bereich in 15 Minuten           | 429 `too_many_attempts`   |
+
+Lokal ausprobieren (Super-Admin per `bin/user.php superadmin:create` anlegen, Mails in `var/mail/`):
+
+```
+# login-service.json: {"email":"chef@example.org","password":"…"}
+curl.exe -c service-cookies.txt -H "Content-Type: application/json" --data-binary "@login-service.json" http://localhost:8000/firefighting/service/api/v1/auth/login
+curl.exe -b service-cookies.txt http://localhost:8000/firefighting/service/api/v1/tenants
+# tenant.json: {"slug":"geisingen","name":"Feuerwehr Geisingen","admin_email":"kommandant@example.org"}
+curl.exe -b service-cookies.txt -H "Content-Type: application/json" --data-binary "@tenant.json" http://localhost:8000/firefighting/service/api/v1/tenants
+curl.exe -b service-cookies.txt http://localhost:8000/firefighting/service/api/v1/tenants/3
+# rename.json: {"name":"Freiwillige Feuerwehr Geisingen"}
+curl.exe -b service-cookies.txt -H "Content-Type: application/json" --data-binary "@rename.json" http://localhost:8000/firefighting/service/api/v1/tenants/3/rename
+curl.exe -b service-cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/service/api/v1/tenants/3/lock
+curl.exe -b service-cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/service/api/v1/tenants/3/unlock
+# admin.json: {"email":"vertretung@example.org"}
+curl.exe -b service-cookies.txt -H "Content-Type: application/json" --data-binary "@admin.json" http://localhost:8000/firefighting/service/api/v1/tenants/3/admins
+curl.exe -b service-cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/service/api/v1/tenants/3/users/12/resend-invitation
+curl.exe -b service-cookies.txt "http://localhost:8000/firefighting/service/api/v1/tenants/3/users?status=invited"
+
+# accept.json: {"token":"<Token aus der Mail in var/mail/>","name":"Erika Musterfrau","password":"…"}
+curl.exe -H "Content-Type: application/json" --data-binary "@accept.json" http://localhost:8000/firefighting/geisingen/api/v1/auth/invitation/accept
+```
+
+Die JSON-Dateien und `service-cookies.txt` danach löschen (sie enthalten Passwörter, Tokens bzw.
+die Sitzung; nie committen). Der Super-Admin bleibt höchstens 1 Stunde ohne Aktivität angemeldet.
 
 ### Lokal starten
 
@@ -378,16 +457,27 @@ Hinweise:
 ```
 php bin/tenant.php list                                                  # alle Städte
 php bin/tenant.php create --slug=immendingen --name="Feuerwehr Immendingen"
+php bin/tenant.php rename --slug=immendingen --name="Freiwillige Feuerwehr Immendingen"
 php bin/tenant.php deactivate --slug=immendingen                         # sperren
 php bin/tenant.php activate --slug=immendingen                           # entsperren
+php bin/tenant.php invite-admin --slug=immendingen --email=kommandant@example.org
+php bin/tenant.php invite-admin --slug=immendingen --email=kommandant@example.org --print-link
 php bin/tenant.php list --config=PFAD                                    # andere Konfiguration
 ```
 
 Das Kürzel erscheint in der URL (`/firefighting/<kürzel>/`) und ist nach dem Anlegen
-unveränderlich. Erlaubt sind Kleinbuchstaben `a-z`, Ziffern und Bindestrich (nicht am
-Anfang oder Ende, nicht doppelt), höchstens 50 Zeichen; `service` ist reserviert. Städte
-werden nicht gelöscht, sondern gesperrt; ihre Daten bleiben erhalten. Auf dem Server
-`php85` statt `php` verwenden.
+unveränderlich; `rename` ändert nur den Namen. Erlaubt sind Kleinbuchstaben `a-z`, Ziffern und
+Bindestrich (nicht am Anfang oder Ende, nicht doppelt), höchstens 50 Zeichen; `service` ist
+reserviert. Städte werden nicht gelöscht, sondern gesperrt; ihre Daten bleiben erhalten. Sperren
+beendet alle Sitzungen der Konten dieser Stadt. Auf dem Server `php85` statt `php` verwenden.
+
+`invite-admin` ist der Notfallweg ohne API (der übliche Weg ist die Städteverwaltung unter
+`service`): Für eine neue Adresse entsteht ein Admin-Konto im Status `invited`, für eine offene
+Einladung wird der Link erneuert (der alte wird ungültig); andere vorhandene Konten werden
+abgelehnt (Exit-Code 1), ebenso eine gesperrte Stadt. Die Mail geht über den konfigurierten
+Transport; schlägt der Versand fehl, erscheint ein Hinweis (Exit-Code 0). `--print-link` gibt den
+Link zusätzlich auf stdout aus, z. B. wenn keine Mail ankommt. Der Link ist ein Zugang zum Konto:
+nur an die eingeladene Person weitergeben, nicht in Tickets oder Chats kopieren.
 
 ## Super-Admins und Benutzer verwalten
 

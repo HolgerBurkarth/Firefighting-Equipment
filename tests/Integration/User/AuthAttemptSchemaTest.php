@@ -34,6 +34,7 @@ final class AuthAttemptSchemaTest extends AuthSchemaTestCase
         yield 'Link zum Zurücksetzen einlösen' => ['reset_confirm'];
         yield 'E-Mail bestätigen' => ['verify_email'];
         yield 'Bestätigungslink neu anfordern' => ['verify_resend'];
+        yield 'Einladung annehmen' => ['invitation_accept'];
     }
 
     #[DataProvider('actions')]
@@ -67,6 +68,13 @@ final class AuthAttemptSchemaTest extends AuthSchemaTestCase
         self::assertSame(1, $this->countRows('fe_auth_attempts'));
     }
 
+    public function testInvitationAcceptWithoutEmailHashIsAccepted(): void
+    {
+        $this->createAttempt(['action' => 'invitation_accept', 'email_hash' => null]);
+
+        self::assertSame(1, $this->countRows('fe_auth_attempts'));
+    }
+
     /**
      * @return iterable<string, array{array<string, scalar|null>}>
      */
@@ -80,6 +88,8 @@ final class AuthAttemptSchemaTest extends AuthSchemaTestCase
         yield 'Einlösen groß' => [['action' => 'RESET_CONFIRM', 'email_hash' => null]];
         yield 'Neu anfordern ohne E-Mail-Hash' => [['action' => 'verify_resend', 'email_hash' => null]];
         yield 'Neu anfordern groß' => [['action' => 'VERIFY_RESEND']];
+        yield 'Einladung annehmen groß' => [['action' => 'INVITATION_ACCEPT', 'email_hash' => null]];
+        yield 'Einladung annehmen mit zu kurzem E-Mail-Hash' => [['action' => 'invitation_accept', 'email_hash' => str_repeat("", 31)]];
         yield 'Einlösen mit zu kurzem E-Mail-Hash' => [['action' => 'reset_confirm', 'email_hash' => str_repeat("\x01", 31)]];
         yield 'E-Mail-Hash zu kurz' => [['email_hash' => str_repeat("\x01", 31)]];
         yield 'vollständige IPv4-Adresse' => [['ip_prefix' => (string) inet_pton('192.0.2.17')]];

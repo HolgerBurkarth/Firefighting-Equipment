@@ -223,6 +223,79 @@ final class MailTemplates
     }
 
     /**
+     * Der Super-Admin lädt einen Admin ein (neue Stadt oder weiterer Admin, auch erneut gesendet).
+     * Das Konto hat noch keinen Namen; den gibt der Admin beim Annehmen an.
+     *
+     * @throws MailException
+     */
+    public static function adminInvitation(User $user, Tenant $tenant, string $link): MailMessage
+    {
+        $greeting = self::greeting($user);
+        $area = self::area($tenant);
+        $contacts = self::contactsHint();
+        $text = <<<TXT
+            {$greeting}
+
+            Sie wurden als Admin für die Feuerwehr Geräteverwaltung eingeladen:
+
+            {$area}
+
+            Als Admin verwalten Sie Geräte, Standorte und die Benutzer Ihrer
+            Feuerwehr. Über diesen Link legen Sie Ihren Namen und Ihr Passwort fest:
+
+            {$link}
+
+            Der Link ist 24 Stunden gültig und kann nur einmal verwendet werden.
+            Ist er abgelaufen, bitten Sie die Person, die Sie eingeladen hat, die
+            Einladung erneut zu senden. Falls Sie keine Einladung erwartet haben,
+            ignorieren Sie diese E-Mail.
+
+            {$contacts}
+            TXT;
+
+        return self::message($user, 'Einladung als Admin – ' . $area, $text);
+    }
+
+    /**
+     * An einen Super-Admin: Ein eingeladener Admin hat die Einladung angenommen. Name und E-Mail
+     * stehen in eigenen Zeilen (können länger als 76 Zeichen sein).
+     *
+     * @param string $url Startseite der Verwaltung (service)
+     *
+     * @throws MailException
+     */
+    public static function invitationAccepted(
+        User $superAdmin,
+        Tenant $tenant,
+        User $admin,
+        string $url,
+        ?\DateTimeImmutable $at = null,
+    ): MailMessage {
+        $local = ($at ?? new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone(self::TIME_ZONE));
+        $when = $local->format('d.m.Y') . ' um ' . $local->format('H:i') . ' Uhr';
+        $greeting = self::greeting($superAdmin);
+        $area = self::area($tenant);
+        $slug = $tenant->slug->value;
+        $name = $admin->name?->value ?? '–';
+        $email = $admin->email?->value ?? '–';
+        $text = <<<TXT
+            {$greeting}
+
+            eine Einladung als Admin wurde am {$when} angenommen.
+
+            Stadt: {$area} ({$slug})
+            Name: {$name}
+            E-Mail: {$email}
+
+            Das Konto ist aktiv. Übersicht der Städte:
+
+            {$url}
+            TXT;
+
+        return self::message($superAdmin, 'Einladung angenommen – ' . $area, $text);
+    }
+
+    /**
      * Ein Admin hat die Registrierung abgelehnt (vor dem Anonymisieren gesendet).
      *
      * @throws MailException

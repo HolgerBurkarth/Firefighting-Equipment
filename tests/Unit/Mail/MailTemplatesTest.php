@@ -176,6 +176,46 @@ angelegt.", $mail->text);
         self::assertTextRules($mail);
     }
 
+    public function testAdminInvitationWithoutName(): void
+    {
+        $link = 'http://localhost:8000/firefighting/immendingen/einladung-annehmen#token=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+        $invited = self::user(displayName: null, role: UserRole::Admin, email: 'kommandant@example.org', name: null, status: UserStatus::Invited);
+
+        $mail = MailTemplates::adminInvitation($invited, self::tenant(), $link);
+
+        self::assertSame('kommandant@example.org', $mail->to->value);
+        self::assertNull($mail->toName);
+        self::assertSame('Einladung als Admin – Feuerwehr Immendingen', $mail->subject);
+        self::assertStringStartsWith("Hallo,\n", $mail->text);
+        self::assertStringContainsString("\nFeuerwehr Immendingen\n", $mail->text);
+        self::assertStringContainsString("\n" . $link . "\n", $mail->text);
+        self::assertStringContainsString('24 Stunden gültig', $mail->text);
+        self::assertStringContainsString('Einladung erneut zu senden', $mail->text);
+        self::assertContactsHint($mail);
+        self::assertTextRules($mail, $link);
+    }
+
+    public function testInvitationAcceptedNamesAdminAndCityInGermanTime(): void
+    {
+        $url = 'http://localhost:8000/firefighting/service/';
+        $admin = self::user(displayName: 'Max Mustermann', role: UserRole::Admin, email: 'max@example.org', name: 'Max Mustermann');
+        $at = new \DateTimeImmutable('2026-07-01 10:05:00', new \DateTimeZone('UTC'));
+
+        $mail = MailTemplates::invitationAccepted(self::user(email: 'chef@example.org', role: UserRole::SuperAdmin), self::tenant(), $admin, $url, $at);
+
+        self::assertSame('chef@example.org', $mail->to->value, 'an den Super-Admin');
+        self::assertSame('Einladung angenommen – Feuerwehr Immendingen', $mail->subject);
+        self::assertStringStartsWith("Hallo Erika,\n", $mail->text);
+        self::assertStringContainsString('am 01.07.2026 um 12:05 Uhr angenommen', $mail->text);
+        self::assertStringContainsString(
+            "\nStadt: Feuerwehr Immendingen (immendingen)\nName: Max Mustermann\nE-Mail: max@example.org\n",
+            $mail->text,
+        );
+        self::assertStringContainsString("\n" . $url . "\n", $mail->text);
+        self::assertStringNotContainsString(MimeMessage::FROM_ADDRESS, $mail->text, 'kein Kontakt-Hinweis');
+        self::assertTextRules($mail, $url);
+    }
+
     public function testAnonymizedAccountGetsNoMail(): void
     {
         $this->expectException(MailException::class);

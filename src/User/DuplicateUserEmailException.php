@@ -13,4 +13,17 @@ final class DuplicateUserEmailException extends UserException
     {
         return new self(sprintf('Es gibt bereits ein Konto mit der E-Mail-Adresse „%s“.', $email->value));
     }
+
+    /**
+     * Einladung als Admin per Kommandozeile für eine Adresse, die in der Stadt schon ein Konto hat
+     * (offene Einladungen werden stattdessen erneuert).
+     */
+    public static function notInvitable(EmailAddress $email, UserStatus $status): self
+    {
+        return new self(sprintf(
+            'Für „%s“ gibt es in dieser Stadt bereits ein Konto (Status: %s). Einladen geht nur für neue Adressen; offene Einladungen werden erneuert.',
+            $email->value,
+            $status->label(),
+        ));
+    }
 }
