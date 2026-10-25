@@ -16,6 +16,8 @@ use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
+use FirefightingEquipment\Mail\MailMessage;
+use FirefightingEquipment\Mail\MailTemplates;
 use FirefightingEquipment\User\Password\PasswordContext;
 use FirefightingEquipment\User\Password\PasswordPolicy;
 use FirefightingEquipment\User\Password\WeakPasswordException;
@@ -28,7 +30,8 @@ use FirefightingEquipment\User\UserRepository;
  * Prüft das aktuelle Passwort (Fehlversuche zählen in die Bremse der Anmeldung) und die
  * Passwortregeln (Kontext E-Mail, Name, Anzeigename, Stadt). Danach sind alle Sitzungen des Kontos
  * beendet; die aktuelle wird durch eine neue ersetzt (neues Cookie), angemeldet bleibt also nur
- * dieses Gerät.
+ * dieses Gerät. Das Konto bekommt eine Benachrichtigung (ein Fehler beim Versand ändert die
+ * Antwort nicht).
  */
 final readonly class PasswordChangeHandler implements RequestHandler
 {
@@ -65,6 +68,13 @@ final readonly class PasswordChangeHandler implements RequestHandler
 
         $label = $auth->session->deviceLabel ?? DeviceLabel::fromUserAgent($context->request->header('User-Agent'));
         $started = new SessionManager($pdo)->start($user, $label);
+
+        $tenant = $context->tenant;
+        $context->notifier()->send(
+            'password_changed',
+            $user->id,
+            static fn (): MailMessage => MailTemplates::passwordChanged($user, $tenant, $context->urls->area($tenant), $label),
+        );
 
         return new JsonResponse(
             AuthJson::me($started->auth, $context->tenant),

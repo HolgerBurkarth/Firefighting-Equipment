@@ -11,7 +11,6 @@ namespace FirefightingEquipment\Auth;
 final readonly class SessionToken
 {
     public const int BYTES = 32;
-    private const string PATTERN = '/^[A-Za-z0-9_-]{43}$/D';
 
     private function __construct(#[\SensitiveParameter] private string $bytes)
     {
@@ -27,24 +26,14 @@ final readonly class SessionToken
      */
     public static function fromCookie(#[\SensitiveParameter] string $value): ?self
     {
-        if (preg_match(self::PATTERN, $value) !== 1) {
-            return null;
-        }
+        $bytes = Base64Url::decode($value, self::BYTES);
 
-        $bytes = base64_decode(strtr($value, '-_', '+/'), true);
-        if ($bytes === false || strlen($bytes) !== self::BYTES) {
-            return null;
-        }
-
-        $token = new self($bytes);
-
-        // Nur eine Schreibweise je Token (die letzten Bits des 43. Zeichens sind sonst frei).
-        return $token->cookieValue() === $value ? $token : null;
+        return $bytes === null ? null : new self($bytes);
     }
 
     public function cookieValue(): string
     {
-        return rtrim(strtr(base64_encode($this->bytes), '+/', '-_'), '=');
+        return Base64Url::encode($this->bytes);
     }
 
     /** SHA-256 (32 Byte, binär) für fe_sessions.token_hash. */

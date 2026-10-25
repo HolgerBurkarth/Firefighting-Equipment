@@ -31,6 +31,7 @@ final class AuthAttemptSchemaTest extends AuthSchemaTestCase
         yield 'Anmeldung' => ['login'];
         yield 'Registrierung' => ['register'];
         yield 'Passwort zurücksetzen' => ['password_reset'];
+        yield 'Link zum Zurücksetzen einlösen' => ['reset_confirm'];
         yield 'E-Mail bestätigen' => ['verify_email'];
     }
 
@@ -58,6 +59,13 @@ final class AuthAttemptSchemaTest extends AuthSchemaTestCase
         self::assertSame(1, $this->countRows('fe_auth_attempts'));
     }
 
+    public function testResetConfirmWithoutEmailHashIsAccepted(): void
+    {
+        $this->createAttempt(['action' => 'reset_confirm', 'email_hash' => null]);
+
+        self::assertSame(1, $this->countRows('fe_auth_attempts'));
+    }
+
     /**
      * @return iterable<string, array{array<string, scalar|null>}>
      */
@@ -68,6 +76,8 @@ final class AuthAttemptSchemaTest extends AuthSchemaTestCase
         yield 'Anmeldung ohne E-Mail-Hash' => [['email_hash' => null]];
         yield 'Registrierung ohne E-Mail-Hash' => [['action' => 'register', 'email_hash' => null]];
         yield 'Passwort zurücksetzen ohne E-Mail-Hash' => [['action' => 'password_reset', 'email_hash' => null]];
+        yield 'Einlösen groß' => [['action' => 'RESET_CONFIRM', 'email_hash' => null]];
+        yield 'Einlösen mit zu kurzem E-Mail-Hash' => [['action' => 'reset_confirm', 'email_hash' => str_repeat("\x01", 31)]];
         yield 'E-Mail-Hash zu kurz' => [['email_hash' => str_repeat("\x01", 31)]];
         yield 'vollständige IPv4-Adresse' => [['ip_prefix' => (string) inet_pton('192.0.2.17')]];
         yield 'vollständige IPv6-Adresse' => [['ip_prefix' => (string) inet_pton('2001:db8:abcd:12::1')]];

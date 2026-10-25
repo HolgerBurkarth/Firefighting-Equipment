@@ -11,12 +11,20 @@ use FirefightingEquipment\Cli\UserCommand;
 use FirefightingEquipment\Config\ConfigLoader;
 use FirefightingEquipment\Database\ConnectionFactory;
 use FirefightingEquipment\Database\DatabaseConfig;
+use FirefightingEquipment\Http\AppUrls;
+use FirefightingEquipment\Http\ErrorReporter;
+use FirefightingEquipment\Mail\MailException;
+use FirefightingEquipment\Mail\MailMessage;
+use FirefightingEquipment\Mail\MailTemplates;
+use FirefightingEquipment\Mail\MimeMessage;
+use FirefightingEquipment\Mail\Notifier;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Tenant\TenantException;
 use FirefightingEquipment\Tenant\TenantName;
 use FirefightingEquipment\Tenant\TenantNotFoundException;
 use FirefightingEquipment\Tenant\TenantRepository;
 use FirefightingEquipment\Tenant\TenantSlug;
+use FirefightingEquipment\Tests\Support\FakeMailer;
 use FirefightingEquipment\Tests\Support\FakePasswordPrompt;
 use FirefightingEquipment\Tests\Support\TestDatabase;
 use FirefightingEquipment\Tests\Support\TestPasswordHasher;
@@ -39,11 +47,18 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
 #[CoversClass(UserCommand::class)]
+#[UsesClass(AppUrls::class)]
 #[UsesClass(ConfigLoader::class)]
 #[UsesClass(ConnectionFactory::class)]
 #[UsesClass(DatabaseConfig::class)]
 #[UsesClass(DuplicateUserEmailException::class)]
 #[UsesClass(EmailAddress::class)]
+#[UsesClass(ErrorReporter::class)]
+#[UsesClass(MailException::class)]
+#[UsesClass(MailMessage::class)]
+#[UsesClass(MailTemplates::class)]
+#[UsesClass(MimeMessage::class)]
+#[UsesClass(Notifier::class)]
 #[UsesClass(PasswordBlocklist::class)]
 #[UsesClass(PasswordContext::class)]
 #[UsesClass(PasswordHasher::class)]
@@ -69,6 +84,18 @@ use PHPUnit\Framework\Attributes\UsesClass;
 final class UserCommandTest extends AuthSchemaTestCase
 {
     private const string PASSWORD = 'Unsere Feuerwehr fährt rot';
+
+    private FakeMailer $mailer;
+
+    /** @var list<string> Zeilen des Fehlerprotokolls */
+    private array $log = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->mailer = new FakeMailer();
+    }
 
     public function testCreateSuperAdminWithPasswordStdinThenList(): void
     {
@@ -181,9 +208,39 @@ final class UserCommandTest extends AuthSchemaTestCase
         );
 
         self::assertSame(UserCommand::EXIT_OK, $exitCode, $err);
-        self::assertSame('Passwort geändert: chef@example.org. Alle Sitzungen des Kontos wurden beendet.' . PHP_EOL, $out);
+        self::assertSame(
+            'Passwort geändert: chef@example.org. Alle Sitzungen des Kontos wurden beendet.' . PHP_EOL
+            . 'Benachrichtigung per E-Mail gesendet.' . PHP_EOL,
+            $out,
+        );
         self::assertTrue(password_verify('Lange Leitern für hohe Häuser', $this->hashOf('chef@example.org')));
         self::assertSame(0, $this->countRows('fe_sessions'));
+
+        $mail = $this->mailer->only();
+        self::assertSame('chef@example.org', $mail->to->value);
+        self::assertSame('Ihr Passwort wurde geändert', $mail->subject);
+        self::assertStringContainsString('(Verwaltung)', $mail->text);
+        self::assertStringContainsString('informieren Sie einen anderen Super-Admin', $mail->text);
+        self::assertMatchesRegularExpression('#^https?://[a-z0-9.:-]+/firefighting/service/$#m', $mail->text, 'base_url laut Testkonfiguration');
+    }
+
+    public function testFailedNotificationIsReportedButPasswordIsChanged(): void
+    {
+        $this->runCommand(['superadmin:create', '--email=chef@example.org', '--name=Erika', '--password-stdin'], stdin: self::PASSWORD);
+        $this->mailer->fail = true;
+
+        [$exitCode, $out, $err] = $this->runCommand(
+            ['superadmin:password', '--email=chef@example.org', '--password-stdin'],
+            stdin: 'Lange Leitern für hohe Häuser',
+        );
+
+        self::assertSame(UserCommand::EXIT_OK, $exitCode, $err);
+        self::assertStringContainsString('Passwort geändert', $out);
+        self::assertStringContainsString('HINWEIS: Die Benachrichtigung per E-Mail konnte nicht gesendet werden', $err);
+        self::assertTrue(password_verify('Lange Leitern für hohe Häuser', $this->hashOf('chef@example.org')));
+        self::assertCount(1, $this->log);
+        self::assertStringContainsString('mail_failed (password_changed, Konto #', $this->log[0]);
+        self::assertStringNotContainsString('chef@example.org', $this->log[0]);
     }
 
     public function testChangePasswordChecksNameOfAccount(): void
@@ -303,7 +360,7 @@ final class UserCommandTest extends AuthSchemaTestCase
         rewind($in);
 
         try {
-            $exitCode = new UserCommand(TestDatabase::CONFIG_PATH, $in, $out, $err, $prompt, TestPasswordHasher::fast())->run($args);
+            $exitCode = new UserCommand(TestDatabase::CONFIG_PATH, $in, $out, $err, $prompt, TestPasswordHasher::fast(), $this->mailer, $this->errors())->run($args);
 
             rewind($out);
             rewind($err);
@@ -314,6 +371,13 @@ final class UserCommandTest extends AuthSchemaTestCase
             fclose($out);
             fclose($err);
         }
+    }
+
+    private function errors(): ErrorReporter
+    {
+        return new ErrorReporter(function (string $line): void {
+            $this->log[] = $line;
+        });
     }
 
     /**

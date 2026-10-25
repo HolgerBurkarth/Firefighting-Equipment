@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Tests\Integration\Auth;
 
 use FirefightingEquipment\Database\LazyConnection;
+use FirefightingEquipment\Http\AppUrls;
 use FirefightingEquipment\Http\Application;
 use FirefightingEquipment\Http\ErrorReporter;
 use FirefightingEquipment\Http\JsonResponse;
+use FirefightingEquipment\Http\MinimumDuration;
 use FirefightingEquipment\Http\Request;
 use FirefightingEquipment\Http\Router;
 use FirefightingEquipment\Http\Routes;
@@ -15,6 +17,7 @@ use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Tenant\TenantRepository;
 use FirefightingEquipment\Tenant\TenantSlug;
 use FirefightingEquipment\Tests\Integration\User\AuthSchemaTestCase;
+use FirefightingEquipment\Tests\Support\FakeMailer;
 use FirefightingEquipment\Tests\Support\TestPasswordHasher;
 use FirefightingEquipment\User\Password\PasswordHasher;
 
@@ -22,22 +25,27 @@ use FirefightingEquipment\User\Password\PasswordHasher;
  * Basis für Tests von Anmeldung und Sitzungen: zwei aktive Städte (immendingen, tuttlingen),
  * Konten mit echtem Argon2id-Hash von PASSWORD und Anfragen über die ganze Anwendung. Hash und
  * Anwendung verwenden minimale Argon2id-Parameter (TestPasswordHasher), außer ein Test übergibt
- * ausdrücklich einen anderen Hasher.
+ * ausdrücklich einen anderen Hasher. Mails landen in $mailer (FakeMailer), Links beginnen mit
+ * BASE_URL, und die Mindestdauer von password-reset/request ist 0 (kein Warten in Tests).
  */
 abstract class AuthTestCase extends AuthSchemaTestCase
 {
     protected const string PASSWORD = 'Korrekt-Pferd-Batterie-42';
     protected const string IP = '192.0.2.10';
+    protected const string BASE_URL = 'http://localhost:8000';
 
     private static ?string $passwordHash = null;
 
     /** @var list<string> */
     protected array $log = [];
 
+    protected FakeMailer $mailer;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->mailer = new FakeMailer();
         $this->createTenant('immendingen');
         $this->createTenant('tuttlingen');
     }
@@ -93,11 +101,13 @@ abstract class AuthTestCase extends AuthSchemaTestCase
         });
 
         return new Application(
-            $service ?? Routes::service(),
-            $tenant ?? Routes::tenant(),
+            $service ?? Routes::service(new MinimumDuration(0)),
+            $tenant ?? Routes::tenant(new MinimumDuration(0)),
             new LazyConnection(fn (): \PDO => $this->pdo()),
             $errors,
             hasher: $hasher ?? TestPasswordHasher::fast(),
+            mailer: $this->mailer,
+            urls: AppUrls::fixed(self::BASE_URL),
         );
     }
 

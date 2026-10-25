@@ -39,6 +39,15 @@ final class HttpException extends \RuntimeException
         return new self('not_authenticated', 'Bitte zuerst anmelden.', 401, $headers);
     }
 
+    /**
+     * Einmal-Link unbekannt, abgelaufen, schon benutzt oder für ein anderes Konto bzw. einen anderen
+     * Bereich (bewusst nicht unterschieden).
+     */
+    public static function invalidToken(): self
+    {
+        return new self('invalid_token', 'Der Link ist ungültig oder abgelaufen. Bitte fordern Sie einen neuen an.', 400);
+    }
+
     public static function invalidCredentials(): self
     {
         return new self('invalid_credentials', 'E-Mail-Adresse oder Passwort ist falsch.', 401);

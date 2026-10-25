@@ -79,6 +79,49 @@ final class PasswordChangeTest extends AuthTestCase
         self::assertSame(200, $this->me($cookie)->statusCode(), 'Sitzung bleibt');
     }
 
+    public function testNotificationIsSentAfterChange(): void
+    {
+        $this->account('immendingen', 'user@example.org');
+        $cookie = $this->loginCookie('immendingen', 'user@example.org');
+
+        self::assertSame(200, $this->change($cookie, self::PASSWORD, self::NEW_PASSWORD)->statusCode());
+
+        $mail = $this->mailer->only();
+        self::assertSame('user@example.org', $mail->to->value);
+        self::assertSame('Erika', $mail->toName);
+        self::assertSame('Ihr Passwort wurde geändert', $mail->subject);
+        self::assertStringContainsString("\nGerät: Chrome auf Android\n", $mail->text);
+        self::assertStringContainsString('(Feuerwehr immendingen)', $mail->text);
+        self::assertStringContainsString("\n" . self::BASE_URL . "/firefighting/immendingen/\n", $mail->text);
+        self::assertSame([], $this->log);
+    }
+
+    public function testMailFailureDoesNotChangeResponse(): void
+    {
+        $id = $this->account('immendingen', 'user@example.org');
+        $cookie = $this->loginCookie('immendingen', 'user@example.org');
+        $this->mailer->fail = true;
+
+        $response = $this->change($cookie, self::PASSWORD, self::NEW_PASSWORD);
+
+        self::assertSame(200, $response->statusCode(), $response->body());
+        self::assertNotNull(self::cookieValue($response));
+        self::assertSame(1, $this->sessionCountOf($id));
+        self::assertCount(1, $this->log);
+        self::assertStringContainsString(sprintf('mail_failed (password_changed, Konto #%d)', $id), $this->log[0]);
+    }
+
+    public function testRejectedChangeSendsNoNotification(): void
+    {
+        $this->account('immendingen', 'user@example.org');
+        $cookie = $this->loginCookie('immendingen', 'user@example.org');
+
+        $this->change($cookie, 'Falsches-Passwort-99', self::NEW_PASSWORD);
+        $this->change($cookie, self::PASSWORD, 'kurz');
+
+        self::assertSame([], $this->mailer->sent);
+    }
+
     public function testWrongCurrentPasswordCountsIntoThrottle(): void
     {
         $id = $this->account('immendingen', 'user@example.org');

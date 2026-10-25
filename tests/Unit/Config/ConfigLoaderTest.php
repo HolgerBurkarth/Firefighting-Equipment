@@ -6,7 +6,10 @@ namespace FirefightingEquipment\Tests\Unit\Config;
 
 use FirefightingEquipment\Config\ConfigException;
 use FirefightingEquipment\Config\ConfigLoader;
+use FirefightingEquipment\Config\AppConfig;
 use FirefightingEquipment\Database\DatabaseConfig;
+use FirefightingEquipment\Mail\MailConfig;
+use FirefightingEquipment\Mail\MailTransport;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -14,7 +17,9 @@ use PHPUnit\Framework\TestCase;
 
 #[CoversClass(ConfigLoader::class)]
 #[CoversClass(ConfigException::class)]
+#[CoversClass(AppConfig::class)]
 #[UsesClass(DatabaseConfig::class)]
+#[UsesClass(MailConfig::class)]
 final class ConfigLoaderTest extends TestCase
 {
     private const string FIXTURES = __DIR__ . '/../../Fixtures/config/';
@@ -125,6 +130,88 @@ final class ConfigLoaderTest extends TestCase
             self::assertStringContainsString($expectedMessage, $e->getMessage());
             self::assertStringNotContainsString(self::SECRET_MARKER, $e->getMessage());
         }
+    }
+
+    public function testAppConfigIsLoaded(): void
+    {
+        self::assertSame('http://localhost:8000', new ConfigLoader()->loadAppConfig(self::FIXTURES . 'app-valid.php')->baseUrl);
+    }
+
+    public function testAppConfigDefaultsToProduction(): void
+    {
+        self::assertSame('https://www.prodad.de', new ConfigLoader()->loadAppConfig(self::FIXTURES . 'valid.php')->baseUrl);
+        self::assertSame('https://www.prodad.de', new ConfigLoader()->loadAppConfig(self::FIXTURES . 'app-empty.php')->baseUrl);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function invalidAppFiles(): iterable
+    {
+        yield 'app kein Array' => ['app-not-array', "'app' muss"];
+        yield 'unbekannter Schlüssel' => ['app-unknown-key', "Unbekannter Schlüssel 'app.url'"];
+        yield 'mit Pfad' => ['app-base-url-with-path', "'app.base_url'"];
+        yield 'mit / am Ende' => ['app-base-url-trailing-slash', "'app.base_url'"];
+        yield 'kein Text' => ['app-base-url-not-string', "'app.base_url'"];
+    }
+
+    #[DataProvider('invalidAppFiles')]
+    public function testInvalidAppGroupIsReported(string $fixture, string $expectedMessage): void
+    {
+        try {
+            new ConfigLoader()->loadAppConfig(self::FIXTURES . $fixture . '.php');
+            self::fail('ConfigException erwartet.');
+        } catch (ConfigException $e) {
+            self::assertStringContainsString($expectedMessage, $e->getMessage());
+            self::assertStringNotContainsString(self::SECRET_MARKER, $e->getMessage());
+        }
+    }
+
+    public function testMailConfigIsLoaded(): void
+    {
+        $config = new ConfigLoader()->loadMailConfig(self::FIXTURES . 'mail-file.php');
+
+        self::assertSame(MailTransport::File, $config->transport);
+        self::assertSame('tmp/mails', $config->fileDir);
+        self::assertSame(MailTransport::Sendmail, new ConfigLoader()->loadMailConfig(self::FIXTURES . 'mail-sendmail.php')->transport);
+    }
+
+    public function testMailConfigDefaultsToSendmail(): void
+    {
+        $config = new ConfigLoader()->loadMailConfig(self::FIXTURES . 'valid.php');
+
+        self::assertSame(MailTransport::Sendmail, $config->transport);
+        self::assertSame('var/mail', $config->fileDir);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function invalidMailFiles(): iterable
+    {
+        yield 'mail kein Array' => ['mail-not-array', "'mail' muss"];
+        yield 'unbekannter Schlüssel' => ['mail-unknown-key', "Unbekannter Schlüssel 'mail.dir'"];
+        yield 'unbekannter Transport' => ['mail-unknown-transport', "'mail.transport' muss"];
+        yield 'Transport großgeschrieben' => ['mail-transport-uppercase', "'mail.transport' muss"];
+        yield 'leerer Ordner' => ['mail-empty-file-dir', "'mail.file_dir' muss"];
+    }
+
+    #[DataProvider('invalidMailFiles')]
+    public function testInvalidMailGroupIsReported(string $fixture, string $expectedMessage): void
+    {
+        try {
+            new ConfigLoader()->loadMailConfig(self::FIXTURES . $fixture . '.php');
+            self::fail('ConfigException erwartet.');
+        } catch (ConfigException $e) {
+            self::assertStringContainsString($expectedMessage, $e->getMessage());
+            self::assertStringNotContainsString(self::SECRET_MARKER, $e->getMessage());
+        }
+    }
+
+    public function testOtherLoadersIgnoreAppAndMailGroups(): void
+    {
+        self::assertSame('pass-nicht-ausgeben', $this->load('mail-file')->pass);
+        self::assertSame([], new ConfigLoader()->loadAllowedOrigins(self::FIXTURES . 'app-valid.php'));
     }
 
     private function load(string $fixture): DatabaseConfig

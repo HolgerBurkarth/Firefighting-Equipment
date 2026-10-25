@@ -17,6 +17,11 @@ Thumbs.db
 # Logs
 *.log
 
+# Lokale Laufzeitdaten, z. B. Mails als .eml (mail.transport = file; enthalten Links mit Tokens)
+/var/
+
 # Lokale Tests der API mit curl (Sitzungs-Token, Zugangsdaten)
 /cookies.txt
 /login.json
+/request.json
+/reset.json

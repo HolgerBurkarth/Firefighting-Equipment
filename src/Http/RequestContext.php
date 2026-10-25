@@ -6,6 +6,9 @@ namespace FirefightingEquipment\Http;
 
 use FirefightingEquipment\Auth\AuthSession;
 use FirefightingEquipment\Database\LazyConnection;
+use FirefightingEquipment\Mail\Mailer;
+use FirefightingEquipment\Mail\Notifier;
+use FirefightingEquipment\Mail\SendmailMailer;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\Password\PasswordHasher;
 
@@ -31,7 +34,19 @@ final readonly class RequestContext
         public ?AuthSession $auth = null,
         /** Argon2id für Anmeldung und Passwortänderung (in Produktion Standardparameter). */
         public PasswordHasher $hasher = new PasswordHasher(),
+        /** Versand von Mails; Handler senden über notifier(). */
+        public Mailer $mailer = new SendmailMailer(),
+        /** Absolute Adressen für Mails (app.base_url). */
+        public AppUrls $urls = new AppUrls(),
     ) {
+    }
+
+    /**
+     * Versand ohne Fehler für den Aufrufer: Fehler landen im Protokoll (ErrorReporter).
+     */
+    public function notifier(): Notifier
+    {
+        return new Notifier($this->mailer, $this->errors);
     }
 
     /**

@@ -15,4 +15,16 @@ return [
     // 'http' => [
     //     'allowed_origins' => ['http://localhost:8000'],
     // ],
+    // Optional: Adresse der Anwendung für Links in Mails (ohne Pfad, ohne / am Ende).
+    // Standard https://www.prodad.de; auf dem Server weglassen.
+    // 'app' => [
+    //     'base_url' => 'http://localhost:8000',
+    // ],
+    // Optional: Versand von Mails. Standard 'sendmail' (mail()); auf dem Server weglassen.
+    // Lokal 'file': jede Mail als .eml-Datei in file_dir (relativ zum Projektordner oder absolut,
+    // Standard var/mail; steht in .gitignore).
+    // 'mail' => [
+    //     'transport' => 'file',
+    //     'file_dir'  => 'var/mail',
+    // ],
 ];

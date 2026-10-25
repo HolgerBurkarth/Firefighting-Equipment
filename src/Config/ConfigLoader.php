@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Config;
 
 use FirefightingEquipment\Database\DatabaseConfig;
+use FirefightingEquipment\Mail\MailConfig;
+use FirefightingEquipment\Mail\MailTransport;
 
 /**
  * Lädt eine Konfigurationsdatei im Format von config/config.example.php und prüft sie.
@@ -66,20 +68,7 @@ final readonly class ConfigLoader
      */
     public function loadAllowedOrigins(string $path): array
     {
-        $config = $this->loadFile($path);
-        if (!array_key_exists('http', $config)) {
-            return [];
-        }
-
-        $http = $config['http'];
-        if (!is_array($http)) {
-            throw new ConfigException(sprintf("'http' muss in %s ein Array sein.", $path));
-        }
-        foreach (array_keys($http) as $key) {
-            if ($key !== 'allowed_origins') {
-                throw new ConfigException(sprintf("Unbekannter Schlüssel 'http.%s' in %s.", $key, $path));
-            }
-        }
+        $http = $this->optionalGroup($this->loadFile($path), 'http', ['allowed_origins'], $path);
 
         $origins = $http['allowed_origins'] ?? [];
         if (!is_array($origins) || !array_is_list($origins)) {
@@ -95,6 +84,83 @@ final readonly class ConfigLoader
         }
 
         return $origins;
+    }
+
+    /**
+     * Optionale Gruppe 'app' (Schlüssel 'base_url', Format wie ein Origin). Fehlt sie oder der
+     * Schlüssel: Standardwerte (Produktion).
+     *
+     * @throws ConfigException
+     */
+    public function loadAppConfig(string $path): AppConfig
+    {
+        $app = $this->optionalGroup($this->loadFile($path), 'app', ['base_url'], $path);
+        if (!array_key_exists('base_url', $app)) {
+            return new AppConfig();
+        }
+
+        $baseUrl = $app['base_url'];
+        if (!is_string($baseUrl) || preg_match(self::ORIGIN_PATTERN, $baseUrl) !== 1) {
+            throw new ConfigException(sprintf(
+                "'app.base_url' in %s ist ungültig (erwartet z. B. http://localhost:8000, ohne Pfad und ohne / am Ende).",
+                $path,
+            ));
+        }
+
+        return new AppConfig($baseUrl);
+    }
+
+    /**
+     * Optionale Gruppe 'mail' (Schlüssel 'transport' = sendmail oder file, 'file_dir'). Fehlt sie
+     * oder ein Schlüssel: Standardwerte (Produktion: sendmail).
+     *
+     * @throws ConfigException
+     */
+    public function loadMailConfig(string $path): MailConfig
+    {
+        $mail = $this->optionalGroup($this->loadFile($path), 'mail', ['transport', 'file_dir'], $path);
+
+        $transport = MailTransport::Sendmail;
+        if (array_key_exists('transport', $mail)) {
+            $transport = (is_string($mail['transport']) ? MailTransport::tryFrom($mail['transport']) : null)
+                ?? throw new ConfigException(sprintf("'mail.transport' muss in %s 'sendmail' oder 'file' sein.", $path));
+        }
+
+        $fileDir = $mail['file_dir'] ?? MailConfig::DEFAULT_FILE_DIR;
+        if (!is_string($fileDir) || trim($fileDir) === '' || str_contains($fileDir, "\0")) {
+            throw new ConfigException(sprintf("'mail.file_dir' muss in %s ein nicht leerer Pfad sein.", $path));
+        }
+
+        return new MailConfig($transport, $fileDir);
+    }
+
+    /**
+     * Inhalt einer optionalen Gruppe; fehlt sie, ein leeres Array. Unbekannte Schlüssel sind ein Fehler.
+     *
+     * @param array<array-key, mixed> $config
+     * @param list<string>            $keys erlaubte Schlüssel
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws ConfigException
+     */
+    private function optionalGroup(array $config, string $group, array $keys, string $path): array
+    {
+        if (!array_key_exists($group, $config)) {
+            return [];
+        }
+
+        $values = $config[$group];
+        if (!is_array($values)) {
+            throw new ConfigException(sprintf("'%s' muss in %s ein Array sein.", $group, $path));
+        }
+        foreach (array_keys($values) as $key) {
+            if (!in_array($key, $keys, true)) {
+                throw new ConfigException(sprintf("Unbekannter Schlüssel '%s.%s' in %s.", $group, $key, $path));
+            }
+        }
+
+        return $values;
     }
 
     /**

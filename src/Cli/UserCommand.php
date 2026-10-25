@@ -9,6 +9,13 @@ use FirefightingEquipment\Config\ConfigLoader;
 use FirefightingEquipment\Database\ConnectionException;
 use FirefightingEquipment\Database\ConnectionFactory;
 use FirefightingEquipment\Database\DatabaseError;
+use FirefightingEquipment\Http\AppUrls;
+use FirefightingEquipment\Http\ErrorReporter;
+use FirefightingEquipment\Mail\ConfiguredMailer;
+use FirefightingEquipment\Mail\MailMessage;
+use FirefightingEquipment\Mail\Mailer;
+use FirefightingEquipment\Mail\MailTemplates;
+use FirefightingEquipment\Mail\Notifier;
 use FirefightingEquipment\Tenant\TenantException;
 use FirefightingEquipment\Tenant\TenantNotFoundException;
 use FirefightingEquipment\Tenant\TenantRepository;
@@ -27,7 +34,8 @@ use FirefightingEquipment\User\UserRepository;
 /**
  * Kommandozeile für Benutzerkonten (bin/user.php): Super-Admins verwalten, Konten einer Stadt
  * anzeigen. Passwörter nie als Argument, sondern verdeckt (mit Wiederholung) oder für Tests und
- * Skripte über --password-stdin. Hashes werden nie ausgegeben.
+ * Skripte über --password-stdin. Hashes werden nie ausgegeben. Nach superadmin:password bekommt das
+ * Konto eine Benachrichtigung per Mail (Transport aus der Konfiguration).
  */
 final readonly class UserCommand
 {
@@ -79,6 +87,8 @@ final readonly class UserCommand
 
     private PasswordPrompt $prompt;
 
+    private ErrorReporter $errors;
+
     /**
      * @param resource $in
      * @param resource $out
@@ -92,8 +102,12 @@ final readonly class UserCommand
         ?PasswordPrompt $prompt = null,
         /** bin/user.php übergibt keinen: Standardparameter (nur Tests verwenden andere). */
         private PasswordHasher $hasher = new PasswordHasher(),
+        /** null = laut Konfiguration (--config); andere nur für Tests. */
+        private ?Mailer $mailer = null,
+        ?ErrorReporter $errors = null,
     ) {
         $this->prompt = $prompt ?? new TerminalPasswordPrompt($in, $err);
+        $this->errors = $errors ?? new ErrorReporter();
     }
 
     /**
@@ -121,7 +135,8 @@ final readonly class UserCommand
             $name = $options['name'] === null ? null : PersonName::fromString($options['name']);
             $slug = $options['tenant'] === null ? null : TenantSlug::fromString($options['tenant']);
 
-            $config = new ConfigLoader()->loadDatabaseConfig($options['config'] ?? $this->defaultConfigPath);
+            $configPath = $options['config'] ?? $this->defaultConfigPath;
+            $config = new ConfigLoader()->loadDatabaseConfig($configPath);
             $pdo = new ConnectionFactory()->create($config);
             $users = new UserRepository($pdo);
             $stdin = $options['passwordStdin'];
@@ -129,7 +144,7 @@ final readonly class UserCommand
             match ($options['command']) {
                 'superadmin:create' => $this->createSuperAdmin($users, self::required($email), self::required($name), $stdin),
                 'superadmin:list' => $this->printSuperAdmins($users->listSuperAdmins()),
-                'superadmin:password' => $this->setPassword($users, self::required($email), $stdin),
+                'superadmin:password' => $this->setPassword($users, self::required($email), $stdin, $configPath),
                 'superadmin:lock' => $this->setLocked($users, self::required($email), true),
                 'superadmin:unlock' => $this->setLocked($users, self::required($email), false),
                 'list' => $this->printTenantUsers(new TenantRepository($pdo), $users, self::required($slug)),
@@ -242,7 +257,7 @@ final readonly class UserCommand
      * @throws UserException
      * @throws PasswordPromptException
      */
-    private function setPassword(UserRepository $users, EmailAddress $email, bool $stdin): void
+    private function setPassword(UserRepository $users, EmailAddress $email, bool $stdin, string $configPath): void
     {
         $user = $users->findSuperAdminByEmail($email) ?? throw UserNotFoundException::superAdmin($email);
 
@@ -251,6 +266,18 @@ final readonly class UserCommand
         $users->setPassword($user->id, $this->hasher->hash($password));
 
         $this->line(sprintf('Passwort geändert: %s. Alle Sitzungen des Kontos wurden beendet.', $email->value));
+
+        $mailer = $this->mailer ?? ConfiguredMailer::fromConfigFile($configPath, dirname(__DIR__, 2));
+        $sent = new Notifier($mailer, $this->errors)->send(
+            'password_changed',
+            $user->id,
+            static fn (): MailMessage => MailTemplates::passwordChanged($user, null, AppUrls::fromConfigFile($configPath)->area(null)),
+        );
+        if ($sent) {
+            $this->line('Benachrichtigung per E-Mail gesendet.');
+        } else {
+            fwrite($this->err, 'HINWEIS: Die Benachrichtigung per E-Mail konnte nicht gesendet werden (Details im Fehlerprotokoll).' . PHP_EOL);
+        }
     }
 
     /**

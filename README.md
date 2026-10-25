@@ -9,17 +9,19 @@ https://www.prodad.de/firefighting/<kürzel>/<pfad>    # Stadt
 https://www.prodad.de/firefighting/service/<pfad>     # Super-Admin
 ```
 
-| Methode | Pfad                                 | Zugriff    | Antwort                                        |
-|---------|--------------------------------------|------------|------------------------------------------------|
-| GET     | `api/v1/health`                      | öffentlich | `{"status":"ok","database":"ok"}`              |
-| GET     | `api/v1/tenant`                      | öffentlich | `{"slug":"immendingen","name":"Feuerwehr …"}`  |
-| POST    | `api/v1/auth/login`                  | öffentlich | `{"user":…,"tenant":…,"session":…}` + Cookie   |
-| POST    | `api/v1/auth/logout`                 | öffentlich | `{"logged_out":true}`, Cookie wird gelöscht    |
-| GET     | `api/v1/auth/me`                     | angemeldet | wie Login                                      |
-| GET     | `api/v1/auth/sessions`               | angemeldet | `{"sessions":[{"id":…,"current":true,…}]}`     |
-| DELETE  | `api/v1/auth/sessions/{id}`          | angemeldet | `{"deleted":true,"current":false}`             |
-| POST    | `api/v1/auth/sessions/logout-others` | angemeldet | `{"ended_sessions":2}`                         |
-| POST    | `api/v1/auth/password`               | angemeldet | wie Login, mit neuem Cookie                    |
+| Methode | Pfad                                  | Zugriff    | Antwort                                        |
+|---------|---------------------------------------|------------|------------------------------------------------|
+| GET     | `api/v1/health`                       | öffentlich | `{"status":"ok","database":"ok"}`              |
+| GET     | `api/v1/tenant`                       | öffentlich | `{"slug":"immendingen","name":"Feuerwehr …"}`  |
+| POST    | `api/v1/auth/login`                   | öffentlich | `{"user":…,"tenant":…,"session":…}` + Cookie   |
+| POST    | `api/v1/auth/logout`                  | öffentlich | `{"logged_out":true}`, Cookie wird gelöscht    |
+| GET     | `api/v1/auth/me`                      | angemeldet | wie Login                                      |
+| GET     | `api/v1/auth/sessions`                | angemeldet | `{"sessions":[{"id":…,"current":true,…}]}`     |
+| DELETE  | `api/v1/auth/sessions/{id}`           | angemeldet | `{"deleted":true,"current":false}`             |
+| POST    | `api/v1/auth/sessions/logout-others`  | angemeldet | `{"ended_sessions":2}`                         |
+| POST    | `api/v1/auth/password`                | angemeldet | wie Login, mit neuem Cookie                    |
+| POST    | `api/v1/auth/password-reset/request`  | öffentlich | 202 `{"message":"Falls zu dieser Adresse …"}`  |
+| POST    | `api/v1/auth/password-reset/confirm`  | öffentlich | `{"message":"Das Passwort wurde geändert. …"}` |
 
 `api/v1/tenant` gibt es nur unter einer Stadt (unter `service`: 404), alle anderen Routen unter
 `service` und unter jeder Stadt. Super-Admins melden sich nur unter `service` an, Konten einer Stadt
@@ -36,6 +38,7 @@ Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`:
 | HTTP | `error`                    | Bedeutung                                                  |
 |------|----------------------------|------------------------------------------------------------|
 | 400  | `invalid_request`          | Body kein JSON-Objekt, zu groß (> 16 KiB), Feld fehlt      |
+| 400  | `invalid_token`            | Link zum Zurücksetzen ungültig, abgelaufen oder benutzt    |
 | 401  | `not_authenticated`        | keine oder abgelaufene Sitzung                             |
 | 401  | `invalid_credentials`      | E-Mail oder Passwort falsch (bewusst nicht unterschieden)  |
 | 403  | `forbidden`                | angemeldet, aber die Rolle reicht nicht                    |
@@ -70,6 +73,39 @@ Alle Antworten tragen `Cache-Control: no-store` und `X-Content-Type-Options: nos
 - Bremse: 5 Fehlversuche je E-Mail und Stadt oder 30 je IP-Bereich (/24 bzw. /48) innerhalb von
   15 Minuten führen zu 429. Eine erfolgreiche Anmeldung setzt nur den Zähler der E-Mail zurück.
 - Passwort ändern beendet alle anderen Sitzungen und ersetzt die aktuelle (neues Cookie).
+- Nach jeder Passwortänderung (selbst geändert, zurückgesetzt oder per `bin/user.php`) bekommt das
+  Konto die Mail "Ihr Passwort wurde geändert".
+
+### Passwort vergessen
+
+1. `POST api/v1/auth/password-reset/request` mit `{"email":"…"}` antwortet immer mit 202 und
+   derselben Meldung, auch wenn es kein Konto zu der Adresse gibt, und frühestens nach 1,5 s.
+   Nur aktive, nicht gesperrte Konten des Bereichs bekommen eine Mail mit dem Link
+   `<base_url>/firefighting/<kürzel>/passwort-zuruecksetzen#token=…` (1 Stunde gültig, nur einmal
+   nutzbar; ein neuer Link ersetzt den alten). Eine ungültige Schreibweise der Adresse gibt 400.
+2. Die Seite hinter dem Link (Frontend, noch nicht gebaut) liest das Token hinter `#` und schickt
+   `POST api/v1/auth/password-reset/confirm` mit `{"token":"…","new_password":"…"}`. Danach sind
+   alle Sitzungen beendet; man meldet sich mit dem neuen Passwort an.
+
+| Fall                                                        | Antwort                 |
+|-------------------------------------------------------------|-------------------------|
+| Link unbekannt, abgelaufen, benutzt, falscher Bereich       | 400 `invalid_token`     |
+| Konto inzwischen gesperrt oder nicht mehr aktiv             | 400 `invalid_token`     |
+| neues Passwort verletzt die Regeln (Link bleibt gültig)     | 422 `weak_password`     |
+| > 3 Anforderungen je Adresse, > 20 je IP-Bereich pro Stunde | 429 `too_many_attempts` |
+| > 10 ungültige Links je IP-Bereich in 15 Minuten            | 429 `too_many_attempts` |
+
+Lokal ausprobieren (mit `mail.transport = file` und `app.base_url = http://localhost:8000`, siehe
+"E-Mail-Versand"): `request.json` enthält `{"email":"admin@example.org"}`. Nach dem Anfordern das
+Token aus der neuesten Datei in `var/mail/` kopieren und in `reset.json` schreiben
+(`{"token":"…","new_password":"…"}`):
+
+```
+curl.exe -H "Content-Type: application/json" --data-binary "@request.json" http://localhost:8000/firefighting/immendingen/api/v1/auth/password-reset/request
+curl.exe -H "Content-Type: application/json" --data-binary "@reset.json" http://localhost:8000/firefighting/immendingen/api/v1/auth/password-reset/confirm
+```
+
+`request.json` und `reset.json` danach löschen (nie committen).
 
 ### Lokal starten
 
@@ -108,6 +144,8 @@ committen.
    - `$context->auth()`: angemeldetes Konto und Sitzung (nur bei Routen, die nicht öffentlich sind).
    - `$context->param('id')`: Wert eines Platzhalters; `$context->stringField('name')`: Textfeld aus
      dem JSON-Body (fehlt es, folgt 400).
+   - `$context->notifier()->send('zweck', $userId, fn () => MailTemplates::…)`: Mail senden
+     (Vorlage in `src/Mail/MailTemplates.php`); ein Versandfehler wird nur protokolliert.
    - Bekannte Fehler als `HttpException` werfen (Fabriken in `src/Http/HttpException.php`, neue
      Codes dort ergänzen); alles andere wird automatisch zu 500.
 2. Route in `src/Http/Routes.php` mit Zugriffsstufe eintragen, z. B.
@@ -284,8 +322,54 @@ cd ~/htdocs/apps/firefighting-equipment && php85 bin/user.php superadmin:create 
   zählen dabei nicht als persönliche Daten.
 - Sperren und ein neues Passwort beenden alle Sitzungen des Kontos. Der letzte aktive, nicht
   gesperrte Super-Admin kann nicht gesperrt werden; zuerst einen weiteren anlegen.
+- Nach `superadmin:password` bekommt das Konto die Mail "Ihr Passwort wurde geändert". Klappt der
+  Versand nicht, erscheint ein Hinweis; das Passwort ist trotzdem geändert.
 - `list` zeigt alle Konten einer Stadt (auch gelöschte als "Gelöschter Benutzer #ID"), nie
   Passwort-Hashes.
+
+## E-Mail-Versand
+
+Die Anwendung verschickt nur Klartext-Mails (UTF-8) von
+`"Feuerwehr Geräteverwaltung" <feuerwehr-app@prodad.de>`, mit dem Kennzeichen
+`Auto-Submitted: auto-generated` (keine Abwesenheitsnotizen). Mails gibt es bisher zu
+"Passwort vergessen" und "Ihr Passwort wurde geändert". Kann eine Mail nicht verschickt werden,
+steht `mail_failed` im Fehlerprotokoll (ohne Empfänger und ohne Link); die Anfrage selbst läuft
+normal weiter.
+
+Konfiguration in `config/config.local.php` (siehe `config/config.example.php`). Auf dem Server
+beide Gruppen weglassen: Dann wird über `mail()` (sendmail) versendet, und Links beginnen mit
+`https://www.prodad.de`.
+
+```php
+'app'  => ['base_url' => 'http://localhost:8000'],                  // Anfang der Links in Mails
+'mail' => ['transport' => 'file', 'file_dir' => 'var/mail'],        // lokal: Mails als Dateien
+```
+
+### Mails lokal ansehen
+
+Mit `'transport' => 'file'` wird nichts verschickt: Jede Mail landet als Datei
+`var/mail/JJJJMMTT-HHMMSSZ-xxxxxxxx.eml` (Zeit in UTC). Der Ordner steht in `.gitignore`; die Dateien
+enthalten echte Links mit Tokens, also nicht weitergeben und gelegentlich löschen.
+
+- Ansehen: Doppelklick öffnet die Datei in Outlook bzw. Thunderbird (Datei → Öffnen →
+  Gespeicherte Nachricht) mit allen Kopfzeilen.
+- Im Texteditor ist der Text quoted-printable kodiert (`=C3=A4` = ä, `=` am Zeilenende =
+  Zeile geht weiter). Den Link zum Zurücksetzen findet man trotzdem: `#token=` folgt immer am Stück.
+- Neueste Mail in PowerShell: `Get-ChildItem var\mail\*.eml | Sort-Object Name | Select-Object -Last 1`.
+
+### Zustellung prüfen (Testmail)
+
+```
+php bin/mail-test.php --to=ich@example.org                   # lokal (Transport laut Konfiguration)
+cd ~/htdocs/apps/firefighting-equipment && php85 bin/mail-test.php --to=ich@example.org   # Server
+```
+
+Das Skript zeigt Transport, Message-ID und Dauer. "übergeben" heißt bei sendmail nur, dass der
+Server die Mail angenommen hat. Ob sie ankommt und nicht als Spam gilt, zeigt das Postfach: dort
+die Kopfzeilen bzw. den Quelltext anzeigen und prüfen, dass SPF und DKIM für `prodad.de` bestanden
+sind (`Authentication-Results: … spf=pass … dkim=pass`) und `Return-Path` auf
+`feuerwehr-app@prodad.de` steht. Die Dauer hilft beim Einstellen der Mindestdauer von
+"Passwort vergessen" (1,5 s): Sie muss deutlich über der üblichen Versanddauer liegen.
 
 ## Tests
 

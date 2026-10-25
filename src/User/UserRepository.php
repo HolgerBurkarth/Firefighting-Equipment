@@ -210,6 +210,42 @@ final readonly class UserRepository
     }
 
     /**
+     * Passwort zurücksetzen über einen Einmal-Link: löst den Link (reset_password, nicht abgelaufen)
+     * ein und setzt den Hash in derselben Transaktion; beendet alle Sitzungen. Wird der Link
+     * gleichzeitig zweimal eingelöst, gewinnt nur einer (die Zeile kann nur einmal gelöscht werden).
+     * Die Passwortregeln prüft der Aufrufer.
+     *
+     * @param string $tokenHash SHA-256 des Tokens (32 Byte)
+     *
+     * @return bool false, wenn der Link nicht (mehr) gültig ist oder das Konto nicht aktiv bzw.
+     *              gesperrt ist; dann bleibt alles unverändert
+     *
+     * @throws UserNotFoundException
+     */
+    public function resetPassword(int $id, #[\SensitiveParameter] string $passwordHash, string $tokenHash): bool
+    {
+        return $this->transaction($id, function (User $user) use ($passwordHash, $tokenHash): bool {
+            if ($user->status !== UserStatus::Active || $user->isLocked()) {
+                return false;
+            }
+
+            $stmt = $this->pdo->prepare(
+                "DELETE FROM fe_user_tokens WHERE user_id = ? AND purpose = 'reset_password' AND token_hash = ?"
+                . ' AND expires_at > UTC_TIMESTAMP()',
+            );
+            $stmt->execute([$user->id, $tokenHash]);
+            if ($stmt->rowCount() !== 1) {
+                return false;
+            }
+
+            $this->update($user->id, 'password_hash = ?', [$passwordHash]);
+            $this->endSessions($user->id);
+
+            return true;
+        });
+    }
+
+    /**
      * Löschen = Anonymisieren: entfernt E-Mail, Namen, Passwort-Hash, Sitzungen und Einmal-Links.
      * Der Datensatz bleibt für die Historie („Gelöschter Benutzer #ID“).
      *

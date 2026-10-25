@@ -70,7 +70,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `health` und `tenant` bleiben öffentlich.
 - Handler implementieren `RequestHandler` und erhalten `RequestContext` (Anfrage, Stadt oder
   `null` unter `service`, `LazyConnection`, `ErrorReporter`, Platzhalter `param()`, JSON-Body
-  `body`/`stringField()`, Sitzung `auth()` bei nicht öffentlichen Routen). Die Datenbankverbindung
+  `body`/`stringField()`, Sitzung `auth()` bei nicht öffentlichen Routen, Mails über `notifier()`,
+  absolute Links über `urls`). Die Datenbankverbindung
   (und das Laden der Konfiguration) erfolgt erst beim ersten `$context->db->get()`; schlägt sie im
   Handler fehl, antwortet `Application` mit 503 `database_unavailable`.
 - CSRF-Schutz (`RequestGuard`) für alle ändernden Anfragen (alles außer GET, HEAD, OPTIONS):
@@ -82,7 +83,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   JSON-Objekt sein, auch `{}` (z. B. bei Logout und DELETE); höchstens 16 KiB
   (`Request::MAX_BODY_BYTES`, größere werden nicht gelesen). Sonst 400 `invalid_request`.
 - Fehlerformat immer `{"error":"code","message":"deutscher Text"}`, erzeugt über die Fabriken in
-  `HttpException`; Codes: `invalid_request` 400, `not_authenticated` 401, `invalid_credentials`
+  `HttpException`; Codes: `invalid_request` 400, `invalid_token` 400, `not_authenticated` 401, `invalid_credentials`
   401, `forbidden` 403, `origin_not_allowed` 403, `account_locked` 403, `email_not_verified` 403,
   `pending_approval` 403, `invalid_current_password` 403, `tenant_inactive` 403, `not_found` 404,
   `tenant_not_found` 404, `method_not_allowed` 405, `unsupported_media_type` 415, `weak_password`
@@ -137,7 +138,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `user`, `pass`); den Zeichensatz utf8mb4 setzt der Code. Unbekannte Schlüssel in `db`
   sind ein Fehler, ein leeres `pass` ist erlaubt. Optional (nur lokal) Gruppe `http` mit
   `allowed_origins` (Liste wie `http://localhost:8000`, ohne Pfad, kleingeschrieben); andere
-  Schlüssel in `http` sind ein Fehler.
+  Schlüssel in `http` sind ein Fehler. Ebenso optional (Standardwerte = Produktion, auf dem Server
+  weglassen): `app` → `base_url` (Standard `https://www.prodad.de`, Format wie ein Origin) und
+  `mail` → `transport` (`sendmail` Standard, `file`) und `file_dir` (Standard `var/mail`). Die
+  Gruppen werden erst geladen, wenn ein Link bzw. eine Mail gebraucht wird.
 - Tests: Testsuiten `unit` und `integration` (`composer test`, `composer test:unit`,
   `composer test:integration`). Die ganze Suite dauert lokal unter einer Minute;
   `process-timeout` 900 in `composer.json` bleibt als Reserve. Integrationstests werden übersprungen, wenn
@@ -263,8 +267,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   werden entfernt, der Datensatz bleibt für die Historie ("Gelöschter Benutzer #ID"). Benutzer
   werden nie per `DELETE` entfernt; Fremdschlüssel auf `fe_users` kaskadieren nicht.
 - Gebremst werden Anmeldung, Registrierung, Passwort zurücksetzen und E-Mail-Bestätigung
-  (`fe_auth_attempts`, `action` = `login`, `register`, `password_reset`, `verify_email`).
-  E-Mail nur als SHA-256 (bei `verify_email` ohne E-Mail möglich), IP-Adressen nur gekürzt
+  (`fe_auth_attempts`, `action` = `login`, `register`, `password_reset`, `reset_confirm`,
+  `verify_email`; `reset_confirm` seit Migration `0008`).
+  E-Mail nur als SHA-256 (bei `verify_email` und `reset_confirm` ohne E-Mail möglich), IP-Adressen nur gekürzt
   (IPv4 /24, IPv6 /48, binär). Einträge werden nach 24 Stunden beim Aufruf gelöscht (kein Cron).
 - E-Mail-Absender: `"Feuerwehr Geräteverwaltung" <feuerwehr-app@prodad.de>`.
 
@@ -315,13 +320,18 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     ohne Terminal Abbruch mit Hinweis auf `--password-stdin`. Keine PowerShell-Lösung.
   - `--password-stdin` nur für Tests und Skripte (entfernt genau ein Zeilenende).
   - Ausgaben enthalten nie Hashes. Tabellen über `TextTable` (auch `bin/tenant.php`).
+  - `superadmin:password` sendet danach "Ihr Passwort wurde geändert" über den konfigurierten
+    Transport; schlägt das fehl, Hinweis auf stderr, Exit-Code bleibt 0. Tests übergeben
+    `FakeMailer` und einen eigenen `ErrorReporter`.
 
 ## Anmeldung und Sitzungen im Code
 - Code in `src/Auth/`, Endpunkte in `src/Api/V1/Auth/` (alle unter `service` und unter jeder
   Stadt): `POST auth/login` und `POST auth/logout` (öffentlich; Logout wiederholbar, löscht das
   Cookie immer), `GET auth/me`, `GET auth/sessions`, `DELETE auth/sessions/{id}`,
-  `POST auth/sessions/logout-others`, `POST auth/password` (angemeldet). Noch nicht umgesetzt:
-  Registrierung, Einladungen, Einmal-Links, E-Mail-Versand.
+  `POST auth/sessions/logout-others`, `POST auth/password` (angemeldet),
+  `POST auth/password-reset/request` und `POST auth/password-reset/confirm` (öffentlich, siehe
+  "Passwort vergessen"). Noch nicht umgesetzt: Registrierung, Einladungen, Einmal-Links für
+  E-Mail-Bestätigung und erstes Passwort.
 - Token (`SessionToken`): 32 Zufallsbytes, im Cookie base64url ohne Auffüllung (43 Zeichen, nur
   kanonische Form), in `fe_sessions.token_hash` nur SHA-256. Cookie (`SessionCookie`):
   `ff_session`, `HttpOnly; Secure; SameSite=Strict`, `Path=/firefighting/<kürzel>/` bzw.
@@ -357,9 +367,65 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Passwort ändern: aktuelles Passwort prüfen (falsch → 403 `invalid_current_password`), dann
   `PasswordPolicy` mit Kontext E-Mail, Name, Anzeigename und Stadt (Verstoß → 422
   `weak_password` mit der Meldung der Regeln), dann `UserRepository::setPassword` (beendet alle
-  Sitzungen) und neue Sitzung für das aktuelle Gerät.
+  Sitzungen) und neue Sitzung für das aktuelle Gerät, zuletzt Mail "Ihr Passwort wurde geändert".
 - Tests: `tests/Integration/Auth/AuthTestCase.php` (zwei Städte, Konten mit echtem Hash, Anfragen
-  über die ganze Anwendung, beides mit `TestPasswordHasher` außer bei `app(hasher: …)`, `ageSession()` zum Zurückdatieren von Sitzungen).
+  über die ganze Anwendung, beides mit `TestPasswordHasher` außer bei `app(hasher: …)`, `ageSession()` zum Zurückdatieren von Sitzungen;
+  Mails landen in `$this->mailer` (`FakeMailer`), Links beginnen mit `BASE_URL`, die Mindestdauer
+  von `password-reset/request` ist 0).
+
+## E-Mail-Versand
+- Code in `src/Mail/`: `MailMessage` (Empfänger, Name, Betreff, Text), Schnittstelle `Mailer`
+  (`send()` liefert die Message-ID, Fehler als `MailException`), `SendmailMailer` (`mail()` mit
+  `-ffeuerwehr-app@prodad.de`), `FileMailer` (lokal, `.eml`), `ConfiguredMailer` (laut Gruppe
+  `mail`, lädt die Konfiguration erst beim ersten Versand), `MimeMessage` (Kopfzeilen, Kodierung),
+  `MailTemplates` (alle Texte), `Notifier`. Tests verwenden `tests/Support/FakeMailer`, nie einen
+  echten Transport.
+- Nur Klartext (kein HTML) in Version 1, UTF-8, quoted-printable, CRLF. Absender immer
+  `"Feuerwehr Geräteverwaltung" <feuerwehr-app@prodad.de>`. Betreff und Namen außerhalb von ASCII
+  als RFC-2047-encoded-words (Base64, höchstens 75 Zeichen je Wort, nur an Zeichengrenzen
+  geteilt). Kopfzeilen `Date` (UTC), `Message-ID` (`<32 Hex@prodad.de>`), `MIME-Version`,
+  `Content-Type`, `Content-Transfer-Encoding` und in jeder Mail `Auto-Submitted: auto-generated`.
+- Header-Injection: Steuerzeichen (CR, LF, NUL, Tab, U+2028/2029 …) in Empfänger, Name oder Betreff
+  → `MailException`, es wird nichts gesendet. Betreff höchstens 200 Zeichen. Empfängeradressen
+  nur ASCII (ohne intl kein IDN, kein SMTPUTF8); andere werden mit `MailException` abgelehnt.
+- Vorlagen nur in `MailTemplates`: deutsch, Zeilen höchstens 76 Zeichen (außer Links, die am Stück
+  bleiben), Zeiten in Europe/Berlin, Signatur mit `-- `. Neue Mails dort ergänzen, mit Test.
+- Versandfehler erreichen den Aufrufer nie: Handler und CLI senden über `Notifier`
+  (`$context->notifier()`), der Fehler als `mail_failed (<zweck>, Konto #ID)` über `ErrorReporter`
+  protokolliert, nie mit Empfänger, Text, Link oder Token. Meldungen von `MailException` enthalten
+  daher nie den Text der Mail.
+- Absolute Links nur über `AppUrls` (`base_url` + `AppPath::PREFIX` + Kürzel bzw. `service`).
+- `FileMailer`: `JJJJMMTT-HHMMSSZ-<zufall>.eml`, Rechte 600, Ordner bei Bedarf mit 700 angelegt;
+  Standard `var/mail` (in `.gitignore`, liegt außerhalb von `public/`).
+- `bin/mail-test.php --to=ADRESSE [--config=PFAD]` (Code `src/Cli/MailTestCommand.php`): Testmail
+  über den konfigurierten Transport, zeigt Transport, Message-ID und Dauer; Fehler werden hier
+  angezeigt. Exit-Codes 0/1/2. Auf dem Server:
+  `cd ~/htdocs/apps/firefighting-equipment && php85 bin/mail-test.php --to=…`.
+
+## Passwort vergessen
+- `POST auth/password-reset/request {email}` (öffentlich, unter `service` und jeder Stadt,
+  `PasswordResetRequestHandler`): ungültige Schreibweise → 400 `invalid_request`; sonst immer 202
+  mit derselben Meldung, ob ein Konto existiert oder nicht. Antwortzeit mindestens 1,5 s
+  (`MinimumDuration`, `MIN_DURATION_SECONDS`; wird nach Messung auf STRATO ggf. angepasst); wird sie
+  überschritten, steht `password_reset_slow` im Protokoll. Mail nur an aktive, nicht gesperrte
+  Konten des Bereichs (Stadt: deren Konten, `service`: nur Super-Admins). Link
+  `<base_url>/firefighting/<kürzel>/passwort-zuruecksetzen#token=…` (Token hinter `#`, nie im
+  Pfad oder Query-String). Ein neuer Link ersetzt den alten (`UserTokenRepository::replace`).
+- Bremse (`PasswordResetThrottle`): Anforderung (`password_reset`) zählt jede angenommene Anfrage,
+  auch für unbekannte Adressen; höchstens 3 je E-Mail-Hash und Bereich und 20 je IP-Präfix (über
+  alle Städte) pro Stunde. Einlösen (`reset_confirm`, ohne E-Mail): höchstens 10 Fehlversuche je
+  IP-Präfix in 15 Minuten. Darüber 429 `too_many_attempts` mit `Retry-After`; abgewiesene Anfragen
+  werden nicht gespeichert.
+- `POST auth/password-reset/confirm {token, new_password}` (öffentlich,
+  `PasswordResetConfirmHandler`): ungültig (falsches Format, unbekannt, anderer Zweck, abgelaufen,
+  benutzt, Konto nicht aktiv oder gesperrt, anderer Bereich) → 400 `invalid_token`, bewusst nicht
+  unterschieden, zählt in die Bremse. Danach `PasswordPolicy` (422 `weak_password`, der Link bleibt
+  gültig). `UserRepository::resetPassword` löscht den Link und setzt den Hash in einer
+  Transaktion (gleichzeitiges Einlösen: nur einer gewinnt) und beendet alle Sitzungen. Keine neue
+  Sitzung; ein mitgesendetes Cookie wird gelöscht. Ein erfolgreicher `login`-Eintrag hebt die
+  Bremse der Anmeldung für dieses Konto auf. Abgelaufene Links werden beim Aufruf gelöscht.
+- Nach jeder Passwortänderung geht die Mail "Ihr Passwort wurde geändert" an das Konto:
+  `POST auth/password`, `password-reset/confirm` und `bin/user.php superadmin:password`.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".

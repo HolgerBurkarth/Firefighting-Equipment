@@ -9,6 +9,9 @@ use FirefightingEquipment\Auth\SessionCookie;
 use FirefightingEquipment\Auth\SessionManager;
 use FirefightingEquipment\Database\ConnectionException;
 use FirefightingEquipment\Database\LazyConnection;
+use FirefightingEquipment\Mail\ConfiguredMailer;
+use FirefightingEquipment\Mail\Mailer;
+use FirefightingEquipment\Mail\SendmailMailer;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\Password\PasswordHasher;
 
@@ -30,11 +33,14 @@ final readonly class Application
         private TenantResolver $tenants = new TenantResolver(),
         private RequestGuard $guard = new RequestGuard(),
         private PasswordHasher $hasher = new PasswordHasher(),
+        private Mailer $mailer = new SendmailMailer(),
+        private AppUrls $urls = new AppUrls(),
     ) {
     }
 
     /**
      * Produktion: Argon2id immer mit den Standardparametern, nie aus der Konfigurationsdatei.
+     * Mail-Versand und base_url aus der Konfiguration, geladen erst bei der ersten Mail.
      */
     public static function create(string $configPath): self
     {
@@ -43,6 +49,8 @@ final readonly class Application
             Routes::tenant(),
             LazyConnection::fromConfigFile($configPath),
             guard: new RequestGuard(AllowedOrigins::fromConfigFile($configPath)),
+            mailer: ConfiguredMailer::fromConfigFile($configPath, dirname(__DIR__, 2)),
+            urls: AppUrls::fromConfigFile($configPath),
         );
     }
 
@@ -63,7 +71,7 @@ final readonly class Application
                 }
             }
 
-            $context = new RequestContext($request, $tenant, $this->db, $this->errors, $route->params, $body, $auth, $this->hasher);
+            $context = new RequestContext($request, $tenant, $this->db, $this->errors, $route->params, $body, $auth, $this->hasher, $this->mailer, $this->urls);
             $response = $route->handler->handle($context);
             // Kodierfehler hier abfangen, nicht erst beim Senden.
             $response->body();

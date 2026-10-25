@@ -40,7 +40,8 @@ final readonly class LoginThrottle
      */
     public function retryAfter(?int $tenantId, string $emailHash, string $ipPrefix): ?int
     {
-        $account = $this->secondsUntilBelowLimit(
+        $account = AttemptWindow::secondsUntilBelowLimit(
+            $this->pdo,
             "SELECT TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), attempted_at + INTERVAL ? SECOND) FROM fe_auth_attempts"
             . " WHERE action = 'login' AND tenant_id <=> ? AND email_hash = ? AND succeeded = 0"
             . ' AND attempted_at > UTC_TIMESTAMP() - INTERVAL ? SECOND'
@@ -50,7 +51,8 @@ final readonly class LoginThrottle
             [self::WINDOW_SECONDS, $tenantId, $emailHash, self::WINDOW_SECONDS, $tenantId, $emailHash],
             self::MAX_FAILURES_PER_ACCOUNT,
         );
-        $ip = $this->secondsUntilBelowLimit(
+        $ip = AttemptWindow::secondsUntilBelowLimit(
+            $this->pdo,
             'SELECT TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), attempted_at + INTERVAL ? SECOND) FROM fe_auth_attempts'
             . " WHERE ip_prefix = ? AND action = 'login' AND succeeded = 0"
             . ' AND attempted_at > UTC_TIMESTAMP() - INTERVAL ? SECOND'
@@ -59,7 +61,7 @@ final readonly class LoginThrottle
             self::MAX_FAILURES_PER_IP,
         );
 
-        return $account === null && $ip === null ? null : max($account ?? 0, $ip ?? 0);
+        return AttemptWindow::combine($account, $ip);
     }
 
     /**
@@ -84,24 +86,5 @@ final readonly class LoginThrottle
         $stmt->execute([self::RETENTION_HOURS]);
 
         return $stmt->rowCount();
-    }
-
-    /**
-     * Die Abfrage liefert je zählendem Fehlversuch (neueste zuerst, höchstens $limit) die Sekunden,
-     * bis er aus dem Zeitfenster fällt. Gesperrt ist bei $limit Treffern, bis der älteste davon
-     * herausfällt.
-     *
-     * @param list<int|string|null> $params
-     */
-    private function secondsUntilBelowLimit(string $sql, array $params, int $limit): ?int
-    {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        $seconds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
-        if (count($seconds) < $limit) {
-            return null;
-        }
-
-        return max(1, (int) end($seconds));
     }
 }

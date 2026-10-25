@@ -6,6 +6,7 @@ namespace FirefightingEquipment\Tests\Unit\Http;
 
 use FirefightingEquipment\Api\V1\HealthHandler;
 use FirefightingEquipment\Api\V1\TenantHandler;
+use FirefightingEquipment\Config\ConfigException;
 use FirefightingEquipment\Database\ConnectionException;
 use FirefightingEquipment\Database\DatabaseError;
 use FirefightingEquipment\Database\LazyConnection;
@@ -13,6 +14,8 @@ use FirefightingEquipment\Http\Access;
 use FirefightingEquipment\Http\AllowedOrigins;
 use FirefightingEquipment\Http\AppPath;
 use FirefightingEquipment\Http\Application;
+use FirefightingEquipment\Http\AppUrls;
+use FirefightingEquipment\Mail\ConfiguredMailer;
 use FirefightingEquipment\Http\ErrorReporter;
 use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\JsonResponse;
@@ -72,6 +75,18 @@ final class ApplicationTest extends TestCase
         self::assertInstanceOf(PasswordHasher::class, $hasher);
         self::assertFalse($hasher->needsRehash(PasswordHasher::DEFAULT_DUMMY_HASH));
         self::assertSame(PasswordHasher::DEFAULT_DUMMY_HASH, $hasher->dummyHash());
+    }
+
+    public function testCreateUsesConfiguredMailerAndUrlsLoadedOnlyOnUse(): void
+    {
+        // Eine fehlende Konfiguration fällt erst beim ersten Link bzw. Versand auf, nicht beim Anlegen.
+        $app = Application::create('gibt-es-nicht.php');
+
+        self::assertInstanceOf(ConfiguredMailer::class, new \ReflectionProperty(Application::class, 'mailer')->getValue($app));
+        $urls = new \ReflectionProperty(Application::class, 'urls')->getValue($app);
+        self::assertInstanceOf(AppUrls::class, $urls);
+        $this->expectException(ConfigException::class);
+        $urls->area(null);
     }
 
     public function testServiceHealthWithBrokenDatabaseIs503InStatusFormat(): void
