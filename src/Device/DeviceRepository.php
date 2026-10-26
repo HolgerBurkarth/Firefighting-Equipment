@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Device;
 
+use FirefightingEquipment\Database\UnbufferedQuery;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -72,6 +73,24 @@ final readonly class DeviceRepository
         $stmt->execute($params);
 
         return new DevicePage(array_map(self::hydrate(...), $stmt->fetchAll()), $total);
+    }
+
+    /**
+     * Alle Geräte des Filters für den CSV-Export, natürlich sortiert nach Kennung, ungepuffert
+     * gelesen (siehe UnbufferedQuery: bis zum Ende keine andere Abfrage über diese Verbindung).
+     *
+     * @return \Generator<int, Device>
+     */
+    public function export(Tenant $tenant, DeviceFilter $filter): \Generator
+    {
+        [$where, $params] = self::where($filter);
+
+        return UnbufferedQuery::rows(
+            $this->pdo,
+            self::SELECT . self::FROM . $where . ' ORDER BY NATURAL_SORT_KEY(d.identifier), d.id',
+            [$tenant->id, ...$params],
+            self::hydrate(...),
+        );
     }
 
     /**

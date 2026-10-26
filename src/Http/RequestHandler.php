@@ -10,7 +10,9 @@ namespace FirefightingEquipment\Http;
 interface RequestHandler
 {
     /**
+     * @return Response in der Regel JsonResponse; CsvResponse nur für Downloads
+     *
      * @throws HttpException
      */
-    public function handle(RequestContext $context): JsonResponse;
+    public function handle(RequestContext $context): Response;
 }

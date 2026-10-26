@@ -7,7 +7,7 @@ namespace FirefightingEquipment\Http;
 /**
  * JSON-Antwort der REST-API.
  */
-final readonly class JsonResponse
+final readonly class JsonResponse implements Response
 {
     public const string CONTENT_TYPE = 'application/json; charset=utf-8';
 

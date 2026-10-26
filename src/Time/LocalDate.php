@@ -41,6 +41,22 @@ final class LocalDate
         return $diff->invert === 1 ? -(int) $diff->days : (int) $diff->days;
     }
 
+    /**
+     * Beginn des Tages (00:00 deutscher Zeit) in UTC, z. B. für Zeiträume über created_at.
+     * Mitternacht gibt es immer genau einmal (die Zeitumstellung liegt in der Nacht um 2 bzw. 3 Uhr).
+     *
+     * @param string $date JJJJ-MM-TT
+     *
+     * @return string JJJJ-MM-TT HH:MM:SS in UTC
+     */
+    public static function startOfDayUtc(string $date): string
+    {
+        $local = \DateTimeImmutable::createFromFormat('!Y-m-d', self::parse($date)->format('Y-m-d'), new \DateTimeZone(self::TIMEZONE))
+            ?: throw new \InvalidArgumentException(sprintf('Ungültiges Datum: %s', $date));
+
+        return $local->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+    }
+
     private static function parse(string $date): \DateTimeImmutable
     {
         $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date, new \DateTimeZone('UTC'));

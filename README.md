@@ -368,6 +368,8 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
 | POST    | `api/v1/devices/{id}/retire`          | Admin      | `{"device":…}`                              |
 | POST    | `api/v1/devices/{id}/reinstate`       | Admin      | `{"device":…}`                              |
 | GET     | `api/v1/devices/{id}/events`          | angemeldet | `{"events":[…],"total":…,"limit":…,"offset":…}` |
+| GET     | `api/v1/devices/export`               | angemeldet | CSV-Download (siehe "CSV-Export")           |
+| GET     | `api/v1/device-events/export`         | angemeldet | CSV-Download (siehe "CSV-Export")           |
 
 - Liste: je Gerät `id`, `identifier`, `device_type` (`id`, `name`), `location` (`id`, `name`,
   `path` wie „HLF 20 / G1“), `status` mit `status_label` (einsatzbereit, in Wartung, defekt,
@@ -511,6 +513,64 @@ Beispielantwort von `device-summary`:
  "inspection":{"overdue":3,"due_soon":7,"due_soon_days":30,"without_date":12}}
 ```
 
+### CSV-Export
+
+Nur unter einer Stadt, für alle angemeldeten Konten der Stadt (`user` und `admin`). Die Antwort ist
+ein Download (`Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment`,
+`Cache-Control: no-store`); Fehler (z. B. ungültige Parameter, 400) kommen wie immer als JSON.
+
+| Methode | Pfad                          | Zugriff    | Datei                                      |
+|---------|-------------------------------|------------|--------------------------------------------|
+| GET     | `api/v1/devices/export`       | angemeldet | `geraete-<kürzel>-<JJJJ-MM-TT>.csv`        |
+| GET     | `api/v1/device-events/export` | angemeldet | `historie-<kürzel>-<von>-bis-<bis>.csv`    |
+
+Format (für Excel unter Windows gedacht, Doppelklick öffnet die Datei mit korrekten Umlauten):
+
+- UTF-8 mit BOM, Semikolon als Trennzeichen, Zeilenende CRLF.
+- Felder mit Semikolon, Anführungszeichen oder Zeilenumbruch stehen in Anführungszeichen
+  (RFC 4180, `"` wird zu `""`); Zeilenumbrüche in Notizen bleiben innerhalb des Felds erhalten.
+- Deutsche Spaltenüberschriften und Bezeichnungen (z. B. „in Wartung“), Datum `TT.MM.JJJJ`,
+  Zeitpunkte in deutscher Zeit als `TT.MM.JJJJ HH:MM`.
+- Schutz gegen Formeln: Werte, die mit `=`, `+`, `-`, `@`, Tab, CR oder `'` beginnen, erhalten ein
+  vorangestelltes `'` (z. B. `'-12`). Der spätere Import entfernt genau ein führendes `'` wieder.
+- Bricht der Export mittendrin ab (z. B. Datenbankfehler), endet die Datei mit der Zeile
+  `Export abgebrochen – Datei unvollständig`; der Fehler steht im Server-Log.
+
+**Geräteliste** (`devices/export`): Spalten Kennung, Gerätetyp, Standort (Pfad wie „HLF 20 / G1“),
+Status, Nächste Prüfung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz. Filter wie in der
+Geräteliste (`device_type_id`, `location_id`, `include_sublocations=1`, `status`, `q`,
+`include_retired=1`), ohne Seitenbegrenzung, immer natürlich nach Kennung sortiert; `sort`, `limit`
+und `offset` werden ignoriert. Die Datei kann später wieder importiert werden.
+
+**Historie** (`device-events/export`): alle Ereignisse der Stadt, auch ausgesonderter Geräte.
+Spalten Zeitpunkt, Geräte-Nr. (ID; unterscheidet Geräte, deren Kennung nach dem Aussondern neu
+vergeben wurde), Kennung und Gerätetyp (aktueller Stand), Ereignis, Wer, Standort von/nach, Status
+von/nach, Prüfdatum alt/neu, Feld, Alter Wert, Neuer Wert, Kommentar. Parameter (alle optional):
+
+- `from`, `to` (`JJJJ-MM-TT`, Kalendertage in deutscher Zeit, beide einschließlich). Standard: die
+  letzten 90 Tage bis heute; nur `to` → 90 Tage bis dahin, nur `from` → bis heute. Höchstens 366
+  Tage, sonst 400.
+- `device_id`; `device_type_id` (aktueller Gerätetyp des Geräts); `location_id`: Ereignisse, deren
+  Von- **oder** Nach-Standort dieser Standort ist, mit `include_sublocations=1` auch seine
+  Unterstandorte (Prüfdatum- und Stammdatenänderungen haben keinen Standort und fallen dann heraus).
+- `order=newest` (Standard) oder `oldest`.
+- Höchstens 100.000 Einträge; mehr ergibt 409 `rule_violation` mit
+  `details: {"events": …, "max": 100000}`, dann Zeitraum verkleinern oder filtern.
+
+Lokal ausprobieren (angemeldet wie unter "Lokal starten"; `-o` speichert die Datei):
+
+```
+curl.exe -b cookies.txt -o geraete.csv http://localhost:8000/firefighting/immendingen/api/v1/devices/export
+curl.exe -b cookies.txt -o geraete-hlf.csv "http://localhost:8000/firefighting/immendingen/api/v1/devices/export?location_id=1&include_sublocations=1&status=ready,defective"
+curl.exe -b cookies.txt -o alle-geraete.csv "http://localhost:8000/firefighting/immendingen/api/v1/devices/export?include_retired=1"
+curl.exe -b cookies.txt -o historie.csv http://localhost:8000/firefighting/immendingen/api/v1/device-events/export
+curl.exe -b cookies.txt -o historie-2026.csv "http://localhost:8000/firefighting/immendingen/api/v1/device-events/export?from=2026-01-01&to=2026-12-31&order=oldest"
+curl.exe -b cookies.txt -o historie-geraet.csv "http://localhost:8000/firefighting/immendingen/api/v1/device-events/export?device_id=7&from=2025-11-01"
+```
+
+Mit `-o` landet auch eine Fehlerantwort (JSON) in der Datei; `-f` (`--fail`) bricht stattdessen mit
+Fehlermeldung ab.
+
 ### Lokal starten
 
 ```
@@ -541,7 +601,8 @@ committen.
 ### Neuen Endpunkt anlegen
 
 1. Handler in `src/Api/V1/` anlegen, der `FirefightingEquipment\Http\RequestHandler` implementiert.
-   Er bekommt einen `RequestContext`:
+   Er liefert eine `JsonResponse` (Downloads: `CsvResponse`, siehe "CSV-Export") und bekommt einen
+   `RequestContext`:
    - `$context->tenant`: die aktive Stadt (unter `service`: `null`); jede Abfrage nach deren ID
      filtern.
    - `$context->db->get()`: die PDO-Verbindung; sie wird erst hier aufgebaut.

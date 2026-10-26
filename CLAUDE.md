@@ -70,7 +70,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   keine oder ungültige Sitzung → 401 `not_authenticated` (ein mitgesendetes ungültiges Cookie
   wird gelöscht), Rolle reicht nicht → 403 `forbidden`. Bei `Public` wird keine Sitzung geladen.
   `health` und `tenant` bleiben öffentlich.
-- Handler implementieren `RequestHandler` und erhalten `RequestContext` (Anfrage, Stadt oder
+- Handler implementieren `RequestHandler` (Rückgabe `Response`, in der Regel `JsonResponse`) und
+  erhalten `RequestContext` (Anfrage, Stadt oder
   `null` unter `service`, `LazyConnection`, `ErrorReporter`, Platzhalter `param()`, JSON-Body
   `body`/`stringField()`/`optionalStringField()`/`intField(name, min, max)`/
   `optionalIntField(name, min, max)` (nur echte JSON-Ganzzahlen; optional: fehlt oder `null` →
@@ -115,7 +116,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Argumente wie Zugangsdaten). Nie Details oder Zugangsdaten in die Antwort.
 - Jede API-Antwort trägt `Content-Type: application/json; charset=utf-8`,
   `Cache-Control: no-store` und `X-Content-Type-Options: nosniff` (`JsonResponse::DEFAULT_HEADERS`,
-  nicht überschreibbar).
+  nicht überschreibbar). Einzige Ausnahme: CSV-Downloads (`CsvResponse`, siehe "CSV-Export (API)")
+  mit `text/csv; charset=utf-8` und `Content-Disposition: attachment`, ebenfalls `no-store` und
+  `nosniff`; ihre Fehler kommen weiterhin als JSON.
+- Antworten implementieren `Http\Response` (`statusCode()`, `headers()`, `send()`): `JsonResponse`
+  (Regelfall) oder `CsvResponse`. `Application` erzeugt nur JSON vorab (Kodierfehler → 500); ein
+  CSV-Download wird erst beim Senden geschrieben.
 
 ## Server und .htaccess
 - Die `.htaccess` in der Hauptebene des Webspace (`htdocs/.htaccess`) gehört NICHT zum
@@ -413,7 +419,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   über die ganze Anwendung, beides mit `TestPasswordHasher` außer bei `app(hasher: …)`, `ageSession()` zum Zurückdatieren von Sitzungen;
   Mails landen in `$this->mailer` (`FakeMailer`), Links beginnen mit `BASE_URL`, die Mindestdauer
   von `password-reset/request`, `register` und `email/resend` ist 0; `registeredAccount()` legt
-  Konten im Status `unverified`/`pending` samt Einlader und Code an). Rechte aller Admin-Routen
+  Konten im Status `unverified`/`pending` samt Einlader und Code an; `send()` verlangt eine
+  JSON-Antwort, `sendAny()` liefert jede `Response`, `responseBody()` liest auch einen CSV-Download,
+  und zwar vor der nächsten Datenbankabfrage, da er ungepuffert liest). Rechte aller Admin-Routen
   prüft `AdminRoutesAccessTest` (neue Admin-Routen dort eintragen), die der lesenden Routen unter
   einer Stadt (`Access::Authenticated`, z. B. Gerätetypen, Standorte, Prüffristen)
   `TenantReadRoutesAccessTest`
@@ -615,8 +623,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Stand: Schema (Migrationen `0011`–`0015`), Start-Gerätetypen neuer Städte, die API für
   Gerätetypen und Standorte (siehe "Gerätetypen und Standorte (API)") und für Geräte (anlegen,
   Stammdaten, Prüfdatum, Liste, Einzelansicht, Umbuchen/Status, Aussondern/Wiederaufnehmen,
-  Historie; siehe "Geräte (API)") sowie Prüffristen und Zusammenfassung (siehe "Prüffristen und
-  Zusammenfassung (API)"); CSV folgt. Schema-Tests in
+  Historie; siehe "Geräte (API)"), Prüffristen und Zusammenfassung (siehe "Prüffristen und
+  Zusammenfassung (API)") sowie der CSV-Export (siehe "CSV-Export (API)"); der CSV-Import folgt. Schema-Tests in
   `tests/Integration/Device/` (`DeviceSchemaTestCase`), Zeilen per SQL über
   den Trait `DeviceRows` (auch in API-Tests auf Basis von `AuthTestCase`).
 - Rechte: `user` darf ansehen, umbuchen, Status setzen (einsatzbereit, in Wartung, defekt) und CSV
@@ -836,6 +844,64 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Indizes `idx_fe_devices_tenant_due` und `idx_fe_devices_tenant_status` (Migration `0014`) genügen;
   keine Migration.
 
+## CSV-Export (API)
+- Nur unter Städten (unter `service` 404), beide `Access::Authenticated` (in
+  `TenantReadRoutesAccessTest`): `GET devices/export` und `GET device-events/export`. Code:
+  `src/Csv/CsvFormat.php` (Format), `src/Http/CsvResponse.php` (Download),
+  `src/Database/UnbufferedQuery.php`, `src/Time/GermanFormat.php`, `LocalDate::startOfDayUtc`,
+  `src/Api/V1/Devices/` (`DeviceExportHandler`, `DeviceHistoryExportHandler`, `DeviceCsv` mit
+  Spalten), `DeviceRepository::export`, `DeviceEventRepository::countHistory`/`exportHistory`
+  (`DeviceHistoryFilter`, `DeviceHistoryEntry`). Tests in `tests/Integration/Export/`
+  (`ExportApiTestCase` mit `FixedClock`).
+- Format (`CsvFormat`, gilt auch für den künftigen Import): UTF-8 MIT BOM (Excel unter Windows),
+  Semikolon, Zeilenende CRLF, Felder nach RFC 4180 nur bei Bedarf in Anführungszeichen (enthält
+  `;`, `"`, CR oder LF; `"` → `""`); Zeilenumbrüche in Feldern (Notizen) bleiben LF. Deutsche
+  Überschriften und Bezeichnungen (`label()`), Datum `TT.MM.JJJJ`, Zeitpunkte in Europe/Berlin als
+  `TT.MM.JJJJ HH:MM` (`GermanFormat`), leere Werte als leeres Feld.
+- Formelschutz: Werte, die mit `=`, `+`, `-`, `@`, Tab, CR oder `'` beginnen, erhalten ein
+  vorangestelltes `'` (`CsvFormat::FORMULA_PREFIXES`). Der Import entfernt IMMER genau ein führendes
+  `'` (`CsvFormat::removeFormulaGuard`); weil `'` selbst geschützt wird, kommt jeder Wert unverändert
+  zurück. Beide Stellen gemeinsam ändern.
+- Antwort: `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment;
+  filename="…"` (nur `a-z0-9.-`, Endung `.csv`), `Cache-Control: no-store`,
+  `X-Content-Type-Options: nosniff`. Fehler vor dem Download (400, 401, 409 …) als JSON.
+- Streaming: Die Repositorys lesen ungepuffert (`UnbufferedQuery`: `Pdo\Mysql::ATTR_USE_BUFFERED_QUERY`
+  aus, danach wiederhergestellt, auch wenn der Generator verworfen wird). Solange gelesen wird, keine
+  andere Abfrage über die Verbindung; alles Nötige (Typ, Standortpfad, Benutzer, Gerät) per JOIN.
+  `CsvResponse` startet den Generator im Konstruktor (Fehler der Abfrage noch im Handler → normale
+  Fehlerantwort), schreibt beim Senden Zeile für Zeile nach `php://output`, leert vorher die
+  PHP-Puffer und gibt nach je 500 Zeilen (`FLUSH_ROWS`) weiter. Fehler danach: `csv_export_failed`
+  im Protokoll, letzte Zeile `Export abgebrochen – Datei unvollständig` (der Import lehnt sie ab).
+- Geräteliste: Filter wie `GET devices` (`DeviceListHandler::filter`: `device_type_id`, `location_id`,
+  `include_sublocations`, `status`, `q`, `include_retired`), ohne Seitenbegrenzung, immer
+  `NATURAL_SORT_KEY(identifier), id`; `sort`, `limit`, `offset` werden ignoriert. Spalten
+  (`DeviceCsv::DEVICE_HEADER`): Kennung, Gerätetyp, Standort, Status, Nächste Prüfung,
+  Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz. Dateiname
+  `geraete-<kürzel>-<JJJJ-MM-TT>.csv` (heute in Europe/Berlin über `Clock`).
+- Für den Import (nächster Schritt) gewählt, Spalten nur gemeinsam mit ihm ändern: Kennung ist der
+  Schlüssel, Gerätetyp über den Namen (je Stadt eindeutig), Standort über den vollständigen Pfad
+  „HLF 20 / G1“ (mit den Pfaden aller Standorte vergleichen, nicht an „ / “ trennen, da Namen `/`
+  enthalten dürfen; mehrdeutig → Zeile ablehnen), Status über die deutsche Bezeichnung, Datum
+  `TT.MM.JJJJ`.
+- Historie: alle Ereignisse der Stadt, auch ausgesonderter Geräte. Parameter `from`/`to`
+  (`JJJJ-MM-TT`, Kalendertage in Europe/Berlin, beide einschließlich; abgefragt halboffen
+  `created_at >= Beginn(from)` und `< Beginn(to + 1)` in UTC über `LocalDate::startOfDayUtc`, Index
+  `idx_fe_device_events_tenant`). Standard: die letzten 90 Tage bis heute
+  (`DeviceHistoryExportHandler::DEFAULT_DAYS`); nur `to` → 90 Tage bis dahin, nur `from` → bis heute;
+  höchstens 366 Tage (`MAX_DAYS`), `from` nach `to` oder mehr Tage → 400. `device_id`;
+  `device_type_id` = AKTUELLER Typ des Geräts; `location_id` = Ereignisse, deren Von- ODER
+  Nach-Standort dieser Standort ist, mit `include_sublocations=1` auch dessen Unterstandorte
+  (Ereignisse ohne Standort wie `due_changed`/`field_changed` fallen dann heraus). Unbekannte oder
+  fremde IDs → leere Datei. `order=newest` (Standard) bzw. `oldest`, sortiert nach `created_at`,
+  dann `id`. Vor dem Download wird gezählt: mehr als 100.000 Einträge (`MAX_ROWS`; im Konstruktor
+  nur für Tests änderbar) → 409 `rule_violation` mit `details: {"events": n, "max": 100000}`.
+- Spalten der Historie (`DeviceCsv::EVENT_HEADER`): Zeitpunkt, Geräte-Nr. (ID; Kennungen können nach
+  dem Aussondern neu vergeben werden), Kennung und Gerätetyp (aktueller Stand), Ereignis
+  (`DeviceEvent::label()`), Wer (Anzeigename, anonymisiert „Gelöschter Benutzer #ID“, nie die
+  E-Mail), Standort von/nach (aktueller Pfad), Status von/nach, Prüfdatum alt/neu, Feld (deutsch),
+  Alter/Neuer Wert (Beschaffungsdatum als `TT.MM.JJJJ`), Kommentar. Dateiname
+  `historie-<kürzel>-<von>-bis-<bis>.csv`.
+
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".
 - Neue Stadt: Super-Admin legt Name, Kürzel und E-Mail des ersten Admins an (siehe
@@ -843,7 +909,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Geräte, Gerätetypen, Status, Standorte und Historie: siehe "Standorte und Geräte".
 - Übersicht "überfällig" und "in 30 Tagen fällig" (umgesetzt, siehe "Prüffristen und
   Zusammenfassung (API)").
-- CSV-Export (Semikolon, UTF-8, Umlaute korrekt) und CSV-Import mit Prüfung und Fehleranzeige.
+- CSV-Export (umgesetzt, siehe "CSV-Export (API)") und CSV-Import mit Prüfung und Fehleranzeige
+  (folgt; liest das Format des Exports).
 - Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
 
 ## Deployment

@@ -36,19 +36,7 @@ final readonly class DeviceListHandler implements RequestHandler
     {
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
         $query = $context->request->query();
-
-        try {
-            $filter = new DeviceFilter(
-                $context->queryInt('device_type_id', 1, DeviceFields::MAX_ID),
-                $context->queryInt('location_id', 1, DeviceFields::MAX_ID),
-                $context->queryFlag('include_sublocations'),
-                self::statuses($query['status'] ?? null),
-                DeviceText::search($query['q'] ?? null),
-                $context->queryFlag('include_retired'),
-            );
-        } catch (DeviceException $e) {
-            throw DeviceErrors::http($e);
-        }
+        $filter = self::filter($context);
         $sort = DeviceSort::tryFrom($query['sort'] ?? DeviceSort::Identifier->value) ?? throw HttpException::invalidRequest(sprintf(
             'Der Parameter "sort" muss einer der Werte %s sein.',
             implode(', ', array_map(static fn (DeviceSort $s): string => sprintf('"%s"', $s->value), DeviceSort::cases())),
@@ -64,6 +52,29 @@ final readonly class DeviceListHandler implements RequestHandler
             'limit' => $limit,
             'offset' => $offset,
         ]);
+    }
+
+    /**
+     * Filter aus den Parametern device_type_id, location_id, include_sublocations, status, q und
+     * include_retired (auch für den CSV-Export, DeviceExportHandler).
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public static function filter(RequestContext $context): DeviceFilter
+    {
+        $query = $context->request->query();
+        try {
+            return new DeviceFilter(
+                $context->queryInt('device_type_id', 1, DeviceFields::MAX_ID),
+                $context->queryInt('location_id', 1, DeviceFields::MAX_ID),
+                $context->queryFlag('include_sublocations'),
+                self::statuses($query['status'] ?? null),
+                DeviceText::search($query['q'] ?? null),
+                $context->queryFlag('include_retired'),
+            );
+        } catch (DeviceException $e) {
+            throw DeviceErrors::http($e);
+        }
     }
 
     /**

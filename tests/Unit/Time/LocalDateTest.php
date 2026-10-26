@@ -73,6 +73,33 @@ final class LocalDateTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{string, string}> Tag, Beginn in UTC
+     */
+    public static function startsOfDay(): iterable
+    {
+        yield 'Sommer' => ['2026-06-15', '2026-06-14 22:00:00'];
+        yield 'Winter' => ['2026-01-15', '2026-01-14 23:00:00'];
+        yield 'Tag der Umstellung im März (beginnt in MEZ)' => ['2026-03-29', '2026-03-28 23:00:00'];
+        yield 'Tag nach der Umstellung im März' => ['2026-03-30', '2026-03-29 22:00:00'];
+        yield 'Tag der Umstellung im Oktober (beginnt in MESZ)' => ['2026-10-25', '2026-10-24 22:00:00'];
+        yield 'Tag nach der Umstellung im Oktober' => ['2026-10-26', '2026-10-25 23:00:00'];
+        yield 'Neujahr' => ['2027-01-01', '2026-12-31 23:00:00'];
+    }
+
+    #[DataProvider('startsOfDay')]
+    public function testStartOfDayUtc(string $date, string $expected): void
+    {
+        self::assertSame($expected, LocalDate::startOfDayUtc($date));
+    }
+
+    public function testStartOfDayRejectsInvalidDate(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        LocalDate::startOfDayUtc('2026-02-30');
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function invalidDates(): iterable

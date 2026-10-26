@@ -16,7 +16,8 @@ use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\Password\PasswordHasher;
 
 /**
- * Bearbeitet eine Anfrage vollständig und liefert immer eine JSON-Antwort.
+ * Bearbeitet eine Anfrage vollständig und liefert eine JSON-Antwort (Fehler immer als JSON) oder
+ * einen CSV-Download.
  *
  * Reihenfolge: Adresse zerlegen, Route suchen, ändernde Anfragen prüfen (CSRF, JSON-Body; ohne
  * Datenbank), erst dann die Stadt laden (Datenbank), Sitzung und Zugriffsstufe prüfen (nur bei
@@ -54,7 +55,7 @@ final readonly class Application
         );
     }
 
-    public function handle(Request $request): JsonResponse
+    public function handle(Request $request): Response
     {
         try {
             $path = AppPath::parse($request->uri) ?? throw HttpException::notFound();
@@ -73,8 +74,11 @@ final readonly class Application
 
             $context = new RequestContext($request, $tenant, $this->db, $this->errors, $route->params, $body, $auth, $this->hasher, $this->mailer, $this->urls);
             $response = $route->handler->handle($context);
-            // Kodierfehler hier abfangen, nicht erst beim Senden.
-            $response->body();
+            // Kodierfehler hier abfangen, nicht erst beim Senden. Ein CSV-Download wird erst beim
+            // Senden geschrieben (gestreamt); seine Abfrage hat der Handler schon ausgeführt.
+            if ($response instanceof JsonResponse) {
+                $response->body();
+            }
 
             return $response;
         } catch (HttpException $e) {

@@ -7,10 +7,12 @@ namespace FirefightingEquipment\Tests\Integration\Auth;
 use FirefightingEquipment\Database\LazyConnection;
 use FirefightingEquipment\Http\AppUrls;
 use FirefightingEquipment\Http\Application;
+use FirefightingEquipment\Http\CsvResponse;
 use FirefightingEquipment\Http\ErrorReporter;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\MinimumDuration;
 use FirefightingEquipment\Http\Request;
+use FirefightingEquipment\Http\Response;
 use FirefightingEquipment\Http\Router;
 use FirefightingEquipment\Http\Routes;
 use FirefightingEquipment\Tenant\Tenant;
@@ -113,6 +115,8 @@ abstract class AuthTestCase extends AuthSchemaTestCase
     }
 
     /**
+     * Anfrage, deren Antwort JSON sein muss.
+     *
      * @param array<string, mixed>|string|null $body Array wird als JSON gesendet; null = ohne Body
      * @param array<string, string>            $headers
      */
@@ -124,6 +128,27 @@ abstract class AuthTestCase extends AuthSchemaTestCase
         array $headers = [],
         ?Application $app = null,
     ): JsonResponse {
+        $response = $this->sendAny($method, $uri, $body, $cookie, $headers, $app);
+        self::assertInstanceOf(JsonResponse::class, $response);
+
+        return $response;
+    }
+
+    /**
+     * Anfrage mit beliebiger Antwort (JSON oder CSV-Download). Einen CSV-Download vor der nächsten
+     * Datenbankabfrage mit responseBody() lesen (ungepufferte Abfrage, siehe UnbufferedQuery).
+     *
+     * @param array<string, mixed>|string|null $body
+     * @param array<string, string>            $headers
+     */
+    protected function sendAny(
+        string $method,
+        string $uri,
+        array|string|null $body = null,
+        ?string $cookie = null,
+        array $headers = [],
+        ?Application $app = null,
+    ): Response {
         if (is_array($body)) {
             $body = json_encode($body === [] ? new \stdClass() : $body, JSON_THROW_ON_ERROR);
         }
@@ -180,6 +205,22 @@ abstract class AuthTestCase extends AuthSchemaTestCase
         self::assertSame(1, preg_match('/^ff_session=([^;]*);/', $header, $m), $header);
 
         return $m[1];
+    }
+
+    /**
+     * Inhalt einer Antwort; ein CSV-Download wird dabei vollständig geschrieben (nur einmal möglich).
+     */
+    protected static function responseBody(Response $response): string
+    {
+        if ($response instanceof JsonResponse) {
+            return $response->body();
+        }
+        self::assertInstanceOf(CsvResponse::class, $response);
+        $stream = fopen('php://memory', 'w+b') ?: self::fail('Kein Stream.');
+        $response->writeTo($stream);
+        rewind($stream);
+
+        return (string) stream_get_contents($stream);
     }
 
     /**

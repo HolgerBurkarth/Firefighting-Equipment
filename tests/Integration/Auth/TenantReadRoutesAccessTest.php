@@ -33,6 +33,10 @@ final class TenantReadRoutesAccessTest extends AuthTestCase
         yield 'Prüffristen' => ['inspection-due'];
         yield 'Prüffristen gefiltert' => ['inspection-due?days=60&include_without_date=1&location_id={location}&include_sublocations=1&limit=10'];
         yield 'Zusammenfassung' => ['device-summary'];
+        yield 'Export Geräte' => ['devices/export'];
+        yield 'Export Geräte gefiltert' => ['devices/export?location_id={location}&include_sublocations=1&status=ready,retired&q=ma'];
+        yield 'Export Historie' => ['device-events/export'];
+        yield 'Export Historie gefiltert' => ['device-events/export?from=2026-01-01&to=2026-12-31&device_id={device}&location_id={location}&include_sublocations=1&order=oldest'];
     }
 
     #[DataProvider('readRoutes')]
@@ -56,8 +60,9 @@ final class TenantReadRoutesAccessTest extends AuthTestCase
         self::assertError(404, 'not_found', $this->send('GET', self::url(null, $path), cookie: $superAdmin));
 
         foreach (['user@example.org', 'admin@example.org'] as $email) {
-            $response = $this->send('GET', $url, cookie: $this->loginCookie('immendingen', $email));
-            self::assertSame(200, $response->statusCode(), $response->body());
+            $response = $this->sendAny('GET', $url, cookie: $this->loginCookie('immendingen', $email));
+            $body = self::responseBody($response);
+            self::assertSame(200, $response->statusCode(), $body);
         }
     }
 }

@@ -20,6 +20,8 @@ use FirefightingEquipment\Api\V1\Auth\SessionListHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceAction;
 use FirefightingEquipment\Api\V1\Devices\DeviceActionHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceEventListHandler;
+use FirefightingEquipment\Api\V1\Devices\DeviceExportHandler;
+use FirefightingEquipment\Api\V1\Devices\DeviceHistoryExportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceListHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceSummaryHandler;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeAction;
@@ -79,8 +81,8 @@ final class Routes
      * Routen unter /firefighting/<kürzel>/ (nur aktive Städte).
      *
      * @param MinimumDuration|null $neutralDuration wie bei service()
-     * @param Clock|null           $clock           Uhr für „heute“ der Prüffristen (null =
-     *                                              Systemzeit, andere nur für Tests)
+     * @param Clock|null           $clock           Uhr für „heute“ der Prüffristen und Exporte
+     *                                              (null = Systemzeit, andere nur für Tests)
      */
     public static function tenant(?MinimumDuration $neutralDuration = null, ?Clock $clock = null): Router
     {
@@ -117,6 +119,8 @@ final class Routes
             ->add('POST', 'api/v1/locations/{id}/lock', Access::Admin, new LocationActionHandler(LocationAction::Lock))
             ->add('POST', 'api/v1/locations/{id}/unlock', Access::Admin, new LocationActionHandler(LocationAction::Unlock))
             ->add('GET', 'api/v1/devices', Access::Authenticated, new DeviceListHandler())
+            ->add('GET', 'api/v1/devices/export', Access::Authenticated, new DeviceExportHandler($clock))
+            ->add('GET', 'api/v1/device-events/export', Access::Authenticated, new DeviceHistoryExportHandler($clock))
             ->add('POST', 'api/v1/devices', Access::Admin, new DeviceActionHandler(DeviceAction::Create))
             ->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceActionHandler(DeviceAction::Show))
             ->add('POST', 'api/v1/devices/{id}/fields', Access::Admin, new DeviceActionHandler(DeviceAction::UpdateFields))
