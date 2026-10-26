@@ -24,11 +24,13 @@ final readonly class RequestGuard
     }
 
     /**
+     * @param int $maxBodyBytes Grenze der Route (Standard Request::MAX_BODY_BYTES)
+     *
      * @return array<string, mixed> der Body als Objekt; [] bei sicheren Methoden
      *
      * @throws HttpException 415 unsupported_media_type, 403 origin_not_allowed, 400 invalid_request
      */
-    public function check(Request $request): array
+    public function check(Request $request, int $maxBodyBytes = Request::MAX_BODY_BYTES): array
     {
         if (!$request->isMutating()) {
             return [];
@@ -43,14 +45,14 @@ final readonly class RequestGuard
             throw HttpException::originNotAllowed();
         }
 
-        if ($request->bodyTooLarge) {
+        $body = $request->body ?? '';
+        if ($request->bodyTooLarge || strlen($body) > $maxBodyBytes) {
             throw HttpException::invalidRequest(sprintf(
                 'Der Inhalt der Anfrage ist zu groß (höchstens %d Byte).',
-                Request::MAX_BODY_BYTES,
+                $maxBodyBytes,
             ));
         }
 
-        $body = $request->body ?? '';
         if (!str_starts_with(ltrim($body, " \t\r\n"), '{')) {
             throw HttpException::invalidRequest('Erwartet wird ein JSON-Objekt, z. B. {}.');
         }

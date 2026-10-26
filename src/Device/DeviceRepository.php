@@ -167,6 +167,45 @@ final readonly class DeviceRepository
     }
 
     /**
+     * Nicht ausgesonderte Geräte zu Kennungsschlüsseln (identifier_key) für den CSV-Import.
+     *
+     * Mit $lock (nur in einer Transaktion): zuerst FOR UPDATE auf die Schlüssel (auf dem UNIQUE-Index
+     * sperrt das auch die Lücken fehlender Schlüssel, bis zum Ende der Transaktion kann niemand sie
+     * vergeben), dann mit LOCK IN SHARE MODE gelesen: Das liefert den aktuellen Stand, unabhängig
+     * vom Snapshot der Transaktion.
+     *
+     * @param list<string> $keys
+     *
+     * @return array<string, Device> Schlüssel => Gerät
+     */
+    public function findByIdentifierKeys(Tenant $tenant, array $keys, bool $lock): array
+    {
+        if ($keys === []) {
+            return [];
+        }
+        if ($lock && !$this->pdo->inTransaction()) {
+            throw new \LogicException('Sperren nur innerhalb einer Transaktion.');
+        }
+
+        $in = implode(', ', array_fill(0, count($keys), '?'));
+        if ($lock) {
+            $this->pdo->prepare('SELECT id FROM fe_devices WHERE tenant_id = ? AND identifier_key IN (' . $in . ') FOR UPDATE')
+                ->execute([$tenant->id, ...$keys]);
+        }
+        $stmt = $this->pdo->prepare(
+            self::SELECT . ', d.identifier_key' . self::FROM . ' AND d.identifier_key IN (' . $in . ')' . ($lock ? ' LOCK IN SHARE MODE' : ''),
+        );
+        $stmt->execute([$tenant->id, ...$keys]);
+
+        $devices = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $devices[(string) $row['identifier_key']] = self::hydrate($row);
+        }
+
+        return $devices;
+    }
+
+    /**
      * Legt ein Gerät an und schreibt das Ereignis created.
      *
      * @param int $userId Konto der Stadt, das anlegt

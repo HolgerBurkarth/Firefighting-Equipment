@@ -268,6 +268,27 @@ final class ApplicationTest extends TestCase
         self::assertSame(0, $this->connectAttempts);
     }
 
+    public function testBodyLimitOfRouteApplies(): void
+    {
+        $json = ['content-type' => 'application/json'];
+        $body = '{"file":"' . str_repeat('a', 20_000) . '"}';
+
+        $small = $this->echoApplication()->handle(self::post('/firefighting/service/echo/1', $json, $body));
+        self::assertSame(400, $small->statusCode());
+        self::assertSame(
+            ['error' => 'invalid_request', 'message' => sprintf('Der Inhalt der Anfrage ist zu groß (höchstens %d Byte).', Request::MAX_BODY_BYTES)],
+            json_decode($small->body(), true),
+        );
+
+        $upload = $this->echoApplication()->handle(self::post('/firefighting/service/upload/1', $json, $body));
+        self::assertSame(200, $upload->statusCode(), $upload->body());
+
+        $tooLarge = $this->echoApplication()->handle(self::post('/firefighting/service/upload/1', $json, '{"file":"' . str_repeat('a', 32_768) . '"}'));
+        self::assertSame(400, $tooLarge->statusCode());
+        self::assertStringContainsString('höchstens 32768 Byte', $tooLarge->body());
+        self::assertSame(0, $this->connectAttempts);
+    }
+
     public function testValidMutatingRequestPassesBodyAndParamsToHandler(): void
     {
         $request = self::post(
@@ -334,7 +355,8 @@ final class ApplicationTest extends TestCase
         };
         $service = Router::forService()
             ->add('POST', 'echo/{id}', Access::Public, $echo)
-            ->add('DELETE', 'echo/{id}', Access::Public, $echo);
+            ->add('DELETE', 'echo/{id}', Access::Public, $echo)
+            ->add('POST', 'upload/{id}', Access::Public, $echo, 32_768);
         $tenant = Router::forTenant()->add('POST', 'echo/{id}', Access::Public, $echo);
 
         return new Application($service, $tenant, $this->failingDb(), $this->errorReporter(), guard: $guard);

@@ -73,14 +73,14 @@ final class RequestTest extends TestCase
 
     public function testBodyAtLimitIsRead(): void
     {
-        $body = str_repeat('a', Request::MAX_BODY_BYTES);
+        $body = str_repeat('a', Request::MAX_UPLOAD_BYTES);
 
         self::assertSame($body, self::post($body, (string) strlen($body))->body);
     }
 
     public function testBodyOverLimitIsNotKept(): void
     {
-        $request = self::post(str_repeat('a', Request::MAX_BODY_BYTES + 1), null);
+        $request = self::post(str_repeat('a', Request::MAX_UPLOAD_BYTES + 1), null);
 
         self::assertNull($request->body);
         self::assertTrue($request->bodyTooLarge);
@@ -88,7 +88,7 @@ final class RequestTest extends TestCase
 
     public function testLargeContentLengthIsRejectedWithoutReading(): void
     {
-        foreach ([(string) (Request::MAX_BODY_BYTES + 1), '99999999999999', 'abc', '-1'] as $length) {
+        foreach ([(string) (Request::MAX_UPLOAD_BYTES + 1), '99999999999999', 'abc', '-1'] as $length) {
             $request = Request::fromServer(
                 ['REQUEST_METHOD' => 'POST', 'CONTENT_LENGTH' => $length],
                 [],

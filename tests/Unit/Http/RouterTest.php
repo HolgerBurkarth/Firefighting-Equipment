@@ -7,6 +7,7 @@ namespace FirefightingEquipment\Tests\Unit\Http;
 use FirefightingEquipment\Http\Access;
 use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\JsonResponse;
+use FirefightingEquipment\Http\Request;
 use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
 use FirefightingEquipment\Http\RouteMatch;
@@ -40,6 +41,30 @@ final class RouterTest extends TestCase
         $match = $router->match('POST', 'api/v1/items');
         self::assertSame($post, $match->handler);
         self::assertSame(Access::Admin, $match->access);
+    }
+
+    public function testBodyLimitIsDefaultOrPerRoute(): void
+    {
+        $router = Router::forTenant()
+            ->add('POST', 'api/v1/items', Access::Admin, self::handler())
+            ->add('POST', 'api/v1/items/import', Access::Admin, self::handler(), Request::MAX_UPLOAD_BYTES)
+            ->add('POST', 'api/v1/items/{id}/upload', Access::Admin, self::handler(), 50_000);
+
+        self::assertSame(Request::MAX_BODY_BYTES, $router->match('POST', 'api/v1/items')->maxBodyBytes);
+        self::assertSame(Request::MAX_UPLOAD_BYTES, $router->match('POST', 'api/v1/items/import')->maxBodyBytes);
+        self::assertSame(50_000, $router->match('POST', 'api/v1/items/7/upload')->maxBodyBytes);
+    }
+
+    public function testBodyLimitOutsideRangeIsRejected(): void
+    {
+        foreach ([0, Request::MAX_UPLOAD_BYTES + 1] as $limit) {
+            try {
+                Router::forTenant()->add('POST', 'api/v1/items', Access::Admin, self::handler(), $limit);
+                self::fail('Grenze angenommen: ' . $limit);
+            } catch (\LogicException $e) {
+                self::assertStringContainsString('Body-Grenze', $e->getMessage());
+            }
+        }
     }
 
     public function testUnknownPathIs404(): void

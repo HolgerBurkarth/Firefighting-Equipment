@@ -22,6 +22,7 @@ use FirefightingEquipment\Api\V1\Devices\DeviceActionHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceEventListHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceExportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceHistoryExportHandler;
+use FirefightingEquipment\Api\V1\Devices\DeviceImportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceListHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceSummaryHandler;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeAction;
@@ -122,6 +123,8 @@ final class Routes
             ->add('GET', 'api/v1/devices/export', Access::Authenticated, new DeviceExportHandler($clock))
             ->add('GET', 'api/v1/device-events/export', Access::Authenticated, new DeviceHistoryExportHandler($clock))
             ->add('POST', 'api/v1/devices', Access::Admin, new DeviceActionHandler(DeviceAction::Create))
+            ->add('POST', 'api/v1/devices/import/preview', Access::Admin, new DeviceImportHandler(apply: false), DeviceImportHandler::MAX_BODY_BYTES)
+            ->add('POST', 'api/v1/devices/import', Access::Admin, new DeviceImportHandler(apply: true), DeviceImportHandler::MAX_BODY_BYTES)
             ->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceActionHandler(DeviceAction::Show))
             ->add('POST', 'api/v1/devices/{id}/fields', Access::Admin, new DeviceActionHandler(DeviceAction::UpdateFields))
             ->add('POST', 'api/v1/devices/{id}/inspection-due', Access::Admin, new DeviceActionHandler(DeviceAction::SetInspectionDue))

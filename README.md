@@ -68,7 +68,7 @@ nicht leer ist: `{"error":"rule_violation","message":"…","details":{"devices":
 
 | HTTP | `error`                    | Bedeutung                                                  |
 |------|----------------------------|------------------------------------------------------------|
-| 400  | `invalid_request`          | Body kein JSON-Objekt, zu groß (> 16 KiB), Feld fehlt      |
+| 400  | `invalid_request`          | Body kein JSON-Objekt, zu groß (> 16 KiB, CSV-Import 3 MiB), Feld fehlt, Import-Datei unlesbar |
 | 400  | `invalid_token`            | Link (Zurücksetzen, Bestätigen, Einladung) ungültig, abgelaufen, benutzt |
 | 400  | `invalid_invitation_code`  | Einladungscode ungültig, abgelaufen, aufgebraucht, widerrufen |
 | 401  | `not_authenticated`        | keine oder abgelaufene Sitzung                             |
@@ -89,6 +89,7 @@ nicht leer ist: `{"error":"rule_violation","message":"…","details":{"devices":
 | 409  | `name_taken`               | Name eines Gerätetyps bzw. Standorts schon vergeben        |
 | 409  | `identifier_taken`         | Kennung eines Geräts schon vergeben (ohne Groß-/Kleinschreibung) |
 | 409  | `version_conflict`         | Gerät inzwischen geändert; aktueller Stand in `details.device` |
+| 409  | `import_outdated`          | CSV-Import: seit der Vorschau geändert oder Datei fehlerhaft; Vorschau neu erstellen |
 | 415  | `unsupported_media_type`   | ändernde Anfrage ohne `Content-Type: application/json`     |
 | 422  | `weak_password`            | neues Passwort verletzt die Passwortregeln                 |
 | 429  | `too_many_attempts`        | zu viele Fehlversuche (Wartezeit im Header `Retry-After`)  |
@@ -532,7 +533,7 @@ Format (für Excel unter Windows gedacht, Doppelklick öffnet die Datei mit korr
 - Deutsche Spaltenüberschriften und Bezeichnungen (z. B. „in Wartung“), Datum `TT.MM.JJJJ`,
   Zeitpunkte in deutscher Zeit als `TT.MM.JJJJ HH:MM`.
 - Schutz gegen Formeln: Werte, die mit `=`, `+`, `-`, `@`, Tab, CR oder `'` beginnen, erhalten ein
-  vorangestelltes `'` (z. B. `'-12`). Der spätere Import entfernt genau ein führendes `'` wieder.
+  vorangestelltes `'` (z. B. `'-12`). Der Import entfernt genau ein führendes `'` wieder.
 - Bricht der Export mittendrin ab (z. B. Datenbankfehler), endet die Datei mit der Zeile
   `Export abgebrochen – Datei unvollständig`; der Fehler steht im Server-Log.
 
@@ -540,7 +541,7 @@ Format (für Excel unter Windows gedacht, Doppelklick öffnet die Datei mit korr
 Status, Nächste Prüfung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz. Filter wie in der
 Geräteliste (`device_type_id`, `location_id`, `include_sublocations=1`, `status`, `q`,
 `include_retired=1`), ohne Seitenbegrenzung, immer natürlich nach Kennung sortiert; `sort`, `limit`
-und `offset` werden ignoriert. Die Datei kann später wieder importiert werden.
+und `offset` werden ignoriert. Die Datei kann wieder importiert werden (siehe "CSV-Import").
 
 **Historie** (`device-events/export`): alle Ereignisse der Stadt, auch ausgesonderter Geräte.
 Spalten Zeitpunkt, Geräte-Nr. (ID; unterscheidet Geräte, deren Kennung nach dem Aussondern neu
@@ -570,6 +571,140 @@ curl.exe -b cookies.txt -o historie-geraet.csv "http://localhost:8000/firefighti
 
 Mit `-o` landet auch eine Fehlerantwort (JSON) in der Datei; `-f` (`--fail`) bricht stattdessen mit
 Fehlermeldung ab.
+
+### CSV-Import
+
+Nur unter einer Stadt, nur für Admins. Der Import liest die Geräteliste im Format des Exports, legt
+neue Geräte an und ändert bestehende. Er legt nie Gerätetypen oder Standorte an und sondert weder
+aus noch nimmt er wieder auf. Ablauf in zwei Schritten:
+
+| Methode | Pfad                            | Body                         | Wirkung                                  |
+|---------|---------------------------------|------------------------------|------------------------------------------|
+| POST    | `api/v1/devices/import/preview` | `{file}`                     | prüfen und Vorschau zeigen, nichts speichern |
+| POST    | `api/v1/devices/import`         | `{file, token, comment?}`    | dieselbe Datei erneut prüfen und übernehmen |
+
+`file` ist die Datei als Base64. Die Import-Routen nehmen Bodys bis 3 MiB an, alle anderen weiterhin
+höchstens 16 KiB. Der Schutz gegen CSRF bleibt wie überall: nur `Content-Type: application/json`
+und erlaubter `Origin`.
+
+**Datei**
+
+- Spalten wie im Export (Kennung, Gerätetyp, Standort, Status, Nächste Prüfung, Seriennummer,
+  Hersteller, Modell, Beschaffungsdatum, Notiz). Zugeordnet wird über die Überschrift, Reihenfolge
+  und Groß-/Kleinschreibung sind egal. Unbekannte Spalten (z. B. Tippfehler „Seriennumer“) sind ein
+  Fehler. Nur die Spalte Kennung ist Pflicht.
+- Die Kennung ordnet die Zeile einem nicht ausgesonderten Gerät zu (ohne Groß-/Kleinschreibung,
+  „ß“ ≠ „ss“). Ohne passendes Gerät entsteht ein neues; dafür sind Gerätetyp und Standort Pflicht, der
+  Status ist ohne Angabe „einsatzbereit“. Dieselbe Kennung zweimal in der Datei ist ein Fehler.
+- Fehlt eine Spalte, bleibt das Feld unverändert. Ist die Spalte da und die Zelle leer, wird ein
+  optionales Feld geleert. Leere Zellen bei Gerätetyp, Standort und Status ändern ein bestehendes
+  Gerät nicht.
+- Gerätetyp über den Namen, Standort über den Pfad wie im Export („HLF 20 / G1“), jeweils wie in
+  der Datenbank verglichen (ohne Groß-/Kleinschreibung, „Straße“ = „Strasse“). Unbekannte Namen und
+  Pfade sind Fehler; die Vorschau listet sie unter `unknown` auf, damit sie zuerst angelegt werden
+  können. Gesperrte Standorte und deaktivierte Gerätetypen sind kein neues Ziel.
+- Status: einsatzbereit, in Wartung, defekt. Zeilen mit „ausgesondert“ werden übersprungen
+  (Aussondern und Wiederaufnehmen nur einzeln). Ein Export mit ausgesonderten Geräten lässt sich
+  daher ohne Fehler einlesen.
+- Datum als `TT.MM.JJJJ`, `T.M.JJJJ` oder `JJJJ-MM-TT`. Ein führendes `'` (Formelschutz des Exports)
+  wird immer genau einmal entfernt.
+- Kodierung UTF-8 (mit oder ohne BOM) oder Windows-1252 (Excel „CSV (Trennzeichen-getrennt)“).
+  UTF-16 („Unicode-Text“) wird abgelehnt. Trennzeichen Semikolon, Komma oder Tab, erkannt an der
+  Kopfzeile.
+- Grenzen: höchstens 2 MiB und 5000 Zeilen, sonst bitte aufteilen. Eine Datei aus einem
+  abgebrochenen Export (letzte Zeile „Export abgebrochen – Datei unvollständig“) wird abgelehnt.
+- Fehler der ganzen Datei (z. B. unbekannte Spalte, nicht geschlossenes Anführungszeichen) kommen als
+  400 `invalid_request`, wenn möglich mit `details`, z. B. `{"line": 1, "columns": ["Seriennumer"]}`.
+
+**Vorschau** (Auszug):
+
+```json
+{
+  "token": "3f9a…(64 Zeichen, nur ohne Fehler, sonst null)",
+  "encoding": "utf-8", "delimiter": ";", "delimiter_label": "Semikolon",
+  "columns": ["Kennung", "Standort", "Status"],
+  "summary": {"rows": 3, "new": 1, "changed": 1, "unchanged": 0, "skipped": 0, "errors": 1, "warnings": 1},
+  "unknown": {"device_types": [], "locations": ["LF 8"]},
+  "rows": [
+    {"line": 2, "identifier": "MA-01", "result": "changed", "result_label": "Änderungen",
+     "device": {"id": 7, "version": 3},
+     "changes": [{"field": "location", "label": "Standort", "old": "HLF 20 / G1", "new": "Lager"}],
+     "messages": [], "warnings": []},
+    {"line": 3, "identifier": "7", "result": "new", "…": "…",
+     "warnings": ["Die neue Kennung „7“ entspricht ohne führende Nullen dem vorhandenen Gerät „007“. …"]},
+    {"line": 4, "identifier": "MA-09", "result": "error", "…": "…",
+     "messages": ["Der Standort „LF 8“ ist nicht bekannt."]}
+  ]
+}
+```
+
+`result` ist `new`, `changed`, `unchanged`, `skipped` oder `error`; `line` ist die Zeilennummer wie in
+Excel (Kopfzeile = 1). Warnungen blockieren nicht. Sie erscheinen, wenn Excel eine Kennung vermutlich
+verändert hat: eine neue Kennung aus Ziffern, die ohne führende Nullen einem vorhandenen Gerät
+entspricht, oder eine Kennung, die wie ein Datum aussieht.
+
+**Übernehmen**: Nur mit dem `token` der Vorschau und nur, wenn die erneute Prüfung fehlerfrei ist und
+seit der Vorschau kein betroffenes Gerät (Version), keine Zuordnung und nicht die Datei geändert
+wurde. Sonst 409 `import_outdated` (in `details.summary` die Zahlen der neuen Prüfung); dann die
+Vorschau neu erstellen. Alles oder nichts in einer Transaktion. Antwort `{"summary": …}`. Die
+Historie zeigt neue Geräte als „Importiert“, Änderungen wie bei der Bearbeitung von Hand (Stammdaten
+je Feld, Prüfdatum, Umbuchung und Status in einem Eintrag); der Kommentar steht an allen Einträgen.
+
+**CSV in Excel sicher öffnen und speichern**
+
+Ein Doppelklick auf die CSV-Datei öffnet sie zwar, Excel wandelt dabei aber Werte um: Aus „007“ wird
+„7“, aus „1-3“ ein Datum. Zum Bearbeiten daher so öffnen:
+
+1. In einer leeren Arbeitsmappe **Daten → Aus Text/CSV** wählen und die Datei auswählen.
+2. Dateiursprung „65001: Unicode (UTF-8)“ und Trennzeichen „Semikolon“ prüfen, dann **Daten
+   transformieren** wählen.
+3. Im Power-Query-Editor die Spalte **Kennung** markieren, **Datentyp → Text** wählen und „Aktuelle
+   ersetzen“ bestätigen. Am besten ebenso für Seriennummer und Modell. Dann **Schließen & laden**.
+4. Nach dem Bearbeiten **Datei → Speichern unter → „CSV UTF-8 (durch Trennzeichen getrennt)“**
+   wählen. Auch „CSV (Trennzeichen-getrennt)“ (Windows-1252) wird erkannt; Zeichen wie „ẞ“ gehen dort
+   aber verloren.
+
+In der Vorschau auf Warnungen achten: Sie zeigen, wenn Excel eine Kennung trotzdem umgewandelt hat.
+
+**Laufzeit und Server-Einstellungen**
+
+Lokal gemessen (5000 Zeilen, 0,5 MiB): Vorschau 0,3–0,4 s; Übernehmen 0,8 s bei 5000 neuen Geräten,
+2 s bei 5000 geänderten mit je 5 Ereignissen; Spitzenspeicher rund 45 MiB je Anfrage. Neue Geräte
+und Ereignisse werden in Blöcken zu 500 Zeilen geschrieben, geänderte Geräte mit je einem `UPDATE`.
+Schätzung für STRATO (Datenbank auf einem anderen Rechner, etwa 0,5–1 ms je Abfrage, langsamere
+CPU): Vorschau 1–2 s, Übernehmen bis etwa 10 s bei 5000 geänderten Geräten. Das liegt deutlich unter
+`max_execution_time` von 30 s. Nach dem Deployment mit einer Teststadt nachmessen, z. B. mit
+`-w "%{time_total}"` beim curl-Aufruf, und die Werte hier eintragen. Voraussetzungen auf dem Server:
+`post_max_size` mindestens 4M (der Body ist bis 3 MiB groß; darüber verwirft PHP ihn und die API
+meldet 400) und `memory_limit` mindestens 128M.
+
+Lokal ausprobieren in PowerShell, angemeldet als Admin wie unter "Lokal starten". Die JSON-Dateien
+werden ohne BOM geschrieben, sonst lehnt die API sie ab:
+
+```
+curl.exe -b cookies.txt -o geraete.csv http://localhost:8000/firefighting/immendingen/api/v1/devices/export
+# geraete.csv bearbeiten, dann:
+$b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\geraete.csv"))
+[IO.File]::WriteAllText("$PWD\preview.json", (@{ file = $b64 } | ConvertTo-Json -Compress))
+curl.exe -b cookies.txt -o vorschau.json -H "Content-Type: application/json" --data-binary "@preview.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/import/preview
+$token = (Get-Content -Raw -Encoding UTF8 vorschau.json | ConvertFrom-Json).token
+[IO.File]::WriteAllText("$PWD\apply.json", (@{ file = $b64; token = $token; comment = "Inventur 2026" } | ConvertTo-Json -Compress))
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@apply.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/import
+```
+
+Dasselbe in Bash (Linux, macOS, Git Bash; `jq` für die Antwort):
+
+```
+printf '{"file":"%s"}' "$(base64 -w0 geraete.csv)" > preview.json
+token=$(curl -s -b cookies.txt -H "Content-Type: application/json" --data-binary @preview.json \
+  http://localhost:8000/firefighting/immendingen/api/v1/devices/import/preview | jq -r .token)
+printf '{"file":"%s","token":"%s","comment":"Inventur 2026"}' "$(base64 -w0 geraete.csv)" "$token" > apply.json
+curl -b cookies.txt -H "Content-Type: application/json" --data-binary @apply.json \
+  http://localhost:8000/firefighting/immendingen/api/v1/devices/import
+```
+
+Ist `token` `null`, enthält die Datei Fehler (siehe `rows[].messages` in der Vorschau); Übernehmen
+ergibt dann 409 `import_outdated`.
 
 ### Lokal starten
 

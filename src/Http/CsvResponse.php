@@ -24,7 +24,7 @@ final readonly class CsvResponse implements Response
     /** Nach so vielen Zeilen wird die Ausgabe an den Webserver weitergereicht. */
     public const int FLUSH_ROWS = 500;
 
-    public const string ABORTED_LINE = 'Export abgebrochen – Datei unvollständig';
+    public const string ABORTED_LINE = CsvFormat::ABORTED_LINE;
 
     /** @var \Iterator<mixed, mixed> */
     private \Iterator $items;

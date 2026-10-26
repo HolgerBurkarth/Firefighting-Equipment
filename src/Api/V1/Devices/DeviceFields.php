@@ -222,11 +222,13 @@ final class DeviceFields
     }
 
     /**
+     * Lehnt Felder des Bodys ab, die nicht in $allowed stehen (auch für den CSV-Import).
+     *
      * @param list<string> $allowed
      *
      * @throws HttpException 400 invalid_request
      */
-    private static function rejectUnknown(RequestContext $context, array $allowed): void
+    public static function rejectUnknown(RequestContext $context, array $allowed): void
     {
         foreach (array_keys($context->body) as $key) {
             if (!in_array($key, $allowed, true)) {

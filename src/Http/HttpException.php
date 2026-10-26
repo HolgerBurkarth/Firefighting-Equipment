@@ -26,11 +26,12 @@ final class HttpException extends \RuntimeException
     }
 
     /**
-     * @param string $message deutscher Hinweis, was an der Anfrage falsch ist
+     * @param string                    $message deutscher Hinweis, was an der Anfrage falsch ist
+     * @param array<string, mixed>|null $details z. B. {"line": 4} bei einer fehlerhaften CSV-Datei
      */
-    public static function invalidRequest(string $message = 'Die Anfrage ist ungültig.'): self
+    public static function invalidRequest(string $message = 'Die Anfrage ist ungültig.', ?array $details = null): self
     {
-        return new self('invalid_request', $message, 400);
+        return new self('invalid_request', $message, 400, details: $details);
     }
 
     /**
@@ -167,6 +168,17 @@ final class HttpException extends \RuntimeException
     public static function versionConflict(string $message, array $details): self
     {
         return new self('version_conflict', $message, 409, details: $details);
+    }
+
+    /**
+     * CSV-Import: Seit der Vorschau hat sich etwas geändert (betroffenes Gerät, Kennung inzwischen
+     * vergeben, Standort gesperrt, andere Datei …); nichts geschrieben, Vorschau neu erstellen.
+     *
+     * @param array<string, mixed> $details z. B. Anzahlen der neuen Prüfung
+     */
+    public static function importOutdated(string $message, array $details = []): self
+    {
+        return new self('import_outdated', $message, 409, details: $details === [] ? null : $details);
     }
 
     /**

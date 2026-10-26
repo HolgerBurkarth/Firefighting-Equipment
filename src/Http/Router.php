@@ -17,11 +17,11 @@ final class Router
     private const string PLACEHOLDER_PATTERN = '/^\{([a-z][a-z_]*)\}$/D';
     private const string ID_PATTERN = '/^[1-9][0-9]{0,17}$/D';
 
-    /** @var array<string, array<string, array{RequestHandler, Access}>> Pfad => Methode => Route */
+    /** @var array<string, array<string, array{RequestHandler, Access, int}>> Pfad => Methode => Route (mit Body-Grenze) */
     private array $exact = [];
 
     /**
-     * @var array<string, array{segments: list<string>, methods: array<string, array{RequestHandler, Access}>}>
+     * @var array<string, array{segments: list<string>, methods: array<string, array{RequestHandler, Access, int}>}>
      *      Pfad mit Platzhaltern (Namen durch {} ersetzt) => Segmente und Routen
      */
     private array $patterns = [];
@@ -45,8 +45,9 @@ final class Router
     /**
      * @param string $method z. B. "GET"
      * @param string $path ohne führenden Slash, z. B. "api/v1/health" oder "api/v1/auth/sessions/{id}"
+     * @param int    $maxBodyBytes Höchstgröße des Bodys (1 bis Request::MAX_UPLOAD_BYTES)
      */
-    public function add(string $method, string $path, Access $access, RequestHandler $handler): self
+    public function add(string $method, string $path, Access $access, RequestHandler $handler, int $maxBodyBytes = Request::MAX_BODY_BYTES): self
     {
         if (preg_match(self::METHOD_PATTERN, $method) !== 1) {
             throw new \LogicException(sprintf('Ungültige Methode: %s', $method));
@@ -56,6 +57,10 @@ final class Router
         }
         if ($access === ($this->forTenant ? Access::SuperAdmin : Access::Admin)) {
             throw new \LogicException(sprintf('Zugriff %s ist in diesem Bereich nicht möglich: %s', $access->value, $path));
+        }
+
+        if ($maxBodyBytes < 1 || $maxBodyBytes > Request::MAX_UPLOAD_BYTES) {
+            throw new \LogicException(sprintf('Body-Grenze außerhalb von 1 bis %d: %s', Request::MAX_UPLOAD_BYTES, $path));
         }
 
         $segments = explode('/', $path);
@@ -79,7 +84,7 @@ final class Router
             }
         }
 
-        $route = [$handler, $access];
+        $route = [$handler, $access, $maxBodyBytes];
         if ($names === []) {
             if (isset($this->exact[$path][$method])) {
                 throw new \LogicException(sprintf('Route doppelt: %s %s', $method, $path));
@@ -114,9 +119,9 @@ final class Router
         }
 
         if (isset($byMethod[$method])) {
-            [$handler, $access] = $byMethod[$method];
+            [$handler, $access, $maxBodyBytes] = $byMethod[$method];
 
-            return new RouteMatch($handler, $access, $params);
+            return new RouteMatch($handler, $access, $params, $maxBodyBytes);
         }
 
         $allowed = array_keys($byMethod);
@@ -126,7 +131,7 @@ final class Router
     }
 
     /**
-     * @return array{array<string, array{RequestHandler, Access}>, array<string, int>}|null
+     * @return array{array<string, array{RequestHandler, Access, int}>, array<string, int>}|null
      */
     private function matchPattern(string $path): ?array
     {

@@ -9,8 +9,14 @@ namespace FirefightingEquipment\Http;
  */
 final readonly class Request
 {
-    /** Höchstgröße des Bodys in Byte; größere Bodys werden nicht gelesen. */
+    /** Standardgrenze des Bodys je Route in Byte (RequestGuard; Routen können mehr erlauben). */
     public const int MAX_BODY_BYTES = 16384;
+
+    /**
+     * Größte Body-Grenze einer Route (CSV-Import: Datei als Base64 im JSON); größere Bodys werden
+     * nicht gelesen. Die Grenze der Route prüft RequestGuard.
+     */
+    public const int MAX_UPLOAD_BYTES = 3_145_728;
 
     /** Methoden ohne Body; alle anderen gelten als ändernd. */
     public const array SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
@@ -25,7 +31,7 @@ final readonly class Request
         public string $uri,
         public array $headers = [],
         public array $cookies = [],
-        /** Rohdaten; null bei sicheren Methoden oder wenn der Body zu groß war. */
+        /** Rohdaten; null bei sicheren Methoden oder wenn der Body größer als MAX_UPLOAD_BYTES war. */
         public ?string $body = null,
         public bool $bodyTooLarge = false,
         /** Wie $_SERVER['REMOTE_ADDR']; "" wenn unbekannt. */
@@ -109,7 +115,7 @@ final readonly class Request
     private static function readBody(?string $contentLength, \Closure $input): array
     {
         if ($contentLength !== null && (!ctype_digit($contentLength) || strlen($contentLength) > 9
-            || (int) $contentLength > self::MAX_BODY_BYTES)) {
+            || (int) $contentLength > self::MAX_UPLOAD_BYTES)) {
             return [null, true];
         }
 
@@ -118,7 +124,7 @@ final readonly class Request
             return ['', false];
         }
         try {
-            $body = stream_get_contents($stream, self::MAX_BODY_BYTES + 1);
+            $body = stream_get_contents($stream, self::MAX_UPLOAD_BYTES + 1);
         } finally {
             fclose($stream);
         }
@@ -126,7 +132,7 @@ final readonly class Request
             return ['', false];
         }
 
-        return strlen($body) > self::MAX_BODY_BYTES ? [null, true] : [$body, false];
+        return strlen($body) > self::MAX_UPLOAD_BYTES ? [null, true] : [$body, false];
     }
 
     /**

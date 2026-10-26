@@ -71,6 +71,23 @@ final class HttpExceptionTest extends TestCase
         );
     }
 
+    public function testImportOutdatedIsConflictWithOptionalDetails(): void
+    {
+        $response = HttpException::importOutdated('Vorschau neu erstellen.', ['summary' => ['errors' => 1]])->toResponse();
+        self::assertSame(409, $response->statusCode());
+        self::assertSame('{"error":"import_outdated","message":"Vorschau neu erstellen.","details":{"summary":{"errors":1}}}', $response->body());
+
+        self::assertSame('{"error":"import_outdated","message":"Vorschau neu erstellen."}', HttpException::importOutdated('Vorschau neu erstellen.')->toResponse()->body());
+    }
+
+    public function testInvalidRequestWithDetails(): void
+    {
+        $response = HttpException::invalidRequest('Zeile 4 ist kaputt.', ['line' => 4])->toResponse();
+
+        self::assertSame(400, $response->statusCode());
+        self::assertSame('{"error":"invalid_request","message":"Zeile 4 ist kaputt.","details":{"line":4}}', $response->body());
+    }
+
     public function testSlugAndEmailTakenAreConflicts(): void
     {
         $slug = HttpException::slugTaken('Das Kürzel „immendingen“ ist bereits vergeben.')->toResponse();

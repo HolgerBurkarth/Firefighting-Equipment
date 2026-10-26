@@ -61,7 +61,7 @@ final readonly class Application
             $path = AppPath::parse($request->uri) ?? throw HttpException::notFound();
             $routes = $path->isService() ? $this->serviceRoutes : $this->tenantRoutes;
             $route = $routes->match($request->method, $path->rest);
-            $body = $this->guard->check($request);
+            $body = $this->guard->check($request, $route->maxBodyBytes);
             $tenant = $path->isService() ? null : $this->tenants->resolve($path->scope, $this->db);
 
             $auth = null;

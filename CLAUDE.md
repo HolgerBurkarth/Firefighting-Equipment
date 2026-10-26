@@ -89,7 +89,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   weitere nur lokal über die optionale Gruppe `http` → `allowed_origins` in der
   Konfigurationsdatei (wird nur geladen, wenn ein anderer Origin kommt). Der Body muss ein
   JSON-Objekt sein, auch `{}` (z. B. bei Logout und DELETE); höchstens 16 KiB
-  (`Request::MAX_BODY_BYTES`, größere werden nicht gelesen). Sonst 400 `invalid_request`.
+  (`Request::MAX_BODY_BYTES`). Sonst 400 `invalid_request`. Eine Route kann eine größere Grenze
+  deklarieren (`Router::add(…, maxBodyBytes)`, über `RouteMatch::$maxBodyBytes` an `RequestGuard`),
+  höchstens `Request::MAX_UPLOAD_BYTES` (3 MiB); bisher nur die Routen des CSV-Imports. `Request`
+  liest bis zu 3 MiB, größere Bodys werden nicht gelesen. Kein anderer Content-Type und kein
+  `multipart/form-data` (Formulare fremder Seiten könnten es senden): Dateien kommen als Base64 im
+  JSON.
 - Fehlerformat immer `{"error":"code","message":"deutscher Text"}`, erzeugt über die Fabriken in
   `HttpException`; Codes: `invalid_request` 400, `invalid_token` 400, `invalid_invitation_code`
   400, `not_authenticated` 401, `invalid_credentials`
@@ -99,13 +104,16 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Regel), `slug_taken` 409, `email_taken` 409 (beide nur für den Super-Admin; öffentliche Abläufe
   verraten nie, ob eine Adresse existiert), `name_taken` 409 (Name eines Gerätetyps bzw. Standorts
   vergeben), `identifier_taken` 409 (Kennung eines Geräts vergeben), `version_conflict` 409
-  (Gerät inzwischen geändert, aktueller Stand in `details`), `unsupported_media_type` 415, `weak_password`
+  (Gerät inzwischen geändert, aktueller Stand in `details`), `import_outdated` 409 (CSV-Import: seit
+  der Vorschau geändert, Vorschau neu erstellen), `unsupported_media_type` 415, `weak_password`
   422, `too_many_attempts` 429 (mit `Retry-After`), `database_unavailable` 503, `internal_error`
   500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
   Passwort beim Ändern 403, nicht 401.
 - Optionales Feld `details` (immer ein JSON-Objekt) mit maschinenlesbaren Angaben zum Fehler,
   z. B. `{"error":"rule_violation","message":"…","details":{"devices":2,"sublocations":1}}` beim
-  Sperren eines Standorts, der nicht leer ist (`HttpException::ruleViolation(message, details)`).
+  Sperren eines Standorts, der nicht leer ist (`HttpException::ruleViolation(message, details)`),
+  oder `{"line": 4}` bei einer unlesbaren Import-Datei (`HttpException::invalidRequest(message,
+  details)`).
   Fehler ohne Angaben haben kein Feld `details` (alle bisherigen unverändert). Nie Interna,
   Zugangsdaten oder personenbezogene Daten in `details`.
 - Einzige Ausnahme vom Fehlerformat: `GET api/v1/health` liefert `{"status":"ok","database":"ok"}`
@@ -624,7 +632,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Gerätetypen und Standorte (siehe "Gerätetypen und Standorte (API)") und für Geräte (anlegen,
   Stammdaten, Prüfdatum, Liste, Einzelansicht, Umbuchen/Status, Aussondern/Wiederaufnehmen,
   Historie; siehe "Geräte (API)"), Prüffristen und Zusammenfassung (siehe "Prüffristen und
-  Zusammenfassung (API)") sowie der CSV-Export (siehe "CSV-Export (API)"); der CSV-Import folgt. Schema-Tests in
+  Zusammenfassung (API)"), CSV-Export und -Import (siehe "CSV-Export (API)" und "CSV-Import (API)").
+  Schema-Tests in
   `tests/Integration/Device/` (`DeviceSchemaTestCase`), Zeilen per SQL über
   den Trait `DeviceRows` (auch in API-Tests auf Basis von `AuthTestCase`).
 - Rechte: `user` darf ansehen, umbuchen, Status setzen (einsatzbereit, in Wartung, defekt) und CSV
@@ -669,7 +678,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden). Wer (`user_id`
   aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann
   (`created_at`, UTC), optionaler Kommentar (höchstens 500 Zeichen). Ereignisse (`event_type`):
-  `created` bzw. `imported` (Ziel-Standort und -Status, nicht ausgesondert), `state_changed`
+  `created` bzw. `imported` (CSV-Import; Ziel-Standort und -Status, nicht ausgesondert), `state_changed`
   (Umbuchung und/oder Statusänderung in EINEM Eintrag, Von/Nach je Paar, verschieden; auch Aussondern
   und Wiederaufnehmen), `due_changed` (Prüfdatum alt/neu, je auch leer), `field_changed` (Stammdaten:
   ein Eintrag je Feld `identifier`, `device_type`, `serial_number`, `manufacturer`, `model`,
@@ -691,8 +700,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Gerätetypen: `GET device-types[?include_inactive=1]` (nach Name, `device_count` = nicht
   ausgesonderte Geräte; deaktivierte nur mit Parameter), `POST device-types {name}` → 201,
   `POST device-types/{id}/rename {name}`, `POST device-types/{id}/deactivate` bzw. `activate {}`
-  (wiederholbar). Antwort `{"device_type": …}`. Deaktiviert = kein Ziel für neue Geräte (prüft die
-  künftige Geräte-API); bestehende Geräte behalten ihn.
+  (wiederholbar). Antwort `{"device_type": …}`. Deaktiviert = kein Ziel für neue Geräte oder einen
+  Typwechsel (prüfen Geräte-API und Import); bestehende Geräte behalten ihn.
 - Standorte: `GET locations[?include_inactive=1]` → `{"locations": [...]}` als Baum (Ebene 1 nach
   Name, je `children` nach Name; ohne Parameter ohne gesperrte Standorte und gesperrte
   Unterstandorte), `GET locations/{id}` (Ebene 1 mit allen Unterstandorten, auch gesperrten),
@@ -721,10 +730,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   mit `LOCK IN SHARE MODE` und prüft dann `active`; `lock` sperrt ihn mit `FOR UPDATE` und zählt erst
   danach (erste nicht sperrende Abfrage der Transaktion, sieht also den Stand nach der Sperre).
   Reihenfolge immer übergeordneter vor untergeordnetem Standort. Regel für die Geräte-API:
-  Anlegen, Umbuchen und Wiederaufnehmen (umgesetzt, per Test mit zweiter Verbindung gesichert:
-  `DeviceLocationLockingTest`) sowie künftig der Import lesen den Ziel-Standort (und den Gerätetyp)
-  mit `LOCK IN SHARE MODE` und lehnen gesperrte bzw. deaktivierte ab, bevor das Gerät geschrieben
-  wird. Aussondern liest keinen Standort (es leert ihn nur).
+  Anlegen, Umbuchen und Wiederaufnehmen sowie der CSV-Import (per Test mit zweiter Verbindung
+  gesichert: `DeviceLocationLockingTest`, `DeviceImportLockingTest`) lesen den Ziel-Standort (und den
+  Gerätetyp) mit `LOCK IN SHARE MODE` und lehnen gesperrte bzw. deaktivierte ab, bevor das Gerät
+  geschrieben wird. Aussondern liest keinen Standort (es leert ihn nur).
 
 ## Geräte (API)
 - Nur unter Städten (unter `service` 404). Lesen `Access::Authenticated`, Ändern `Access::Admin`
@@ -853,7 +862,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Spalten), `DeviceRepository::export`, `DeviceEventRepository::countHistory`/`exportHistory`
   (`DeviceHistoryFilter`, `DeviceHistoryEntry`). Tests in `tests/Integration/Export/`
   (`ExportApiTestCase` mit `FixedClock`).
-- Format (`CsvFormat`, gilt auch für den künftigen Import): UTF-8 MIT BOM (Excel unter Windows),
+- Format (`CsvFormat`; der Import liest es, siehe "CSV-Import (API)"): UTF-8 MIT BOM (Excel unter
+  Windows),
   Semikolon, Zeilenende CRLF, Felder nach RFC 4180 nur bei Bedarf in Anführungszeichen (enthält
   `;`, `"`, CR oder LF; `"` → `""`); Zeilenumbrüche in Feldern (Notizen) bleiben LF. Deutsche
   Überschriften und Bezeichnungen (`label()`), Datum `TT.MM.JJJJ`, Zeitpunkte in Europe/Berlin als
@@ -871,18 +881,17 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `CsvResponse` startet den Generator im Konstruktor (Fehler der Abfrage noch im Handler → normale
   Fehlerantwort), schreibt beim Senden Zeile für Zeile nach `php://output`, leert vorher die
   PHP-Puffer und gibt nach je 500 Zeilen (`FLUSH_ROWS`) weiter. Fehler danach: `csv_export_failed`
-  im Protokoll, letzte Zeile `Export abgebrochen – Datei unvollständig` (der Import lehnt sie ab).
+  im Protokoll, letzte Zeile `Export abgebrochen – Datei unvollständig` (`CsvFormat::ABORTED_LINE`;
+  der Import lehnt solche Dateien ab).
 - Geräteliste: Filter wie `GET devices` (`DeviceListHandler::filter`: `device_type_id`, `location_id`,
   `include_sublocations`, `status`, `q`, `include_retired`), ohne Seitenbegrenzung, immer
   `NATURAL_SORT_KEY(identifier), id`; `sort`, `limit`, `offset` werden ignoriert. Spalten
   (`DeviceCsv::DEVICE_HEADER`): Kennung, Gerätetyp, Standort, Status, Nächste Prüfung,
   Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz. Dateiname
   `geraete-<kürzel>-<JJJJ-MM-TT>.csv` (heute in Europe/Berlin über `Clock`).
-- Für den Import (nächster Schritt) gewählt, Spalten nur gemeinsam mit ihm ändern: Kennung ist der
-  Schlüssel, Gerätetyp über den Namen (je Stadt eindeutig), Standort über den vollständigen Pfad
-  „HLF 20 / G1“ (mit den Pfaden aller Standorte vergleichen, nicht an „ / “ trennen, da Namen `/`
-  enthalten dürfen; mehrdeutig → Zeile ablehnen), Status über die deutsche Bezeichnung, Datum
-  `TT.MM.JJJJ`.
+- Die Geräteliste ist das Format des Imports; Spalten nur gemeinsam mit `ImportColumn` ändern (per
+  Test gleich): Kennung ist der Schlüssel, Gerätetyp über den Namen, Standort über den vollständigen
+  Pfad „HLF 20 / G1“, Status über die deutsche Bezeichnung, Datum `TT.MM.JJJJ`.
 - Historie: alle Ereignisse der Stadt, auch ausgesonderter Geräte. Parameter `from`/`to`
   (`JJJJ-MM-TT`, Kalendertage in Europe/Berlin, beide einschließlich; abgefragt halboffen
   `created_at >= Beginn(from)` und `< Beginn(to + 1)` in UTC über `LocalDate::startOfDayUtc`, Index
@@ -902,6 +911,78 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Alter/Neuer Wert (Beschaffungsdatum als `TT.MM.JJJJ`), Kommentar. Dateiname
   `historie-<kürzel>-<von>-bis-<bis>.csv`.
 
+## CSV-Import (API)
+- Nur unter Städten (unter `service` 404), beide `Access::Admin` (in `AdminRoutesAccessTest`):
+  `POST devices/import/preview {file}` (prüfen, speichert nichts) und `POST devices/import {file,
+  token, comment?}` (übernehmen). `file` = die Datei als Base64 (Whitespace erlaubt); Body-Grenze der
+  Routen 3 MiB (`DeviceImportHandler::MAX_BODY_BYTES`), CSRF-Schutz wie überall (JSON, Origin).
+  Code: `src/Csv/` (`CsvReader`, `CsvTable`, `CsvRecord`, `CsvException`), `src/Device/Import/`
+  (`DeviceImportFile` Datei und Kopfzeile, `ImportRow` Werte je Zeile, `ImportColumn`, `ImportDate`,
+  `ImportWarnings`, `DeviceImportPlanner` Abgleich mit der Datenbank, `DeviceImportPlan` mit
+  Kennzeichen, `ImportRowPlan`, `ImportChange`, `ImportResult`, `DeviceImport` Vorschau und
+  Übernehmen, Fehler `ImportFileException`, `ImportOutdatedException`),
+  `DeviceRepository::findByIdentifierKeys`, `DeviceEventWriter` (gepuffert, `imported`), Endpunkte
+  `src/Api/V1/Devices/DeviceImportHandler.php` und `DeviceImportJson.php`. Tests in
+  `tests/Integration/Import/` (`ImportApiTestCase`) sowie `tests/Unit/Csv/` und
+  `tests/Unit/Device/Import/`.
+- Entscheidungen: Der Import legt neue Geräte an UND ändert bestehende. Schlüssel ist die Kennung,
+  ohne Groß-/Kleinschreibung, nur unter nicht ausgesonderten Geräten (wie der UNIQUE-Index; ß ≠ ss).
+  Unbekannte Gerätetypen (über den Namen) und Standorte (über den vollständigen Pfad wie im Export)
+  sind Fehler; die Vorschau listet sie gesammelt auf (`unknown`). Nichts wird automatisch angelegt.
+- Datei (`CsvReader`, `DeviceImportFile`): UTF-8 mit oder ohne BOM; kein gültiges UTF-8 → als
+  Windows-1252 umgewandelt (dort nicht belegte Bytes 81/8D/8F/90/9D, NUL-Bytes und UTF-16 → Fehler).
+  Trennzeichen `;`, `,` oder Tab, erkannt an der Kopfzeile (die meisten bekannten Überschriften, bei
+  Gleichstand `;`). RFC 4180, Zeilenende CRLF/LF/CR, Zeilenumbrüche in Feldern. Zeilennummern wie in
+  Excel (Kopfzeile = 1, Datensätze statt physischer Zeilen); völlig leere Zeilen (auch `;;;`) werden
+  übergangen. Jede Zelle: genau ein führendes `'` entfernen (`CsvFormat::removeFormulaGuard`).
+- Spalten wie im Export (`ImportColumn` = `DeviceCsv::DEVICE_HEADER`), Zuordnung über die Überschrift
+  (Reihenfolge und Groß-/Kleinschreibung egal). Fehler der ganzen Datei → 400 `invalid_request`
+  (ggf. `details` mit `line`, `columns`, `rows`/`max_rows`, `max_bytes`): unbekannte, doppelte oder
+  leere Überschrift, Spalte Kennung fehlt, nicht lesbar (z. B. Anführungszeichen nicht geschlossen),
+  Zeile `CsvFormat::ABORTED_LINE` (abgebrochener Export), keine Datenzeile, mehr als 5000 Zeilen
+  (`DeviceImportFile::MAX_ROWS`) oder mehr als 2 MiB (`MAX_BYTES`).
+- Werte (`ImportRow`): Spalte fehlt = Feld unverändert; Spalte vorhanden und Zelle leer = optionales
+  Feld leeren. Gerätetyp, Standort, Status leer = nicht angegeben (bestehendes Gerät: unverändert;
+  neues: Typ und Standort Pflicht, Status Standard einsatzbereit). Status über die deutsche
+  Bezeichnung ohne Groß-/Kleinschreibung, nur einsatzbereit, in Wartung, defekt; „ausgesondert“ →
+  Zeile übersprungen (kein Aussondern oder Wiederaufnehmen per Import; zählt nicht als doppelte
+  Kennung). Datum `TT.MM.JJJJ`, `T.M.JJJJ` oder `JJJJ-MM-TT` (`ImportDate`; keine zweistelligen
+  Jahre). Texte und Kennung wie `DeviceText` bzw. `DeviceIdentifier`. Falsche Anzahl Felder → Fehler
+  der Zeile (nie still als leer werten).
+- Abgleich (`DeviceImportPlanner`), alle Vergleiche rechnet die Datenbank (wie die UNIQUE-Indizes):
+  Schlüssel der Kennung mit der Formel von `identifier_key` über `JSON_TABLE`; Gerätetyp über den Namen
+  und Standort über den Pfad (`IF(p.id IS NULL, l.name, CONCAT(p.name, ' / ', l.name))`, nie an
+  „ / “ trennen) unter `utf8mb4_unicode_ci` („Straße“ = „Strasse“); mehrere passende Standorte →
+  Fehler „nicht eindeutig“. Doppelte Kennung in der Datei → Fehler in allen betroffenen Zeilen.
+  Neues bzw. geändertes Ziel: Standort gesperrt bzw. Gerätetyp deaktiviert → Fehler; ein schon
+  zugeordneter darf bleiben. Kennung nur in anderer Schreibweise → `field_changed` (binär verglichen).
+- Ergebnis je Zeile: `new`, `changed` (je Feld alt → neu in der Schreibweise der Datei),
+  `unchanged`, `skipped`, `error` (verständliche Meldungen; die Zeilennummer steht in `line`).
+  Warnungen (`warnings`, blockieren nicht; `ImportWarnings`): eine NEUE Kennung aus Ziffern, die ohne
+  führende Nullen einem vorhandenen Gerät entspricht („7“ ↔ „007“); eine Kennung, die wie ein Datum
+  aussieht (neu oder geänderte Schreibweise; „01.03.2026“, „1-Mar“, „01. Mrz“ …). Zusammenfassung
+  `summary {rows, new, changed, unchanged, skipped, errors, warnings}` (Warnungen = Zeilen mit
+  Warnung).
+- Kennzeichen (`token`, nur ohne Fehler): SHA-256 über den Hash der Datei und den Plan aller Zeilen
+  (Ergebnis, Gerät mit Version, Änderungen samt Typ- und Standort-IDs). Kein Geheimnis nötig, da beim
+  Übernehmen alles neu geprüft wird. Übernehmen (`DeviceImport::apply`, eigene Transaktion, eine offene
+  ist ein Fehler): erneut prüfen MIT Sperren; Fehler oder anderes Kennzeichen → 409 `import_outdated`
+  (`details.summary` der neuen Prüfung; Meldung: Vorschau neu erstellen), nichts geschrieben.
+  Fehler 1062 (Kennung gleichzeitig vergeben) oder 1213 (Verklemmung) → ebenfalls `import_outdated`.
+  Alles oder nichts.
+- Sperren beim Übernehmen, Reihenfolge Gerät → Standort → Gerätetyp: Geräte `FOR UPDATE` über
+  `identifier_key IN (…)` (sperrt auf dem UNIQUE-Index auch die Lücken neuer Kennungen), dann mit
+  `LOCK IN SHARE MODE` gelesen (aktueller Stand, unabhängig vom Snapshot); alle genannten Standorte,
+  danach alle genannten Gerätetypen `LOCK IN SHARE MODE`, `active` aus diesen Zeilen.
+- Schreiben wie bei der Einzelbearbeitung: neues Gerät Version 1 und Ereignis `imported`; bestehendes
+  ein `UPDATE` (Version einmal + 1) und Ereignisse `field_changed` (je Feld, Reihenfolge von
+  `DeviceField`), `due_changed`, `state_changed` (Standort und Status in EINEM Eintrag), alle mit dem
+  gemeinsamen Kommentar. Neue Geräte (500 je INSERT, IDs danach über `identifier_key`) und Ereignisse
+  (`DeviceEventWriter` gepuffert, 500 je INSERT) werden gesammelt geschrieben. Unveränderte und
+  übersprungene Zeilen schreiben nichts.
+- Laufzeit: lokal 5000 Zeilen Vorschau unter 0,5 s, Übernehmen 0,8 s (neu) bis 2 s (geändert),
+  Spitzenspeicher rund 45 MiB; Schätzung für STRATO und Messung siehe README ("CSV-Import").
+
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".
 - Neue Stadt: Super-Admin legt Name, Kürzel und E-Mail des ersten Admins an (siehe
@@ -909,8 +990,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Geräte, Gerätetypen, Status, Standorte und Historie: siehe "Standorte und Geräte".
 - Übersicht "überfällig" und "in 30 Tagen fällig" (umgesetzt, siehe "Prüffristen und
   Zusammenfassung (API)").
-- CSV-Export (umgesetzt, siehe "CSV-Export (API)") und CSV-Import mit Prüfung und Fehleranzeige
-  (folgt; liest das Format des Exports).
+- CSV-Export und CSV-Import mit Vorschau und Fehleranzeige (umgesetzt, siehe "CSV-Export (API)" und
+  "CSV-Import (API)"). Der Import legt neue Geräte an und ändert bestehende; er legt nie Gerätetypen
+  oder Standorte an und sondert weder aus noch nimmt er wieder auf.
 - Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
 
 ## Deployment

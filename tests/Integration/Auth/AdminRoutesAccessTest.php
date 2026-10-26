@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tests\Integration\Auth;
 
+use FirefightingEquipment\Device\Import\DeviceImport;
+use FirefightingEquipment\Device\Import\DeviceImportFile;
 use FirefightingEquipment\Http\Routes;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -17,6 +19,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
 #[CoversClass(Routes::class)]
 final class AdminRoutesAccessTest extends AuthTestCase
 {
+    /** CSV-Import: ändert den Status von MA-01 */
+    private const string IMPORT_FILE = "Kennung;Status
+MA-01;defekt
+";
+
     /**
      * @return iterable<string, array{string, string, array<string, mixed>|null}>
      */
@@ -47,6 +54,8 @@ final class AdminRoutesAccessTest extends AuthTestCase
         yield 'Prüfdatum setzen' => ['POST', 'devices/{device}/inspection-due', ['version' => 1, 'next_inspection_due' => '2027-03-01']];
         yield 'Gerät aussondern' => ['POST', 'devices/{device}/retire', ['version' => 1]];
         yield 'Gerät wieder aufnehmen' => ['POST', 'devices/{retired}/reinstate', ['version' => 1, 'status' => 'ready']];
+        yield 'Import prüfen' => ['POST', 'devices/import/preview', ['file' => '{import_file}']];
+        yield 'Import übernehmen' => ['POST', 'devices/import', ['file' => '{import_file}', 'token' => '{import_token}']];
     }
 
     /**
@@ -70,8 +79,11 @@ final class AdminRoutesAccessTest extends AuthTestCase
         $retired = $this->insert('fe_devices', [
             'tenant_id' => $this->tenant('immendingen')->id, 'identifier' => 'MA-09', 'device_type_id' => $type, 'location_id' => $vehicle, 'status' => 'retired',
         ]);
+        $import = self::IMPORT_FILE;
+        $importToken = new DeviceImport($this->pdo())->preview($this->tenant('immendingen'), DeviceImportFile::parse($import))->token;
         $placeholders = ['{code}' => $code, '{user}' => $user, '{type}' => $type, '{location}' => $location, '{device}' => $device, '{retired}' => $retired];
         $path = strtr($path, array_map('strval', $placeholders));
+        $placeholders += ['{import_file}' => base64_encode($import), '{import_token}' => $importToken];
         // Platzhalter als ganzer Wert im Body werden zur ID (echte JSON-Ganzzahl).
         $body = $body === null ? null : array_map(static fn (mixed $v): mixed => is_string($v) ? ($placeholders[$v] ?? $v) : $v, $body);
         $url = self::url('immendingen', $path);
