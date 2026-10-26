@@ -19,8 +19,8 @@ use FirefightingEquipment\Http\RequestHandler;
  * Ungültige Felder 400 (auch ein unbekannter oder fremder Gerätetyp bzw. Standort im Body), fremde
  * oder unbekannte ID im Pfad 404, Kennung vergeben 409 identifier_taken, veraltete Version 409
  * version_conflict (details {"device": aktueller Stand}), Regelverstoß 409 rule_violation (Standort
- * gesperrt, Gerätetyp deaktiviert, Gerät ausgesondert). Felder werden vor der Suche gelesen (400 vor
- * 404). Ändert sich nichts, bleibt die Version gleich.
+ * gesperrt, Gerätetyp deaktiviert, Gerät ausgesondert bzw. beim Wiederaufnehmen nicht ausgesondert).
+ * Felder werden vor der Suche gelesen (400 vor 404). Ändert sich nichts, bleibt die Version gleich.
  */
 final readonly class DeviceActionHandler implements RequestHandler
 {
@@ -57,6 +57,29 @@ final readonly class DeviceActionHandler implements RequestHandler
                     $context->param('id'),
                     DeviceFields::version($context),
                     DeviceFields::inspectionDue($context),
+                    DeviceFields::comment($context),
+                ),
+                DeviceAction::ChangeState => $devices->changeState(
+                    $tenant,
+                    $context->auth()->user->id,
+                    $context->param('id'),
+                    DeviceFields::version($context),
+                    DeviceFields::stateChange($context),
+                    DeviceFields::comment($context),
+                ),
+                DeviceAction::Retire => $devices->retire(
+                    $tenant,
+                    $context->auth()->user->id,
+                    $context->param('id'),
+                    DeviceFields::version($context),
+                    DeviceFields::retirementComment($context),
+                ),
+                DeviceAction::Reinstate => $devices->reinstate(
+                    $tenant,
+                    $context->auth()->user->id,
+                    $context->param('id'),
+                    DeviceFields::version($context),
+                    DeviceFields::reinstatement($context),
                     DeviceFields::comment($context),
                 ),
             };

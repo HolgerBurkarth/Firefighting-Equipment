@@ -28,6 +28,22 @@ enum DeviceField: string
     }
 
     /**
+     * Deutsche Bezeichnung für die Historie, z. B. „Seriennummer“.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Identifier => 'Kennung',
+            self::DeviceType => 'Gerätetyp',
+            self::SerialNumber => 'Seriennummer',
+            self::Manufacturer => 'Hersteller',
+            self::Model => 'Modell',
+            self::ProcuredOn => 'Beschaffungsdatum',
+            self::Note => 'Notiz',
+        };
+    }
+
+    /**
      * Subjekt für Meldungen, z. B. „Die Seriennummer“.
      */
     public function subject(): string

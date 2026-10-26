@@ -45,6 +45,8 @@ final class AdminRoutesAccessTest extends AuthTestCase
         yield 'Gerät anlegen' => ['POST', 'devices', ['identifier' => 'MA-02', 'device_type_id' => '{type}', 'location_id' => '{location}']];
         yield 'Stammdaten ändern' => ['POST', 'devices/{device}/fields', ['version' => 1, 'model' => 'FPS 7000']];
         yield 'Prüfdatum setzen' => ['POST', 'devices/{device}/inspection-due', ['version' => 1, 'next_inspection_due' => '2027-03-01']];
+        yield 'Gerät aussondern' => ['POST', 'devices/{device}/retire', ['version' => 1]];
+        yield 'Gerät wieder aufnehmen' => ['POST', 'devices/{retired}/reinstate', ['version' => 1, 'status' => 'ready']];
     }
 
     /**
@@ -65,7 +67,10 @@ final class AdminRoutesAccessTest extends AuthTestCase
         $device = $this->insert('fe_devices', [
             'tenant_id' => $this->tenant('immendingen')->id, 'identifier' => 'MA-01', 'device_type_id' => $type, 'location_id' => $vehicle, 'status' => 'ready',
         ]);
-        $placeholders = ['{code}' => $code, '{user}' => $user, '{type}' => $type, '{location}' => $location, '{device}' => $device];
+        $retired = $this->insert('fe_devices', [
+            'tenant_id' => $this->tenant('immendingen')->id, 'identifier' => 'MA-09', 'device_type_id' => $type, 'location_id' => $vehicle, 'status' => 'retired',
+        ]);
+        $placeholders = ['{code}' => $code, '{user}' => $user, '{type}' => $type, '{location}' => $location, '{device}' => $device, '{retired}' => $retired];
         $path = strtr($path, array_map('strval', $placeholders));
         // Platzhalter als ganzer Wert im Body werden zur ID (echte JSON-Ganzzahl).
         $body = $body === null ? null : array_map(static fn (mixed $v): mixed => is_string($v) ? ($placeholders[$v] ?? $v) : $v, $body);

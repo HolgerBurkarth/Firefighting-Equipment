@@ -353,9 +353,9 @@ curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" h
 
 ### Geräte
 
-Nur unter einer Stadt. Ansehen dürfen alle angemeldeten Konten der Stadt, anlegen und ändern nur
-Admins (`user`: 403). Fremde oder unbekannte IDs im Pfad: 404. Umbuchen, Status ändern, Aussondern
-und Wiederaufnehmen folgen in einem eigenen Schritt.
+Nur unter einer Stadt. Ansehen, umbuchen und den Status setzen dürfen alle angemeldeten Konten der
+Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehmen nur Admins
+(`user`: 403). Fremde oder unbekannte IDs im Pfad: 404.
 
 | Methode | Pfad                                  | Zugriff    | Antwort                                     |
 |---------|---------------------------------------|------------|---------------------------------------------|
@@ -364,6 +364,10 @@ und Wiederaufnehmen folgen in einem eigenen Schritt.
 | POST    | `api/v1/devices`                      | Admin      | 201 `{"device":…}`                          |
 | POST    | `api/v1/devices/{id}/fields`          | Admin      | `{"device":…}`                              |
 | POST    | `api/v1/devices/{id}/inspection-due`  | Admin      | `{"device":…}`                              |
+| POST    | `api/v1/devices/{id}/state`           | angemeldet | `{"device":…}`                              |
+| POST    | `api/v1/devices/{id}/retire`          | Admin      | `{"device":…}`                              |
+| POST    | `api/v1/devices/{id}/reinstate`       | Admin      | `{"device":…}`                              |
+| GET     | `api/v1/devices/{id}/events`          | angemeldet | `{"events":[…],"total":…,"limit":…,"offset":…}` |
 
 - Liste: je Gerät `id`, `identifier`, `device_type` (`id`, `name`), `location` (`id`, `name`,
   `path` wie „HLF 20 / G1“), `status` mit `status_label` (einsatzbereit, in Wartung, defekt,
@@ -394,20 +398,40 @@ und Wiederaufnehmen folgen in einem eigenen Schritt.
     `manufacturer`, `model`, `procured_on`, `note`; `null` leert ein optionales Feld) und optional
     `comment`. Je geändertem Feld ein Eintrag in der Historie mit demselben Kommentar.
   - `…/inspection-due`: `next_inspection_due` (Datum oder `null` zum Entfernen), optional `comment`.
+  - `…/state` (auch `user`): `location_id` (neuer Standort) und/oder `status` (`ready`,
+    `maintenance`, `defective`), optional `comment`. Umbuchung und Statusänderung ergeben EINEN
+    Eintrag in der Historie. Der neue Standort muss aktiv sein.
+  - `…/retire` (Admin): nur `version` und optional `comment`. Das Gerät ist danach ausgesondert,
+    erscheint nicht mehr in normalen Listen, und seine Kennung ist frei.
+  - `…/reinstate` (Admin): `status` (Pflicht, nicht `retired`), optional `location_id` (sonst der
+    bisherige Standort), `identifier` (neue Kennung, falls die alte inzwischen vergeben ist),
+    `device_type_id` (falls der bisherige Typ deaktiviert ist) und `comment`. Standort und Typ
+    müssen aktiv sein.
   - Jede Änderung erhöht `version` um 1. Ändert sich nichts (gleiche Werte), bleibt alles wie es
-    ist, auch die Version.
+    ist, auch die Version. Bei `…/state` und `…/reinstate` werden gleiche Teile (z. B. der aktuelle
+    Standort) einfach übergangen.
   - Ist die Version veraltet: 409 `version_conflict`, `details.device` enthält den aktuellen Stand.
-  - Ausgesonderte Geräte lassen sich nicht ändern (409 `rule_violation`).
+  - Ausgesonderte Geräte lassen sich nur wieder aufnehmen (alles andere 409 `rule_violation`).
+- Historie (`…/events`, auch für ausgesonderte Geräte): neueste zuerst, `limit`/`offset` wie bei der
+  Liste. Je Eintrag `type` mit `type_label` (z. B. „Umgebucht“, „Status geändert“, „Ausgesondert“,
+  „Wieder aufgenommen“, „Prüfdatum geändert“, „Stammdaten geändert“), `created_at` (UTC), `user`
+  (`id`, `name` = Anzeigename bzw. „Gelöschter Benutzer #ID“), `comment` sowie je nach Art
+  `location` (`from`/`to` mit `id`, `name`, `path`), `status` (`from`/`to` mit deutscher
+  Bezeichnung), `inspection_due` (`from`/`to`) und `field` (`name`, `label`, `old`, `new`); was die
+  Art nicht kennt, ist `null`. Standorte erscheinen mit ihrem heutigen Namen (nach dem Umbenennen
+  also mit dem neuen).
 
 | Fall                                                                    | Antwort                |
 |-------------------------------------------------------------------------|------------------------|
 | Feld fehlt, falscher Typ, unbekanntes Feld, Wert verletzt die Regeln    | 400 `invalid_request`  |
 | `device_type_id`/`location_id` im Body unbekannt oder aus anderer Stadt | 400 `invalid_request`  |
 | `…/fields` ohne Stammdaten, `status` oder `location_id` mitgesendet     | 400 `invalid_request`  |
+| `…/state` ohne `location_id` und `status`; `status` = `retired`         | 400 `invalid_request`  |
 | Parameter der Liste ungültig (z. B. `limit=500`, `status=kaputt`)       | 400 `invalid_request`  |
-| Kennung schon vergeben                                                  | 409 `identifier_taken` |
+| Kennung schon vergeben (auch beim Wiederaufnehmen)                      | 409 `identifier_taken` |
 | Version veraltet                                                        | 409 `version_conflict` |
 | Standort gesperrt, Gerätetyp deaktiviert, Gerät ausgesondert            | 409 `rule_violation`   |
+| Aussondern eines ausgesonderten, Wiederaufnahme eines nicht ausgesonderten Geräts | 409 `rule_violation` |
 
 Lokal ausprobieren (Admin angemeldet wie unter "Lokal starten"):
 
@@ -424,6 +448,17 @@ curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@fiel
 curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@due.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/inspection-due
 # Dieselbe Datei noch einmal: Version 2 ist jetzt veraltet → 409 version_conflict mit details.device
 curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@due.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/inspection-due
+# move.json:     {"version":3,"location_id":1,"status":"maintenance","comment":"Nach Einsatz zur Wartung"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@move.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/state
+# status.json:   {"version":4,"status":"defective"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@status.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/state
+# retire.json:   {"version":5,"comment":"Nicht mehr reparierbar"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@retire.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/retire
+# reinstate.json: {"version":6,"status":"ready","location_id":2,"comment":"Doch repariert"}
+#   Kennung inzwischen vergeben → 409 identifier_taken; dann mit neuer Kennung:
+#   {"version":6,"status":"ready","location_id":2,"identifier":"MA-01a"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@reinstate.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/reinstate
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/devices/1/events?limit=20&offset=0"
 ```
 
 Hinweis zum letzten Aufruf: Beim zweiten Senden ist das Datum unverändert, die Version wird aber

@@ -99,4 +99,41 @@ final class DeviceRuleViolationException extends DeviceException
             $identifier->value,
         ));
     }
+
+    public static function retiredNotMovable(DeviceIdentifier $identifier): self
+    {
+        return new self(sprintf(
+            'Das Gerät „%s“ ist ausgesondert; Standort und Status lassen sich erst nach der Wiederaufnahme ändern.',
+            $identifier->value,
+        ));
+    }
+
+    public static function alreadyRetired(DeviceIdentifier $identifier): self
+    {
+        return new self(sprintf('Das Gerät „%s“ ist bereits ausgesondert.', $identifier->value));
+    }
+
+    public static function notRetired(DeviceIdentifier $identifier): self
+    {
+        return new self(sprintf(
+            'Das Gerät „%s“ ist nicht ausgesondert und kann daher nicht wieder aufgenommen werden.',
+            $identifier->value,
+        ));
+    }
+
+    public static function reinstateLocationLocked(LocationName $location): self
+    {
+        return new self(sprintf(
+            'Der bisherige Standort „%s“ ist gesperrt; bitte beim Wiederaufnehmen einen aktiven Standort angeben (Feld "location_id").',
+            $location->value,
+        ));
+    }
+
+    public static function reinstateDeviceTypeInactive(DeviceTypeName $type): self
+    {
+        return new self(sprintf(
+            'Der Gerätetyp „%s“ ist deaktiviert; bitte beim Wiederaufnehmen einen aktiven Gerätetyp angeben (Feld "device_type_id") oder den Typ wieder aktivieren.',
+            $type->value,
+        ));
+    }
 }

@@ -9,6 +9,8 @@ use FirefightingEquipment\Device\DeviceDate;
 use FirefightingEquipment\Device\DeviceException;
 use FirefightingEquipment\Device\DeviceField;
 use FirefightingEquipment\Device\DeviceIdentifier;
+use FirefightingEquipment\Device\DeviceReinstatement;
+use FirefightingEquipment\Device\DeviceStateChange;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\DeviceText;
 use FirefightingEquipment\Device\NewDevice;
@@ -101,6 +103,54 @@ final class DeviceFields
     }
 
     /**
+     * POST devices/{id}/state: location_id und/oder status (nicht ausgesondert).
+     *
+     * @throws HttpException   400 invalid_request
+     * @throws DeviceException weder Standort noch Status
+     */
+    public static function stateChange(RequestContext $context): DeviceStateChange
+    {
+        self::rejectUnknown($context, ['version', 'location_id', 'status', 'comment']);
+
+        return new DeviceStateChange(
+            $context->optionalIntField('location_id', 1, self::MAX_ID),
+            self::serviceStatus($context, false),
+        );
+    }
+
+    /**
+     * POST devices/{id}/retire: nur version und comment; liefert den Kommentar.
+     *
+     * @throws HttpException   400 invalid_request
+     * @throws DeviceException
+     */
+    public static function retirementComment(RequestContext $context): ?string
+    {
+        self::rejectUnknown($context, ['version', 'comment']);
+
+        return self::comment($context);
+    }
+
+    /**
+     * POST devices/{id}/reinstate: Pflicht status (nicht ausgesondert), optional location_id,
+     * identifier (nicht leerbar) und device_type_id.
+     *
+     * @throws HttpException   400 invalid_request
+     * @throws DeviceException ungültige Kennung
+     */
+    public static function reinstatement(RequestContext $context): DeviceReinstatement
+    {
+        self::rejectUnknown($context, ['version', 'status', 'location_id', 'identifier', 'device_type_id', 'comment']);
+
+        return new DeviceReinstatement(
+            self::serviceStatus($context, true) ?? throw new \LogicException('Status fehlt.'),
+            $context->optionalIntField('location_id', 1, self::MAX_ID),
+            $context->hasField('identifier') ? DeviceIdentifier::fromString($context->stringField('identifier')) : null,
+            $context->optionalIntField('device_type_id', 1, self::MAX_ID),
+        );
+    }
+
+    /**
      * Erwartete Version (Pflicht bei Änderungen).
      *
      * @throws HttpException 400 invalid_request
@@ -135,6 +185,29 @@ final class DeviceFields
             'Das Feld "status" muss einer der Werte %s sein.',
             implode(', ', array_map(static fn (DeviceStatus $s): string => sprintf('"%s"', $s->value), DeviceStatus::cases())),
         ));
+    }
+
+    /**
+     * Status im Dienst (nicht ausgesondert; dafür gibt es POST devices/{id}/retire).
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    private static function serviceStatus(RequestContext $context, bool $required): ?DeviceStatus
+    {
+        $value = $required ? $context->stringField('status') : $context->optionalStringField('status');
+        if ($value === null) {
+            return null;
+        }
+        $status = DeviceStatus::tryFrom($value);
+        if ($status === null || $status === DeviceStatus::Retired) {
+            $allowed = array_filter(DeviceStatus::cases(), static fn (DeviceStatus $s): bool => $s !== DeviceStatus::Retired);
+            throw HttpException::invalidRequest(sprintf(
+                'Das Feld "status" muss einer der Werte %s sein (Aussondern über POST devices/{id}/retire).',
+                implode(', ', array_map(static fn (DeviceStatus $s): string => sprintf('"%s"', $s->value), $allowed)),
+            ));
+        }
+
+        return $status;
     }
 
     /**

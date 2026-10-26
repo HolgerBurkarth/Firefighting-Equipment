@@ -18,6 +18,7 @@ abstract class DeviceApiTestCase extends AuthTestCase
 
     protected int $tenantId;
     protected int $adminId;
+    protected int $userId;
     protected int $typeId;
     protected int $hlf;
     protected int $g1;
@@ -42,7 +43,7 @@ abstract class DeviceApiTestCase extends AuthTestCase
         $this->otherLocation = $this->createLocation($this->otherTenantId, ['name' => 'HLF 20']);
 
         $this->adminId = $this->account('immendingen', 'admin@example.org', ['role' => 'admin']);
-        $this->account('immendingen', 'user@example.org');
+        $this->userId = $this->account('immendingen', 'user@example.org');
         $this->admin = $this->loginCookie('immendingen', 'admin@example.org');
         $this->user = $this->loginCookie('immendingen', 'user@example.org');
     }
@@ -79,6 +80,26 @@ abstract class DeviceApiTestCase extends AuthTestCase
         $stmt->execute([$deviceId]);
 
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Ereignis aus events() in Kurzform.
+     *
+     * @param array<string, mixed> $event
+     *
+     * @return list<mixed> Art, Benutzer, Standort von/nach, Status von/nach, Kommentar
+     */
+    protected static function state(array $event): array
+    {
+        return [
+            $event['event_type'],
+            (int) $event['user_id'],
+            $event['from_location_id'] === null ? null : (int) $event['from_location_id'],
+            $event['to_location_id'] === null ? null : (int) $event['to_location_id'],
+            $event['from_status'],
+            $event['to_status'],
+            $event['comment'],
+        ];
     }
 
     /**

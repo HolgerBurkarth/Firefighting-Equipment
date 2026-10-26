@@ -15,7 +15,8 @@ use FirefightingEquipment\Tenant\Tenant;
  *
  * Sperren gegen gleichzeitige Änderungen (siehe LocationRepository): Ziel-Standort und Gerätetyp
  * werden mit LOCK IN SHARE MODE gelesen und erst dann auf active geprüft, bevor das Gerät
- * geschrieben wird. Änderungen sperren zuerst das Gerät (FOR UPDATE), dann ggf. den Gerätetyp.
+ * geschrieben wird (Anlegen, Umbuchen, Wiederaufnehmen). Änderungen sperren zuerst das Gerät
+ * (FOR UPDATE), dann ggf. den Ziel-Standort, dann ggf. den Gerätetyp.
  */
 final readonly class DeviceRepository
 {
@@ -94,11 +95,7 @@ final readonly class DeviceRepository
     public function create(Tenant $tenant, int $userId, NewDevice $device, ?string $comment): Device
     {
         return $this->transaction(function () use ($tenant, $userId, $device, $comment): int {
-            $location = $this->lockLocation($tenant, $device->locationId)
-                ?? throw new InvalidDeviceValueException('Der Standort wurde nicht gefunden.');
-            if ((int) $location['active'] !== 1) {
-                throw DeviceRuleViolationException::locationLocked(LocationName::fromString((string) $location['name']));
-            }
+            $this->lockActiveLocation($tenant, $device->locationId);
             $this->lockActiveDeviceType($tenant, $device->deviceTypeId);
 
             try {
@@ -145,6 +142,9 @@ final readonly class DeviceRepository
     {
         return $this->transaction(function () use ($tenant, $userId, $id, $expectedVersion, $changes, $comment): int {
             $current = $this->lockForChange($tenant, $id, $expectedVersion);
+            if ($current->isRetired()) {
+                throw DeviceRuleViolationException::deviceRetired($current->identifier);
+            }
 
             /** @var array<string, array{?string, ?string, int|string|null}> $changed Feld => [alt, neu, Spaltenwert] */
             $changed = [];
@@ -198,6 +198,9 @@ final readonly class DeviceRepository
     {
         return $this->transaction(function () use ($tenant, $userId, $id, $expectedVersion, $due, $comment): int {
             $current = $this->lockForChange($tenant, $id, $expectedVersion);
+            if ($current->isRetired()) {
+                throw DeviceRuleViolationException::deviceRetired($current->identifier);
+            }
             if ($current->nextInspectionDue?->value === $due?->value) {
                 return $id;
             }
@@ -211,11 +214,158 @@ final readonly class DeviceRepository
     }
 
     /**
-     * Sperrt das Gerät (FOR UPDATE) und prüft Version und Status (in dieser Reihenfolge).
+     * Bucht um und/oder ändert den Status (nie auf ausgesondert): ein Ereignis state_changed mit den
+     * Paaren, die sich ändern; die Version steigt einmal. Gleicher Standort bzw. Status wird
+     * ignoriert; ändert sich nichts, bleibt alles unverändert (auch die Version). Der Ziel-Standort
+     * wird nur bei einem Wechsel gelesen (LOCK IN SHARE MODE) und muss aktiv sein.
      *
      * @throws DeviceNotFoundException
      * @throws DeviceVersionConflictException
-     * @throws DeviceRuleViolationException   ausgesondert
+     * @throws DeviceRuleViolationException   ausgesondert, Ziel-Standort gesperrt
+     * @throws InvalidDeviceValueException    Ziel-Standort unbekannt oder fremd
+     */
+    public function changeState(Tenant $tenant, int $userId, int $id, int $expectedVersion, DeviceStateChange $change, ?string $comment): Device
+    {
+        return $this->transaction(function () use ($tenant, $userId, $id, $expectedVersion, $change, $comment): int {
+            $current = $this->lockForChange($tenant, $id, $expectedVersion);
+            if ($current->isRetired()) {
+                throw DeviceRuleViolationException::retiredNotMovable($current->identifier);
+            }
+
+            $locationId = $change->locationId ?? $current->locationId;
+            $status = $change->status ?? $current->status;
+            if ($locationId === $current->locationId && $status === $current->status) {
+                return $id;
+            }
+            if ($locationId !== $current->locationId) {
+                $this->lockActiveLocation($tenant, $locationId);
+            }
+            $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment);
+
+            return $id;
+        }, $tenant);
+    }
+
+    /**
+     * Sondert ein Gerät aus (Status retired, Ereignis state_changed). Standort und Prüfdatum bleiben
+     * gespeichert; die Kennung wird frei (identifier_key NULL).
+     *
+     * @throws DeviceNotFoundException
+     * @throws DeviceVersionConflictException
+     * @throws DeviceRuleViolationException   bereits ausgesondert
+     */
+    public function retire(Tenant $tenant, int $userId, int $id, int $expectedVersion, ?string $comment): Device
+    {
+        return $this->transaction(function () use ($tenant, $userId, $id, $expectedVersion, $comment): int {
+            $current = $this->lockForChange($tenant, $id, $expectedVersion);
+            if ($current->isRetired()) {
+                throw DeviceRuleViolationException::alreadyRetired($current->identifier);
+            }
+            $this->applyState($tenant, $userId, $current, $current->locationId, DeviceStatus::Retired, [], $comment);
+
+            return $id;
+        }, $tenant);
+    }
+
+    /**
+     * Nimmt ein ausgesondertes Gerät wieder auf: neuer Status; Standort (angegeben oder bisheriger)
+     * und Gerätetyp (angegeben oder bisheriger) werden mit LOCK IN SHARE MODE gelesen und müssen
+     * aktiv sein. Optional neue Kennung bzw. neuer Gerätetyp: je geändertem Feld ein Ereignis
+     * field_changed, danach state_changed (alle mit demselben Kommentar); die Version steigt einmal.
+     * Gleiche Werte werden ignoriert. Ist die Kennung inzwischen vergeben, entscheidet der
+     * UNIQUE-Index (Fehler 1062).
+     *
+     * @throws DeviceNotFoundException
+     * @throws DeviceVersionConflictException
+     * @throws DeviceRuleViolationException       nicht ausgesondert, Standort gesperrt, Gerätetyp deaktiviert
+     * @throws InvalidDeviceValueException        Standort oder Gerätetyp unbekannt oder fremd
+     * @throws DuplicateDeviceIdentifierException
+     */
+    public function reinstate(Tenant $tenant, int $userId, int $id, int $expectedVersion, DeviceReinstatement $reinstatement, ?string $comment): Device
+    {
+        return $this->transaction(function () use ($tenant, $userId, $id, $expectedVersion, $reinstatement, $comment): int {
+            $current = $this->lockForChange($tenant, $id, $expectedVersion);
+            if (!$current->isRetired()) {
+                throw DeviceRuleViolationException::notRetired($current->identifier);
+            }
+
+            $locationId = $reinstatement->locationId ?? $current->locationId;
+            if ($locationId !== $current->locationId) {
+                $this->lockActiveLocation($tenant, $locationId);
+            } else {
+                $location = $this->lockLocation($tenant, $locationId) ?? throw new \LogicException('Standort des Geräts fehlt.');
+                if ((int) $location['active'] !== 1) {
+                    throw DeviceRuleViolationException::reinstateLocationLocked(LocationName::fromString((string) $location['name']));
+                }
+            }
+
+            /** @var array<string, array{?string, ?string, int|string|null}> $changed Feld => [alt, neu, Spaltenwert] */
+            $changed = [];
+            $identifier = $reinstatement->identifier;
+            if ($identifier !== null && $identifier->value !== $current->identifier->value) {
+                $changed[DeviceField::Identifier->value] = [$current->identifier->value, $identifier->value, $identifier->value];
+            }
+            $typeId = $reinstatement->deviceTypeId ?? $current->deviceTypeId;
+            if ($typeId !== $current->deviceTypeId) {
+                $changed[DeviceField::DeviceType->value] = [$current->deviceTypeName, $this->lockActiveDeviceType($tenant, $typeId), $typeId];
+            } else {
+                [$typeName, $active] = $this->lockDeviceType($tenant, $typeId);
+                if (!$active) {
+                    throw DeviceRuleViolationException::reinstateDeviceTypeInactive(DeviceTypeName::fromString($typeName));
+                }
+            }
+
+            try {
+                $this->applyState($tenant, $userId, $current, $locationId, $reinstatement->status, $changed, $comment);
+            } catch (\PDOException $e) {
+                if (!self::isDuplicate($e)) {
+                    throw $e;
+                }
+                throw $identifier !== null && isset($changed[DeviceField::Identifier->value])
+                    ? DuplicateDeviceIdentifierException::forIdentifier($identifier)
+                    : DuplicateDeviceIdentifierException::onReinstatement($current->identifier);
+            }
+
+            return $id;
+        }, $tenant);
+    }
+
+    /**
+     * Schreibt Standort, Status und ggf. Stammdaten in einem UPDATE (Version + 1), danach je Feld ein
+     * Ereignis field_changed und zuletzt state_changed mit den Paaren, die sich ändern.
+     *
+     * @param array<string, array{?string, ?string, int|string|null}> $fields Feld => [alt, neu, Spaltenwert]
+     */
+    private function applyState(Tenant $tenant, int $userId, Device $current, int $locationId, DeviceStatus $status, array $fields, ?string $comment): void
+    {
+        $set = implode('', array_map(static fn (string $f): string => ', ' . self::COLUMNS[$f] . ' = ?', array_keys($fields)));
+        $this->pdo->prepare('UPDATE fe_devices SET location_id = ?, status = ?' . $set . ', version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?')
+            ->execute([$locationId, $status->value, ...array_column($fields, 2), $current->id, $tenant->id]);
+
+        $events = new DeviceEventWriter($this->pdo);
+        foreach ($fields as $field => [$old, $new]) {
+            $events->fieldChanged($tenant, $current->id, $userId, DeviceField::from($field), $old, $new, $comment);
+        }
+        $moved = $locationId !== $current->locationId;
+        $statusChanged = $status !== $current->status;
+        $events->stateChanged(
+            $tenant,
+            $current->id,
+            $userId,
+            $moved ? $current->locationId : null,
+            $moved ? $locationId : null,
+            $statusChanged ? $current->status : null,
+            $statusChanged ? $status : null,
+            $comment,
+        );
+    }
+
+    /**
+     * Sperrt das Gerät (FOR UPDATE) und prüft die Version. Ob das Gerät ausgesondert sein darf,
+     * prüft danach die jeweilige Änderung.
+     *
+     * @throws DeviceNotFoundException
+     * @throws DeviceVersionConflictException
      */
     private function lockForChange(Tenant $tenant, int $id, int $expectedVersion): Device
     {
@@ -229,9 +379,6 @@ final readonly class DeviceRepository
         $current = $this->find($tenant, $id) ?? throw DeviceNotFoundException::forId($id);
         if ($current->version !== $expectedVersion) {
             throw new DeviceVersionConflictException($current);
-        }
-        if ($current->isRetired()) {
-            throw DeviceRuleViolationException::deviceRetired($current->identifier);
         }
 
         return $current;
@@ -259,17 +406,44 @@ final readonly class DeviceRepository
      */
     private function lockActiveDeviceType(Tenant $tenant, int $typeId): string
     {
+        [$name, $active] = $this->lockDeviceType($tenant, $typeId);
+        if (!$active) {
+            throw DeviceRuleViolationException::deviceTypeInactive(DeviceTypeName::fromString($name));
+        }
+
+        return $name;
+    }
+
+    /**
+     * @return array{string, bool} [Name, aktiv]
+     *
+     * @throws InvalidDeviceValueException unbekannt oder fremd
+     */
+    private function lockDeviceType(Tenant $tenant, int $typeId): array
+    {
         $stmt = $this->pdo->prepare('SELECT name, active FROM fe_device_types WHERE id = ? AND tenant_id = ? LOCK IN SHARE MODE');
         $stmt->execute([$typeId, $tenant->id]);
         $type = $stmt->fetch();
         if (!is_array($type)) {
             throw new InvalidDeviceValueException('Der Gerätetyp wurde nicht gefunden.');
         }
-        if ((int) $type['active'] !== 1) {
-            throw DeviceRuleViolationException::deviceTypeInactive(DeviceTypeName::fromString((string) $type['name']));
-        }
 
-        return (string) $type['name'];
+        return [(string) $type['name'], (int) $type['active'] === 1];
+    }
+
+    /**
+     * Ziel-Standort (LOCK IN SHARE MODE), muss aktiv sein.
+     *
+     * @throws InvalidDeviceValueException  unbekannt oder fremd
+     * @throws DeviceRuleViolationException gesperrt
+     */
+    private function lockActiveLocation(Tenant $tenant, int $locationId): void
+    {
+        $location = $this->lockLocation($tenant, $locationId)
+            ?? throw new InvalidDeviceValueException('Der Standort wurde nicht gefunden.');
+        if ((int) $location['active'] !== 1) {
+            throw DeviceRuleViolationException::locationLocked(LocationName::fromString((string) $location['name']));
+        }
     }
 
     /**

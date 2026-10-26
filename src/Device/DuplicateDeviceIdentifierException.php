@@ -17,4 +17,15 @@ final class DuplicateDeviceIdentifierException extends DeviceException
             $identifier->value,
         ));
     }
+
+    /**
+     * Wiederaufnahme ohne neue Kennung, die alte ist inzwischen an ein anderes Gerät vergeben.
+     */
+    public static function onReinstatement(DeviceIdentifier $identifier): self
+    {
+        return new self(sprintf(
+            'Die Kennung „%s“ ist inzwischen an ein anderes Gerät vergeben. Bitte beim Wiederaufnehmen eine neue Kennung angeben (Feld "identifier").',
+            $identifier->value,
+        ));
+    }
 }

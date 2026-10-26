@@ -611,8 +611,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 ## Standorte und Geräte
 - Stand: Schema (Migrationen `0011`–`0015`), Start-Gerätetypen neuer Städte, die API für
   Gerätetypen und Standorte (siehe "Gerätetypen und Standorte (API)") und für Geräte (anlegen,
-  Stammdaten, Prüfdatum, Liste, Einzelansicht; siehe "Geräte (API)"); Umbuchen, Status,
-  Aussondern/Wiederaufnehmen, Anzeige der Historie und CSV folgen. Schema-Tests in `tests/Integration/Device/` (`DeviceSchemaTestCase`), Zeilen per SQL über
+  Stammdaten, Prüfdatum, Liste, Einzelansicht, Umbuchen/Status, Aussondern/Wiederaufnehmen,
+  Historie; siehe "Geräte (API)"); Übersicht der Fälligkeiten und CSV folgen. Schema-Tests in
+  `tests/Integration/Device/` (`DeviceSchemaTestCase`), Zeilen per SQL über
   den Trait `DeviceRows` (auch in API-Tests auf Basis von `AuthTestCase`).
 - Rechte: `user` darf ansehen, umbuchen, Status setzen (einsatzbereit, in Wartung, defekt) und CSV
   exportieren. `admin` zusätzlich: aussondern und wieder aufnehmen, Prüfdatum ("nächste Prüfung
@@ -708,21 +709,26 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   mit `LOCK IN SHARE MODE` und prüft dann `active`; `lock` sperrt ihn mit `FOR UPDATE` und zählt erst
   danach (erste nicht sperrende Abfrage der Transaktion, sieht also den Stand nach der Sperre).
   Reihenfolge immer übergeordneter vor untergeordnetem Standort. Regel für die Geräte-API:
-  Anlegen (umgesetzt), Umbuchen, Wiederaufnehmen und Import lesen den Ziel-Standort (und den
-  Gerätetyp) mit `LOCK IN SHARE MODE` und lehnen gesperrte bzw. deaktivierte ab, bevor das Gerät
-  geschrieben wird.
+  Anlegen, Umbuchen und Wiederaufnehmen (umgesetzt, per Test mit zweiter Verbindung gesichert:
+  `DeviceLocationLockingTest`) sowie künftig der Import lesen den Ziel-Standort (und den Gerätetyp)
+  mit `LOCK IN SHARE MODE` und lehnen gesperrte bzw. deaktivierte ab, bevor das Gerät geschrieben
+  wird. Aussondern liest keinen Standort (es leert ihn nur).
 
 ## Geräte (API)
 - Nur unter Städten (unter `service` 404). Lesen `Access::Authenticated`, Ändern `Access::Admin`
-  (Routen in `AdminRoutesAccessTest` bzw. `TenantReadRoutesAccessTest`). Code in `src/Device/`
-  (`DeviceIdentifier`, `DeviceStatus` mit `label()`, `DeviceDate`, `DeviceText`, `DeviceField`,
-  `Device`, `NewDevice`, `DeviceChanges`, `DeviceFilter`, `DeviceSort`, `DevicePage`,
-  `DeviceRepository`, `DeviceEventWriter`; Fehler `DeviceNotFoundException`,
+  (Routen in `AdminRoutesAccessTest` bzw. `TenantReadRoutesAccessTest`); einzige Ausnahme:
+  `POST devices/{id}/state` ist `Access::Authenticated` (`user` bucht um und setzt den Status;
+  Rechte in `DeviceStateTest::testOnlyAccountsOfOwnTenant`). Code in `src/Device/`
+  (`DeviceIdentifier`, `DeviceStatus` mit `label()`, `DeviceDate`, `DeviceText`, `DeviceField` mit
+  `label()`, `Device`, `NewDevice`, `DeviceChanges`, `DeviceStateChange`, `DeviceReinstatement`,
+  `DeviceFilter`, `DeviceSort`, `DevicePage`, `DeviceRepository`, `DeviceEventWriter`; Historie
+  lesen: `DeviceEventRepository` (nur lesend), `DeviceEvent`, `DeviceEventType`,
+  `DeviceEventLocation`, `DeviceEventPage`; Fehler `DeviceNotFoundException`,
   `DuplicateDeviceIdentifierException`, `DeviceVersionConflictException`, dazu
   `DeviceRuleViolationException`), Endpunkte in `src/Api/V1/Devices/` (`DeviceListHandler`,
-  `DeviceActionHandler` mit `DeviceAction`, `DeviceFields` liest die Bodys, `DeviceJson`),
-  Fehlerumsetzung in `DeviceErrors`. Tests in `tests/Integration/Device/` auf Basis von
-  `DeviceApiTestCase`.
+  `DeviceActionHandler` mit `DeviceAction`, `DeviceFields` liest die Bodys, `DeviceJson`,
+  `DeviceEventListHandler`, `DeviceEventJson`), Fehlerumsetzung in `DeviceErrors`. Tests in
+  `tests/Integration/Device/` auf Basis von `DeviceApiTestCase`.
 - `GET devices`: Parameter `device_type_id`, `location_id`, `include_sublocations=1` (nur mit
   `location_id`, sonst 400), `status` (kommagetrennt; nennt er `retired`, erscheinen ausgesonderte),
   `include_retired=1` (ohne `status`: alle Status), `q` (`LIKE` auf Kennung, Seriennummer,
@@ -749,13 +755,43 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   und ohne neue Version.
 - `POST devices/{id}/inspection-due {version, next_inspection_due, comment?}` (`null` = entfernen):
   `due_changed`, Version + 1; gleiches Datum wie oben ohne Änderung.
-- Unbekannte Felder im Body der drei ändernden Routen → 400 (z. B. `status` oder `location_id` bei
+- `POST devices/{id}/state {version, location_id?, status?, comment?}` (angemeldet): mindestens eines
+  von beiden (sonst 400); `status` nur `ready`, `maintenance`, `defective` (`retired` → 400, dafür
+  `retire`). Gleicher Standort bzw. Status wird ignoriert; ändert sich insgesamt nichts, 200 ohne
+  Ereignis und ohne neue Version. Ziel-Standort nur bei einem Wechsel gelesen: unbekannt oder fremd
+  → 400, gesperrt → 409. Ausgesondert → 409. Sonst EIN `state_changed` mit den Paaren, die sich
+  ändern, Version + 1.
+- `POST devices/{id}/retire {version, comment?}` (Admin): bereits ausgesondert → 409; sonst Status
+  `retired`, `state_changed` (nur Status), Version + 1. Standort und Prüfdatum bleiben gespeichert,
+  die Kennung wird frei (`identifier_key` `NULL`).
+- `POST devices/{id}/reinstate {version, status, location_id?, identifier?, device_type_id?,
+  comment?}` (Admin): nur ausgesonderte (sonst 409); `status` Pflicht, nicht `retired`. Standort:
+  angegeben oder der bisherige, `LOCK IN SHARE MODE`, gesperrt → 409 (beim bisherigen mit Hinweis auf
+  `location_id`), unbekannt/fremd → 400. Gerätetyp: angegeben oder der bisherige, ebenso gelesen,
+  deaktiviert → 409 (beim bisherigen mit Hinweis auf `device_type_id`). `identifier` (nicht leerbar)
+  und `device_type_id` ändern Stammdaten nur hier ausnahmsweise bei einem ausgesonderten Gerät;
+  gleiche Werte werden ignoriert. Je geändertem Feld ein `field_changed`, danach ein `state_changed`
+  (gemeinsamer Kommentar, eine Transaktion), Version einmal + 1. Kennung inzwischen vergeben
+  (UNIQUE-Index, Fehler 1062) → 409 `identifier_taken` mit Hinweis, eine neue Kennung anzugeben.
+- `GET devices/{id}/events` (angemeldet, auch ausgesonderte; fremd/unbekannt 404): neueste zuerst
+  (nach `id`), `limit` 1–200 (Standard 50), `offset` 0–1000000; Antwort `{events, total, limit,
+  offset}`. Je Eintrag immer `id`, `type`, `type_label`, `created_at`, `user {id, name}`
+  (Anzeigename, sonst Name; anonymisiert „Gelöschter Benutzer #ID“; nie die E-Mail), `comment`,
+  `location {from, to}` (je `{id, name, path}` oder `null`), `status {from, from_label, to,
+  to_label}`, `inspection_due {from, to}`, `field {name, label, old, new}`; was die Art nicht kennt,
+  ist `null`. `type_label` bei `state_changed` nach Inhalt: „Ausgesondert“, „Wieder aufgenommen“,
+  „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“; sonst „Angelegt“, „Importiert“,
+  „Prüfdatum geändert“, „Stammdaten geändert“. Standorte erscheinen mit ihrem aktuellen Namen und
+  Pfad (die Historie speichert nur die ID; nach dem Umbenennen steht dort der neue Name; bewusst so
+  in Version 1, Namen zum Zeitpunkt bräuchten eine Migration).
+- Unbekannte Felder im Body der ändernden Routen → 400 (z. B. `status` oder `location_id` bei
   `fields`, damit nichts still ignoriert wird). Felder werden vor der Suche gelesen (400 vor 404).
-- Reihenfolge der Prüfung beim Ändern (`DeviceRepository::lockForChange`): Gerät `FOR UPDATE`
-  (unbekannt/fremd 404) → Version (veraltet: 409 `version_conflict`, `details: {"device": …}` mit dem
-  aktuellen Stand, nichts geschrieben; auch wenn sich nichts ändern würde) → ausgesondert (409
-  `rule_violation`, gilt für Stammdaten und Prüfdatum) → neuer Gerätetyp `LOCK IN SHARE MODE`, aktiv
-  (ein schon zugeordneter deaktivierter Typ darf bleiben).
+- Reihenfolge der Prüfung beim Ändern: Gerät `FOR UPDATE` (unbekannt/fremd 404) → Version
+  (`DeviceRepository::lockForChange`; veraltet: 409 `version_conflict`, `details: {"device": …}` mit
+  dem aktuellen Stand, nichts geschrieben; auch wenn sich nichts ändern würde) → ausgesondert (409
+  `rule_violation`; bei `reinstate` umgekehrt: nicht ausgesondert) → ggf. Ziel-Standort → ggf.
+  Gerätetyp, beide `LOCK IN SHARE MODE` und aktiv (bei `fields` darf ein schon zugeordneter
+  deaktivierter Typ bleiben).
 - Texte (`DeviceText`): getrimmt, leer → `NULL`, Seriennummer/Hersteller/Modell höchstens 100,
   Notiz 1000 (Zeilenumbrüche erlaubt, als LF gespeichert), Kommentar 500 (einzeilig). Keine
   Steuerzeichen. Datum (`DeviceDate`): genau `JJJJ-MM-TT`, gültiger Kalendertag, 1950-01-01 bis

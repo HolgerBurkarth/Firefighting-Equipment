@@ -29,6 +29,28 @@ final readonly class DeviceEventWriter
     }
 
     /**
+     * Umbuchung und/oder Statusänderung in einem Eintrag (auch Aussondern und Wiederaufnehmen): je
+     * Paar beide Werte (verschieden) oder keiner, mindestens ein Paar (chk_fe_device_events_state).
+     */
+    public function stateChanged(
+        Tenant $tenant,
+        int $deviceId,
+        int $userId,
+        ?int $fromLocationId,
+        ?int $toLocationId,
+        ?DeviceStatus $fromStatus,
+        ?DeviceStatus $toStatus,
+        ?string $comment,
+    ): void {
+        $this->insert($tenant, $deviceId, $userId, 'state_changed', [
+            'from_location_id' => $fromLocationId,
+            'to_location_id' => $toLocationId,
+            'from_status' => $fromStatus?->value,
+            'to_status' => $toStatus?->value,
+        ], $comment);
+    }
+
+    /**
      * Ein Stammdatenfeld geändert; Werte als Text (beim Gerätetyp der Name), null = leer.
      */
     public function fieldChanged(Tenant $tenant, int $deviceId, int $userId, DeviceField $field, ?string $old, ?string $new, ?string $comment): void
