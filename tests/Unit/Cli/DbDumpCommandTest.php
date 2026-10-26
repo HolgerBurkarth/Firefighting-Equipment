@@ -7,6 +7,8 @@ namespace FirefightingEquipment\Tests\Unit\Cli;
 use FirefightingEquipment\Backup\BackupDirectory;
 use FirefightingEquipment\Backup\BackupException;
 use FirefightingEquipment\Backup\BackupFileName;
+use FirefightingEquipment\Backup\BackupResult;
+use FirefightingEquipment\Backup\DatabaseBackup;
 use FirefightingEquipment\Backup\DatabaseDumper;
 use FirefightingEquipment\Backup\MysqlDefaultsFile;
 use FirefightingEquipment\Cli\DbDumpCommand;
@@ -23,6 +25,8 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(BackupDirectory::class)]
 #[UsesClass(BackupException::class)]
 #[UsesClass(BackupFileName::class)]
+#[UsesClass(BackupResult::class)]
+#[UsesClass(DatabaseBackup::class)]
 #[UsesClass(ConfigLoader::class)]
 #[UsesClass(ConfigException::class)]
 #[UsesClass(DatabaseConfig::class)]

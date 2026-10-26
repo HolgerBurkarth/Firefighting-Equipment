@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Cli;
 
+use FirefightingEquipment\Backup\BackupException;
+use FirefightingEquipment\Backup\DatabaseBackup;
 use FirefightingEquipment\Config\ConfigException;
 use FirefightingEquipment\Config\ConfigLoader;
 use FirefightingEquipment\Database\ConnectionException;
 use FirefightingEquipment\Database\ConnectionFactory;
+use FirefightingEquipment\Database\DatabaseConfig;
 use FirefightingEquipment\Database\DatabaseError;
+use FirefightingEquipment\Device\DeviceDataCounts;
+use FirefightingEquipment\Device\TenantDeviceDataPurge;
 use FirefightingEquipment\Http\AppUrls;
 use FirefightingEquipment\Http\ErrorReporter;
 use FirefightingEquipment\Mail\AdminInvitationMail;
@@ -30,7 +35,10 @@ use FirefightingEquipment\User\UserStatus;
 
 /**
  * Kommandozeile für Städte (bin/tenant.php). Kein Umbenennen des Kürzels (nur des Namens), kein
- * Löschen. invite-admin ist der Notfallweg für Einladungen ohne API (z. B. ohne Super-Admin-Zugang).
+ * Löschen einer Stadt. invite-admin ist der Notfallweg für Einladungen ohne API (z. B. ohne
+ * Super-Admin-Zugang). purge-device-data ist die bewusste Ausnahme von "Geräte nie löschen": Es
+ * entfernt Geräte, Historie und Standorte einer Stadt ohne echte Daten (z. B. Testdaten vor der
+ * Erstbefüllung), nur mit --execute und --confirm=KÜRZEL und erst nach einer Datenbanksicherung.
  */
 final readonly class TenantCommand
 {
@@ -47,6 +55,8 @@ final readonly class TenantCommand
           php bin/tenant.php activate --slug=KÜRZEL [--config=PFAD]              Stadt entsperren
           php bin/tenant.php invite-admin --slug=KÜRZEL --email=ADRESSE [--print-link] [--config=PFAD]
                                                                                  Admin einladen
+          php bin/tenant.php purge-device-data --slug=KÜRZEL [--execute --confirm=KÜRZEL] [--config=PFAD]
+                                                                                 Gerätedaten löschen
 
         Kürzel: Kleinbuchstaben a-z, Ziffern und Bindestrich, höchstens 50 Zeichen;
         nach dem Anlegen unveränderlich. "service" ist reserviert.
@@ -55,12 +65,20 @@ final readonly class TenantCommand
         (24 Stunden gültig); für eine offene Einladung wird der Link erneuert. --print-link
         zeigt den Link zusätzlich an (Notfall, z. B. wenn keine Mail ankommt): nur an die
         eingeladene Person weitergeben.
+        purge-device-data löscht ALLE Geräte, Ereignisse (Historie) und Standorte der Stadt; nur
+        für Städte ohne echte Daten (z. B. Testdaten vor der Erstbefüllung). Ohne --execute nur
+        Probelauf (zeigt die Anzahlen). Mit --execute muss --confirm genau dem Kürzel entsprechen;
+        vorher wird die Datenbank gesichert (Zusatz vor-purge-KÜRZEL, Abbruch bei Fehler).
+        Gerätetypen, Benutzer, Einladungscodes, Sitzungen und die Stadt selbst bleiben.
         Standard-Konfiguration: config/config.local.php
         Auf dem Server immer php85 statt php verwenden.
 
         TXT;
 
-    private const array COMMANDS = ['list', 'create', 'rename', 'deactivate', 'activate', 'invite-admin'];
+    private const array COMMANDS = ['list', 'create', 'rename', 'deactivate', 'activate', 'invite-admin', 'purge-device-data'];
+
+    /** Zusatz im Namen der Sicherung vor purge-device-data (+ Kürzel, zusammen höchstens 60 Zeichen). */
+    public const string PURGE_BACKUP_SUFFIX_PREFIX = 'vor-purge-';
 
     private ErrorReporter $errors;
 
@@ -75,6 +93,15 @@ final readonly class TenantCommand
         /** null = laut Konfiguration (--config); andere nur für Tests. */
         private ?Mailer $mailer = null,
         ?ErrorReporter $errors = null,
+        /**
+         * Sicherung vor purge-device-data: (Konfiguration, Zusatz) → Pfad, Fehler als
+         * BackupException. null = DatabaseBackup im Ordner $backupDir; andere nur für Tests.
+         *
+         * @var (\Closure(DatabaseConfig, string): string)|null
+         */
+        private ?\Closure $backup = null,
+        /** Wie bei bin/db-dump.php: ~/htdocs/apps/_backup neben dem Projektordner. */
+        private string $backupDir = __DIR__ . '/../../../_backup',
     ) {
         $this->errors = $errors ?? new ErrorReporter();
     }
@@ -116,8 +143,9 @@ final readonly class TenantCommand
                 'deactivate' => $this->setActive($repository, self::required($slug), false),
                 'activate' => $this->setActive($repository, self::required($slug), true),
                 'invite-admin' => $this->inviteAdmin($pdo, self::required($slug), self::required($email), $options['print_link'], $configPath),
+                'purge-device-data' => $this->purgeDeviceData($pdo, $config, self::required($slug), $options['execute']),
             };
-        } catch (ConfigException | ConnectionException | TenantException | UserException $e) {
+        } catch (BackupException | ConfigException | ConnectionException | TenantException | UserException $e) {
             fwrite($this->err, 'FEHLER: ' . $e->getMessage() . PHP_EOL);
 
             return self::EXIT_ERROR;
@@ -133,19 +161,20 @@ final readonly class TenantCommand
     /**
      * @param list<string> $args
      *
-     * @return array{command: 'list'|'create'|'rename'|'deactivate'|'activate'|'invite-admin'|'help', slug: ?string, name: ?string, email: ?string, config: ?string, print_link: bool}
+     * @return array{command: 'list'|'create'|'rename'|'deactivate'|'activate'|'invite-admin'|'purge-device-data'|'help', slug: ?string, name: ?string, email: ?string, config: ?string, confirm: ?string, print_link: bool, execute: bool}
      *
      * @throws \InvalidArgumentException bei falschem Aufruf
      */
     public static function parseArguments(array $args): array
     {
         $command = null;
-        $values = ['slug' => null, 'name' => null, 'email' => null, 'config' => null];
+        $values = ['slug' => null, 'name' => null, 'email' => null, 'config' => null, 'confirm' => null];
         $printLink = false;
+        $execute = false;
 
         foreach ($args as $arg) {
             if ($arg === '--help' || $arg === '-h' || $arg === 'help') {
-                return ['command' => 'help', 'slug' => null, 'name' => null, 'email' => null, 'config' => null, 'print_link' => false];
+                return ['command' => 'help', 'slug' => null, 'name' => null, 'email' => null, 'config' => null, 'confirm' => null, 'print_link' => false, 'execute' => false];
             }
 
             if ($arg === '--print-link') {
@@ -153,7 +182,12 @@ final readonly class TenantCommand
                     throw new \InvalidArgumentException('--print-link ist doppelt angegeben.');
                 }
                 $printLink = true;
-            } elseif (preg_match('/^--(slug|name|email|config)=(.*)$/sD', $arg, $match) === 1) {
+            } elseif ($arg === '--execute') {
+                if ($execute) {
+                    throw new \InvalidArgumentException('--execute ist doppelt angegeben.');
+                }
+                $execute = true;
+            } elseif (preg_match('/^--(slug|name|email|config|confirm)=(.*)$/sD', $arg, $match) === 1) {
                 $key = $match[1];
                 if ($values[$key] !== null) {
                     throw new \InvalidArgumentException(sprintf('--%s ist doppelt angegeben.', $key));
@@ -205,8 +239,21 @@ final readonly class TenantCommand
         if (!$needsEmail && $printLink) {
             throw new \InvalidArgumentException(sprintf('--print-link ist bei %s nicht möglich.', $command));
         }
+        if ($command !== 'purge-device-data' && ($execute || $values['confirm'] !== null)) {
+            throw new \InvalidArgumentException(sprintf('%s ist bei %s nicht möglich.', $execute ? '--execute' : '--confirm', $command));
+        }
+        if (!$execute && $values['confirm'] !== null) {
+            throw new \InvalidArgumentException('--confirm ist nur zusammen mit --execute möglich.');
+        }
+        if ($execute && $values['confirm'] === null) {
+            throw new \InvalidArgumentException('--execute braucht --confirm=KÜRZEL (dasselbe Kürzel wie bei --slug).');
+        }
+        // Exakter Vergleich, keine Normalisierung: Die Bestätigung soll bewusst getippt werden.
+        if ($execute && $values['confirm'] !== $values['slug']) {
+            throw new \InvalidArgumentException('--confirm stimmt nicht mit --slug überein. Es wurde nichts gelöscht.');
+        }
 
-        return ['command' => $command, ...$values, 'print_link' => $printLink];
+        return ['command' => $command, ...$values, 'print_link' => $printLink, 'execute' => $execute];
     }
 
     /**
@@ -313,6 +360,65 @@ final readonly class TenantCommand
             fwrite($this->err, 'WARNUNG: Der Link ist ein Zugang zum Konto. Nur an die eingeladene Person weitergeben.' . PHP_EOL);
             $this->line($urls->acceptInvitation($tenant, $invitation->token));
         }
+    }
+
+    /**
+     * Ohne $execute nur Anzahlen (Probelauf). Mit $execute: nichts vorhanden → Hinweis ohne
+     * Sicherung; sonst zuerst sichern (Fehler → Abbruch ohne Löschen), dann in einer Transaktion löschen.
+     *
+     * @throws TenantException
+     * @throws BackupException
+     */
+    private function purgeDeviceData(\PDO $pdo, DatabaseConfig $config, TenantSlug $slug, bool $execute): void
+    {
+        $tenant = new TenantRepository($pdo)->findBySlug($slug) ?? throw TenantNotFoundException::for($slug);
+        $purge = new TenantDeviceDataPurge($pdo);
+        $counts = $purge->count($tenant);
+
+        if (!$execute) {
+            $this->line(sprintf('Probelauf für %s („%s“) – es wird nichts geändert. Vorhanden:', $slug->value, $tenant->name->value));
+            $this->printCounts($counts);
+            $this->line(sprintf(
+                'Zum Löschen (vorher wird die Datenbank gesichert): php bin/tenant.php purge-device-data --slug=%1$s --execute --confirm=%1$s',
+                $slug->value,
+            ));
+
+            return;
+        }
+
+        if ($counts->isEmpty()) {
+            $this->line(sprintf('Keine Gerätedaten vorhanden: %s. Nichts gelöscht, keine Sicherung angelegt.', $slug->value));
+
+            return;
+        }
+
+        $backupPath = ($this->backup ?? $this->databaseBackup(...))($config, self::PURGE_BACKUP_SUFFIX_PREFIX . $slug->value);
+        $this->line(sprintf('Sicherung angelegt: %s', $backupPath));
+
+        $deleted = $purge->purge($tenant);
+        $this->line(sprintf('Gerätedaten gelöscht: %s („%s“). Gelöscht:', $slug->value, $tenant->name->value));
+        $this->printCounts($deleted);
+    }
+
+    private function printCounts(DeviceDataCounts $counts): void
+    {
+        $this->line(sprintf('  Geräte:     %d', $counts->devices));
+        $this->line(sprintf('  Ereignisse: %d', $counts->events));
+        $this->line(sprintf('  Standorte:  %d', $counts->locations));
+    }
+
+    /**
+     * @throws BackupException
+     */
+    private function databaseBackup(DatabaseConfig $config, string $suffix): string
+    {
+        $result = DatabaseBackup::open($this->backupDir)->create($config, $suffix)
+            ?? throw new BackupException('Keine Tabellen fe_* gefunden – Sicherung nicht möglich.');
+        foreach ($result->deleted as $deleted) {
+            fwrite($this->err, sprintf('Lösche alte Sicherung: %s', $deleted) . PHP_EOL);
+        }
+
+        return $result->path;
     }
 
     /**

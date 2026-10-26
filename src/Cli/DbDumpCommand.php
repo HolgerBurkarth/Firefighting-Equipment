@@ -4,16 +4,12 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Cli;
 
-use FirefightingEquipment\Backup\BackupDirectory;
 use FirefightingEquipment\Backup\BackupException;
 use FirefightingEquipment\Backup\BackupFileName;
-use FirefightingEquipment\Backup\BackupRotation;
-use FirefightingEquipment\Backup\BackupTables;
-use FirefightingEquipment\Backup\DatabaseDumper;
+use FirefightingEquipment\Backup\DatabaseBackup;
 use FirefightingEquipment\Config\ConfigException;
 use FirefightingEquipment\Config\ConfigLoader;
 use FirefightingEquipment\Database\ConnectionException;
-use FirefightingEquipment\Database\ConnectionFactory;
 use FirefightingEquipment\Database\DatabaseConfig;
 use FirefightingEquipment\Database\DatabaseError;
 
@@ -88,26 +84,24 @@ final readonly class DbDumpCommand
 
         try {
             // Zielordner vor dem Verbindungsaufbau prüfen.
-            $directory = BackupDirectory::assertUsable($options['target-dir'] ?? $this->defaultTargetDir);
-            if (!extension_loaded('zlib')) {
-                throw new BackupException('PHP-Erweiterung zlib fehlt.');
-            }
+            $backup = DatabaseBackup::open(
+                $options['target-dir'] ?? $this->defaultTargetDir,
+                [$options['mysqldump'] ?? 'mysqldump'],
+                $this->listTables,
+            );
 
             $config = new ConfigLoader()->loadDatabaseConfig($options['config'] ?? $this->defaultConfigPath);
-            $tables = ($this->listTables ?? self::listTables(...))($config);
-            if ($tables === []) {
+            $result = $backup->create($config, $options['suffix']);
+            if ($result === null) {
                 fwrite($this->err, 'Hinweis: Keine Tabellen fe_* vorhanden – nichts zu sichern, keine Datei angelegt.' . PHP_EOL);
 
                 return self::EXIT_NOTHING_TO_DUMP;
             }
 
-            $filename = BackupFileName::create(new \DateTimeImmutable('now'), $options['suffix']);
-            $dumper = new DatabaseDumper([$options['mysqldump'] ?? 'mysqldump']);
-            $path = $dumper->dump($config, $tables, $directory, $filename);
-
-            foreach (BackupRotation::prune($directory, BackupRotation::KEEP, basename($path)) as $deleted) {
+            foreach ($result->deleted as $deleted) {
                 fwrite($this->err, sprintf('Lösche alte Sicherung: %s', $deleted) . PHP_EOL);
             }
+            $path = $result->path;
         } catch (BackupException | ConfigException | ConnectionException $e) {
             fwrite($this->err, 'FEHLER: ' . $e->getMessage() . PHP_EOL);
 
@@ -121,16 +115,6 @@ final readonly class DbDumpCommand
         fwrite($this->out, $path . PHP_EOL);
 
         return self::EXIT_OK;
-    }
-
-    /**
-     * @return list<string>
-     *
-     * @throws BackupException
-     */
-    private static function listTables(DatabaseConfig $config): array
-    {
-        return BackupTables::list(new ConnectionFactory()->create($config));
     }
 
     /**

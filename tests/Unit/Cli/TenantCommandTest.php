@@ -44,7 +44,7 @@ final class TenantCommandTest extends TestCase
     public function testParseList(): void
     {
         self::assertSame(
-            ['command' => 'list', 'slug' => null, 'name' => null, 'email' => null, 'config' => null, 'print_link' => false],
+            ['command' => 'list', 'slug' => null, 'name' => null, 'email' => null, 'config' => null, 'confirm' => null, 'print_link' => false, 'execute' => false],
             TenantCommand::parseArguments(['list']),
         );
     }
@@ -52,7 +52,7 @@ final class TenantCommandTest extends TestCase
     public function testParseCreateWithConfig(): void
     {
         self::assertSame(
-            ['command' => 'create', 'slug' => 'immendingen', 'name' => 'Feuerwehr Immendingen', 'email' => null, 'config' => 'pfad/zur config.php', 'print_link' => false],
+            ['command' => 'create', 'slug' => 'immendingen', 'name' => 'Feuerwehr Immendingen', 'email' => null, 'config' => 'pfad/zur config.php', 'confirm' => null, 'print_link' => false, 'execute' => false],
             TenantCommand::parseArguments([
                 '--name=Feuerwehr Immendingen',
                 'create',
@@ -71,7 +71,7 @@ final class TenantCommandTest extends TestCase
     public function testParseRename(): void
     {
         self::assertSame(
-            ['command' => 'rename', 'slug' => 'a', 'name' => 'Neu', 'email' => null, 'config' => null, 'print_link' => false],
+            ['command' => 'rename', 'slug' => 'a', 'name' => 'Neu', 'email' => null, 'config' => null, 'confirm' => null, 'print_link' => false, 'execute' => false],
             TenantCommand::parseArguments(['rename', '--slug=a', '--name=Neu']),
         );
     }
@@ -79,10 +79,22 @@ final class TenantCommandTest extends TestCase
     public function testParseInviteAdmin(): void
     {
         self::assertSame(
-            ['command' => 'invite-admin', 'slug' => 'a', 'name' => null, 'email' => 'x@example.org', 'config' => null, 'print_link' => false],
+            ['command' => 'invite-admin', 'slug' => 'a', 'name' => null, 'email' => 'x@example.org', 'config' => null, 'confirm' => null, 'print_link' => false, 'execute' => false],
             TenantCommand::parseArguments(['invite-admin', '--slug=a', '--email=x@example.org']),
         );
         self::assertTrue(TenantCommand::parseArguments(['--print-link', 'invite-admin', '--slug=a', '--email=x@example.org'])['print_link']);
+    }
+
+    public function testParsePurgeDeviceData(): void
+    {
+        self::assertSame(
+            ['command' => 'purge-device-data', 'slug' => 'a', 'name' => null, 'email' => null, 'config' => null, 'confirm' => null, 'print_link' => false, 'execute' => false],
+            TenantCommand::parseArguments(['purge-device-data', '--slug=a']),
+        );
+        self::assertSame(
+            ['command' => 'purge-device-data', 'slug' => 'a', 'name' => null, 'email' => null, 'config' => null, 'confirm' => 'a', 'print_link' => false, 'execute' => true],
+            TenantCommand::parseArguments(['--confirm=a', 'purge-device-data', '--execute', '--slug=a']),
+        );
     }
 
     public function testParseKeepsEqualsSignInValue(): void
@@ -126,6 +138,18 @@ final class TenantCommandTest extends TestCase
         yield 'slug doppelt' => [['deactivate', '--slug=a', '--slug=b'], '--slug ist doppelt angegeben.'];
         yield 'slug leer' => [['deactivate', '--slug='], '--slug= braucht einen Wert.'];
         yield 'config leer' => [['list', '--config='], '--config= braucht einen Pfad.'];
+        yield 'purge ohne slug' => [['purge-device-data'], 'purge-device-data braucht --slug=KÜRZEL.'];
+        yield 'purge ohne confirm' => [['purge-device-data', '--slug=a', '--execute'], '--execute braucht --confirm=KÜRZEL'];
+        yield 'purge confirm ohne execute' => [['purge-device-data', '--slug=a', '--confirm=a'], '--confirm ist nur zusammen mit --execute möglich.'];
+        yield 'purge falsches confirm' => [['purge-device-data', '--slug=a', '--execute', '--confirm=b'], '--confirm stimmt nicht mit --slug überein.'];
+        yield 'purge confirm in anderer Schreibweise' => [['purge-device-data', '--slug=a', '--execute', '--confirm=A'], '--confirm stimmt nicht mit --slug überein.'];
+        yield 'purge confirm mit Leerzeichen' => [['purge-device-data', '--slug=a', '--execute', '--confirm=a '], '--confirm stimmt nicht mit --slug überein.'];
+        yield 'purge confirm leer' => [['purge-device-data', '--slug=a', '--execute', '--confirm='], '--confirm= braucht einen Wert.'];
+        yield 'purge execute doppelt' => [['purge-device-data', '--slug=a', '--execute', '--execute', '--confirm=a'], '--execute ist doppelt angegeben.'];
+        yield 'purge confirm doppelt' => [['purge-device-data', '--slug=a', '--execute', '--confirm=a', '--confirm=a'], '--confirm ist doppelt angegeben.'];
+        yield 'purge mit name' => [['purge-device-data', '--slug=a', '--name=X'], '--name ist bei purge-device-data nicht möglich.'];
+        yield 'execute bei deactivate' => [['deactivate', '--slug=a', '--execute', '--confirm=a'], '--execute ist bei deactivate nicht möglich.'];
+        yield 'confirm bei list' => [['list', '--confirm=a'], '--confirm ist bei list nicht möglich.'];
     }
 
     /**
@@ -149,6 +173,7 @@ final class TenantCommandTest extends TestCase
         self::assertStringContainsString('php bin/tenant.php create --slug=KÜRZEL', $this->contents($this->out));
         self::assertStringContainsString('php bin/tenant.php rename --slug=KÜRZEL', $this->contents($this->out));
         self::assertStringContainsString('php bin/tenant.php invite-admin --slug=KÜRZEL --email=ADRESSE [--print-link]', $this->contents($this->out));
+        self::assertStringContainsString('php bin/tenant.php purge-device-data --slug=KÜRZEL [--execute --confirm=KÜRZEL]', $this->contents($this->out));
         self::assertSame('', $this->contents($this->err));
     }
 
@@ -168,6 +193,8 @@ final class TenantCommandTest extends TestCase
         yield 'Name nur Leerzeichen' => [['create', '--slug=a', '--name=   '], 'FEHLER: Der Name darf nicht leer sein.'];
         yield 'neuer Name nur Leerzeichen' => [['rename', '--slug=a', '--name=   '], 'FEHLER: Der Name darf nicht leer sein.'];
         yield 'ungültige E-Mail' => [['invite-admin', '--slug=a', '--email=keine-adresse'], 'FEHLER: Ungültige E-Mail-Adresse'];
+        yield 'purge service' => [['purge-device-data', '--slug=service'], 'FEHLER: Das Kürzel „service“ ist reserviert.'];
+        yield 'purge service mit execute' => [['purge-device-data', '--slug=service', '--execute', '--confirm=service'], 'FEHLER: Das Kürzel „service“ ist reserviert.'];
     }
 
     /**

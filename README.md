@@ -903,6 +903,35 @@ Transport; schlägt der Versand fehl, erscheint ein Hinweis (Exit-Code 0). `--pr
 Link zusätzlich auf stdout aus, z. B. wenn keine Mail ankommt. Der Link ist ein Zugang zum Konto:
 nur an die eingeladene Person weitergeben, nicht in Tickets oder Chats kopieren.
 
+### Gerätedaten einer Stadt zurücksetzen (nur Testdaten)
+
+```
+php bin/tenant.php purge-device-data --slug=immendingen                                         # Probelauf
+php bin/tenant.php purge-device-data --slug=immendingen --execute --confirm=immendingen          # löschen
+```
+
+Löscht **alle** Geräte, Ereignisse (Historie) und Standorte einer Stadt, z. B. Testdaten vor der
+Erstbefüllung. Bewusste Ausnahme von „Geräte und Historie werden nie gelöscht“: nur für Städte
+ohne echte Daten verwenden. Gerätetypen, Benutzer, Einladungscodes, Sitzungen und die Stadt selbst
+bleiben unverändert; andere Städte sind nie betroffen.
+
+- Ohne `--execute`: Probelauf, zeigt die Anzahl Geräte, Ereignisse und Standorte; ändert nichts.
+- Mit `--execute` muss `--confirm` genau dem Kürzel entsprechen (sonst Abbruch, Exit-Code 2).
+- Vorher wird die Datenbank gesichert wie mit `bin/db-dump.php` (alle Tabellen `fe_*`, nach
+  `~/htdocs/apps/_backup/`, Zusatz `vor-purge-<kürzel>`). Schlägt die Sicherung fehl, wird nichts
+  gelöscht (Exit-Code 1). Sind keine Gerätedaten vorhanden, gibt es weder Sicherung noch Löschung
+  (Exit-Code 0).
+- Gelöscht wird in einer Transaktion (alles oder nichts). Ausgegeben werden die gelöschten
+  Anzahlen und der Pfad der Sicherung. Zurück geht es nur über die Sicherung (siehe „Sicherung
+  zurückspielen“; das spielt die ganze Datenbank zurück, nicht nur diese Stadt).
+- `service` ist kein gültiges Ziel; gesperrte Städte sind erlaubt.
+
+Auf dem Server:
+
+```
+cd ~/htdocs/apps/firefighting-equipment && php85 bin/tenant.php purge-device-data --slug=immendingen
+```
+
 ## Super-Admins und Benutzer verwalten
 
 ```

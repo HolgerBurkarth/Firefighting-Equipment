@@ -260,6 +260,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Verwaltung über die API des Super-Admins (siehe "Städte verwalten und Admins einladen") oder per
   Kommandozeile `bin/tenant.php` (`list`, `create --slug=… --name=…`, `rename --slug=… --name=…`,
   `deactivate --slug=…`, `activate --slug=…`, `invite-admin --slug=… --email=… [--print-link]`,
+  `purge-device-data --slug=… [--execute --confirm=…]` (siehe "Gerätedaten zurücksetzen"),
   `--config=PFAD` wie bei `migrate.php`). `create` per Kommandozeile legt keinen Admin an.
   Auf dem Server: `cd ~/htdocs/apps/firefighting-equipment && php85 bin/tenant.php list`.
   Exit-Codes: 0 OK, 1 Fehler (z. B. ungültiges oder doppeltes Kürzel), 2 falscher Aufruf.
@@ -656,7 +657,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Status (`status`, `ascii_bin`): `ready` (einsatzbereit), `maintenance` (in Wartung), `defective`
   (defekt), `retired` (ausgesondert). Ausgesonderte Geräte sind aus normalen Listen und Prüffristen
   ausgeblendet, nicht umbuchbar; der Admin kann sie wieder aufnehmen. Geräte werden nie gelöscht
-  (jedes hat ein Ereignis, der Fremdschlüssel verhindert das Löschen).
+  (jedes hat ein Ereignis, der Fremdschlüssel verhindert das Löschen; einzige Ausnahme: "Gerätedaten
+  zurücksetzen").
 - Gleichzeitige Änderungen: Versionszähler `fe_devices.version` (ab 1, jede Änderung erhöht ihn); eine
   Änderung mit veralteter Version wird mit 409 `version_conflict` abgelehnt (siehe "Geräte (API)").
 - Gerätetypen (`fe_device_types`): je Stadt, Name je Stadt eindeutig (ohne Groß-/Kleinschreibung),
@@ -672,11 +674,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Unterstandort eines Unterstandorts, keine andere Art, keine andere Stadt; Art und Ebene eines
   Standorts mit Unterstandorten sind nicht änderbar. Name je Stadt und übergeordnetem Standort
   eindeutig (`utf8mb4_unicode_ci`, also auch "Straße" = "Strasse"; `parent_key` 0 = Ebene 1). Nie
-  gelöscht; sperrbar (`active = 0`) nur, wenn leer (keine nicht ausgesonderten Geräte, keine aktiven
+  gelöscht (Ausnahme: "Gerätedaten zurücksetzen"); sperrbar (`active = 0`) nur, wenn leer (keine nicht ausgesonderten Geräte, keine aktiven
   Unterstandorte; prüft der Code). Gesperrt = kein Ziel für Umbuchungen, die Historie bleibt.
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
-  `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden). Wer (`user_id`
-  aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann
+  `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
+  "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann
   (`created_at`, UTC), optionaler Kommentar (höchstens 500 Zeichen). Ereignisse (`event_type`):
   `created` bzw. `imported` (CSV-Import; Ziel-Standort und -Status, nicht ausgesondert), `state_changed`
   (Umbuchung und/oder Statusänderung in EINEM Eintrag, Von/Nach je Paar, verschieden; auch Aussondern
@@ -686,6 +688,27 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Zeitpunkt der Änderung). Welche Spalten je Ereignis gefüllt sind, prüfen CHECK-Bedingungen.
 - Was nur der Code sichert (ohne Trigger nicht möglich): Standort nur leer sperren, gesperrter Standort
   und deaktivierter Gerätetyp sind kein Ziel, Ereignis passend zur Änderung am Gerät, Versionsprüfung.
+
+### Gerätedaten zurücksetzen (`bin/tenant.php purge-device-data`)
+- Bewusste, einzige Ausnahme von "Geräte werden nie gelöscht" und "Historie nur `INSERT`": nur für
+  Städte ohne echte Daten (z. B. Testdaten vor der Erstbefüllung). **Agenten führen den Befehl NIE
+  aus** (auch nicht lokal gegen `config.local.php`); nur der Nutzer, nur von Hand.
+- Code: `src/Device/TenantDeviceDataPurge.php` (`count`, `purge`; eigene Klasse, kein Repository
+  bekommt Lösch-Methoden), `DeviceDataCounts`, Befehl in `TenantCommand`. Sicherung über
+  `src/Backup/DatabaseBackup` (derselbe Ablauf wie `bin/db-dump.php`, das ihn ebenfalls nutzt).
+- Ohne `--execute`: Probelauf (Anzahl Geräte, Ereignisse, Standorte), ändert nichts, keine Sicherung.
+  `--execute` nur mit `--confirm` exakt gleich `--slug` (sonst Exit-Code 2); `--confirm` ohne
+  `--execute` oder bei anderen Befehlen ebenso. `service` ist ungültig (`TenantSlug`), unbekannte
+  Stadt Exit-Code 1, gesperrte Stadt erlaubt.
+- Mit `--execute`: nichts vorhanden → Hinweis, keine Sicherung, Exit-Code 0. Sonst zuerst Sicherung
+  aller `fe_*` mit Zusatz `vor-purge-<kürzel>` (`TenantCommand::PURGE_BACKUP_SUFFIX_PREFIX`); Fehler
+  (auch keine Tabellen) → Abbruch ohne Löschen, Exit-Code 1. Dann in EINER Transaktion (eine offene
+  ist ein Fehler): Standorte der Stadt `FOR UPDATE`, `DELETE` von `fe_device_events`, `fe_devices`,
+  `fe_locations` Ebene 2, dann Ebene 1, jeweils `WHERE tenant_id = ?`. Gerätetypen, Benutzer,
+  Einladungscodes, Sitzungen und die Stadt bleiben. Ausgabe: gelöschte Anzahlen und Pfad der Sicherung.
+- Tests (`tests/Integration/Tenant/TenantPurgeCommandTest`) übergeben eine Fake-Sicherung per
+  Konstruktor (`backup`) bzw. einen temporären Ordner (`backupDir`); sie vergleichen alle Zeilen
+  aller Tabellen `fe_*` vorher und nachher.
 
 ## Gerätetypen und Standorte (API)
 - Nur unter Städten (unter `service` gibt es die Routen nicht, 404). Lesen: `Access::Authenticated`

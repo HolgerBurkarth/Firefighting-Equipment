@@ -6,8 +6,10 @@ namespace FirefightingEquipment\Tests\Integration\Backup;
 
 use FirefightingEquipment\Backup\BackupDirectory;
 use FirefightingEquipment\Backup\BackupFileName;
+use FirefightingEquipment\Backup\BackupResult;
 use FirefightingEquipment\Backup\BackupRotation;
 use FirefightingEquipment\Backup\BackupTables;
+use FirefightingEquipment\Backup\DatabaseBackup;
 use FirefightingEquipment\Backup\DatabaseDumper;
 use FirefightingEquipment\Backup\MysqlDefaultsFile;
 use FirefightingEquipment\Cli\DbDumpCommand;
@@ -32,6 +34,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[CoversClass(BackupTables::class)]
 #[UsesClass(BackupDirectory::class)]
 #[UsesClass(BackupFileName::class)]
+#[UsesClass(BackupResult::class)]
+#[UsesClass(DatabaseBackup::class)]
 #[UsesClass(BackupRotation::class)]
 #[UsesClass(ConfigLoader::class)]
 #[UsesClass(ConnectionFactory::class)]
