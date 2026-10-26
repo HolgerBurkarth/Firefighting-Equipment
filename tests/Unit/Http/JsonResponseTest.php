@@ -87,4 +87,13 @@ final class JsonResponseTest extends TestCase
         self::assertSame(404, $response->statusCode());
         self::assertSame('{"error":"not_found","message":"Die Adresse wurde nicht gefunden."}', $response->body());
     }
+
+    public function testErrorDetailsAreAlwaysAnObject(): void
+    {
+        $with = JsonResponse::error('rule_violation', 'x', 409, details: ['devices' => 2]);
+        $empty = JsonResponse::error('rule_violation', 'x', 409, details: []);
+
+        self::assertSame('{"error":"rule_violation","message":"x","details":{"devices":2}}', $with->body());
+        self::assertSame('{"error":"rule_violation","message":"x","details":{}}', $empty->body());
+    }
 }

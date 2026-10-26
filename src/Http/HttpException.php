@@ -11,7 +11,8 @@ namespace FirefightingEquipment\Http;
 final class HttpException extends \RuntimeException
 {
     /**
-     * @param array<string, string> $headers
+     * @param array<string, string>     $headers
+     * @param array<string, mixed>|null $details Feld "details" der Antwort (null = ohne)
      */
     private function __construct(
         public readonly string $errorCode,
@@ -19,6 +20,7 @@ final class HttpException extends \RuntimeException
         public readonly int $statusCode,
         public readonly array $headers = [],
         ?\Throwable $previous = null,
+        public readonly ?array $details = null,
     ) {
         parent::__construct($message, 0, $previous);
     }
@@ -127,11 +129,23 @@ final class HttpException extends \RuntimeException
     /**
      * Eine Änderung verletzt eine Geschäftsregel (z. B. letzter Admin, sich selbst sperren).
      *
-     * @param string $message Meldung der Regel (deutsch, für Benutzer)
+     * @param string                    $message Meldung der Regel (deutsch, für Benutzer)
+     * @param array<string, mixed>|null $details z. B. {"devices":3,"sublocations":1} beim Sperren
+     *                                           eines Standorts, der nicht leer ist
      */
-    public static function ruleViolation(string $message): self
+    public static function ruleViolation(string $message, ?array $details = null): self
     {
-        return new self('rule_violation', $message, 409);
+        return new self('rule_violation', $message, 409, details: $details);
+    }
+
+    /**
+     * Der Name eines Gerätetyps bzw. Standorts ist schon vergeben (ohne Groß- und Kleinschreibung).
+     *
+     * @param string $message Meldung mit dem Namen
+     */
+    public static function nameTaken(string $message): self
+    {
+        return new self('name_taken', $message, 409);
     }
 
     /**
@@ -195,6 +209,6 @@ final class HttpException extends \RuntimeException
 
     public function toResponse(): JsonResponse
     {
-        return JsonResponse::error($this->errorCode, $this->getMessage(), $this->statusCode, $this->headers);
+        return JsonResponse::error($this->errorCode, $this->getMessage(), $this->statusCode, $this->headers, $this->details);
     }
 }

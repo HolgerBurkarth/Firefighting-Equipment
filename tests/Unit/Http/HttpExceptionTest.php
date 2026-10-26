@@ -33,6 +33,25 @@ final class HttpExceptionTest extends TestCase
         self::assertSame('{"error":"rule_violation","message":"Sie können sich nicht selbst sperren."}', $response->body());
     }
 
+    public function testRuleViolationWithDetails(): void
+    {
+        $response = HttpException::ruleViolation('Nicht leer.', ['devices' => 3, 'sublocations' => 1])->toResponse();
+
+        self::assertSame(409, $response->statusCode());
+        self::assertSame(
+            '{"error":"rule_violation","message":"Nicht leer.","details":{"devices":3,"sublocations":1}}',
+            $response->body(),
+        );
+    }
+
+    public function testNameTakenIsConflict(): void
+    {
+        $response = HttpException::nameTaken('Es gibt bereits einen Gerätetyp „Funkgerät“.')->toResponse();
+
+        self::assertSame(409, $response->statusCode());
+        self::assertSame('{"error":"name_taken","message":"Es gibt bereits einen Gerätetyp „Funkgerät“."}', $response->body());
+    }
+
     public function testSlugAndEmailTakenAreConflicts(): void
     {
         $slug = HttpException::slugTaken('Das Kürzel „immendingen“ ist bereits vergeben.')->toResponse();

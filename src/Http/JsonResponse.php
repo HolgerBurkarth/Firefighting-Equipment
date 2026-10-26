@@ -30,13 +30,21 @@ final readonly class JsonResponse
     }
 
     /**
-     * Antwort im einheitlichen Fehlerformat {"error":"code","message":"deutscher Text"}.
+     * Antwort im einheitlichen Fehlerformat {"error":"code","message":"deutscher Text"}, optional
+     * mit "details" (Objekt mit maschinenlesbaren Angaben, z. B. {"devices":3,"sublocations":1}).
      *
-     * @param array<string, string> $headers
+     * @param array<string, string>     $headers
+     * @param array<string, mixed>|null $details null = ohne Feld "details"
      */
-    public static function error(string $code, string $message, int $statusCode, array $headers = []): self
+    public static function error(string $code, string $message, int $statusCode, array $headers = [], ?array $details = null): self
     {
-        return new self(['error' => $code, 'message' => $message], $statusCode, $headers);
+        $data = ['error' => $code, 'message' => $message];
+        if ($details !== null) {
+            // Immer ein JSON-Objekt, auch wenn leer.
+            $data['details'] = (object) $details;
+        }
+
+        return new self($data, $statusCode, $headers);
     }
 
     public function statusCode(): int

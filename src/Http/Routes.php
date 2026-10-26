@@ -17,10 +17,16 @@ use FirefightingEquipment\Api\V1\Auth\PasswordResetRequestHandler;
 use FirefightingEquipment\Api\V1\Auth\RegisterHandler;
 use FirefightingEquipment\Api\V1\Auth\SessionDeleteHandler;
 use FirefightingEquipment\Api\V1\Auth\SessionListHandler;
+use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeAction;
+use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeActionHandler;
+use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeListHandler;
 use FirefightingEquipment\Api\V1\HealthHandler;
 use FirefightingEquipment\Api\V1\Invitation\InvitationCodeCreateHandler;
 use FirefightingEquipment\Api\V1\Invitation\InvitationCodeListHandler;
 use FirefightingEquipment\Api\V1\Invitation\InvitationCodeRevokeHandler;
+use FirefightingEquipment\Api\V1\Locations\LocationAction;
+use FirefightingEquipment\Api\V1\Locations\LocationActionHandler;
+use FirefightingEquipment\Api\V1\Locations\LocationListHandler;
 use FirefightingEquipment\Api\V1\TenantHandler;
 use FirefightingEquipment\Api\V1\Tenants\AdminInvitationHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantAction;
@@ -86,7 +92,18 @@ final class Routes
             ->add('POST', 'api/v1/users/{id}/lock', Access::Admin, new UserActionHandler(UserAction::Lock))
             ->add('POST', 'api/v1/users/{id}/unlock', Access::Admin, new UserActionHandler(UserAction::Unlock))
             ->add('POST', 'api/v1/users/{id}/role', Access::Admin, new UserActionHandler(UserAction::ChangeRole))
-            ->add('POST', 'api/v1/users/{id}/display-name', Access::Admin, new UserActionHandler(UserAction::ChangeDisplayName));
+            ->add('POST', 'api/v1/users/{id}/display-name', Access::Admin, new UserActionHandler(UserAction::ChangeDisplayName))
+            ->add('GET', 'api/v1/device-types', Access::Authenticated, new DeviceTypeListHandler())
+            ->add('POST', 'api/v1/device-types', Access::Admin, new DeviceTypeActionHandler(DeviceTypeAction::Create))
+            ->add('POST', 'api/v1/device-types/{id}/rename', Access::Admin, new DeviceTypeActionHandler(DeviceTypeAction::Rename))
+            ->add('POST', 'api/v1/device-types/{id}/deactivate', Access::Admin, new DeviceTypeActionHandler(DeviceTypeAction::Deactivate))
+            ->add('POST', 'api/v1/device-types/{id}/activate', Access::Admin, new DeviceTypeActionHandler(DeviceTypeAction::Activate))
+            ->add('GET', 'api/v1/locations', Access::Authenticated, new LocationListHandler())
+            ->add('POST', 'api/v1/locations', Access::Admin, new LocationActionHandler(LocationAction::Create))
+            ->add('GET', 'api/v1/locations/{id}', Access::Authenticated, new LocationActionHandler(LocationAction::Show))
+            ->add('POST', 'api/v1/locations/{id}/rename', Access::Admin, new LocationActionHandler(LocationAction::Rename))
+            ->add('POST', 'api/v1/locations/{id}/lock', Access::Admin, new LocationActionHandler(LocationAction::Lock))
+            ->add('POST', 'api/v1/locations/{id}/unlock', Access::Admin, new LocationActionHandler(LocationAction::Unlock));
     }
 
     /** Anmeldung, Sitzungen und Passwort; unter service und unter jeder Stadt gleich. */

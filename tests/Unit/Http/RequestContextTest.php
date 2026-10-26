@@ -79,13 +79,68 @@ final class RequestContextTest extends TestCase
         self::context([])->intField('tage', 1, 90);
     }
 
+    public function testOptionalIntField(): void
+    {
+        $context = self::context(['a' => 7, 'leer' => null, 'text' => '7']);
+
+        self::assertSame(7, $context->optionalIntField('a', 1, 10));
+        self::assertNull($context->optionalIntField('leer', 1, 10));
+        self::assertNull($context->optionalIntField('fehlt', 1, 10));
+
+        $this->expectExceptionObject(HttpException::invalidRequest('Das Feld "text" muss eine ganze Zahl von 1 bis 10 sein.'));
+        $context->optionalIntField('text', 1, 10);
+    }
+
+    public function testOptionalIntFieldChecksRange(): void
+    {
+        $this->expectExceptionObject(HttpException::invalidRequest('Das Feld "a" muss eine ganze Zahl von 1 bis 10 sein.'));
+
+        self::context(['a' => 11])->optionalIntField('a', 1, 10);
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function flags(): iterable
+    {
+        yield 'fehlt' => ['', false];
+        yield 'anderer Parameter' => ['?x=1', false];
+        yield '0' => ['?include_inactive=0', false];
+        yield '1' => ['?include_inactive=1', true];
+    }
+
+    #[DataProvider('flags')]
+    public function testQueryFlag(string $query, bool $expected): void
+    {
+        self::assertSame($expected, self::context([], 'GET', $query)->queryFlag('include_inactive'));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function invalidFlags(): iterable
+    {
+        yield 'leer' => ['?include_inactive='];
+        yield 'true' => ['?include_inactive=true'];
+        yield 'ja' => ['?include_inactive=ja'];
+        yield '01' => ['?include_inactive=01'];
+    }
+
+    #[DataProvider('invalidFlags')]
+    public function testQueryFlagRejectsOtherValues(string $query): void
+    {
+        $this->expectExceptionObject(HttpException::invalidRequest('Der Parameter "include_inactive" muss 0 oder 1 sein.'));
+
+        self::context([], 'GET', $query)->queryFlag('include_inactive');
+    }
+
     /**
      * @param array<string, mixed> $body
      */
-    private static function context(array $body): RequestContext
+    private static function context(array $body, string $method = 'POST', string $query = ''): RequestContext
     {
         return new RequestContext(
-            new Request('POST', '/firefighting/immendingen/api/v1/x'),
+            new Request($method, '/firefighting/immendingen/api/v1/x' . $query),
             null,
             new LazyConnection(static fn (): \PDO => throw new \LogicException('Keine Datenbank im Unit-Test.')),
             new ErrorReporter(static function (): void {

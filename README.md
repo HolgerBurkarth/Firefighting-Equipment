@@ -62,7 +62,9 @@ prüft die Datenbankverbindung; bei einer Störung antwortet er mit 503 und
 
 ### Fehler
 
-Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`:
+Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`. Manche Fehler enthalten
+zusätzlich ein Objekt `details` mit maschinenlesbaren Angaben, z. B. beim Sperren eines Standorts, der
+nicht leer ist: `{"error":"rule_violation","message":"…","details":{"devices":2,"sublocations":1}}`.
 
 | HTTP | `error`                    | Bedeutung                                                  |
 |------|----------------------------|------------------------------------------------------------|
@@ -84,6 +86,7 @@ Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`:
 | 409  | `rule_violation`           | Regel verletzt (letzter Admin, sich selbst sperren, …)     |
 | 409  | `slug_taken`               | Super-Admin: Kürzel einer neuen Stadt schon vergeben       |
 | 409  | `email_taken`              | Super-Admin: Adresse hat in der Stadt schon ein Konto      |
+| 409  | `name_taken`               | Name eines Gerätetyps bzw. Standorts schon vergeben        |
 | 415  | `unsupported_media_type`   | ändernde Anfrage ohne `Content-Type: application/json`     |
 | 422  | `weak_password`            | neues Passwort verletzt die Passwortregeln                 |
 | 429  | `too_many_attempts`        | zu viele Fehlversuche (Wartezeit im Header `Retry-After`)  |
@@ -282,6 +285,69 @@ curl.exe -H "Content-Type: application/json" --data-binary "@accept.json" http:/
 
 Die JSON-Dateien und `service-cookies.txt` danach löschen (sie enthalten Passwörter, Tokens bzw.
 die Sitzung; nie committen). Der Super-Admin bleibt höchstens 1 Stunde ohne Aktivität angemeldet.
+
+### Gerätetypen und Standorte
+
+Nur unter einer Stadt. Ansehen dürfen alle angemeldeten Konten der Stadt (`user` und `admin`),
+ändern nur Admins (`user`: 403). Fremde oder unbekannte IDs im Pfad: 404. Gezählt werden immer nur
+nicht ausgesonderte Geräte.
+
+- Gerätetypen: `GET api/v1/device-types` listet die aktiven Typen nach Name (mit `device_count`),
+  `?include_inactive=1` auch deaktivierte. `POST api/v1/device-types` mit `{"name":"…"}` legt an
+  (höchstens 50 Zeichen), `…/{id}/rename` benennt um, `…/{id}/deactivate` und `…/{id}/activate`
+  (Body `{}`) schalten ab bzw. wieder an. Ein deaktivierter Typ ist kein Ziel für neue Geräte;
+  bestehende Geräte behalten ihn.
+- Standorte: `GET api/v1/locations` liefert einen Baum: Standorte der obersten Ebene mit ihren
+  Unterstandorten in `children`, jeweils nach Name. `device_count` zählt die Geräte direkt am
+  Standort, `device_count_total` (nur oberste Ebene) auch die der Unterstandorte. Gesperrte
+  Standorte nur mit `?include_inactive=1`. `GET api/v1/locations/{id}` zeigt einen Standort (oberste
+  Ebene mit allen Unterstandorten, auch gesperrten).
+- Art (`kind`, Bezeichnung in `kind_label`): `vehicle` (Fahrzeug), `room` (Raum/Lager), `external`
+  (Extern). Höchstens zwei Ebenen; ein Unterstandort hat immer die Art seines übergeordneten
+  Standorts.
+- Anlegen: `POST api/v1/locations` mit `{"name":"HLF 20","kind":"vehicle"}` (oberste Ebene) bzw.
+  `{"name":"Fach 1","parent_id":5}` (Unterstandort; `kind` weglassen oder gleich). Umbenennen:
+  `…/{id}/rename`. Verschieben und Art ändern gibt es in Version 1 nicht.
+- Sperren (`…/{id}/lock`, Body `{}`) nur, wenn der Standort leer ist: keine Geräte, keine aktiven
+  Unterstandorte. Entsperren (`…/{id}/unlock`) eines Unterstandorts nur, wenn der übergeordnete
+  Standort aktiv ist. Beides ist wiederholbar.
+
+| Fall                                                                 | Antwort                   |
+|----------------------------------------------------------------------|---------------------------|
+| Name leer, zu lang (Typ 50, Standort 100 Zeichen), mit Zeilenumbruch | 400 `invalid_request`     |
+| Oberste Ebene ohne `kind`, unbekannte Art                            | 400 `invalid_request`     |
+| `parent_id` keine Zahl, unbekannt oder aus einer anderen Stadt       | 400 `invalid_request`     |
+| `?include_inactive=` mit anderem Wert als `0`/`1`                    | 400 `invalid_request`     |
+| Name schon vergeben (Typ je Stadt, Standort je Ebene bzw. übergeordnetem Standort; ohne Groß-/Kleinschreibung, „Straße“ = „Strasse“, auch gesperrte) | 409 `name_taken` |
+| Unterstandort unter einem Unterstandort                              | 409 `rule_violation`      |
+| Unterstandort unter gesperrtem Standort oder mit anderer Art         | 409 `rule_violation`      |
+| Sperren, obwohl Geräte oder aktive Unterstandorte da sind            | 409 `rule_violation` mit `details` |
+| Unterstandort entsperren, übergeordneter Standort gesperrt           | 409 `rule_violation`      |
+
+Lokal ausprobieren (Admin angemeldet wie unter "Lokal starten"):
+
+```
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/device-types
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/device-types?include_inactive=1"
+# type.json:     {"name":"Hitzeschutzhaube"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@type.json" http://localhost:8000/firefighting/immendingen/api/v1/device-types
+# type-name.json: {"name":"Flammschutzhaube"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@type-name.json" http://localhost:8000/firefighting/immendingen/api/v1/device-types/5/rename
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/device-types/5/deactivate
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/device-types/5/activate
+
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/locations
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/locations?include_inactive=1"
+# vehicle.json:  {"name":"HLF 20","kind":"vehicle"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@vehicle.json" http://localhost:8000/firefighting/immendingen/api/v1/locations
+# fach.json:     {"name":"Fach 1","parent_id":1}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@fach.json" http://localhost:8000/firefighting/immendingen/api/v1/locations
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/locations/1
+# location-name.json: {"name":"HLF 20/16"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@location-name.json" http://localhost:8000/firefighting/immendingen/api/v1/locations/1/rename
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/locations/2/lock
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/locations/2/unlock
+```
 
 ### Lokal starten
 

@@ -103,6 +103,31 @@ final readonly class RequestContext
         return $value;
     }
 
+    /**
+     * Optionales Feld des JSON-Bodys als Ganzzahl wie bei intField(); fehlt es oder ist es null,
+     * dann null.
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public function optionalIntField(string $name, int $min, int $max): ?int
+    {
+        return ($this->body[$name] ?? null) === null ? null : $this->intField($name, $min, $max);
+    }
+
+    /**
+     * Schalter im Query-String (z. B. ?include_inactive=1): "1" = an, "0" oder fehlend = aus.
+     *
+     * @throws HttpException 400 invalid_request bei jedem anderen Wert
+     */
+    public function queryFlag(string $name): bool
+    {
+        return match ($this->request->query()[$name] ?? null) {
+            null, '0' => false,
+            '1' => true,
+            default => throw HttpException::invalidRequest(sprintf('Der Parameter "%s" muss 0 oder 1 sein.', $name)),
+        };
+    }
+
     public function param(string $name): int
     {
         return $this->params[$name] ?? throw new \LogicException(sprintf('Platzhalter fehlt: %s', $name));

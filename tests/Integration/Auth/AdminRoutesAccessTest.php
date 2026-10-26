@@ -34,6 +34,14 @@ final class AdminRoutesAccessTest extends AuthTestCase
         yield 'Rolle ändern' => ['POST', 'users/{user}/role', ['role' => 'admin']];
         yield 'Anzeigename ändern' => ['POST', 'users/{user}/display-name', ['display_name' => 'Max']];
         yield 'löschen' => ['DELETE', 'users/{user}', []];
+        yield 'Gerätetyp anlegen' => ['POST', 'device-types', ['name' => 'Funkgerät']];
+        yield 'Gerätetyp umbenennen' => ['POST', 'device-types/{type}/rename', ['name' => 'Handfunkgerät']];
+        yield 'Gerätetyp deaktivieren' => ['POST', 'device-types/{type}/deactivate', []];
+        yield 'Gerätetyp aktivieren' => ['POST', 'device-types/{type}/activate', []];
+        yield 'Standort anlegen' => ['POST', 'locations', ['name' => 'HLF 20', 'kind' => 'vehicle']];
+        yield 'Standort umbenennen' => ['POST', 'locations/{location}/rename', ['name' => 'LF 10']];
+        yield 'Standort sperren' => ['POST', 'locations/{location}/lock', []];
+        yield 'Standort entsperren' => ['POST', 'locations/{location}/unlock', []];
     }
 
     /**
@@ -48,7 +56,13 @@ final class AdminRoutesAccessTest extends AuthTestCase
         $this->account(null, 'chef@example.org');
         $code = $this->createInvitationCode($this->tenant('immendingen')->id, $admin);
         $user = $this->registeredAccount('immendingen', 'max@example.org', 'pending');
-        $path = str_replace(['{code}', '{user}'], [(string) $code, (string) $user], $path);
+        $type = $this->insert('fe_device_types', ['tenant_id' => $this->tenant('immendingen')->id, 'name' => 'Atemschutzmaske']);
+        $location = $this->insert('fe_locations', ['tenant_id' => $this->tenant('immendingen')->id, 'kind' => 'room', 'name' => 'Lager', 'level' => 1]);
+        $path = str_replace(
+            ['{code}', '{user}', '{type}', '{location}'],
+            [(string) $code, (string) $user, (string) $type, (string) $location],
+            $path,
+        );
         $url = self::url('immendingen', $path);
         $before = $this->snapshot();
 
@@ -76,6 +90,8 @@ final class AdminRoutesAccessTest extends AuthTestCase
                 $this->pdo()->query('SELECT * FROM fe_invitation_codes ORDER BY id')->fetchAll(),
             ),
             $this->pdo()->query('SELECT user_id, purpose FROM fe_user_tokens ORDER BY id')->fetchAll(),
+            $this->pdo()->query('SELECT * FROM fe_device_types ORDER BY id')->fetchAll(),
+            $this->pdo()->query('SELECT * FROM fe_locations ORDER BY id')->fetchAll(),
         ], JSON_THROW_ON_ERROR);
     }
 }

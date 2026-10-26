@@ -1,0 +1,54 @@
+<?php
+
+declare(strict_types=1);
+
+namespace FirefightingEquipment\Tests\Integration\Auth;
+
+use FirefightingEquipment\Http\Routes;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+
+/**
+ * Rechte der lesenden Routen unter einer Stadt (Access::Authenticated) über die echten Routen:
+ * Benutzer und Admins der eigenen Stadt 200; ohne Anmeldung, Admin einer anderen Stadt und
+ * Super-Admin unter einem Stadt-Pfad 401; unter service gibt es die Routen nicht (404).
+ */
+#[CoversClass(Routes::class)]
+final class TenantReadRoutesAccessTest extends AuthTestCase
+{
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function readRoutes(): iterable
+    {
+        yield 'Gerätetypen' => ['device-types'];
+        yield 'Gerätetypen mit inaktiven' => ['device-types?include_inactive=1'];
+        yield 'Standorte' => ['locations'];
+        yield 'Standorte mit gesperrten' => ['locations?include_inactive=1'];
+        yield 'Standort anzeigen' => ['locations/{location}'];
+    }
+
+    #[DataProvider('readRoutes')]
+    public function testOnlyAccountsOfOwnTenant(string $path): void
+    {
+        $tenantId = $this->tenant('immendingen')->id;
+        $this->account('immendingen', 'user@example.org');
+        $this->account('immendingen', 'admin@example.org', ['role' => 'admin']);
+        $this->account('tuttlingen', 'admin@example.org', ['role' => 'admin']);
+        $this->account(null, 'chef@example.org');
+        $location = $this->insert('fe_locations', ['tenant_id' => $tenantId, 'kind' => 'room', 'name' => 'Lager', 'level' => 1]);
+        $path = str_replace('{location}', (string) $location, $path);
+        $url = self::url('immendingen', $path);
+
+        self::assertError(401, 'not_authenticated', $this->send('GET', $url));
+        self::assertError(401, 'not_authenticated', $this->send('GET', $url, cookie: $this->loginCookie('tuttlingen', 'admin@example.org')));
+        $superAdmin = $this->loginCookie(null, 'chef@example.org');
+        self::assertError(401, 'not_authenticated', $this->send('GET', $url, cookie: $superAdmin));
+        self::assertError(404, 'not_found', $this->send('GET', self::url(null, $path), cookie: $superAdmin));
+
+        foreach (['user@example.org', 'admin@example.org'] as $email) {
+            $response = $this->send('GET', $url, cookie: $this->loginCookie('immendingen', $email));
+            self::assertSame(200, $response->statusCode(), $response->body());
+        }
+    }
+}

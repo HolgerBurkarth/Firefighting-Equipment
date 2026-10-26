@@ -71,8 +71,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `health` und `tenant` bleiben öffentlich.
 - Handler implementieren `RequestHandler` und erhalten `RequestContext` (Anfrage, Stadt oder
   `null` unter `service`, `LazyConnection`, `ErrorReporter`, Platzhalter `param()`, JSON-Body
-  `body`/`stringField()`/`optionalStringField()`/`intField(name, min, max)` (nur echte
-  JSON-Ganzzahlen), Query-String über `request->query()` (nur einfache Werte), Sitzung `auth()` bei nicht öffentlichen Routen, Mails über `notifier()`,
+  `body`/`stringField()`/`optionalStringField()`/`intField(name, min, max)`/
+  `optionalIntField(name, min, max)` (nur echte JSON-Ganzzahlen; optional: fehlt oder `null` →
+  `null`), Query-String über `request->query()` (nur einfache Werte) und `queryFlag(name)` (`1` =
+  an, `0` oder fehlend = aus, sonst 400), Sitzung `auth()` bei nicht öffentlichen Routen, Mails über `notifier()`,
   absolute Links über `urls`). Die Datenbankverbindung
   (und das Laden der Konfiguration) erfolgt erst beim ersten `$context->db->get()`; schlägt sie im
   Handler fehl, antwortet `Application` mit 503 `database_unavailable`.
@@ -91,10 +93,16 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `pending_approval` 403, `invalid_current_password` 403, `tenant_inactive` 403, `not_found` 404,
   `tenant_not_found` 404, `method_not_allowed` 405, `rule_violation` 409 (Meldung der verletzten
   Regel), `slug_taken` 409, `email_taken` 409 (beide nur für den Super-Admin; öffentliche Abläufe
-  verraten nie, ob eine Adresse existiert), `unsupported_media_type` 415, `weak_password`
+  verraten nie, ob eine Adresse existiert), `name_taken` 409 (Name eines Gerätetyps bzw. Standorts
+  vergeben), `unsupported_media_type` 415, `weak_password`
   422, `too_many_attempts` 429 (mit `Retry-After`), `database_unavailable` 503, `internal_error`
   500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
   Passwort beim Ändern 403, nicht 401.
+- Optionales Feld `details` (immer ein JSON-Objekt) mit maschinenlesbaren Angaben zum Fehler,
+  z. B. `{"error":"rule_violation","message":"…","details":{"devices":2,"sublocations":1}}` beim
+  Sperren eines Standorts, der nicht leer ist (`HttpException::ruleViolation(message, details)`).
+  Fehler ohne Angaben haben kein Feld `details` (alle bisherigen unverändert). Nie Interna,
+  Zugangsdaten oder personenbezogene Daten in `details`.
 - Einzige Ausnahme vom Fehlerformat: `GET api/v1/health` liefert `{"status":"ok","database":"ok"}`
   (200) bzw. `{"status":"error","database":"error"}` (503). Unter einer Stadt gilt vorher die
   Stadtprüfung (403/404/503 im Fehlerformat).
@@ -400,7 +408,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Mails landen in `$this->mailer` (`FakeMailer`), Links beginnen mit `BASE_URL`, die Mindestdauer
   von `password-reset/request`, `register` und `email/resend` ist 0; `registeredAccount()` legt
   Konten im Status `unverified`/`pending` samt Einlader und Code an). Rechte aller Admin-Routen
-  prüft `AdminRoutesAccessTest` (neue Admin-Routen dort eintragen).
+  prüft `AdminRoutesAccessTest` (neue Admin-Routen dort eintragen), die der lesenden Routen unter
+  einer Stadt (`Access::Authenticated`, z. B. Gerätetypen, Standorte) `TenantReadRoutesAccessTest`
+  (neue dort eintragen).
 
 ## E-Mail-Versand
 - Code in `src/Mail/`: `MailMessage` (Empfänger, Name, Betreff, Text), Schnittstelle `Mailer`
@@ -595,8 +605,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Europe/Berlin). Zwecke im Protokoll: `admin_invitation`, `invitation_accepted`.
 
 ## Standorte und Geräte
-- Stand: nur das Schema (Migrationen `0011`–`0015`) und die Start-Gerätetypen neuer Städte; Fachlogik
-  und API folgen. Schema-Tests in `tests/Integration/Device/` (`DeviceSchemaTestCase`).
+- Stand: Schema (Migrationen `0011`–`0015`), Start-Gerätetypen neuer Städte und die API für
+  Gerätetypen und Standorte (siehe "Gerätetypen und Standorte (API)"); Geräte, Historie und CSV
+  folgen. Schema-Tests in `tests/Integration/Device/` (`DeviceSchemaTestCase`), Zeilen per SQL über
+  den Trait `DeviceRows` (auch in API-Tests auf Basis von `AuthTestCase`).
 - Rechte: `user` darf ansehen, umbuchen, Status setzen (einsatzbereit, in Wartung, defekt) und CSV
   exportieren. `admin` zusätzlich: aussondern und wieder aufnehmen, Prüfdatum ("nächste Prüfung
   fällig") ändern, Geräte anlegen und Stammdaten bearbeiten, Gerätetypen und Standorte verwalten,
@@ -648,6 +660,52 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Zeitpunkt der Änderung). Welche Spalten je Ereignis gefüllt sind, prüfen CHECK-Bedingungen.
 - Was nur der Code sichert (ohne Trigger nicht möglich): Standort nur leer sperren, gesperrter Standort
   und deaktivierter Gerätetyp sind kein Ziel, Ereignis passend zur Änderung am Gerät, Versionsprüfung.
+
+## Gerätetypen und Standorte (API)
+- Nur unter Städten (unter `service` gibt es die Routen nicht, 404). Lesen: `Access::Authenticated`
+  (`user` und `admin` der Stadt), Ändern: `Access::Admin`. Code in `src/Device/` (`DeviceTypeName`
+  höchstens 50 Zeichen, `LocationName` höchstens 100, beide über `DeviceNameRules` wie `TenantName`;
+  `LocationKind` mit `label()`; `DeviceType`, `Location`; `DeviceTypeRepository`,
+  `LocationRepository`; Fehler erben von `DeviceException`), Endpunkte in `src/Api/V1/DeviceTypes/`
+  und `src/Api/V1/Locations/` (je List- und Action-Handler mit Enum, Json-Klasse), Fehlerumsetzung
+  `src/Api/V1/DeviceErrors.php`: ungültiger Wert 400, fremde/unbekannte ID im Pfad 404 `not_found`,
+  Name vergeben 409 `name_taken`, Regelverstoß 409 `rule_violation`. Felder werden vor der Suche
+  gelesen (400 vor 404). Antworten tragen zu festen Werten deutsche Bezeichnungen (`kind_label`).
+- Gerätetypen: `GET device-types[?include_inactive=1]` (nach Name, `device_count` = nicht
+  ausgesonderte Geräte; deaktivierte nur mit Parameter), `POST device-types {name}` → 201,
+  `POST device-types/{id}/rename {name}`, `POST device-types/{id}/deactivate` bzw. `activate {}`
+  (wiederholbar). Antwort `{"device_type": …}`. Deaktiviert = kein Ziel für neue Geräte (prüft die
+  künftige Geräte-API); bestehende Geräte behalten ihn.
+- Standorte: `GET locations[?include_inactive=1]` → `{"locations": [...]}` als Baum (Ebene 1 nach
+  Name, je `children` nach Name; ohne Parameter ohne gesperrte Standorte und gesperrte
+  Unterstandorte), `GET locations/{id}` (Ebene 1 mit allen Unterstandorten, auch gesperrten),
+  `POST locations {name, kind?, parent_id?}` → 201, `POST locations/{id}/rename {name}`,
+  `POST locations/{id}/lock` bzw. `unlock {}` (wiederholbar). Antwort `{"location": …}` mit `id`,
+  `name`, `kind`, `kind_label`, `level`, `parent_id`, `active`, `device_count` (nicht ausgesonderte
+  Geräte direkt am Standort), nur bei Ebene 1 zusätzlich `device_count_total` (einschließlich aller
+  Unterstandorte, auch nicht aufgeführter) und `children`.
+- Anlegen: Ebene 1 braucht `kind` (`vehicle`, `room`, `external`, sonst 400). Mit `parent_id`
+  (echte JSON-Ganzzahl): unbekannter oder fremder übergeordneter Standort → 400 (Feld im Body, nicht
+  im Pfad); übergeordneter ist selbst Unterstandort → 409 (zwei Ebenen); gesperrt → 409; `kind`
+  weglassen (übernimmt die Art) oder dieselbe, sonst 409. Namen eindeutig je Stadt und
+  übergeordnetem Standort (Ebene 1 untereinander, Unterstandorte je übergeordnetem Standort; auch
+  gegenüber gesperrten; ohne Groß-/Kleinschreibung, "Straße" = "Strasse") → sonst 409 `name_taken`.
+  Ob ein Name vergeben ist, entscheidet der UNIQUE-Index (Fehler 1062), nicht eine Vorabfrage.
+- Sperren nur leer: keine nicht ausgesonderten Geräte direkt am Standort und keine aktiven
+  Unterstandorte, sonst 409 `rule_violation` mit Anzahl in der Meldung und
+  `details: {"devices": n, "sublocations": m}`. Entsperren: Unterstandort nur unter aktivem
+  übergeordnetem Standort (sonst 409); Entsperren der Ebene 1 lässt die Unterstandorte gesperrt.
+  Damit gibt es nie einen aktiven Unterstandort unter einem gesperrten Standort.
+- Nicht in Version 1: Standort verschieben, Art ändern, Ebene ändern (`LocationRepository` hat
+  bewusst keine Methoden dafür; `parent_id` gilt daher als unveränderlich).
+- Sperren in der Datenbank (MariaDB 10.11 kennt kein `FOR SHARE`, immer `LOCK IN SHARE MODE`):
+  `create` (mit `parent_id`), `lock` und `unlock` öffnen eine eigene Transaktion (eine bereits offene
+  ist ein Fehler). Wer einen Standort als übergeordneten Standort oder als Ziel benutzt, liest ihn
+  mit `LOCK IN SHARE MODE` und prüft dann `active`; `lock` sperrt ihn mit `FOR UPDATE` und zählt erst
+  danach (erste nicht sperrende Abfrage der Transaktion, sieht also den Stand nach der Sperre).
+  Reihenfolge immer übergeordneter vor untergeordnetem Standort. Regel für die künftige Geräte-API:
+  Anlegen, Umbuchen, Wiederaufnehmen und Import lesen den Ziel-Standort (und den Gerätetyp) mit
+  `LOCK IN SHARE MODE` und lehnen gesperrte bzw. deaktivierte ab, bevor das Gerät geschrieben wird.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".
