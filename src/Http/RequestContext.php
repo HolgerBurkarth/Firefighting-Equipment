@@ -115,6 +115,34 @@ final readonly class RequestContext
     }
 
     /**
+     * Ob der JSON-Body das Feld enthält, auch mit dem Wert null (z. B. null = Feld leeren, fehlt =
+     * unverändert).
+     */
+    public function hasField(string $name): bool
+    {
+        return array_key_exists($name, $this->body);
+    }
+
+    /**
+     * Ganzzahl im Query-String im Bereich $min bis $max (nur Ziffern ohne führende Null, kein
+     * Vorzeichen); fehlt der Parameter, dann null.
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public function queryInt(string $name, int $min, int $max): ?int
+    {
+        $value = $this->request->query()[$name] ?? null;
+        if ($value === null) {
+            return null;
+        }
+        if (preg_match('/^(0|[1-9][0-9]{0,17})\z/', $value) !== 1 || (int) $value < $min || (int) $value > $max) {
+            throw HttpException::invalidRequest(sprintf('Der Parameter "%s" muss eine ganze Zahl von %d bis %d sein.', $name, $min, $max));
+        }
+
+        return (int) $value;
+    }
+
+    /**
      * Schalter im Query-String (z. B. ?include_inactive=1): "1" = an, "0" oder fehlend = aus.
      *
      * @throws HttpException 400 invalid_request bei jedem anderen Wert

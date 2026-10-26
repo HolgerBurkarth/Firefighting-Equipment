@@ -87,6 +87,8 @@ nicht leer ist: `{"error":"rule_violation","message":"…","details":{"devices":
 | 409  | `slug_taken`               | Super-Admin: Kürzel einer neuen Stadt schon vergeben       |
 | 409  | `email_taken`              | Super-Admin: Adresse hat in der Stadt schon ein Konto      |
 | 409  | `name_taken`               | Name eines Gerätetyps bzw. Standorts schon vergeben        |
+| 409  | `identifier_taken`         | Kennung eines Geräts schon vergeben (ohne Groß-/Kleinschreibung) |
+| 409  | `version_conflict`         | Gerät inzwischen geändert; aktueller Stand in `details.device` |
 | 415  | `unsupported_media_type`   | ändernde Anfrage ohne `Content-Type: application/json`     |
 | 422  | `weak_password`            | neues Passwort verletzt die Passwortregeln                 |
 | 429  | `too_many_attempts`        | zu viele Fehlversuche (Wartezeit im Header `Retry-After`)  |
@@ -348,6 +350,84 @@ curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@loca
 curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/locations/2/lock
 curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/locations/2/unlock
 ```
+
+### Geräte
+
+Nur unter einer Stadt. Ansehen dürfen alle angemeldeten Konten der Stadt, anlegen und ändern nur
+Admins (`user`: 403). Fremde oder unbekannte IDs im Pfad: 404. Umbuchen, Status ändern, Aussondern
+und Wiederaufnehmen folgen in einem eigenen Schritt.
+
+| Methode | Pfad                                  | Zugriff    | Antwort                                     |
+|---------|---------------------------------------|------------|---------------------------------------------|
+| GET     | `api/v1/devices`                      | angemeldet | `{"devices":[…],"total":…,"limit":…,"offset":…}` |
+| GET     | `api/v1/devices/{id}`                 | angemeldet | `{"device":…}` mit allen Feldern            |
+| POST    | `api/v1/devices`                      | Admin      | 201 `{"device":…}`                          |
+| POST    | `api/v1/devices/{id}/fields`          | Admin      | `{"device":…}`                              |
+| POST    | `api/v1/devices/{id}/inspection-due`  | Admin      | `{"device":…}`                              |
+
+- Liste: je Gerät `id`, `identifier`, `device_type` (`id`, `name`), `location` (`id`, `name`,
+  `path` wie „HLF 20 / G1“), `status` mit `status_label` (einsatzbereit, in Wartung, defekt,
+  ausgesondert), `next_inspection_due`, `version`. Die Einzelansicht zeigt zusätzlich
+  `serial_number`, `manufacturer`, `model`, `procured_on`, `note`, `created_at`, `updated_at`.
+- Parameter der Liste (alle optional):
+  - `device_type_id`, `location_id`; `include_sublocations=1` (nur mit `location_id`) schließt die
+    Geräte der Unterstandorte ein. Unbekannte oder fremde IDs ergeben eine leere Liste.
+  - `status=ready,defective` (kommagetrennt). Ausgesonderte Geräte (`retired`) erscheinen nur, wenn
+    `retired` angegeben ist oder (ohne `status`) mit `include_retired=1`.
+  - `q`: Teil von Kennung, Seriennummer, Hersteller oder Modell, ohne Groß-/Kleinschreibung
+    (höchstens 100 Zeichen; `%` und `_` sind keine Platzhalter).
+  - `sort=identifier` (Standard, natürlich: „M2“ vor „M10“) oder `sort=next_inspection_due`
+    (früheste zuerst, Geräte ohne Datum am Ende).
+  - `limit` 1–200 (Standard 50), `offset` 0–1000000 (Standard 0); `total` zählt alle Treffer.
+- Kennung: höchstens 30 Zeichen aus Buchstaben, Ziffern, Leerzeichen, `-`, `/`, `.`; Leerraum am
+  Rand wird entfernt, mehrere Leerzeichen werden zu einem. Eindeutig je Stadt unter nicht
+  ausgesonderten Geräten, ohne Groß-/Kleinschreibung („MA-01“ = „ma-01“), aber „ß“ ≠ „ss“ und
+  „é“ ≠ „e“. Nach dem Aussondern ist die Kennung wieder frei.
+- Datumsfelder (`procured_on`, `next_inspection_due`) im Format `JJJJ-MM-TT` zwischen 1950-01-01
+  und 2099-12-31. Leere Texte werden zu `null`. Nur die Notiz darf Zeilenumbrüche enthalten.
+- Anlegen: Pflicht `identifier`, `device_type_id` (aktiver Typ), `location_id` (aktiver Standort);
+  optional `status` (`ready` Standard, `maintenance`, `defective`), `serial_number`, `manufacturer`,
+  `model` (je 100 Zeichen), `procured_on`, `next_inspection_due`, `note` (1000 Zeichen) und
+  `comment` (500 Zeichen, einzeilig) für die Historie.
+- Ändern mit erwarteter `version` (aus der letzten Antwort):
+  - `…/fields`: nur die mitgesendeten Stammdaten (`identifier`, `device_type_id`, `serial_number`,
+    `manufacturer`, `model`, `procured_on`, `note`; `null` leert ein optionales Feld) und optional
+    `comment`. Je geändertem Feld ein Eintrag in der Historie mit demselben Kommentar.
+  - `…/inspection-due`: `next_inspection_due` (Datum oder `null` zum Entfernen), optional `comment`.
+  - Jede Änderung erhöht `version` um 1. Ändert sich nichts (gleiche Werte), bleibt alles wie es
+    ist, auch die Version.
+  - Ist die Version veraltet: 409 `version_conflict`, `details.device` enthält den aktuellen Stand.
+  - Ausgesonderte Geräte lassen sich nicht ändern (409 `rule_violation`).
+
+| Fall                                                                    | Antwort                |
+|-------------------------------------------------------------------------|------------------------|
+| Feld fehlt, falscher Typ, unbekanntes Feld, Wert verletzt die Regeln    | 400 `invalid_request`  |
+| `device_type_id`/`location_id` im Body unbekannt oder aus anderer Stadt | 400 `invalid_request`  |
+| `…/fields` ohne Stammdaten, `status` oder `location_id` mitgesendet     | 400 `invalid_request`  |
+| Parameter der Liste ungültig (z. B. `limit=500`, `status=kaputt`)       | 400 `invalid_request`  |
+| Kennung schon vergeben                                                  | 409 `identifier_taken` |
+| Version veraltet                                                        | 409 `version_conflict` |
+| Standort gesperrt, Gerätetyp deaktiviert, Gerät ausgesondert            | 409 `rule_violation`   |
+
+Lokal ausprobieren (Admin angemeldet wie unter "Lokal starten"):
+
+```
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/devices
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/devices?location_id=1&include_sublocations=1&status=ready,maintenance&q=ma&sort=next_inspection_due&limit=20&offset=0"
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/devices?include_retired=1"
+# device.json:   {"identifier":"MA-01","device_type_id":1,"location_id":2,"manufacturer":"Dräger","model":"FPS 7000","next_inspection_due":"2027-03-01","comment":"Neu beschafft"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@device.json" http://localhost:8000/firefighting/immendingen/api/v1/devices
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/devices/1
+# fields.json:   {"version":1,"serial_number":"ARFK-1234","note":null,"comment":"Seriennummer nachgetragen"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@fields.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/fields
+# due.json:      {"version":2,"next_inspection_due":"2028-03-01","comment":"Prüfung bestanden"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@due.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/inspection-due
+# Dieselbe Datei noch einmal: Version 2 ist jetzt veraltet → 409 version_conflict mit details.device
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@due.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/inspection-due
+```
+
+Hinweis zum letzten Aufruf: Beim zweiten Senden ist das Datum unverändert, die Version wird aber
+trotzdem zuerst geprüft, daher der Konflikt.
 
 ### Lokal starten
 

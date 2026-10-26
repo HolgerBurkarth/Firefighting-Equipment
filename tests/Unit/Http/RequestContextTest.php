@@ -134,6 +134,49 @@ final class RequestContextTest extends TestCase
         self::context([], 'GET', $query)->queryFlag('include_inactive');
     }
 
+    public function testHasFieldDistinguishesNullFromMissing(): void
+    {
+        $context = self::context(['note' => null, 'model' => 'X']);
+
+        self::assertTrue($context->hasField('note'));
+        self::assertTrue($context->hasField('model'));
+        self::assertFalse($context->hasField('fehlt'));
+    }
+
+    public function testQueryInt(): void
+    {
+        $context = self::context([], 'GET', '?limit=200&offset=0&x=7');
+
+        self::assertSame(200, $context->queryInt('limit', 1, 200));
+        self::assertSame(0, $context->queryInt('offset', 0, 10));
+        self::assertNull($context->queryInt('fehlt', 1, 10));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function invalidQueryInts(): iterable
+    {
+        yield 'leer' => ['?limit='];
+        yield 'führende Null' => ['?limit=05'];
+        yield 'negativ' => ['?limit=-1'];
+        yield 'Plus' => ['?limit=%2B5'];
+        yield 'Kommazahl' => ['?limit=1.5'];
+        yield 'Text' => ['?limit=zehn'];
+        yield 'zu klein' => ['?limit=0'];
+        yield 'zu groß' => ['?limit=201'];
+        yield 'riesig' => ['?limit=99999999999999999999'];
+        yield 'Leerzeichen' => ['?limit=%205'];
+    }
+
+    #[DataProvider('invalidQueryInts')]
+    public function testQueryIntRejects(string $query): void
+    {
+        $this->expectExceptionObject(HttpException::invalidRequest('Der Parameter "limit" muss eine ganze Zahl von 1 bis 200 sein.'));
+
+        self::context([], 'GET', $query)->queryInt('limit', 1, 200);
+    }
+
     /**
      * @param array<string, mixed> $body
      */

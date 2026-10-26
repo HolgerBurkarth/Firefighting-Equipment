@@ -26,6 +26,9 @@ final class TenantReadRoutesAccessTest extends AuthTestCase
         yield 'Standorte' => ['locations'];
         yield 'Standorte mit gesperrten' => ['locations?include_inactive=1'];
         yield 'Standort anzeigen' => ['locations/{location}'];
+        yield 'Geräte' => ['devices'];
+        yield 'Geräte gefiltert' => ['devices?location_id={location}&include_sublocations=1&status=ready,retired&q=ma&sort=next_inspection_due&limit=10&offset=0'];
+        yield 'Gerät anzeigen' => ['devices/{device}'];
     }
 
     #[DataProvider('readRoutes')]
@@ -37,7 +40,9 @@ final class TenantReadRoutesAccessTest extends AuthTestCase
         $this->account('tuttlingen', 'admin@example.org', ['role' => 'admin']);
         $this->account(null, 'chef@example.org');
         $location = $this->insert('fe_locations', ['tenant_id' => $tenantId, 'kind' => 'room', 'name' => 'Lager', 'level' => 1]);
-        $path = str_replace('{location}', (string) $location, $path);
+        $type = $this->insert('fe_device_types', ['tenant_id' => $tenantId, 'name' => 'Atemschutzmaske']);
+        $device = $this->insert('fe_devices', ['tenant_id' => $tenantId, 'identifier' => 'MA-01', 'device_type_id' => $type, 'location_id' => $location, 'status' => 'ready']);
+        $path = str_replace(['{location}', '{device}'], [(string) $location, (string) $device], $path);
         $url = self::url('immendingen', $path);
 
         self::assertError(401, 'not_authenticated', $this->send('GET', $url));

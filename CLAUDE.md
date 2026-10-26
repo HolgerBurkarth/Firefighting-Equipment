@@ -13,6 +13,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Das Repository ist öffentlich: niemals Passwörter, Zugangsdaten oder
   `config/config.local.php` committen.
 - Code und Bezeichner auf Englisch, Dokumentation und Oberflächentexte auf Deutsch.
+- Antworten an den Nutzer immer auf Deutsch.
 
 ## Zielumgebung (STRATO, Shared Hosting)
 - PHP 8.5 (CGI), MariaDB 10.11, Apache mit `.htaccess` und mod_rewrite.
@@ -73,8 +74,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `null` unter `service`, `LazyConnection`, `ErrorReporter`, Platzhalter `param()`, JSON-Body
   `body`/`stringField()`/`optionalStringField()`/`intField(name, min, max)`/
   `optionalIntField(name, min, max)` (nur echte JSON-Ganzzahlen; optional: fehlt oder `null` →
-  `null`), Query-String über `request->query()` (nur einfache Werte) und `queryFlag(name)` (`1` =
-  an, `0` oder fehlend = aus, sonst 400), Sitzung `auth()` bei nicht öffentlichen Routen, Mails über `notifier()`,
+  `null`), `hasField(name)` (Feld vorhanden, auch mit `null`; unterscheidet "leeren" von
+  "unverändert"), Query-String über `request->query()` (nur einfache Werte), `queryFlag(name)` (`1` =
+  an, `0` oder fehlend = aus, sonst 400) und `queryInt(name, min, max)` (nur Ziffern ohne führende
+  Null, fehlend = `null`, sonst 400), Sitzung `auth()` bei nicht öffentlichen Routen, Mails über `notifier()`,
   absolute Links über `urls`). Die Datenbankverbindung
   (und das Laden der Konfiguration) erfolgt erst beim ersten `$context->db->get()`; schlägt sie im
   Handler fehl, antwortet `Application` mit 503 `database_unavailable`.
@@ -94,7 +97,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `tenant_not_found` 404, `method_not_allowed` 405, `rule_violation` 409 (Meldung der verletzten
   Regel), `slug_taken` 409, `email_taken` 409 (beide nur für den Super-Admin; öffentliche Abläufe
   verraten nie, ob eine Adresse existiert), `name_taken` 409 (Name eines Gerätetyps bzw. Standorts
-  vergeben), `unsupported_media_type` 415, `weak_password`
+  vergeben), `identifier_taken` 409 (Kennung eines Geräts vergeben), `version_conflict` 409
+  (Gerät inzwischen geändert, aktueller Stand in `details`), `unsupported_media_type` 415, `weak_password`
   422, `too_many_attempts` 429 (mit `Retry-After`), `database_unavailable` 503, `internal_error`
   500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
   Passwort beim Ändern 403, nicht 401.
@@ -605,9 +609,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Europe/Berlin). Zwecke im Protokoll: `admin_invitation`, `invitation_accepted`.
 
 ## Standorte und Geräte
-- Stand: Schema (Migrationen `0011`–`0015`), Start-Gerätetypen neuer Städte und die API für
-  Gerätetypen und Standorte (siehe "Gerätetypen und Standorte (API)"); Geräte, Historie und CSV
-  folgen. Schema-Tests in `tests/Integration/Device/` (`DeviceSchemaTestCase`), Zeilen per SQL über
+- Stand: Schema (Migrationen `0011`–`0015`), Start-Gerätetypen neuer Städte, die API für
+  Gerätetypen und Standorte (siehe "Gerätetypen und Standorte (API)") und für Geräte (anlegen,
+  Stammdaten, Prüfdatum, Liste, Einzelansicht; siehe "Geräte (API)"); Umbuchen, Status,
+  Aussondern/Wiederaufnehmen, Anzeige der Historie und CSV folgen. Schema-Tests in `tests/Integration/Device/` (`DeviceSchemaTestCase`), Zeilen per SQL über
   den Trait `DeviceRows` (auch in API-Tests auf Basis von `AuthTestCase`).
 - Rechte: `user` darf ansehen, umbuchen, Status setzen (einsatzbereit, in Wartung, defekt) und CSV
   exportieren. `admin` zusätzlich: aussondern und wieder aufnehmen, Prüfdatum ("nächste Prüfung
@@ -631,8 +636,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   ausgeblendet, nicht umbuchbar; der Admin kann sie wieder aufnehmen. Geräte werden nie gelöscht
   (jedes hat ein Ereignis, der Fremdschlüssel verhindert das Löschen).
 - Gleichzeitige Änderungen: Versionszähler `fe_devices.version` (ab 1, jede Änderung erhöht ihn); eine
-  Änderung mit veralteter Version wird mit einem verständlichen Konflikt abgelehnt (Code und Status
-  werden mit der API festgelegt, vorgesehen 409 `version_conflict`).
+  Änderung mit veralteter Version wird mit 409 `version_conflict` abgelehnt (siehe "Geräte (API)").
 - Gerätetypen (`fe_device_types`): je Stadt, Name je Stadt eindeutig (ohne Groß-/Kleinschreibung),
   vom Admin pflegbar, deaktivierbar (`active = 0`) statt löschbar. Start: Atemschutzmaske,
   Atemschutzgerät, Funkgerät, Wärmebildkamera (`DefaultDeviceTypes::NAMES`); bestehende Städte per
@@ -703,9 +707,61 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   ist ein Fehler). Wer einen Standort als übergeordneten Standort oder als Ziel benutzt, liest ihn
   mit `LOCK IN SHARE MODE` und prüft dann `active`; `lock` sperrt ihn mit `FOR UPDATE` und zählt erst
   danach (erste nicht sperrende Abfrage der Transaktion, sieht also den Stand nach der Sperre).
-  Reihenfolge immer übergeordneter vor untergeordnetem Standort. Regel für die künftige Geräte-API:
-  Anlegen, Umbuchen, Wiederaufnehmen und Import lesen den Ziel-Standort (und den Gerätetyp) mit
-  `LOCK IN SHARE MODE` und lehnen gesperrte bzw. deaktivierte ab, bevor das Gerät geschrieben wird.
+  Reihenfolge immer übergeordneter vor untergeordnetem Standort. Regel für die Geräte-API:
+  Anlegen (umgesetzt), Umbuchen, Wiederaufnehmen und Import lesen den Ziel-Standort (und den
+  Gerätetyp) mit `LOCK IN SHARE MODE` und lehnen gesperrte bzw. deaktivierte ab, bevor das Gerät
+  geschrieben wird.
+
+## Geräte (API)
+- Nur unter Städten (unter `service` 404). Lesen `Access::Authenticated`, Ändern `Access::Admin`
+  (Routen in `AdminRoutesAccessTest` bzw. `TenantReadRoutesAccessTest`). Code in `src/Device/`
+  (`DeviceIdentifier`, `DeviceStatus` mit `label()`, `DeviceDate`, `DeviceText`, `DeviceField`,
+  `Device`, `NewDevice`, `DeviceChanges`, `DeviceFilter`, `DeviceSort`, `DevicePage`,
+  `DeviceRepository`, `DeviceEventWriter`; Fehler `DeviceNotFoundException`,
+  `DuplicateDeviceIdentifierException`, `DeviceVersionConflictException`, dazu
+  `DeviceRuleViolationException`), Endpunkte in `src/Api/V1/Devices/` (`DeviceListHandler`,
+  `DeviceActionHandler` mit `DeviceAction`, `DeviceFields` liest die Bodys, `DeviceJson`),
+  Fehlerumsetzung in `DeviceErrors`. Tests in `tests/Integration/Device/` auf Basis von
+  `DeviceApiTestCase`.
+- `GET devices`: Parameter `device_type_id`, `location_id`, `include_sublocations=1` (nur mit
+  `location_id`, sonst 400), `status` (kommagetrennt; nennt er `retired`, erscheinen ausgesonderte),
+  `include_retired=1` (ohne `status`: alle Status), `q` (`LIKE` auf Kennung, Seriennummer,
+  Hersteller, Modell; `%`, `_`, `\` maskiert; höchstens 100 Zeichen), `sort=identifier` (Standard)
+  bzw. `next_inspection_due` (ohne Datum am Ende), `limit` 1–200 (Standard 50), `offset`
+  0–1000000. Unbekannte oder fremde IDs im Filter → leere Liste. Antwort `{devices, total, limit,
+  offset}`; je Gerät `id`, `identifier`, `device_type {id, name}`, `location {id, name, path}`
+  (Pfad „HLF 20 / G1“), `status`, `status_label`, `next_inspection_due`, `version`.
+- Natürliche Sortierung mit `NATURAL_SORT_KEY(identifier)` (MariaDB ab 10.7, lokal und STRATO
+  10.11), danach `id`; ohne Index (für die Mengen einer Feuerwehr genügt das). Ein Index wäre später
+  über eine generierte Spalte per Migration möglich.
+- `GET devices/{id}`: alle Felder (zusätzlich `serial_number`, `manufacturer`, `model`,
+  `procured_on`, `note`, `created_at`, `updated_at`), auch ausgesonderte. Antworten mit einem Gerät
+  immer `{"device": …}` mit allen Feldern.
+- `POST devices {identifier, device_type_id, location_id, status?, serial_number?, manufacturer?,
+  model?, procured_on?, next_inspection_due?, note?, comment?}` → 201. Status Standard `ready`,
+  `retired` → 400. Typ und Standort: unbekannt oder fremd → 400, deaktiviert bzw. gesperrt → 409
+  `rule_violation`. Kennung vergeben (UNIQUE-Index, Fehler 1062) → 409 `identifier_taken`. Schreibt
+  nur das Ereignis `created` (ein Prüfdatum steht nur am Gerät).
+- `POST devices/{id}/fields {version, comment?, identifier?, device_type_id?, serial_number?,
+  manufacturer?, model?, procured_on?, note?}`: nur mitgesendete Felder (`null` leert ein optionales
+  Feld; Kennung und Typ nicht leerbar); ohne Stammdaten 400. Je Feld mit binär anderem Wert ein
+  `field_changed` (gemeinsamer Kommentar), Version einmal + 1. Ohne Unterschied: 200 ohne Ereignis
+  und ohne neue Version.
+- `POST devices/{id}/inspection-due {version, next_inspection_due, comment?}` (`null` = entfernen):
+  `due_changed`, Version + 1; gleiches Datum wie oben ohne Änderung.
+- Unbekannte Felder im Body der drei ändernden Routen → 400 (z. B. `status` oder `location_id` bei
+  `fields`, damit nichts still ignoriert wird). Felder werden vor der Suche gelesen (400 vor 404).
+- Reihenfolge der Prüfung beim Ändern (`DeviceRepository::lockForChange`): Gerät `FOR UPDATE`
+  (unbekannt/fremd 404) → Version (veraltet: 409 `version_conflict`, `details: {"device": …}` mit dem
+  aktuellen Stand, nichts geschrieben; auch wenn sich nichts ändern würde) → ausgesondert (409
+  `rule_violation`, gilt für Stammdaten und Prüfdatum) → neuer Gerätetyp `LOCK IN SHARE MODE`, aktiv
+  (ein schon zugeordneter deaktivierter Typ darf bleiben).
+- Texte (`DeviceText`): getrimmt, leer → `NULL`, Seriennummer/Hersteller/Modell höchstens 100,
+  Notiz 1000 (Zeilenumbrüche erlaubt, als LF gespeichert), Kommentar 500 (einzeilig). Keine
+  Steuerzeichen. Datum (`DeviceDate`): genau `JJJJ-MM-TT`, gültiger Kalendertag, 1950-01-01 bis
+  2099-12-31.
+- Kennung (`DeviceIdentifier`): ohne intl werden nur zerlegte Umlaute zusammengesetzt; andere
+  kombinierende Zeichen (`\p{M}`) werden mit Meldung abgelehnt.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".

@@ -17,6 +17,9 @@ use FirefightingEquipment\Api\V1\Auth\PasswordResetRequestHandler;
 use FirefightingEquipment\Api\V1\Auth\RegisterHandler;
 use FirefightingEquipment\Api\V1\Auth\SessionDeleteHandler;
 use FirefightingEquipment\Api\V1\Auth\SessionListHandler;
+use FirefightingEquipment\Api\V1\Devices\DeviceAction;
+use FirefightingEquipment\Api\V1\Devices\DeviceActionHandler;
+use FirefightingEquipment\Api\V1\Devices\DeviceListHandler;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeAction;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeActionHandler;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeListHandler;
@@ -103,7 +106,12 @@ final class Routes
             ->add('GET', 'api/v1/locations/{id}', Access::Authenticated, new LocationActionHandler(LocationAction::Show))
             ->add('POST', 'api/v1/locations/{id}/rename', Access::Admin, new LocationActionHandler(LocationAction::Rename))
             ->add('POST', 'api/v1/locations/{id}/lock', Access::Admin, new LocationActionHandler(LocationAction::Lock))
-            ->add('POST', 'api/v1/locations/{id}/unlock', Access::Admin, new LocationActionHandler(LocationAction::Unlock));
+            ->add('POST', 'api/v1/locations/{id}/unlock', Access::Admin, new LocationActionHandler(LocationAction::Unlock))
+            ->add('GET', 'api/v1/devices', Access::Authenticated, new DeviceListHandler())
+            ->add('POST', 'api/v1/devices', Access::Admin, new DeviceActionHandler(DeviceAction::Create))
+            ->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceActionHandler(DeviceAction::Show))
+            ->add('POST', 'api/v1/devices/{id}/fields', Access::Admin, new DeviceActionHandler(DeviceAction::UpdateFields))
+            ->add('POST', 'api/v1/devices/{id}/inspection-due', Access::Admin, new DeviceActionHandler(DeviceAction::SetInspectionDue));
     }
 
     /** Anmeldung, Sitzungen und Passwort; unter service und unter jeder Stadt gleich. */

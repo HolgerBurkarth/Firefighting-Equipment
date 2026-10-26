@@ -149,6 +149,27 @@ final class HttpException extends \RuntimeException
     }
 
     /**
+     * Die Kennung eines Geräts ist unter den nicht ausgesonderten Geräten der Stadt schon vergeben
+     * (ohne Groß- und Kleinschreibung).
+     *
+     * @param string $message Meldung mit der Kennung
+     */
+    public static function identifierTaken(string $message): self
+    {
+        return new self('identifier_taken', $message, 409);
+    }
+
+    /**
+     * Ein Datensatz wurde seit dem Laden geändert (erwartete Version veraltet); nichts geschrieben.
+     *
+     * @param array<string, mixed> $details aktueller Stand, z. B. {"device": {…}}
+     */
+    public static function versionConflict(string $message, array $details): self
+    {
+        return new self('version_conflict', $message, 409, details: $details);
+    }
+
+    /**
      * Das Kürzel einer neuen Stadt ist bereits vergeben (nur Super-Admin).
      *
      * @param string $message Meldung mit dem Kürzel

@@ -52,6 +52,25 @@ final class HttpExceptionTest extends TestCase
         self::assertSame('{"error":"name_taken","message":"Es gibt bereits einen Gerätetyp „Funkgerät“."}', $response->body());
     }
 
+    public function testIdentifierTakenIsConflict(): void
+    {
+        $response = HttpException::identifierTaken('Die Kennung „MA-01“ ist bereits vergeben.')->toResponse();
+
+        self::assertSame(409, $response->statusCode());
+        self::assertSame('{"error":"identifier_taken","message":"Die Kennung „MA-01“ ist bereits vergeben."}', $response->body());
+    }
+
+    public function testVersionConflictCarriesCurrentState(): void
+    {
+        $response = HttpException::versionConflict('Inzwischen geändert.', ['device' => ['id' => 7, 'version' => 3]])->toResponse();
+
+        self::assertSame(409, $response->statusCode());
+        self::assertSame(
+            '{"error":"version_conflict","message":"Inzwischen geändert.","details":{"device":{"id":7,"version":3}}}',
+            $response->body(),
+        );
+    }
+
     public function testSlugAndEmailTakenAreConflicts(): void
     {
         $slug = HttpException::slugTaken('Das Kürzel „immendingen“ ist bereits vergeben.')->toResponse();

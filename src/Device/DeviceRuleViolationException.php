@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Device;
 
 /**
- * Eine Änderung an Standorten oder Gerätetypen verletzt eine Regel (zwei Ebenen, Art, Sperren nur
- * leer). $details enthält maschinenlesbare Angaben für die API (Feld "details" der Fehlerantwort).
+ * Eine Änderung an Standorten, Gerätetypen oder Geräten verletzt eine Regel (zwei Ebenen, Art,
+ * Sperren nur leer, gesperrtes bzw. deaktiviertes Ziel, ausgesondertes Gerät). $details enthält
+ * maschinenlesbare Angaben für die API (Feld "details" der Fehlerantwort).
  */
 final class DeviceRuleViolationException extends DeviceException
 {
@@ -72,6 +73,30 @@ final class DeviceRuleViolationException extends DeviceException
         return new self(sprintf(
             'Der übergeordnete Standort „%s“ ist gesperrt; bitte zuerst diesen entsperren.',
             $parent->value,
+        ));
+    }
+
+    public static function locationLocked(LocationName $location): self
+    {
+        return new self(sprintf(
+            'Der Standort „%s“ ist gesperrt und kann keine Geräte aufnehmen.',
+            $location->value,
+        ));
+    }
+
+    public static function deviceTypeInactive(DeviceTypeName $type): self
+    {
+        return new self(sprintf(
+            'Der Gerätetyp „%s“ ist deaktiviert und kann keinem Gerät zugeordnet werden.',
+            $type->value,
+        ));
+    }
+
+    public static function deviceRetired(DeviceIdentifier $identifier): self
+    {
+        return new self(sprintf(
+            'Das Gerät „%s“ ist ausgesondert; Stammdaten und Prüfdatum lassen sich erst nach der Wiederaufnahme ändern.',
+            $identifier->value,
         ));
     }
 }

@@ -42,6 +42,9 @@ final class AdminRoutesAccessTest extends AuthTestCase
         yield 'Standort umbenennen' => ['POST', 'locations/{location}/rename', ['name' => 'LF 10']];
         yield 'Standort sperren' => ['POST', 'locations/{location}/lock', []];
         yield 'Standort entsperren' => ['POST', 'locations/{location}/unlock', []];
+        yield 'Gerät anlegen' => ['POST', 'devices', ['identifier' => 'MA-02', 'device_type_id' => '{type}', 'location_id' => '{location}']];
+        yield 'Stammdaten ändern' => ['POST', 'devices/{device}/fields', ['version' => 1, 'model' => 'FPS 7000']];
+        yield 'Prüfdatum setzen' => ['POST', 'devices/{device}/inspection-due', ['version' => 1, 'next_inspection_due' => '2027-03-01']];
     }
 
     /**
@@ -58,11 +61,14 @@ final class AdminRoutesAccessTest extends AuthTestCase
         $user = $this->registeredAccount('immendingen', 'max@example.org', 'pending');
         $type = $this->insert('fe_device_types', ['tenant_id' => $this->tenant('immendingen')->id, 'name' => 'Atemschutzmaske']);
         $location = $this->insert('fe_locations', ['tenant_id' => $this->tenant('immendingen')->id, 'kind' => 'room', 'name' => 'Lager', 'level' => 1]);
-        $path = str_replace(
-            ['{code}', '{user}', '{type}', '{location}'],
-            [(string) $code, (string) $user, (string) $type, (string) $location],
-            $path,
-        );
+        $vehicle = $this->insert('fe_locations', ['tenant_id' => $this->tenant('immendingen')->id, 'kind' => 'vehicle', 'name' => 'LF 8', 'level' => 1]);
+        $device = $this->insert('fe_devices', [
+            'tenant_id' => $this->tenant('immendingen')->id, 'identifier' => 'MA-01', 'device_type_id' => $type, 'location_id' => $vehicle, 'status' => 'ready',
+        ]);
+        $placeholders = ['{code}' => $code, '{user}' => $user, '{type}' => $type, '{location}' => $location, '{device}' => $device];
+        $path = strtr($path, array_map('strval', $placeholders));
+        // Platzhalter als ganzer Wert im Body werden zur ID (echte JSON-Ganzzahl).
+        $body = $body === null ? null : array_map(static fn (mixed $v): mixed => is_string($v) ? ($placeholders[$v] ?? $v) : $v, $body);
         $url = self::url('immendingen', $path);
         $before = $this->snapshot();
 
@@ -92,6 +98,8 @@ final class AdminRoutesAccessTest extends AuthTestCase
             $this->pdo()->query('SELECT user_id, purpose FROM fe_user_tokens ORDER BY id')->fetchAll(),
             $this->pdo()->query('SELECT * FROM fe_device_types ORDER BY id')->fetchAll(),
             $this->pdo()->query('SELECT * FROM fe_locations ORDER BY id')->fetchAll(),
+            $this->pdo()->query('SELECT * FROM fe_devices ORDER BY id')->fetchAll(),
+            $this->pdo()->query('SELECT * FROM fe_device_events ORDER BY id')->fetchAll(),
         ], JSON_THROW_ON_ERROR);
     }
 }
