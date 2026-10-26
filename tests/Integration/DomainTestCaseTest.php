@@ -46,8 +46,52 @@ final class DomainTestCaseTest extends DomainTestCase
         }
     }
 
+    public function testClearEmptiesDependentTablesInOneCommit(): void
+    {
+        $pdo = $this->pdo();
+        $pdo->exec("INSERT INTO fe_tenants (slug, name) VALUES ('immendingen', 'Feuerwehr Immendingen')");
+        $tenantId = (int) $pdo->lastInsertId();
+        $pdo->exec(sprintf("INSERT INTO fe_device_types (tenant_id, name) VALUES (%d, 'Atemschutzmaske')", $tenantId));
+        $commitsBefore = self::sessionCommits($pdo);
+
+        TestDatabase::clearDomainTables($pdo);
+
+        // Genau ein ausdrückliches COMMIT (Com_commit); einzeln per Autocommit gelöscht wären es 0.
+        self::assertSame(1, self::sessionCommits($pdo) - $commitsBefore);
+        self::assertFalse($pdo->inTransaction());
+        self::assertSame(1, $pdo->query('SELECT @@SESSION.foreign_key_checks')->fetchColumn());
+
+        // Für andere Verbindungen sichtbar, also wirklich committet.
+        $other = TestDatabase::connect();
+        self::assertSame(0, $other->query('SELECT COUNT(*) FROM fe_tenants')->fetchColumn());
+        self::assertSame(0, $other->query('SELECT COUNT(*) FROM fe_device_types')->fetchColumn());
+    }
+
+    public function testClearRefusesOpenTransactionAndChangesNothing(): void
+    {
+        $pdo = $this->pdo();
+        $pdo->exec("INSERT INTO fe_tenants (slug, name) VALUES ('immendingen', 'Feuerwehr Immendingen')");
+        $pdo->beginTransaction();
+
+        try {
+            TestDatabase::clearDomainTables($pdo);
+            self::fail('Eine offene Transaktion wurde nicht abgelehnt.');
+        } catch (\LogicException) {
+            self::assertTrue($pdo->inTransaction());
+        } finally {
+            $pdo->rollBack();
+        }
+
+        self::assertSame(1, $pdo->query('SELECT COUNT(*) FROM fe_tenants')->fetchColumn());
+    }
+
     public function testTablesAreEmptyAtStartOfTest(): void
     {
         self::assertSame(0, $this->pdo()->query('SELECT COUNT(*) FROM fe_tenants')->fetchColumn());
+    }
+
+    private static function sessionCommits(\PDO $pdo): int
+    {
+        return (int) $pdo->query("SHOW SESSION STATUS LIKE 'Com\\_commit'")->fetch(\PDO::FETCH_NUM)[1];
     }
 }

@@ -63,10 +63,18 @@ final class TestDatabase
      * DELETE statt TRUNCATE: TRUNCATE ist DDL und legt jede Tabelle neu an (lokal rund 125 ms je
      * Tabelle, vor jedem Test). AUTO_INCREMENT wird daher nicht zurückgesetzt; Tests dürfen sich
      * nicht auf bestimmte IDs verlassen.
+     *
+     * Alle DELETEs laufen in EINER Transaktion: Jeder Commit wartet auf das Schreiben des Logs
+     * (lokal unter Windows rund 9 ms), einzeln committet kostete das Leeren rund 90 ms je Test.
+     *
+     * @throws \LogicException wenn auf der Verbindung bereits eine Transaktion offen ist
      */
     public static function clearDomainTables(\PDO $pdo): void
     {
         self::assertConnectedToTestDatabase($pdo);
+        if ($pdo->inTransaction()) {
+            throw new \LogicException('clearDomainTables öffnet eine eigene Transaktion; es ist bereits eine offen.');
+        }
 
         $stmt = $pdo->query(
             "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()"
@@ -83,8 +91,15 @@ final class TestDatabase
         // Fremdschlüssel kurz aus, damit die Reihenfolge der Tabellen keine Rolle spielt.
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         try {
-            foreach ($tables as $table) {
-                $pdo->exec(sprintf('DELETE FROM `%s`', $table));
+            $pdo->beginTransaction();
+            try {
+                foreach ($tables as $table) {
+                    $pdo->exec(sprintf('DELETE FROM `%s`', $table));
+                }
+                $pdo->commit();
+            } catch (\Throwable $e) {
+                $pdo->rollBack();
+                throw $e;
             }
         } finally {
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');

@@ -74,6 +74,70 @@ final readonly class DeviceRepository
         return new DevicePage(array_map(self::hydrate(...), $stmt->fetchAll()), $total);
     }
 
+    /**
+     * Ein Abschnitt der Übersicht der Prüffristen (höchstens $limit Geräte) mit Gesamtzahl. Der
+     * Filter darf nur Gerätetyp und Standort enthalten; ausgesonderte Geräte sind nie dabei. „Heute“
+     * kommt als Parameter aus $window (deutsche Zeit), nie aus CURDATE() (Sitzung in UTC).
+     */
+    public function listInspections(Tenant $tenant, DeviceFilter $filter, InspectionWindow $window, InspectionSection $section, int $limit): DevicePage
+    {
+        if ($limit < 1) {
+            throw new \InvalidArgumentException('limit muss positiv sein.');
+        }
+        if ($filter->statuses !== [] || $filter->includeRetired || $filter->search !== null) {
+            throw new \InvalidArgumentException('Die Prüffristen filtern nur nach Gerätetyp und Standort.');
+        }
+
+        [$where, $params] = self::where($filter);
+        [$condition, $order, $dates] = match ($section) {
+            InspectionSection::Overdue => [' AND d.next_inspection_due < ?', 'd.next_inspection_due, NATURAL_SORT_KEY(d.identifier), d.id', [$window->today]],
+            InspectionSection::DueSoon => [' AND d.next_inspection_due BETWEEN ? AND ?', 'd.next_inspection_due, NATURAL_SORT_KEY(d.identifier), d.id', [$window->today, $window->until]],
+            InspectionSection::WithoutDate => [' AND d.next_inspection_due IS NULL', 'NATURAL_SORT_KEY(d.identifier), d.id', []],
+        };
+        $where .= $condition;
+        $params = [$tenant->id, ...$params, ...$dates];
+
+        $count = $this->pdo->prepare('SELECT COUNT(*)' . self::FROM . $where);
+        $count->execute($params);
+        $total = (int) $count->fetchColumn();
+
+        // limit ist eine geprüfte Ganzzahl.
+        $stmt = $this->pdo->prepare(sprintf('%s%s%s ORDER BY %s LIMIT %d', self::SELECT, self::FROM, $where, $order, $limit));
+        $stmt->execute($params);
+
+        return new DevicePage(array_map(self::hydrate(...), $stmt->fetchAll()), $total);
+    }
+
+    /**
+     * Zahlen für die Startseite in einer Abfrage (ohne ausgesonderte Geräte): je Status sowie
+     * überfällig, bald fällig und ohne Prüfdatum laut $window.
+     */
+    public function summary(Tenant $tenant, InspectionWindow $window): DeviceSummary
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT d.status, COUNT(*) AS devices, SUM(d.next_inspection_due < ?) AS overdue,'
+            . ' SUM(d.next_inspection_due BETWEEN ? AND ?) AS due_soon, SUM(d.next_inspection_due IS NULL) AS without_date'
+            . " FROM fe_devices d WHERE d.tenant_id = ? AND d.status <> 'retired' GROUP BY d.status",
+        );
+        $stmt->execute([$window->today, $window->today, $window->until, $tenant->id]);
+
+        $byStatus = [];
+        foreach (DeviceStatus::cases() as $status) {
+            if ($status !== DeviceStatus::Retired) {
+                $byStatus[$status->value] = 0;
+            }
+        }
+        $overdue = $dueSoon = $withoutDate = 0;
+        foreach ($stmt->fetchAll() as $row) {
+            $byStatus[(string) $row['status']] = (int) $row['devices'];
+            $overdue += (int) $row['overdue'];
+            $dueSoon += (int) $row['due_soon'];
+            $withoutDate += (int) $row['without_date'];
+        }
+
+        return new DeviceSummary($window, $byStatus, $overdue, $dueSoon, $withoutDate);
+    }
+
     public function find(Tenant $tenant, int $id): ?Device
     {
         $stmt = $this->pdo->prepare(self::SELECT . self::FROM . ' AND d.id = ?');

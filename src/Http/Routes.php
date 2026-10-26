@@ -21,10 +21,12 @@ use FirefightingEquipment\Api\V1\Devices\DeviceAction;
 use FirefightingEquipment\Api\V1\Devices\DeviceActionHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceEventListHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceListHandler;
+use FirefightingEquipment\Api\V1\Devices\DeviceSummaryHandler;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeAction;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeActionHandler;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeListHandler;
 use FirefightingEquipment\Api\V1\HealthHandler;
+use FirefightingEquipment\Api\V1\Inspections\InspectionDueHandler;
 use FirefightingEquipment\Api\V1\Invitation\InvitationCodeCreateHandler;
 use FirefightingEquipment\Api\V1\Invitation\InvitationCodeListHandler;
 use FirefightingEquipment\Api\V1\Invitation\InvitationCodeRevokeHandler;
@@ -41,6 +43,8 @@ use FirefightingEquipment\Api\V1\Tenants\TenantUserListHandler;
 use FirefightingEquipment\Api\V1\Users\UserAction;
 use FirefightingEquipment\Api\V1\Users\UserActionHandler;
 use FirefightingEquipment\Api\V1\Users\UserListHandler;
+use FirefightingEquipment\Time\Clock;
+use FirefightingEquipment\Time\SystemClock;
 
 /**
  * Alle Routen der Anwendung. Neue Endpunkte werden hier eingetragen, jeweils mit Zugriffsstufe.
@@ -75,9 +79,13 @@ final class Routes
      * Routen unter /firefighting/<kürzel>/ (nur aktive Städte).
      *
      * @param MinimumDuration|null $neutralDuration wie bei service()
+     * @param Clock|null           $clock           Uhr für „heute“ der Prüffristen (null =
+     *                                              Systemzeit, andere nur für Tests)
      */
-    public static function tenant(?MinimumDuration $neutralDuration = null): Router
+    public static function tenant(?MinimumDuration $neutralDuration = null, ?Clock $clock = null): Router
     {
+        $clock ??= new SystemClock();
+
         return self::auth(Router::forTenant(), $neutralDuration)
             ->add('GET', 'api/v1/health', Access::Public, new HealthHandler())
             ->add('GET', 'api/v1/tenant', Access::Public, new TenantHandler())
@@ -116,7 +124,9 @@ final class Routes
             ->add('POST', 'api/v1/devices/{id}/state', Access::Authenticated, new DeviceActionHandler(DeviceAction::ChangeState))
             ->add('POST', 'api/v1/devices/{id}/retire', Access::Admin, new DeviceActionHandler(DeviceAction::Retire))
             ->add('POST', 'api/v1/devices/{id}/reinstate', Access::Admin, new DeviceActionHandler(DeviceAction::Reinstate))
-            ->add('GET', 'api/v1/devices/{id}/events', Access::Authenticated, new DeviceEventListHandler());
+            ->add('GET', 'api/v1/devices/{id}/events', Access::Authenticated, new DeviceEventListHandler())
+            ->add('GET', 'api/v1/device-summary', Access::Authenticated, new DeviceSummaryHandler($clock))
+            ->add('GET', 'api/v1/inspection-due', Access::Authenticated, new InspectionDueHandler($clock));
     }
 
     /** Anmeldung, Sitzungen und Passwort; unter service und unter jeder Stadt gleich. */

@@ -174,8 +174,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Protokoll in deren `fe_schema_migrations`) und leert vor jedem Test alle Tabellen `fe_*`
   außer `fe_schema_migrations` und `fe_test_*` (`TestDatabase::clearDomainTables`, nur in
   einer Datenbank mit Endung `_test`). Geleert wird per `DELETE`, nicht `TRUNCATE` (DDL, legt
-  jede Tabelle neu an, lokal rund 125 ms je Tabelle und Test); `AUTO_INCREMENT` läuft daher
-  weiter, Tests dürfen sich nicht auf bestimmte IDs verlassen.
+  jede Tabelle neu an, lokal rund 125 ms je Tabelle und Test), und zwar alle Tabellen in EINER
+  Transaktion (jeder Commit kostet lokal rund 9 ms; per Test über `Com_commit` gesichert);
+  `AUTO_INCREMENT` läuft daher weiter, Tests dürfen sich nicht auf bestimmte IDs verlassen.
+  Lokal empfohlen: `innodb_flush_log_at_trx_commit = 2` (README), nie auf dem Server.
 - Argon2id in Tests: Tests verwenden schwache Parameter (`tests/Support/TestPasswordHasher`,
   memory_cost 1024, time_cost 1, threads 1), Produktion nie. Die Anwendung
   (`Application::create`) und die Kommandozeile (`bin/user.php`) erzeugen `PasswordHasher` immer
@@ -413,7 +415,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   von `password-reset/request`, `register` und `email/resend` ist 0; `registeredAccount()` legt
   Konten im Status `unverified`/`pending` samt Einlader und Code an). Rechte aller Admin-Routen
   prüft `AdminRoutesAccessTest` (neue Admin-Routen dort eintragen), die der lesenden Routen unter
-  einer Stadt (`Access::Authenticated`, z. B. Gerätetypen, Standorte) `TenantReadRoutesAccessTest`
+  einer Stadt (`Access::Authenticated`, z. B. Gerätetypen, Standorte, Prüffristen)
+  `TenantReadRoutesAccessTest`
   (neue dort eintragen).
 
 ## E-Mail-Versand
@@ -612,7 +615,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Stand: Schema (Migrationen `0011`–`0015`), Start-Gerätetypen neuer Städte, die API für
   Gerätetypen und Standorte (siehe "Gerätetypen und Standorte (API)") und für Geräte (anlegen,
   Stammdaten, Prüfdatum, Liste, Einzelansicht, Umbuchen/Status, Aussondern/Wiederaufnehmen,
-  Historie; siehe "Geräte (API)"); Übersicht der Fälligkeiten und CSV folgen. Schema-Tests in
+  Historie; siehe "Geräte (API)") sowie Prüffristen und Zusammenfassung (siehe "Prüffristen und
+  Zusammenfassung (API)"); CSV folgt. Schema-Tests in
   `tests/Integration/Device/` (`DeviceSchemaTestCase`), Zeilen per SQL über
   den Trait `DeviceRows` (auch in API-Tests auf Basis von `AuthTestCase`).
 - Rechte: `user` darf ansehen, umbuchen, Status setzen (einsatzbereit, in Wartung, defekt) und CSV
@@ -799,12 +803,46 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Kennung (`DeviceIdentifier`): ohne intl werden nur zerlegte Umlaute zusammengesetzt; andere
   kombinierende Zeichen (`\p{M}`) werden mit Meldung abgelehnt.
 
+## Prüffristen und Zusammenfassung (API)
+- Nur unter Städten (unter `service` 404), beide `Access::Authenticated` (in
+  `TenantReadRoutesAccessTest`). Ausgesonderte Geräte sind nie enthalten, auch nicht über Parameter
+  der Geräteliste (`status`, `include_retired`, `q` und `sort` werden wie alle unbekannten
+  Query-Parameter ignoriert). Code: `src/Time/` (`Clock`, `SystemClock`, `LocalDate`),
+  `src/Device/` (`InspectionWindow`, `InspectionSection`, `DeviceSummary`,
+  `DeviceRepository::listInspections` und `::summary`), Endpunkte
+  `src/Api/V1/Inspections/InspectionDueHandler.php` und `src/Api/V1/Devices/DeviceSummaryHandler.php`.
+  Tests in `tests/Integration/Inspection/` (`InspectionApiTestCase` mit `FixedClock`).
+- „Heute“ ist der Kalendertag in Europe/Berlin (`LocalDate::today`), nie UTC und nie `CURDATE()` oder
+  `UTC_DATE()` in SQL (die Sitzung läuft in UTC): Der Code berechnet heute und das Ende des Fensters
+  (`InspectionWindow`) und übergibt beides als Parameter. Tage werden ohne Zeitzone gezählt
+  (`LocalDate::daysBetween`), die Zeitumstellung verschiebt nichts.
+- Uhr: Handler erhalten `Clock` per Konstruktor über `Routes::tenant(?MinimumDuration, ?Clock)`
+  (null = `SystemClock`); andere Uhren nur in Tests (`tests/Support/FixedClock`). Keine
+  Einstellung in der Konfigurationsdatei.
+- `GET inspection-due`: Parameter `days` 1–365 (Standard 30, `InspectionWindow::DEFAULT_DAYS`),
+  `include_without_date=1`, `device_type_id`, `location_id`, `include_sublocations=1` (wie
+  `GET devices`, über `DeviceFilter` ohne Status und Suche), `limit` 1–500 je Abschnitt (Standard
+  200, kein `offset`). Antwort `{today, days, until, overdue, due_soon[, without_date]}`, je
+  Abschnitt `{devices, total}`; `without_date` fehlt ohne Parameter. `overdue`: Prüfdatum < heute,
+  je Gerät `days_overdue` (≥ 1). `due_soon`: heute ≤ Prüfdatum ≤ `until` (= heute + `days`), je Gerät
+  `days_until_due` (0 = heute). Geräte sonst wie `DeviceJson::summary`. Sortierung nach Prüfdatum
+  aufsteigend (am stärksten überfällig zuerst), dann `NATURAL_SORT_KEY(identifier)`, `id`;
+  `without_date` nur nach Kennung.
+- `GET device-summary` (Startseite, keine Parameter): EINE Abfrage (`GROUP BY status`) ohne
+  Geräteliste. Antwort `{today, devices {total, by_status [{status, status_label, count}]},
+  inspection {overdue, due_soon, due_soon_days, without_date}}`; `by_status` immer `ready`,
+  `maintenance`, `defective` in dieser Reihenfolge, auch mit 0. Fenster fest 30 Tage, Grenzen wie bei
+  `inspection-due` (per Test gleiche Zahlen).
+- Indizes `idx_fe_devices_tenant_due` und `idx_fe_devices_tenant_status` (Migration `0014`) genügen;
+  keine Migration.
+
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".
 - Neue Stadt: Super-Admin legt Name, Kürzel und E-Mail des ersten Admins an (siehe
   "Benutzer und Anmeldung").
 - Geräte, Gerätetypen, Status, Standorte und Historie: siehe "Standorte und Geräte".
-- Übersicht "überfällig" und "in 30 Tagen fällig".
+- Übersicht "überfällig" und "in 30 Tagen fällig" (umgesetzt, siehe "Prüffristen und
+  Zusammenfassung (API)").
 - CSV-Export (Semikolon, UTF-8, Umlaute korrekt) und CSV-Import mit Prüfung und Fehleranzeige.
 - Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
 

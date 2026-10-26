@@ -30,6 +30,9 @@ final class TenantReadRoutesAccessTest extends AuthTestCase
         yield 'Geräte gefiltert' => ['devices?location_id={location}&include_sublocations=1&status=ready,retired&q=ma&sort=next_inspection_due&limit=10&offset=0'];
         yield 'Gerät anzeigen' => ['devices/{device}'];
         yield 'Historie' => ['devices/{device}/events?limit=10&offset=0'];
+        yield 'Prüffristen' => ['inspection-due'];
+        yield 'Prüffristen gefiltert' => ['inspection-due?days=60&include_without_date=1&location_id={location}&include_sublocations=1&limit=10'];
+        yield 'Zusammenfassung' => ['device-summary'];
     }
 
     #[DataProvider('readRoutes')]

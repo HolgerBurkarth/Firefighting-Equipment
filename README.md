@@ -464,6 +464,53 @@ curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/d
 Hinweis zum letzten Aufruf: Beim zweiten Senden ist das Datum unverändert, die Version wird aber
 trotzdem zuerst geprüft, daher der Konflikt.
 
+### Prüffristen und Zusammenfassung
+
+Nur unter einer Stadt, für alle angemeldeten Konten der Stadt (`user` und `admin`). Ausgesonderte
+Geräte sind nie enthalten. „Heute“ ist der Kalendertag in deutscher Zeit (Europe/Berlin): Um
+00:30 Uhr am 16. Juni ist ein Gerät mit Prüfdatum 15. Juni überfällig, obwohl in UTC noch der
+15. ist.
+
+| Methode | Pfad                     | Zugriff    | Antwort                                                     |
+|---------|--------------------------|------------|-------------------------------------------------------------|
+| GET     | `api/v1/inspection-due`  | angemeldet | `{"today":…,"days":…,"until":…,"overdue":{…},"due_soon":{…}}` |
+| GET     | `api/v1/device-summary`  | angemeldet | `{"today":…,"devices":{…},"inspection":{…}}`                |
+
+- `inspection-due`: Abschnitte `overdue` (Prüfdatum vor heute, am stärksten überfällig zuerst) und
+  `due_soon` (heute bis einschließlich `until` = heute + `days`, nächste Fälligkeit zuerst), bei
+  gleichem Datum natürlich nach Kennung. Jeder Abschnitt ist `{"devices":[…],"total":…}`; die Geräte
+  wie in der Geräteliste, zusätzlich `days_overdue` (ab 1) bzw. `days_until_due` (0 = heute fällig).
+  Parameter (alle optional):
+  - `days` 1–365 (Standard 30).
+  - `include_without_date=1`: zusätzlich Abschnitt `without_date` (Geräte ohne Prüfdatum, nach
+    Kennung); ohne den Parameter fehlt das Feld.
+  - `device_type_id`, `location_id`, `include_sublocations=1` wie in der Geräteliste.
+  - `limit` 1–500 je Abschnitt (Standard 200), kein `offset`; `total` zählt alle Treffer.
+  - Andere Parameter (z. B. `status`, `include_retired`) werden ignoriert. Ungültige Werte: 400.
+- `device-summary` (Startseite, eine Abfrage, keine Parameter): `devices.total` und
+  `devices.by_status` (immer `ready`, `maintenance`, `defective` mit `status_label` und `count`, auch
+  0), `inspection` mit `overdue`, `due_soon` (heute bis heute + 30 Tage, `due_soon_days`) und
+  `without_date`.
+
+Lokal ausprobieren (angemeldet wie unter "Lokal starten"):
+
+```
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/inspection-due
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/inspection-due?days=60&include_without_date=1"
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/inspection-due?location_id=1&include_sublocations=1&device_type_id=1&limit=50"
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/device-summary
+```
+
+Beispielantwort von `device-summary`:
+
+```json
+{"today":"2026-10-26",
+ "devices":{"total":42,"by_status":[{"status":"ready","status_label":"einsatzbereit","count":38},
+                                     {"status":"maintenance","status_label":"in Wartung","count":3},
+                                     {"status":"defective","status_label":"defekt","count":1}]},
+ "inspection":{"overdue":3,"due_soon":7,"due_soon_days":30,"without_date":12}}
+```
+
 ### Lokal starten
 
 ```
@@ -840,7 +887,27 @@ Fehlt `config/config.test.php`, werden die Integrationstests übersprungen. Ende
 Datenbankname nicht auf `_test`, bricht der Testlauf sofort ab.
 
 Fachliche Integrationstests führen die echten Migrationen aus `migrations/` automatisch in
-der Testdatenbank aus und leeren vor jedem Test die fachlichen Tabellen.
+der Testdatenbank aus und leeren vor jedem Test die fachlichen Tabellen (in einer Transaktion).
+
+### Empfohlene Einstellung der lokalen MariaDB
+
+Standardmäßig wartet MariaDB bei jedem Commit, bis das Log auf der Platte ist
+(`innodb_flush_log_at_trx_commit = 1`). Unter Windows kostet das rund 9 ms je Commit; die
+Integrationstests committen tausende Male. Für die lokale Entwicklungsdatenbank daher in der
+`my.ini` (Abschnitt `[mysqld]`) eintragen und MariaDB neu starten:
+
+```ini
+innodb_flush_log_at_trx_commit = 2
+```
+
+Mit `2` schreibt MariaDB das Log bei jedem Commit nur in den Puffer des Betriebssystems und
+spült es etwa einmal pro Sekunde auf die Platte. Bei einem Absturz von Windows (nicht nur von
+MariaDB) kann so die letzte Sekunde verloren gehen; für Test- und Entwicklungsdaten ist das
+unerheblich. Die Einstellung gilt für den ganzen lokalen Server.
+
+**Nur lokal, nie auf dem Server:** Auf STRATO bleibt die Einstellung des Hosters unverändert;
+dort zählt, dass jede bestätigte Änderung (z. B. eine Umbuchung) dauerhaft gespeichert ist. Die
+Anwendung setzt die Einstellung nirgends und darf sich nicht auf sie verlassen.
 
 ### Testdatenbank zurücksetzen
 
