@@ -11,8 +11,10 @@ use FirefightingEquipment\Mail\MimeMessage;
 
 /**
  * Versand über ein SMTP-Postfach (auf STRATO: smtp.strato.de, signiert mit DKIM). Eine Verbindung
- * je Mail: EHLO, ggf. STARTTLS und erneut EHLO, AUTH (PLAIN, sonst LOGIN; nur verschlüsselt),
- * MAIL FROM, RCPT TO, DATA, QUIT.
+ * je Aufruf: EHLO, ggf. STARTTLS und erneut EHLO, AUTH (PLAIN, sonst LOGIN; nur verschlüsselt), dann
+ * je Mail MAIL FROM, RCPT TO, DATA, zum Schluss QUIT. sendMany() verschickt mehrere Mails über
+ * dieselbe Verbindung (eine Anmeldung); lehnt der Server eine Mail ab, setzt RSET den Vorgang zurück
+ * und die nächste folgt. Die Frist (timeout) gilt für die ganze Verbindung.
  *
  * Kopfzeilen und Text baut MimeMessage (wie bei den anderen Transporten); Envelope-Absender und
  * From sind immer feuerwehr-app@prodad.de, der Benutzername ist dieselbe Adresse (ConfigLoader).
@@ -30,45 +32,81 @@ final readonly class SmtpMailer implements Mailer
 
     public function send(MailMessage $message): string
     {
-        $messageId = MimeMessage::newMessageId();
-        $data = MimeMessage::build($message, new \DateTimeImmutable('now', new \DateTimeZone('UTC')), $messageId)->toString();
+        $result = $this->sendMany([$message])[0];
+        if ($result instanceof MailException) {
+            throw $result;
+        }
 
-        $connection = SmtpConnection::open($this->config->host, $this->config->port, $this->config->timeoutSeconds, $this->caFile);
+        return $result;
+    }
+
+    public function sendMany(array $messages, float $deadline = INF): array
+    {
+        /** @var list<array{MailMessage, string, string}|MailException> $prepared Mail, Message-ID, Daten */
+        $prepared = [];
+        foreach ($messages as $message) {
+            try {
+                $messageId = MimeMessage::newMessageId();
+                $data = MimeMessage::build($message, new \DateTimeImmutable('now', new \DateTimeZone('UTC')), $messageId)->toString();
+                $prepared[] = [$message, $messageId, $data];
+            } catch (MailException $e) {
+                $prepared[] = $e;
+            }
+        }
+        if (array_filter($prepared, is_array(...)) === []) {
+            return $prepared;
+        }
+
+        /** @var array<int, string|MailException> $results */
+        $results = [];
+        $connection = null;
         try {
-            if ($this->config->encryption === SmtpEncryption::Ssl) {
-                $connection->enableTls();
+            $timeout = $this->config->timeoutSeconds;
+            if (is_finite($deadline)) {
+                $timeout = min($timeout, max(0.001, $deadline - microtime(true)));
             }
-            self::expect($connection->readReply('Begrüßung'), [220], 'Begrüßung');
-            $extensions = self::ehlo($connection);
+            $connection = SmtpConnection::open($this->config->host, $this->config->port, $timeout, $this->caFile);
+            $this->openSession($connection);
 
-            if ($this->config->encryption === SmtpEncryption::StartTls) {
-                if (!array_key_exists('STARTTLS', $extensions)) {
-                    throw new MailException(sprintf('Der Server %s bietet kein STARTTLS an; Versand abgebrochen.', $this->config->describe()));
+            $last = array_key_last($prepared);
+            foreach ($prepared as $i => $item) {
+                if ($item instanceof MailException) {
+                    $results[$i] = $item;
+                    continue;
                 }
-                self::command($connection, 'STARTTLS', [220], 'STARTTLS');
-                $connection->enableTls();
-                $extensions = self::ehlo($connection);
+                if (microtime(true) >= $deadline) {
+                    $results[$i] = MailException::timeBudgetExceeded();
+                    continue;
+                }
+                [$message, $messageId, $data] = $item;
+                try {
+                    self::transmit($connection, $message, $data);
+                    $results[$i] = $messageId;
+                } catch (MailException $e) {
+                    $results[$i] = $e;
+                    if ($i === $last) {
+                        // Nach einem Fehler bei der letzten Mail kein QUIT mehr, nur schließen.
+                        return self::complete($prepared, $results, $e);
+                    }
+                    // Vorgang zurücksetzen; geht auch das nicht, ist die Verbindung unbrauchbar.
+                    self::command($connection, 'RSET', [250], 'RSET');
+                }
             }
 
-            $this->authenticate($connection, $extensions['AUTH'] ?? [], $this->config->password);
-
-            self::command($connection, 'MAIL FROM:<' . MimeMessage::FROM_ADDRESS . '>', [250], 'MAIL FROM');
-            self::command($connection, 'RCPT TO:<' . $message->to->value . '>', [250, 251], 'RCPT TO');
-            self::command($connection, 'DATA', [354], 'DATA');
-            $connection->write(self::dotStuff($data) . '.' . self::CRLF, 'Nachricht');
-            self::expect($connection->readReply('Nachricht'), [250], 'Nachricht');
-
-            // Die Mail ist angenommen; ein Fehler beim Abmelden ändert daran nichts.
+            // Die Mails sind angenommen; ein Fehler beim Abmelden ändert daran nichts.
             try {
                 $connection->write('QUIT' . self::CRLF, 'QUIT');
                 $connection->readReply('QUIT');
             } catch (MailException) {
             }
-        } finally {
-            $connection->close();
-        }
 
-        return $messageId;
+            return self::complete($prepared, $results, null);
+        } catch (MailException $e) {
+            // Verbindung, Anmeldung oder RSET gescheitert: alle noch offenen Mails erhalten diesen Fehler.
+            return self::complete($prepared, $results, $e);
+        } finally {
+            $connection?->close();
+        }
     }
 
     /**
@@ -79,6 +117,63 @@ final readonly class SmtpMailer implements Mailer
         $data = (string) preg_replace('/^\./m', '..', $data);
 
         return str_ends_with($data, self::CRLF) ? $data : $data . self::CRLF;
+    }
+
+    /**
+     * Begrüßung, EHLO, ggf. STARTTLS und erneut EHLO, Anmeldung.
+     *
+     * @throws MailException
+     */
+    private function openSession(SmtpConnection $connection): void
+    {
+        if ($this->config->encryption === SmtpEncryption::Ssl) {
+            $connection->enableTls();
+        }
+        self::expect($connection->readReply('Begrüßung'), [220], 'Begrüßung');
+        $extensions = self::ehlo($connection);
+
+        if ($this->config->encryption === SmtpEncryption::StartTls) {
+            if (!array_key_exists('STARTTLS', $extensions)) {
+                throw new MailException(sprintf('Der Server %s bietet kein STARTTLS an; Versand abgebrochen.', $this->config->describe()));
+            }
+            self::command($connection, 'STARTTLS', [220], 'STARTTLS');
+            $connection->enableTls();
+            $extensions = self::ehlo($connection);
+        }
+
+        $this->authenticate($connection, $extensions['AUTH'] ?? [], $this->config->password);
+    }
+
+    /**
+     * Eine Mail über die angemeldete Verbindung.
+     *
+     * @throws MailException
+     */
+    private static function transmit(SmtpConnection $connection, MailMessage $message, string $data): void
+    {
+        self::command($connection, 'MAIL FROM:<' . MimeMessage::FROM_ADDRESS . '>', [250], 'MAIL FROM');
+        self::command($connection, 'RCPT TO:<' . $message->to->value . '>', [250, 251], 'RCPT TO');
+        self::command($connection, 'DATA', [354], 'DATA');
+        $connection->write(self::dotStuff($data) . '.' . self::CRLF, 'Nachricht');
+        self::expect($connection->readReply('Nachricht'), [250], 'Nachricht');
+    }
+
+    /**
+     * Ergebnisliste in der Reihenfolge der Mails; was noch fehlt, erhält $failure.
+     *
+     * @param list<array{MailMessage, string, string}|MailException> $prepared
+     * @param array<int, string|MailException>                      $results
+     *
+     * @return list<string|MailException>
+     */
+    private static function complete(array $prepared, array $results, ?MailException $failure): array
+    {
+        $complete = [];
+        foreach ($prepared as $i => $item) {
+            $complete[] = $results[$i] ?? ($item instanceof MailException ? $item : $failure ?? MailException::timeBudgetExceeded());
+        }
+
+        return $complete;
     }
 
     /**

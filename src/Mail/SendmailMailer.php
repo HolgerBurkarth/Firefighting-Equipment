@@ -10,6 +10,8 @@ namespace FirefightingEquipment\Mail;
  */
 final readonly class SendmailMailer implements Mailer
 {
+    use SendsEachMessage;
+
     /** @var \Closure(string, string, string, array<string, string>, string): bool */
     private \Closure $mail;
 

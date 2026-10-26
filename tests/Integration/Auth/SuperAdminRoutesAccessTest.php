@@ -33,6 +33,9 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
         yield 'Admin einladen' => ['POST', 'tenants/{tenant}/admins', ['email' => 'zweiter@example.org']];
         yield 'Benutzer ansehen' => ['GET', 'tenants/{tenant}/users', null];
         yield 'Einladung erneut senden' => ['POST', 'tenants/{tenant}/users/{user}/resend-invitation', []];
+        yield 'Super-Admins auflisten' => ['GET', 'superadmins', null];
+        yield 'Super-Admin sperren' => ['POST', 'superadmins/{superadmin}/lock', []];
+        yield 'Super-Admin entsperren' => ['POST', 'superadmins/{superadmin}/unlock', []];
     }
 
     /**
@@ -44,9 +47,10 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
         $this->account('immendingen', 'admin@example.org', ['role' => 'admin']);
         $this->account('immendingen', 'user@example.org');
         $this->account(null, 'chef@example.org');
+        $other = $this->account(null, 'zweiter@example.org');
         $tenant = $this->tenant('immendingen');
         $invited = new UserRepository($this->pdo())->inviteAdmin($tenant, EmailAddress::fromString('neu@example.org'))->user->id;
-        $path = str_replace(['{tenant}', '{user}'], [(string) $tenant->id, (string) $invited], $path);
+        $path = str_replace(['{tenant}', '{user}', '{superadmin}'], [(string) $tenant->id, (string) $invited, (string) $other], $path);
         $url = self::url(null, $path);
         $admin = $this->loginCookie('immendingen', 'admin@example.org');
         $user = $this->loginCookie('immendingen', 'user@example.org');

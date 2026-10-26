@@ -30,12 +30,61 @@ final readonly class Notifier
 
             return true;
         } catch (\Throwable $e) {
-            $this->errors->report(
-                sprintf('mail_failed (%s%s)', $purpose, $userId === null ? '' : ', Konto #' . $userId),
-                $e,
-            );
+            $this->reportFailure($purpose, $userId, $e);
 
             return false;
         }
+    }
+
+    /**
+     * Mehrere Mails in einem Durchgang (SMTP: eine Verbindung, siehe Mailer::sendMany). Jede Mail wird
+     * einzeln gebaut; Fehler (beim Bauen oder Versand, auch Überschreiten von $deadline) werden je
+     * Mail wie bei send() protokolliert.
+     *
+     * @param list<array{?int, \Closure(): MailMessage}> $mails Konto-ID (für das Protokoll) und Aufbau
+     * @param float                                      $deadline Zeitpunkt wie microtime(true)
+     *
+     * @return int Anzahl übergebener Mails
+     */
+    public function sendMany(string $purpose, array $mails, float $deadline = INF): int
+    {
+        $messages = [];
+        $userIds = [];
+        foreach ($mails as [$userId, $build]) {
+            try {
+                $messages[] = $build();
+                $userIds[] = $userId;
+            } catch (\Throwable $e) {
+                $this->reportFailure($purpose, $userId, $e);
+            }
+        }
+        if ($messages === []) {
+            return 0;
+        }
+
+        try {
+            $results = $this->mailer->sendMany($messages, $deadline);
+        } catch (\Throwable $e) {
+            $results = array_fill(0, count($messages), $e);
+        }
+
+        $sent = 0;
+        foreach ($results as $i => $result) {
+            if ($result instanceof \Throwable) {
+                $this->reportFailure($purpose, $userIds[$i], $result);
+            } else {
+                ++$sent;
+            }
+        }
+
+        return $sent;
+    }
+
+    private function reportFailure(string $purpose, ?int $userId, \Throwable $e): void
+    {
+        $this->errors->report(
+            sprintf('mail_failed (%s%s)', $purpose, $userId === null ? '' : ', Konto #' . $userId),
+            $e,
+        );
     }
 }

@@ -25,6 +25,36 @@ final class UserRuleViolationException extends UserException
         );
     }
 
+    public static function protectedAccount(int $id): self
+    {
+        return new self(sprintf(
+            'Das Konto #%d ist geschützt und kann nicht gesperrt, gelöscht oder geändert werden.'
+            . ' Der Schutz lässt sich nur per Kommandozeile auf dem Server entfernen.',
+            $id,
+        ));
+    }
+
+    public static function superAdminNotDeletable(): self
+    {
+        return new self('Super-Admins können nicht gelöscht werden, nur gesperrt.');
+    }
+
+    public static function notProtectable(int $id): self
+    {
+        return new self(sprintf(
+            'Das Konto #%d kann nicht geschützt werden: Nur aktive, nicht gesperrte Super-Admins können geschützt werden.',
+            $id,
+        ));
+    }
+
+    public static function deviceLogNotAllowed(int $id): self
+    {
+        return new self(sprintf(
+            'Für das Konto #%d gibt es die Benachrichtigung „Log“ nicht: Sie steht nur Admins und Super-Admins zur Verfügung.',
+            $id,
+        ));
+    }
+
     public static function deleted(int $id): self
     {
         return new self(sprintf('Das Konto #%d ist gelöscht und kann nicht mehr geändert werden.', $id));

@@ -50,6 +50,9 @@ final readonly class UserCommand
           php bin/user.php superadmin:password --email=ADRESSE             Passwort neu setzen
           php bin/user.php superadmin:lock --email=ADRESSE                 Super-Admin sperren
           php bin/user.php superadmin:unlock --email=ADRESSE               Super-Admin entsperren
+          php bin/user.php superadmin:protect --email=ADRESSE              Super-Admin schützen
+          php bin/user.php superadmin:unprotect --email=ADRESSE --confirm=ADRESSE
+                                                                           Schutz entfernen
           php bin/user.php list --tenant=KÜRZEL                            Konten einer Stadt anzeigen
 
         Weitere Optionen:
@@ -69,6 +72,8 @@ final readonly class UserCommand
         'superadmin:password' => ['email', 'password-stdin'],
         'superadmin:lock' => ['email'],
         'superadmin:unlock' => ['email'],
+        'superadmin:protect' => ['email'],
+        'superadmin:unprotect' => ['email', 'confirm'],
         'list' => ['tenant'],
     ];
 
@@ -77,10 +82,17 @@ final readonly class UserCommand
         'superadmin:password' => ['email'],
         'superadmin:lock' => ['email'],
         'superadmin:unlock' => ['email'],
+        'superadmin:protect' => ['email'],
+        'superadmin:unprotect' => ['email', 'confirm'],
         'list' => ['tenant'],
     ];
 
-    private const array PLACEHOLDERS = ['email' => '--email=ADRESSE', 'name' => '--name="NAME"', 'tenant' => '--tenant=KÜRZEL'];
+    private const array PLACEHOLDERS = [
+        'email' => '--email=ADRESSE',
+        'name' => '--name="NAME"',
+        'tenant' => '--tenant=KÜRZEL',
+        'confirm' => '--confirm=ADRESSE (zur Bestätigung dieselbe Adresse wie bei --email)',
+    ];
 
     /** Mehr Bytes kann ein gültiges Passwort (128 Zeichen à höchstens 4 Byte) samt Zeilenende nicht haben. */
     private const int STDIN_LIMIT = 1024;
@@ -147,6 +159,8 @@ final readonly class UserCommand
                 'superadmin:password' => $this->setPassword($users, self::required($email), $stdin, $configPath),
                 'superadmin:lock' => $this->setLocked($users, self::required($email), true),
                 'superadmin:unlock' => $this->setLocked($users, self::required($email), false),
+                'superadmin:protect' => $this->setProtected($users, self::required($email), true),
+                'superadmin:unprotect' => $this->setProtected($users, self::required($email), false),
                 'list' => $this->printTenantUsers(new TenantRepository($pdo), $users, self::required($slug)),
             };
         } catch (ConfigException | ConnectionException | UserException | TenantException | PasswordPromptException $e) {
@@ -165,14 +179,14 @@ final readonly class UserCommand
     /**
      * @param list<string> $args
      *
-     * @return array{command: string, email: ?string, name: ?string, tenant: ?string, config: ?string, passwordStdin: bool}
+     * @return array{command: string, email: ?string, name: ?string, tenant: ?string, config: ?string, confirm: ?string, passwordStdin: bool}
      *
      * @throws \InvalidArgumentException bei falschem Aufruf
      */
     public static function parseArguments(array $args): array
     {
         $command = null;
-        $values = ['email' => null, 'name' => null, 'tenant' => null, 'config' => null];
+        $values = ['email' => null, 'name' => null, 'tenant' => null, 'config' => null, 'confirm' => null];
         $passwordStdin = false;
 
         foreach ($args as $arg) {
@@ -185,7 +199,7 @@ final readonly class UserCommand
                     throw new \InvalidArgumentException('--password-stdin ist doppelt angegeben.');
                 }
                 $passwordStdin = true;
-            } elseif (preg_match('/^--(email|name|tenant|config)=(.*)$/sD', $arg, $match) === 1) {
+            } elseif (preg_match('/^--(email|name|tenant|config|confirm)=(.*)$/sD', $arg, $match) === 1) {
                 $key = $match[1];
                 if ($values[$key] !== null) {
                     throw new \InvalidArgumentException(sprintf('--%s ist doppelt angegeben.', $key));
@@ -224,13 +238,17 @@ final readonly class UserCommand
                 throw new \InvalidArgumentException(sprintf('%s braucht %s.', $command, self::PLACEHOLDERS[$key]));
             }
         }
-        foreach (['email', 'name', 'tenant'] as $key) {
+        foreach (['email', 'name', 'tenant', 'confirm'] as $key) {
             if ($values[$key] !== null && !in_array($key, self::OPTIONS[$command], true)) {
                 throw new \InvalidArgumentException(sprintf('--%s ist bei %s nicht möglich.', $key, $command));
             }
         }
         if ($passwordStdin && !in_array('password-stdin', self::OPTIONS[$command], true)) {
             throw new \InvalidArgumentException(sprintf('--password-stdin ist bei %s nicht möglich.', $command));
+        }
+        // Bewusste Bestätigung: genau dieselbe Angabe wie bei --email (wie purge-device-data).
+        if ($values['confirm'] !== null && $values['confirm'] !== $values['email']) {
+            throw new \InvalidArgumentException('--confirm muss genau dieselbe Adresse wie --email enthalten.');
         }
 
         return ['command' => $command, ...$values, 'passwordStdin' => $passwordStdin];
@@ -286,6 +304,9 @@ final readonly class UserCommand
     private function setLocked(UserRepository $users, EmailAddress $email, bool $locked): void
     {
         $user = $users->findSuperAdminByEmail($email) ?? throw UserNotFoundException::superAdmin($email);
+        if ($locked && $user->protected) {
+            fwrite($this->err, 'HINWEIS: Zuerst den Schutz entfernen: superadmin:unprotect --email=… --confirm=…' . PHP_EOL);
+        }
 
         $changed = $locked ? $users->lock($user->id) : $users->unlock($user->id);
 
@@ -294,6 +315,25 @@ final readonly class UserCommand
             $changed => sprintf('Super-Admin entsperrt: %s', $email->value),
             $locked => sprintf('Super-Admin ist bereits gesperrt: %s', $email->value),
             default => sprintf('Super-Admin ist nicht gesperrt: %s', $email->value),
+        });
+    }
+
+    /**
+     * Schutz setzen bzw. entfernen (nur hier, nie über die API).
+     *
+     * @throws UserException
+     */
+    private function setProtected(UserRepository $users, EmailAddress $email, bool $protected): void
+    {
+        $user = $users->findSuperAdminByEmail($email) ?? throw UserNotFoundException::superAdmin($email);
+
+        $changed = $protected ? $users->protect($user->id) : $users->unprotect($user->id);
+
+        $this->line(match (true) {
+            $changed && $protected => sprintf('Super-Admin geschützt: %s', $email->value),
+            $changed => sprintf('Schutz entfernt: %s', $email->value),
+            $protected => sprintf('Super-Admin ist bereits geschützt: %s', $email->value),
+            default => sprintf('Super-Admin ist nicht geschützt: %s', $email->value),
         });
     }
 
@@ -348,12 +388,13 @@ final readonly class UserCommand
             return;
         }
 
-        $rows = [['ID', 'E-Mail', 'Status', 'Angelegt (UTC)', 'Name']];
+        $rows = [['ID', 'E-Mail', 'Status', 'Geschützt', 'Angelegt (UTC)', 'Name']];
         foreach ($users as $user) {
             $rows[] = [
                 (string) $user->id,
                 $user->email->value ?? '–',
                 self::statusText($user),
+                $user->protected ? 'ja' : 'nein',
                 $user->createdAt->format('Y-m-d H:i:s'),
                 $user->label(),
             ];

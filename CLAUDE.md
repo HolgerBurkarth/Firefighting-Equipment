@@ -14,6 +14,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `config/config.local.php` committen.
 - Code und Bezeichner auf Englisch, Dokumentation und Oberflächentexte auf Deutsch.
 - Antworten an den Nutzer immer auf Deutsch.
+- Live-Tests (gegen den Server www.prodad.de) nur in der Test-Stadt `/firefighting/test/`, nie in
+  echten Städten.
 
 ## Zielumgebung (STRATO, Shared Hosting)
 - PHP 8.5 (CGI), MariaDB 10.11, Apache mit `.htaccess` und mod_rewrite.
@@ -73,7 +75,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Handler implementieren `RequestHandler` (Rückgabe `Response`, in der Regel `JsonResponse`) und
   erhalten `RequestContext` (Anfrage, Stadt oder
   `null` unter `service`, `LazyConnection`, `ErrorReporter`, Platzhalter `param()`, JSON-Body
-  `body`/`stringField()`/`optionalStringField()`/`intField(name, min, max)`/
+  `body`/`stringField()`/`optionalStringField()`/`boolField()` (nur echte JSON-Werte true/false)/
+  `intField(name, min, max)`/
   `optionalIntField(name, min, max)` (nur echte JSON-Ganzzahlen; optional: fehlt oder `null` →
   `null`), `hasField(name)` (Feld vorhanden, auch mit `null`; unterscheidet "leeren" von
   "unverändert"), Query-String über `request->query()` (nur einfache Werte), `queryFlag(name)` (`1` =
@@ -286,6 +289,21 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Status eines Kontos (`fe_users.status`): `invited` (erster Admin, Passwort noch nicht gesetzt)
   → `unverified` (registriert, E-Mail unbestätigt) → `pending` (wartet auf Freischaltung) →
   `active`; dazu `deleted` (anonymisiert). Sperren ist davon getrennt (`locked_at`).
+- Super-Admins werden nie gelöscht/anonymisiert, nur gesperrt (CHECK
+  `chk_fe_users_superadmin_not_deleted`, Migration `0017`, und `UserRepository::anonymize`). Immer
+  bleibt mindestens ein aktiver, nicht gesperrter Super-Admin.
+- Geschütztes Konto (`fe_users.protected`, Migration `0016`): Die Datenbank erzwingt per CHECK
+  `chk_fe_users_protected` geschützt ⇒ Rolle `superadmin`, Status `active`, nicht gesperrt. Ein
+  geschütztes Konto wird weder gesperrt noch gelöscht noch in Rolle oder Anzeigename geändert
+  (`UserRuleViolationException::protectedAccount`, 409 über die API); erlaubt bleiben das eigene
+  Passwort (`auth/password`, Passwort vergessen, `bin/user.php superadmin:password` als Notfallweg auf
+  dem Server), `rehashPassword` und die eigene Benachrichtigung. Setzen und Entfernen NUR per
+  Kommandozeile (`superadmin:protect`, `superadmin:unprotect --confirm=<gleiche Adresse wie
+  --email>`), nie über die API (die API zeigt `protected` nur an). Keine E-Mail-Adresse eines echten
+  Kontos im Code oder Repository.
+- Benachrichtigung „Log“ (`fe_users.notify_device_log`, Migration `0018`, Standard 0): CHECK
+  `chk_fe_users_notify_device_log` erlaubt 1 nur für `admin`/`superadmin` und nicht `deleted`;
+  `changeRole` auf `user` und Anonymisieren setzen sie auf 0. Siehe "Benachrichtigung „Log“".
 - Passwörter: mindestens 10, höchstens 128 Zeichen, keine Komplexitätspflicht, Sperrliste
   häufiger Passwörter, kein Bestandteil von E-Mail, Name oder Stadtname. Hash mit Argon2id
   (`PASSWORD_ARGON2ID`, Standardparameter; auf STRATO in CLI und Web verfügbar).
@@ -351,7 +369,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - `UserRepository`: ändernde Methoden (`lock`, `unlock`, `changeRole`, `setPassword`,
   `anonymize`, `register`, `verifyEmail`, `approve`, `reject`, `changeDisplayName`,
   `anonymizeStaleUnverified`, `createTenantWithInvitedAdmin`, `inviteAdmin`, `renewInvitation`,
-  `acceptInvitation`) öffnen eine eigene Transaktion (eine bereits offene ist ein Fehler) und sperren
+  `acceptInvitation`, `protect`, `unprotect`, `setDeviceLogNotification`) öffnen eine eigene Transaktion (eine bereits offene ist ein Fehler) und sperren
   zuerst alle Konten derselben Stadt bzw. alle Super-Admins (`FOR UPDATE` über
   `FORCE INDEX (uq_fe_users_tenant_email)`, immer dieselbe Abfrage → gleiche Sperrreihenfolge,
   andere Städte unberührt). Danach Regeln prüfen, dann schreiben.
@@ -359,6 +377,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     nicht gesperrt, herabgestuft oder anonymisiert (`UserRuleViolationException`).
   - Die Rolle `superadmin` wird per `changeRole` weder vergeben noch entzogen. `setPassword` nicht
     für `invited` (eigener Ablauf). Gelöschte Konten werden nicht mehr geändert.
+  - Super-Admins: `anonymize` immer abgelehnt (`superAdminNotDeletable`). Geschützte Konten:
+    `lock`, `changeRole`, `changeDisplayName` abgelehnt (`protectedAccount`); `protect` nur für
+    aktive, nicht gesperrte Super-Admins (`notProtectable`); `protect`/`unprotect` wiederholbar
+    (`bool`). `setDeviceLogNotification` nur für Admins und Super-Admins (`deviceLogNotAllowed`).
+    `listDeviceLogRecipients(Tenant)`: aktiv, nicht gesperrt, Option an; Admins dieser Stadt, dann
+    alle Super-Admins (nach ID).
   - Sperren, Rollenwechsel, Passwort setzen und Anonymisieren löschen alle `fe_sessions` des
     Kontos; Anonymisieren zusätzlich alle `fe_user_tokens`. Abgelehnte Änderungen lassen alles
     unverändert (Rollback).
@@ -367,8 +391,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     den neuen Hash nur, wenn noch der alte gespeichert ist, und beendet keine Sitzungen.
     `passwordHash()` liefert den Hash nur für die Anmeldung; `User` enthält ihn weiterhin nicht.
 - Kommandozeile `bin/user.php` (Code `src/Cli/UserCommand.php`): `superadmin:create --email=…
-  --name=…`, `superadmin:list`, `superadmin:password --email=…`, `superadmin:lock --email=…`,
-  `superadmin:unlock --email=…`, `list --tenant=…`, `--config=PFAD`; Exit-Codes 0/1/2.
+  --name=…`, `superadmin:list` (mit Spalte "Geschützt"), `superadmin:password --email=…`,
+  `superadmin:lock --email=…`, `superadmin:unlock --email=…`, `superadmin:protect --email=…`,
+  `superadmin:unprotect --email=… --confirm=…` (`--confirm` Pflicht und exakt gleich `--email`,
+  bei anderen Befehlen verboten; sonst Exit-Code 2), `list --tenant=…`, `--config=PFAD`; Exit-Codes
+  0/1/2. `superadmin:lock` auf ein geschütztes Konto: Hinweis auf `superadmin:unprotect`, Exit-Code 1.
   Auf dem Server: `cd ~/htdocs/apps/firefighting-equipment && php85 bin/user.php superadmin:list`.
   - Passwörter nie als Argument (`--password=…` wird abgelehnt, ohne den Wert auszugeben).
     Verdeckte Eingabe mit Wiederholung per `stty` (`TerminalPasswordPrompt`); unter Windows oder
@@ -384,6 +411,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Stadt): `POST auth/login` und `POST auth/logout` (öffentlich; Logout wiederholbar, löscht das
   Cookie immer), `GET auth/me`, `GET auth/sessions`, `DELETE auth/sessions/{id}`,
   `POST auth/sessions/logout-others`, `POST auth/password` (angemeldet),
+  `GET`/`POST auth/notifications` (eigene Benachrichtigung; unter Städten `Access::Admin`, unter
+  `service` `Access::SuperAdmin`; Rechte in `NotificationSettingsTest`, da die Route in beiden
+  Bereichen existiert und nicht in die Access-Tests passt),
   `POST auth/password-reset/request` und `POST auth/password-reset/confirm` (öffentlich, siehe
   "Passwort vergessen"). Nur unter Städten: `POST auth/register`, `POST auth/email/verify`,
   `POST auth/email/resend` (öffentlich, siehe "Einladung, Registrierung und E-Mail-Bestätigung"),
@@ -465,6 +495,14 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Fehler werden hier angezeigt (bei SMTP Schritt und Antwort des Servers, dazu Transport, Server
   und Dauer, nie Zugangsdaten). Exit-Codes 0/1/2. Auf dem Server:
   `cd ~/htdocs/apps/firefighting-equipment && php85 bin/mail-test.php --to=…`.
+- Mehrere Mails einer Anfrage: `Mailer::sendMany(messages, deadline)` liefert je Mail die
+  Message-ID oder die `MailException`; nach `deadline` (wie `microtime(true)`) wird keine Mail mehr
+  begonnen (`MailException::timeBudgetExceeded`). Transporte ohne Verbindung über den Trait
+  `SendsEachMessage`; `SmtpMailer` verwendet EINE Verbindung mit einer Anmeldung (nach einer
+  abgelehnten Mail `RSET`, dann die nächste; scheitert Verbindung, Anmeldung oder `RSET`, erhalten
+  alle offenen Mails den Fehler; die Frist `timeout` gilt für die ganze Verbindung, höchstens bis
+  `deadline`). `Notifier::sendMany(purpose, [[kontoId, aufbau], …], deadline)` baut jede Mail
+  einzeln und protokolliert jeden Fehler wie `send()`.
 - `MimeMessage::toString()` (für `.eml` und SMTP) faltet Kopfzeilen über 78 Zeichen an Leerzeichen
   (nie vor einem leeren Wort); `mail()` erhält `To`/`Subject` weiterhin ungefaltet.
 
@@ -593,6 +631,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `TenantJson`, `TenantFields`).
 - Der Router kennt nur Ganzzahl-Platzhalter; Städte werden daher in der API über ihre ID
   angesprochen, das Kürzel steht nur in den Antworten.
+- Super-Admins (`src/Api/V1/SuperAdmins/`, `SuperAdminListHandler`, `SuperAdminLockHandler`,
+  `SuperAdminJson` = `UserJson` + `protected`): `GET superadmins` → `{"super_admins": [...]}` (nach
+  ID), `POST superadmins/{id}/lock` bzw. `unlock {}` → `{"super_admin": …}` (wiederholbar; Sperren
+  beendet die Sitzungen). Unbekannt oder Konto einer Stadt → 404; sich selbst sperren, geschütztes
+  Konto, letzter aktiver Super-Admin → 409 `rule_violation`. Anlegen, Passwort und Schutz nur per
+  Kommandozeile.
 - `GET tenants` (nach Kürzel, mit `counts`: `users_active` = Status `active` und nicht gesperrt,
   `admins_active`, `admins_invited`), `GET tenants/{id}`, `POST tenants {slug, name, admin_email}`
   → 201 `{tenant, user, mail_sent}`, `POST tenants/{id}/rename {name}`, `POST tenants/{id}/lock`
@@ -1005,6 +1049,33 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   übersprungene Zeilen schreiben nichts.
 - Laufzeit: lokal 5000 Zeilen Vorschau unter 0,5 s, Übernehmen 0,8 s (neu) bis 2 s (geändert),
   Spitzenspeicher rund 45 MiB; Schätzung für STRATO und Messung siehe README ("CSV-Import").
+
+## Benachrichtigung „Log“
+- Eigene Einstellung über `GET`/`POST auth/notifications {device_log: bool}` (siehe "Anmeldung und
+  Sitzungen im Code", `NotificationSettingsHandler`), auch in `auth/me` (`notifications`). Standard aus.
+- Auslöser: jeder Vorgang, der in der Geräte-Historie protokolliert wird (Anlegen, CSV-Import,
+  Umbuchen/Status, Aussondern, Wiederaufnehmen, Prüfdatum, Stammdaten). Ohne neues Ereignis (nichts
+  geändert, Fehler, Versionskonflikt) keine Mail.
+- Code: `src/Notification/DeviceLogNotifier.php` (`deviceChanged`, `imported`; `fromContext()`),
+  `DeviceEventRecorder` (IDs der Ereignisse der letzten erfolgreichen Transaktion von
+  `DeviceRepository`; nach Rollback leer; nur der ungepufferte `DeviceEventWriter` meldet IDs),
+  `DeviceEventRepository::findForDevice`, Vorlagen `MailTemplates::deviceLog` und
+  `deviceImportLog`. Aufruf in `DeviceActionHandler` und `DeviceImportHandler` NACH der Rückkehr des
+  Repositorys (also nach dem Commit). Tests: `tests/Integration/Notification/DeviceLogNotificationTest`.
+- Empfänger: `UserRepository::listDeviceLogRecipients` (Admins nur der Stadt des Vorgangs,
+  Super-Admins aller Städte; aktiv, nicht gesperrt, Option an), nie der Auslöser. Eine Mail je
+  Empfänger und Anfrage; ein CSV-Import ergibt EINE Sammelmail (Zusammenfassung, höchstens
+  `MAX_IMPORT_LINES` = 50 Zeilen mit Einzelheiten, danach „… und N weitere“; ohne neue oder geänderte
+  Geräte keine Mail).
+- Betreff „Log <Stadtname>: <Grund>“ (z. B. „MA-01 umgebucht, Status defekt“, „CSV-Import: 2 neu,
+  1 geändert“, höchstens 200 Zeichen). Text: Vorgang, Gerät (Kennung, Typ), Wer (Anzeigename), Wann
+  (Europe/Berlin), Von/Nach je Ereignis, Kommentar, Link `AppUrls::area` (Startseite der Stadt, bis
+  das Frontend Geräteseiten hat). Werte einzeilig, höchstens 200 Zeichen.
+- Versand über `Notifier::sendMany` (Zweck `device_log`; Fehler nur im Protokoll, der Vorgang ist
+  bereits gespeichert). Begrenzung: höchstens `MAX_RECIPIENTS` = 25 Empfänger (zuerst Admins der
+  Stadt; Überschreitung als `device_log_recipients_capped`) und `TIME_BUDGET_SECONDS` = 10 s je
+  Anfrage (danach `mail_failed` mit „Zeitbudget … überschritten“). Eine SMTP-Verbindung für alle
+  Mails (auf STRATO gemessen rund 0,22 s je Mail). Kein Cron, keine Warteschlange.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".

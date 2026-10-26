@@ -27,8 +27,14 @@ final class DeviceEventWriter
     /** @var list<list<int|string|null>> */
     private array $pending = [];
 
-    public function __construct(private readonly \PDO $pdo, private readonly bool $buffered = false)
-    {
+    /**
+     * @param DeviceEventRecorder|null $recorder erhält im ungepufferten Betrieb die ID jedes Ereignisses
+     */
+    public function __construct(
+        private readonly \PDO $pdo,
+        private readonly bool $buffered = false,
+        private readonly ?DeviceEventRecorder $recorder = null,
+    ) {
     }
 
     /**
@@ -126,6 +132,7 @@ final class DeviceEventWriter
 
         if (!$this->buffered) {
             $this->write([$row]);
+            $this->recorder?->add((int) $this->pdo->lastInsertId());
 
             return;
         }

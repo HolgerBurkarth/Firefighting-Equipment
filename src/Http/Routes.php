@@ -11,6 +11,7 @@ use FirefightingEquipment\Api\V1\Auth\LoginHandler;
 use FirefightingEquipment\Api\V1\Auth\LogoutHandler;
 use FirefightingEquipment\Api\V1\Auth\LogoutOthersHandler;
 use FirefightingEquipment\Api\V1\Auth\MeHandler;
+use FirefightingEquipment\Api\V1\Auth\NotificationSettingsHandler;
 use FirefightingEquipment\Api\V1\Auth\PasswordChangeHandler;
 use FirefightingEquipment\Api\V1\Auth\PasswordResetConfirmHandler;
 use FirefightingEquipment\Api\V1\Auth\PasswordResetRequestHandler;
@@ -36,6 +37,8 @@ use FirefightingEquipment\Api\V1\Invitation\InvitationCodeRevokeHandler;
 use FirefightingEquipment\Api\V1\Locations\LocationAction;
 use FirefightingEquipment\Api\V1\Locations\LocationActionHandler;
 use FirefightingEquipment\Api\V1\Locations\LocationListHandler;
+use FirefightingEquipment\Api\V1\SuperAdmins\SuperAdminListHandler;
+use FirefightingEquipment\Api\V1\SuperAdmins\SuperAdminLockHandler;
 use FirefightingEquipment\Api\V1\TenantHandler;
 use FirefightingEquipment\Api\V1\Tenants\AdminInvitationHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantAction;
@@ -75,7 +78,12 @@ final class Routes
             ->add('POST', 'api/v1/tenants/{id}/unlock', Access::SuperAdmin, new TenantActionHandler(TenantAction::Unlock))
             ->add('POST', 'api/v1/tenants/{id}/admins', Access::SuperAdmin, new AdminInvitationHandler(resend: false))
             ->add('GET', 'api/v1/tenants/{id}/users', Access::SuperAdmin, new TenantUserListHandler())
-            ->add('POST', 'api/v1/tenants/{id}/users/{user}/resend-invitation', Access::SuperAdmin, new AdminInvitationHandler(resend: true));
+            ->add('POST', 'api/v1/tenants/{id}/users/{user}/resend-invitation', Access::SuperAdmin, new AdminInvitationHandler(resend: true))
+            ->add('GET', 'api/v1/superadmins', Access::SuperAdmin, new SuperAdminListHandler())
+            ->add('POST', 'api/v1/superadmins/{id}/lock', Access::SuperAdmin, new SuperAdminLockHandler(lock: true))
+            ->add('POST', 'api/v1/superadmins/{id}/unlock', Access::SuperAdmin, new SuperAdminLockHandler(lock: false))
+            ->add('GET', 'api/v1/auth/notifications', Access::SuperAdmin, new NotificationSettingsHandler(update: false))
+            ->add('POST', 'api/v1/auth/notifications', Access::SuperAdmin, new NotificationSettingsHandler(update: true));
     }
 
     /**
@@ -96,6 +104,8 @@ final class Routes
             ->add('POST', 'api/v1/auth/email/verify', Access::Public, new EmailVerifyHandler())
             ->add('POST', 'api/v1/auth/email/resend', Access::Public, self::withDuration(EmailResendHandler::class, $neutralDuration))
             ->add('POST', 'api/v1/auth/invitation/accept', Access::Public, new InvitationAcceptHandler())
+            ->add('GET', 'api/v1/auth/notifications', Access::Admin, new NotificationSettingsHandler(update: false))
+            ->add('POST', 'api/v1/auth/notifications', Access::Admin, new NotificationSettingsHandler(update: true))
             ->add('GET', 'api/v1/invitation-codes', Access::Admin, new InvitationCodeListHandler())
             ->add('POST', 'api/v1/invitation-codes', Access::Admin, new InvitationCodeCreateHandler())
             ->add('POST', 'api/v1/invitation-codes/{id}/revoke', Access::Admin, new InvitationCodeRevokeHandler())
@@ -123,8 +133,8 @@ final class Routes
             ->add('GET', 'api/v1/devices/export', Access::Authenticated, new DeviceExportHandler($clock))
             ->add('GET', 'api/v1/device-events/export', Access::Authenticated, new DeviceHistoryExportHandler($clock))
             ->add('POST', 'api/v1/devices', Access::Admin, new DeviceActionHandler(DeviceAction::Create))
-            ->add('POST', 'api/v1/devices/import/preview', Access::Admin, new DeviceImportHandler(apply: false), DeviceImportHandler::MAX_BODY_BYTES)
-            ->add('POST', 'api/v1/devices/import', Access::Admin, new DeviceImportHandler(apply: true), DeviceImportHandler::MAX_BODY_BYTES)
+            ->add('POST', 'api/v1/devices/import/preview', Access::Admin, new DeviceImportHandler(apply: false, clock: $clock), DeviceImportHandler::MAX_BODY_BYTES)
+            ->add('POST', 'api/v1/devices/import', Access::Admin, new DeviceImportHandler(apply: true, clock: $clock), DeviceImportHandler::MAX_BODY_BYTES)
             ->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceActionHandler(DeviceAction::Show))
             ->add('POST', 'api/v1/devices/{id}/fields', Access::Admin, new DeviceActionHandler(DeviceAction::UpdateFields))
             ->add('POST', 'api/v1/devices/{id}/inspection-due', Access::Admin, new DeviceActionHandler(DeviceAction::SetInspectionDue))

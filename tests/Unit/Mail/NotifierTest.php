@@ -90,6 +90,57 @@ final class NotifierTest extends TestCase
         ConfiguredMailer::fromConfigFile('gibt-es-nicht.php', __DIR__)->send(self::message());
     }
 
+    public function testSendManySendsAllInOneBatch(): void
+    {
+        $mailer = new FakeMailer();
+
+        $sent = $this->notifier($mailer)->sendMany('device_log', [[1, self::message(...)], [2, self::message(...)], [3, self::message(...)]]);
+
+        self::assertSame(3, $sent);
+        self::assertCount(3, $mailer->sent);
+        self::assertSame([3], $mailer->batches, 'ein Aufruf des Transports');
+        self::assertSame([], $this->log);
+    }
+
+    public function testSendManyLogsEachFailureWithoutRecipientOrText(): void
+    {
+        $sent = $this->notifier(new FakeMailer(fail: true))->sendMany('device_log', [
+            [1, self::message(...)],
+            [2, static fn (): MailMessage => throw new \RuntimeException('kaputt')],
+            [3, self::message(...)],
+        ]);
+
+        self::assertSame(0, $sent);
+        self::assertCount(3, $this->log);
+        self::assertStringStartsWith('firefighting: mail_failed (device_log, Konto #2): RuntimeException: kaputt', $this->log[0]);
+        self::assertStringStartsWith('firefighting: mail_failed (device_log, Konto #1): ', $this->log[1]);
+        self::assertStringStartsWith('firefighting: mail_failed (device_log, Konto #3): ', $this->log[2]);
+        foreach ($this->log as $line) {
+            self::assertStringNotContainsString('GEHEIM', $line);
+            self::assertStringNotContainsString('erika@example.org', $line);
+        }
+    }
+
+    public function testSendManyStopsAtDeadline(): void
+    {
+        $mailer = new FakeMailer();
+
+        $sent = $this->notifier($mailer)->sendMany('device_log', [[1, self::message(...)], [2, self::message(...)]], microtime(true) - 1.0);
+
+        self::assertSame(0, $sent);
+        self::assertSame([], $mailer->sent);
+        self::assertCount(2, $this->log);
+        self::assertStringContainsString('Zeitbudget für den Versand überschritten', $this->log[0]);
+    }
+
+    public function testConfiguredMailerSendManyWithUnusableConfiguration(): void
+    {
+        $results = ConfiguredMailer::fromConfigFile('gibt-es-nicht.php', __DIR__)->sendMany([self::message(), self::message()]);
+
+        self::assertCount(2, $results);
+        self::assertContainsOnlyInstancesOf(MailException::class, $results);
+    }
+
     private function notifier(FakeMailer $mailer): Notifier
     {
         return new Notifier($mailer, new ErrorReporter(function (string $line): void {

@@ -35,7 +35,15 @@ final class LoginTest extends AuthTestCase
         self::assertSame(200, $response->statusCode(), $response->body());
         $data = self::json($response);
         self::assertSame(
-            ['id' => $id, 'email' => 'user@example.org', 'name' => 'Erika Musterfrau', 'display_name' => 'Erika', 'role' => 'user'],
+            [
+                'id' => $id,
+                'email' => 'user@example.org',
+                'name' => 'Erika Musterfrau',
+                'display_name' => 'Erika',
+                'role' => 'user',
+                'protected' => false,
+                'notifications' => ['device_log' => false],
+            ],
             $data['user'],
         );
         self::assertSame(['slug' => 'immendingen', 'name' => 'Feuerwehr immendingen'], $data['tenant']);

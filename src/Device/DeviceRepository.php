@@ -44,7 +44,11 @@ final readonly class DeviceRepository
         . ' LEFT JOIN fe_locations p ON p.id = l.parent_id AND p.tenant_id = d.tenant_id'
         . ' WHERE d.tenant_id = ?';
 
-    public function __construct(private \PDO $pdo)
+    /**
+     * @param DeviceEventRecorder|null $recorder erhält die IDs der Ereignisse der letzten erfolgreichen
+     *                                           Änderung (für die Benachrichtigung „Log“)
+     */
+    public function __construct(private \PDO $pdo, private ?DeviceEventRecorder $recorder = null)
     {
     }
 
@@ -243,7 +247,7 @@ final readonly class DeviceRepository
             }
             $id = (int) $this->pdo->lastInsertId();
 
-            new DeviceEventWriter($this->pdo)->created($tenant, $id, $userId, $device->locationId, $device->status, $comment);
+            new DeviceEventWriter($this->pdo, recorder: $this->recorder)->created($tenant, $id, $userId, $device->locationId, $device->status, $comment);
 
             return $id;
         }, $tenant);
@@ -299,7 +303,7 @@ final readonly class DeviceRepository
                     : $e;
             }
 
-            $events = new DeviceEventWriter($this->pdo);
+            $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder);
             foreach ($changed as $field => [$old, $new]) {
                 $events->fieldChanged($tenant, $id, $userId, DeviceField::from($field), $old, $new, $comment);
             }
@@ -329,7 +333,7 @@ final readonly class DeviceRepository
 
             $this->pdo->prepare('UPDATE fe_devices SET next_inspection_due = ?, version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?')
                 ->execute([$due?->value, $id, $tenant->id]);
-            new DeviceEventWriter($this->pdo)->dueChanged($tenant, $id, $userId, $current->nextInspectionDue, $due, $comment);
+            new DeviceEventWriter($this->pdo, recorder: $this->recorder)->dueChanged($tenant, $id, $userId, $current->nextInspectionDue, $due, $comment);
 
             return $id;
         }, $tenant);
@@ -464,7 +468,7 @@ final readonly class DeviceRepository
         $this->pdo->prepare('UPDATE fe_devices SET location_id = ?, status = ?' . $set . ', version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?')
             ->execute([$locationId, $status->value, ...array_column($fields, 2), $current->id, $tenant->id]);
 
-        $events = new DeviceEventWriter($this->pdo);
+        $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder);
         foreach ($fields as $field => [$old, $new]) {
             $events->fieldChanged($tenant, $current->id, $userId, DeviceField::from($field), $old, $new, $comment);
         }
@@ -621,11 +625,13 @@ final readonly class DeviceRepository
             throw new \LogicException('DeviceRepository startet eine eigene Transaktion; keine offene Transaktion erlaubt.');
         }
 
+        $this->recorder?->reset();
         $this->pdo->beginTransaction();
         try {
             $id = $work();
             $this->pdo->commit();
         } catch (\Throwable $e) {
+            $this->recorder?->reset();
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }

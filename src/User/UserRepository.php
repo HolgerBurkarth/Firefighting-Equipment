@@ -24,6 +24,10 @@ use FirefightingEquipment\Tenant\TenantSlug;
  * immer den aktuellen Stand, und die Regeln „letzter Admin“ und „letzter Super-Admin“ lassen sich
  * nicht durch zwei parallele Aufrufe umgehen. Sperren, Rollenwechsel, Passwort setzen und
  * Anonymisieren beenden alle Sitzungen des Kontos.
+ *
+ * Geschützte Konten (protected, nur Super-Admins) lehnen Änderungen durch andere ab; erlaubt bleiben
+ * Passwort ändern bzw. zurücksetzen und die eigene Benachrichtigung. Super-Admins werden nie
+ * anonymisiert. Beides erzwingt zusätzlich die Datenbank (CHECK).
  */
 final readonly class UserRepository
 {
@@ -32,7 +36,7 @@ final readonly class UserRepository
 
     private const int ER_DUP_ENTRY = 1062;
     private const string COLUMNS = 'id, tenant_id, role, status, email, name, display_name, email_verified_at,'
-        . ' locked_at, deleted_at, created_at, updated_at';
+        . ' locked_at, deleted_at, created_at, updated_at, protected, notify_device_log';
 
     public function __construct(private \PDO $pdo)
     {
@@ -221,12 +225,13 @@ final readonly class UserRepository
      * @return bool ob sich etwas geändert hat (false: war bereits gesperrt)
      *
      * @throws UserNotFoundException
-     * @throws UserRuleViolationException letzter Admin bzw. Super-Admin, gelöschtes Konto
+     * @throws UserRuleViolationException letzter Admin bzw. Super-Admin, gelöschtes oder geschütztes Konto
      */
     public function lock(int $id): bool
     {
         return $this->transaction($id, function (User $user, array $group): bool {
             self::assertNotDeleted($user);
+            self::assertNotProtected($user);
             if ($user->isLocked()) {
                 return false;
             }
@@ -271,6 +276,7 @@ final readonly class UserRepository
     {
         return $this->transaction($id, function (User $user, array $group) use ($role): bool {
             self::assertNotDeleted($user);
+            self::assertNotProtected($user);
             if ($role === UserRole::SuperAdmin || $user->role === UserRole::SuperAdmin) {
                 throw UserRuleViolationException::superAdminRole();
             }
@@ -279,7 +285,8 @@ final readonly class UserRepository
             }
             self::assertNotLastAdministrator($user, $group);
 
-            $this->update($user->id, 'role = ?', [$role->value]);
+            // Die Benachrichtigung „Log“ gibt es nur für Admins (CHECK chk_fe_users_notify_device_log).
+            $this->update($user->id, 'role = ?, notify_device_log = ?', [$role->value, $role === UserRole::User ? '0' : ($user->notifyDeviceLog ? '1' : '0')]);
             $this->endSessions($user->id);
 
             return true;
@@ -340,6 +347,7 @@ final readonly class UserRepository
     {
         return $this->transaction($id, function (User $user) use ($displayName): bool {
             self::assertNotDeleted($user);
+            self::assertNotProtected($user);
             if ($user->displayName?->value === $displayName->value) {
                 return false;
             }
@@ -413,11 +421,14 @@ final readonly class UserRepository
      * @return bool ob sich etwas geändert hat (false: war bereits gelöscht)
      *
      * @throws UserNotFoundException
-     * @throws UserRuleViolationException letzter Admin bzw. Super-Admin
+     * @throws UserRuleViolationException letzter Admin, Super-Admin (nie löschbar)
      */
     public function anonymize(int $id): bool
     {
         return $this->transaction($id, function (User $user, array $group): bool {
+            if ($user->role === UserRole::SuperAdmin) {
+                throw UserRuleViolationException::superAdminNotDeletable();
+            }
             if ($user->isDeleted()) {
                 return false;
             }
@@ -498,6 +509,92 @@ final readonly class UserRepository
 
             return true;
         });
+    }
+
+    /**
+     * Schützt einen Super-Admin (nur per Kommandozeile). Nur aktive, nicht gesperrte Super-Admins.
+     *
+     * @return bool ob sich etwas geändert hat (false: war bereits geschützt)
+     *
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException kein aktiver, nicht gesperrter Super-Admin
+     */
+    public function protect(int $id): bool
+    {
+        return $this->transaction($id, function (User $user): bool {
+            if ($user->protected) {
+                return false;
+            }
+            if ($user->role !== UserRole::SuperAdmin || $user->status !== UserStatus::Active || $user->isLocked()) {
+                throw UserRuleViolationException::notProtectable($user->id);
+            }
+
+            $this->update($user->id, 'protected = 1');
+
+            return true;
+        });
+    }
+
+    /**
+     * Entfernt den Schutz (nur per Kommandozeile mit Bestätigung).
+     *
+     * @return bool ob sich etwas geändert hat (false: war nicht geschützt)
+     *
+     * @throws UserNotFoundException
+     */
+    public function unprotect(int $id): bool
+    {
+        return $this->transaction($id, function (User $user): bool {
+            if (!$user->protected) {
+                return false;
+            }
+
+            $this->update($user->id, 'protected = 0');
+
+            return true;
+        });
+    }
+
+    /**
+     * Schaltet die Benachrichtigung „Log“ des Kontos ein oder aus (nur Admins und Super-Admins; auch
+     * für geschützte Konten, es ist eine Einstellung des eigenen Kontos).
+     *
+     * @return bool ob sich etwas geändert hat
+     *
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException Rolle user oder gelöschtes Konto
+     */
+    public function setDeviceLogNotification(int $id, bool $enabled): bool
+    {
+        return $this->transaction($id, function (User $user) use ($enabled): bool {
+            if (!$user->mayReceiveDeviceLog()) {
+                throw UserRuleViolationException::deviceLogNotAllowed($user->id);
+            }
+            if ($user->notifyDeviceLog === $enabled) {
+                return false;
+            }
+
+            $this->update($user->id, 'notify_device_log = ?', [$enabled ? '1' : '0']);
+
+            return true;
+        });
+    }
+
+    /**
+     * Empfänger der Benachrichtigung „Log“ für Vorgänge einer Stadt: aktive, nicht gesperrte Konten
+     * mit eingeschalteter Option, und zwar die Admins dieser Stadt und alle Super-Admins (diese
+     * zuletzt), je nach ID. Konten anderer Städte nie.
+     *
+     * @return list<User>
+     */
+    public function listDeviceLogRecipients(Tenant $tenant): array
+    {
+        return $this->fetchAll(
+            'SELECT ' . self::COLUMNS . " FROM fe_users WHERE notify_device_log = 1 AND status = 'active' AND locked_at IS NULL"
+            . " AND ((tenant_id = ? AND role = 'admin') OR (tenant_key = 0 AND role = 'superadmin'))"
+            . ' ORDER BY tenant_key = 0, id',
+            [$tenant->id],
+        );
     }
 
     /**
@@ -669,6 +766,16 @@ final readonly class UserRepository
     /**
      * @throws UserRuleViolationException
      */
+    private static function assertNotProtected(User $user): void
+    {
+        if ($user->protected) {
+            throw UserRuleViolationException::protectedAccount($user->id);
+        }
+    }
+
+    /**
+     * @throws UserRuleViolationException
+     */
     private static function assertNotDeleted(User $user): void
     {
         if ($user->isDeleted()) {
@@ -696,7 +803,7 @@ final readonly class UserRepository
         $this->update(
             $id,
             "status = 'deleted', email = NULL, email_verified_at = NULL, password_hash = NULL, name = NULL,"
-            . ' display_name = NULL, deleted_at = UTC_TIMESTAMP()',
+            . ' display_name = NULL, notify_device_log = 0, deleted_at = UTC_TIMESTAMP()',
         );
     }
 
@@ -788,6 +895,8 @@ final readonly class UserRepository
             self::utcOrNull($row['deleted_at']),
             self::utc((string) $row['created_at']),
             self::utc((string) $row['updated_at']),
+            (int) $row['protected'] === 1,
+            (int) $row['notify_device_log'] === 1,
         );
     }
 

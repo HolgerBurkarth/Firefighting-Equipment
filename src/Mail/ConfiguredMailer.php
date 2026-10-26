@@ -36,4 +36,18 @@ final class ConfiguredMailer implements Mailer
     {
         return ($this->mailer ??= ($this->factory)())->send($message);
     }
+
+    public function sendMany(array $messages, float $deadline = INF): array
+    {
+        if ($messages === []) {
+            return [];
+        }
+        try {
+            $this->mailer ??= ($this->factory)();
+        } catch (MailException $e) {
+            return array_fill(0, count($messages), $e);
+        }
+
+        return $this->mailer->sendMany($messages, $deadline);
+    }
 }

@@ -107,6 +107,107 @@ final class SmtpMailerTest extends TestCase
         self::assertSame("Hallo,\r\n.Punkt am Anfang\r\nGrüße\r\n", quoted_printable_decode(str_replace("\r\n..", "\r\n.", $body)));
     }
 
+    public function testSendManyUsesOneConnectionAndOneLogin(): void
+    {
+        $server = $this->server([
+            ['tls' => true],
+            ['send' => '220 fake.example ESMTP'],
+            ['read' => true],
+            ['send' => '250-fake.example' . "\n" . '250 AUTH PLAIN'],
+            ['read' => true],
+            ['send' => '235 2.7.0 Authentication successful'],
+            ...self::envelope(),
+            ...self::envelope(),
+            ...self::envelope(),
+            ['read' => true],
+            ['send' => '221 2.0.0 Bye'],
+        ]);
+
+        $results = $this->mailer($server)->sendMany([
+            self::message('Erste'),
+            self::message('Zweite', 'zweite@example.org'),
+            self::message('Dritte', 'dritte@example.org'),
+        ]);
+
+        self::assertCount(3, $results);
+        foreach ($results as $result) {
+            self::assertIsString($result);
+            self::assertMatchesRegularExpression('/^<[0-9a-f]{32}@prodad\.de>$/', $result);
+        }
+        self::assertCount(3, array_unique($results));
+        $received = $server->received();
+        self::assertSame(1, count(array_filter($received, static fn (string $l): bool => str_starts_with($l, 'AUTH '))), 'eine Anmeldung');
+        self::assertSame(1, count(array_filter($received, static fn (string $l): bool => str_starts_with($l, 'EHLO '))));
+        self::assertSame(
+            ['RCPT TO:<erika@example.org>', 'RCPT TO:<zweite@example.org>', 'RCPT TO:<dritte@example.org>'],
+            array_values(array_filter($received, static fn (string $l): bool => str_starts_with($l, 'RCPT '))),
+        );
+        self::assertSame('QUIT', $received[count($received) - 1]);
+    }
+
+    public function testSendManyContinuesAfterRejectedRecipient(): void
+    {
+        $server = $this->server([
+            ['tls' => true],
+            ['send' => '220 fake.example ESMTP'],
+            ['read' => true],
+            ['send' => '250-fake.example' . "\n" . '250 AUTH PLAIN'],
+            ['read' => true],
+            ['send' => '235 2.7.0 Authentication successful'],
+            ['read' => true],
+            ['send' => '250 2.1.0 Ok'],
+            ['read' => true],
+            ['send' => '550 5.1.1 <erika@example.org>: Recipient address rejected'],
+            ['read' => true],
+            ['send' => '250 2.0.0 Ok'],
+            ...self::envelope(),
+            ['read' => true],
+            ['send' => '221 2.0.0 Bye'],
+        ]);
+
+        $results = $this->mailer($server)->sendMany([self::message('Erste'), self::message('Zweite', 'zweite@example.org')]);
+
+        self::assertInstanceOf(MailException::class, $results[0]);
+        self::assertStringStartsWith('SMTP-Fehler bei RCPT TO: 550 5.1.1', $results[0]->getMessage());
+        self::assertStringNotContainsString('erika@example.org', $results[0]->getMessage());
+        self::assertIsString($results[1]);
+        $received = $server->received();
+        self::assertContains('RSET', $received);
+        self::assertSame('RCPT TO:<zweite@example.org>', $received[array_search('RSET', $received, true) + 2]);
+    }
+
+    public function testSendManyReportsFailedLoginForAllMails(): void
+    {
+        $server = $this->server([
+            ['tls' => true],
+            ['send' => '220 fake.example ESMTP'],
+            ['read' => true],
+            ['send' => '250-fake.example' . "\n" . '250 AUTH PLAIN'],
+            ['read' => true],
+            ['send' => '535 5.7.8 Authentication failed'],
+        ]);
+
+        $results = $this->mailer($server)->sendMany([self::message('Erste'), self::message('Zweite', 'zweite@example.org')]);
+
+        self::assertCount(2, $results);
+        foreach ($results as $result) {
+            self::assertInstanceOf(MailException::class, $result);
+            self::assertSame('SMTP-Fehler bei AUTH: 535 5.7.8 Authentication failed', $result->getMessage());
+        }
+        self::assertSame([], $this->mailer($server)->sendMany([]));
+    }
+
+    public function testSendManyWithExpiredDeadlineSendsNothing(): void
+    {
+        // Ohne Server: Frist schon vorbei, die Verbindung kommt nicht mehr zustande.
+        $mailer = new SmtpMailer(new SmtpConfig(MimeMessage::FROM_ADDRESS, self::PASSWORD, '127.0.0.1', 9, SmtpEncryption::Ssl, 5.0));
+
+        $results = $mailer->sendMany([self::message('Erste'), self::message('Zweite')], microtime(true) - 1.0);
+
+        self::assertCount(2, $results);
+        self::assertContainsOnlyInstancesOf(MailException::class, $results);
+    }
+
     public function testSendsMailOverStartTlsWithAuthLogin(): void
     {
         $server = $this->server([
@@ -379,6 +480,16 @@ final class SmtpMailerTest extends TestCase
     /**
      * @param list<array<string, mixed>> $steps
      */
+    /**
+     * MAIL FROM, RCPT TO, DATA und Nachricht einer Mail (ohne QUIT).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function envelope(): array
+    {
+        return array_slice(self::envelopeAndData(), 0, -2);
+    }
+
     private function server(array $steps, ?string $certFile = null): FakeSmtpServer
     {
         $server = FakeSmtpServer::start($steps, $certFile ?? self::$serverCert);
@@ -409,9 +520,9 @@ final class SmtpMailerTest extends TestCase
         self::fail('MailException erwartet.');
     }
 
-    private static function message(string $text = 'Hallo'): MailMessage
+    private static function message(string $text = 'Hallo', string $to = self::RECIPIENT): MailMessage
     {
-        return new MailMessage(EmailAddress::fromString(self::RECIPIENT), 'Erika Musterfrau', 'Testmail äöü', $text);
+        return new MailMessage(EmailAddress::fromString($to), 'Erika Musterfrau', 'Testmail äöü', $text);
     }
 
     /**

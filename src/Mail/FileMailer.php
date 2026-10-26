@@ -10,6 +10,8 @@ namespace FirefightingEquipment\Mail;
  */
 final readonly class FileMailer implements Mailer
 {
+    use SendsEachMessage;
+
     public function __construct(public string $directory)
     {
     }

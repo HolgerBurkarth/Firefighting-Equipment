@@ -8,6 +8,7 @@ use FirefightingEquipment\Mail\MailException;
 use FirefightingEquipment\Mail\Mailer;
 use FirefightingEquipment\Mail\MailMessage;
 use FirefightingEquipment\Mail\MimeMessage;
+use FirefightingEquipment\Mail\SendsEachMessage;
 
 /**
  * Mailer für Tests: sammelt die Mails, statt sie zu versenden. Baut jede Mail wie ein echter
@@ -15,8 +16,15 @@ use FirefightingEquipment\Mail\MimeMessage;
  */
 final class FakeMailer implements Mailer
 {
+    use SendsEachMessage {
+        sendMany as private sendEach;
+    }
+
     /** @var list<MailMessage> */
     public array $sent = [];
+
+    /** @var list<int> Anzahl der Mails je Aufruf von sendMany() */
+    public array $batches = [];
 
     public function __construct(public bool $fail = false)
     {
@@ -32,6 +40,13 @@ final class FakeMailer implements Mailer
         $this->sent[] = $message;
 
         return $messageId;
+    }
+
+    public function sendMany(array $messages, float $deadline = INF): array
+    {
+        $this->batches[] = count($messages);
+
+        return $this->sendEach($messages, $deadline);
     }
 
     /**

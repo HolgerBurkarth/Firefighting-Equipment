@@ -71,6 +71,7 @@ final class UserCommandTest extends TestCase
                 'name' => 'Erika Musterfrau',
                 'tenant' => null,
                 'config' => 'pfad/zur config.php',
+                'confirm' => null,
                 'passwordStdin' => true,
             ],
             UserCommand::parseArguments([
@@ -86,7 +87,7 @@ final class UserCommandTest extends TestCase
     public function testParseList(): void
     {
         self::assertSame(
-            ['command' => 'list', 'email' => null, 'name' => null, 'tenant' => 'immendingen', 'config' => null, 'passwordStdin' => false],
+            ['command' => 'list', 'email' => null, 'name' => null, 'tenant' => 'immendingen', 'config' => null, 'confirm' => null, 'passwordStdin' => false],
             UserCommand::parseArguments(['list', '--tenant=immendingen']),
         );
     }
@@ -101,6 +102,8 @@ final class UserCommandTest extends TestCase
         yield 'superadmin:password mit stdin' => [['superadmin:password', '--email=a@b.de', '--password-stdin']];
         yield 'superadmin:lock' => [['superadmin:lock', '--email=a@b.de']];
         yield 'superadmin:unlock' => [['superadmin:unlock', '--email=a@b.de']];
+        yield 'superadmin:protect' => [['superadmin:protect', '--email=a@b.de']];
+        yield 'superadmin:unprotect' => [['superadmin:unprotect', '--email=a@b.de', '--confirm=a@b.de']];
     }
 
     /**
@@ -124,6 +127,22 @@ final class UserCommandTest extends TestCase
         yield 'create ohne E-Mail' => [['superadmin:create', '--name=Erika'], 'superadmin:create braucht --email=ADRESSE.'];
         yield 'lock ohne E-Mail' => [['superadmin:lock'], 'superadmin:lock braucht --email=ADRESSE.'];
         yield 'list ohne Stadt' => [['list'], 'list braucht --tenant=KÜRZEL.'];
+        yield 'unprotect ohne Bestätigung' => [
+            ['superadmin:unprotect', '--email=a@b.de'],
+            'superadmin:unprotect braucht --confirm=ADRESSE (zur Bestätigung dieselbe Adresse wie bei --email).',
+        ];
+        yield 'unprotect mit anderer Bestätigung' => [
+            ['superadmin:unprotect', '--email=a@b.de', '--confirm=A@b.de'],
+            '--confirm muss genau dieselbe Adresse wie --email enthalten.',
+        ];
+        yield 'Bestätigung bei protect' => [
+            ['superadmin:protect', '--email=a@b.de', '--confirm=a@b.de'],
+            '--confirm ist bei superadmin:protect nicht möglich.',
+        ];
+        yield 'Bestätigung doppelt' => [
+            ['superadmin:unprotect', '--email=a@b.de', '--confirm=a@b.de', '--confirm=a@b.de'],
+            '--confirm ist doppelt angegeben.',
+        ];
         yield 'Name bei lock' => [['superadmin:lock', '--email=a@b.de', '--name=X'], '--name ist bei superadmin:lock nicht möglich.'];
         yield 'E-Mail bei list' => [['list', '--tenant=x', '--email=a@b.de'], '--email ist bei list nicht möglich.'];
         yield 'Stadt bei superadmin:list' => [['superadmin:list', '--tenant=x'], '--tenant ist bei superadmin:list nicht möglich.'];

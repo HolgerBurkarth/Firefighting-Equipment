@@ -115,6 +115,22 @@ final readonly class RequestContext
     }
 
     /**
+     * Pflichtfeld des JSON-Bodys als Wahrheitswert. Nur echte JSON-Werte true/false; 1, "true" und
+     * null werden abgelehnt.
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public function boolField(string $name): bool
+    {
+        $value = $this->body[$name] ?? null;
+        if (!is_bool($value)) {
+            throw HttpException::invalidRequest(sprintf('Das Feld "%s" muss true oder false sein.', $name));
+        }
+
+        return $value;
+    }
+
+    /**
      * Ob der JSON-Body das Feld enthält, auch mit dem Wert null (z. B. null = Feld leeren, fehlt =
      * unverändert).
      */

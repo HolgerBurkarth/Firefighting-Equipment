@@ -29,6 +29,10 @@ final readonly class User
         public \DateTimeImmutable $createdAt,
         /** UTC */
         public \DateTimeImmutable $updatedAt,
+        /** Geschützt (nur aktive, nicht gesperrte Super-Admins; setzbar nur per Kommandozeile) */
+        public bool $protected = false,
+        /** Benachrichtigung „Log“ bei Vorgängen der Geräte-Historie (nur Admins und Super-Admins) */
+        public bool $notifyDeviceLog = false,
     ) {
     }
 
@@ -50,6 +54,14 @@ final readonly class User
         return $this->status === UserStatus::Active
             && !$this->isLocked()
             && ($this->role === UserRole::Admin || $this->role === UserRole::SuperAdmin);
+    }
+
+    /**
+     * Ob das Konto die Benachrichtigung „Log“ einschalten darf.
+     */
+    public function mayReceiveDeviceLog(): bool
+    {
+        return !$this->isDeleted() && ($this->role === UserRole::Admin || $this->role === UserRole::SuperAdmin);
     }
 
     /**

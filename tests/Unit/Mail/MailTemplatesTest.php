@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tests\Unit\Mail;
 
+use FirefightingEquipment\Device\Device;
+use FirefightingEquipment\Device\DeviceEvent;
+use FirefightingEquipment\Device\DeviceEventType;
+use FirefightingEquipment\Device\DeviceField;
+use FirefightingEquipment\Device\DeviceIdentifier;
+use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Mail\MailException;
 use FirefightingEquipment\Mail\MailMessage;
 use FirefightingEquipment\Mail\MailTemplates;
@@ -221,6 +227,89 @@ angelegt.", $mail->text);
         $this->expectException(MailException::class);
 
         MailTemplates::passwordReset(self::user(email: null), self::tenant(), self::LINK);
+    }
+
+    public function testDeviceLogInGermanTime(): void
+    {
+        $at = new \DateTimeImmutable('2026-07-01 08:30:00', new \DateTimeZone('UTC'));
+        $events = [
+            self::event(DeviceEventType::FieldChanged, $at, field: DeviceField::Identifier, old: 'MA-1', new: 'MA-01', comment: 'Zurück aus der Werkstatt'),
+            self::event(DeviceEventType::StateChanged, $at, fromStatus: DeviceStatus::Retired, toStatus: DeviceStatus::Ready, comment: 'Zurück aus der Werkstatt'),
+        ];
+
+        $mail = MailTemplates::deviceLog(self::user(), self::tenant(), self::device(), $events, self::URL);
+
+        self::assertSame('Log Feuerwehr Immendingen: MA-01 wieder aufgenommen', $mail->subject);
+        self::assertStringContainsString(
+            "Vorgang: Wieder aufgenommen\nGerät: MA-01 (Atemschutzmaske)\nWer: Kommandant\nWann: 01.07.2026 um 10:30 Uhr\n"
+            . "Kennung: MA-1 → MA-01\nStatus: ausgesondert → einsatzbereit\nKommentar: Zurück aus der Werkstatt\n",
+            $mail->text,
+        );
+        self::assertStringContainsString('Benachrichtigung „Log“', $mail->text);
+        self::assertTextRules($mail, self::URL);
+    }
+
+    public function testDeviceLogShortensLongValuesAndSubject(): void
+    {
+        $at = new \DateTimeImmutable('2026-01-01 08:30:00', new \DateTimeZone('UTC'));
+        $note = str_repeat("Lange Notiz\n", 50);
+        $tenant = new Tenant(1, TenantSlug::fromString('x'), TenantName::fromString(str_repeat('Feuerwehr ', 10)), true, $at, $at);
+        $event = self::event(DeviceEventType::FieldChanged, $at, field: DeviceField::Note, old: null, new: $note);
+
+        $mail = MailTemplates::deviceLog(self::user(), $tenant, self::device(), [$event], self::URL);
+
+        // Längster möglicher Stadtname (100 Zeichen): passt ungekürzt (die Kürzung ist nur Absicherung).
+        self::assertSame('Log ' . str_repeat('Feuerwehr ', 9) . 'Feuerwehr: MA-01 Stammdaten geändert', $mail->subject);
+        self::assertLessThanOrEqual(MailMessage::MAX_SUBJECT_LENGTH, mb_strlen($mail->subject));
+        self::assertMatchesRegularExpression('/^Notiz: – → (Lange Notiz ){10}.*…$/mu', $mail->text);
+        self::assertDoesNotMatchRegularExpression('/^Lange Notiz$/m', $mail->text, 'keine Zeilenumbrüche aus der Notiz');
+    }
+
+    public function testDeviceLogNeedsEvents(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        MailTemplates::deviceLog(self::user(), self::tenant(), self::device(), [], self::URL);
+    }
+
+    private const string URL = 'https://www.prodad.de/firefighting/immendingen/';
+
+    private static function device(): Device
+    {
+        $now = new \DateTimeImmutable('2026-01-01 00:00:00', new \DateTimeZone('UTC'));
+
+        return new Device(
+            5,
+            DeviceIdentifier::fromString('MA-01'),
+            2,
+            'Atemschutzmaske',
+            3,
+            'Lager',
+            null,
+            DeviceStatus::Ready,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            2,
+            $now,
+            $now,
+        );
+    }
+
+    private static function event(
+        DeviceEventType $type,
+        \DateTimeImmutable $at,
+        ?DeviceStatus $fromStatus = null,
+        ?DeviceStatus $toStatus = null,
+        ?DeviceField $field = null,
+        ?string $old = null,
+        ?string $new = null,
+        ?string $comment = null,
+    ): DeviceEvent {
+        return new DeviceEvent(1, $type, 9, 'Kommandant', null, null, $fromStatus, $toStatus, null, null, $field, $old, $new, $comment, $at);
     }
 
     /**

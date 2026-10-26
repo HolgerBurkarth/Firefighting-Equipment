@@ -10,4 +10,8 @@ namespace FirefightingEquipment\Mail;
  */
 final class MailException extends \RuntimeException
 {
+    public static function timeBudgetExceeded(): self
+    {
+        return new self('Zeitbudget für den Versand überschritten; Mail nicht gesendet.');
+    }
 }

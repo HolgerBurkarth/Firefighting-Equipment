@@ -15,6 +15,9 @@ use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\Request;
 use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
+use FirefightingEquipment\Notification\DeviceLogNotifier;
+use FirefightingEquipment\Time\Clock;
+use FirefightingEquipment\Time\SystemClock;
 
 /**
  * CSV-Import der Geräte (Admin), Datei als Base64 im JSON-Body (Feld "file"; die Route erlaubt
@@ -27,13 +30,19 @@ use FirefightingEquipment\Http\RequestHandler;
  *
  * Fehler der ganzen Datei (nicht lesbar, Kopfzeile, Grenzen, abgebrochener Export): 400
  * invalid_request, ggf. mit details (z. B. {"line": 4}). Felder werden vor der Datei geprüft.
+ *
+ * Nach dem Übernehmen (nach dem Commit) geht EINE Sammelmail „Log“ je Empfänger (DeviceLogNotifier),
+ * nur wenn Geräte neu angelegt oder geändert wurden.
  */
 final readonly class DeviceImportHandler implements RequestHandler
 {
     /** Body-Grenze der Import-Routen: Datei (2 MiB) als Base64 plus JSON */
     public const int MAX_BODY_BYTES = Request::MAX_UPLOAD_BYTES;
 
-    public function __construct(private bool $apply)
+    /**
+     * @param Clock $clock Zeitpunkt in der Benachrichtigung (andere als SystemClock nur für Tests)
+     */
+    public function __construct(private bool $apply, private Clock $clock = new SystemClock())
     {
     }
 
@@ -74,6 +83,8 @@ final readonly class DeviceImportHandler implements RequestHandler
         } catch (DeviceException $e) {
             throw DeviceErrors::http($e);
         }
+
+        DeviceLogNotifier::fromContext($context)->imported($tenant, $context->auth()->user, $plan, $comment, $this->clock->now());
 
         return new JsonResponse(['summary' => DeviceImportJson::summary($plan)]);
     }

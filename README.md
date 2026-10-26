@@ -114,6 +114,29 @@ Alle Antworten tragen `Cache-Control: no-store` und `X-Content-Type-Options: nos
 - Passwort ändern beendet alle anderen Sitzungen und ersetzt die aktuelle (neues Cookie).
 - Nach jeder Passwortänderung (selbst geändert, zurückgesetzt oder per `bin/user.php`) bekommt das
   Konto die Mail "Ihr Passwort wurde geändert".
+- `GET api/v1/auth/me` zeigt zusätzlich `protected` (geschütztes Konto, siehe "Super-Admins und
+  Benutzer verwalten") und `notifications` (`{"device_log": true|false}`).
+
+### Benachrichtigung "Log"
+
+Admins (unter ihrer Stadt) und Super-Admins (unter `service`) können für ihr eigenes Konto eine Mail
+bei jedem Vorgang der Geräte-Historie einschalten (anlegen, importieren, umbuchen/Status, aussondern,
+wieder aufnehmen, Prüfdatum, Stammdaten). Standard: aus.
+
+- `GET api/v1/auth/notifications` → `{"notifications":{"device_log":false}}`
+- `POST api/v1/auth/notifications` mit `{"device_log":true}` bzw. `false` (nur echte JSON-Werte,
+  sonst 400). Benutzer (Rolle `user`): 403.
+
+Empfänger sind aktive, nicht gesperrte Konten mit eingeschalteter Option: Admins nur für Vorgänge
+ihrer Stadt, Super-Admins für alle Städte. Wer den Vorgang auslöst, bekommt keine Mail. Je Vorgang
+(Anfrage) gibt es eine Mail je Empfänger; ein CSV-Import ergibt eine Sammelmail mit Zusammenfassung
+und höchstens 50 Zeilen Einzelheiten. Betreff z. B. "Log Feuerwehr Immendingen: M1 umgebucht, Status
+defekt"; der Text nennt Wer, Wann (deutsche Zeit), Gerät(e), Von/Nach, Kommentar und den Link zur
+Anwendung. Gesendet wird erst nach dem Speichern; ein Versandfehler ändert am Vorgang nichts (nur
+`mail_failed (device_log, Konto #ID)` im Server-Log). Begrenzung: höchstens 25 Empfänger je Vorgang
+(zuerst die Admins der Stadt; Überschreitung als `device_log_recipients_capped` im Log) und 10 s
+Zeitbudget je Anfrage für den Versand. Mehrere Mails gehen über eine SMTP-Verbindung (eine
+Anmeldung; gemessen auf STRATO rund 0,22 s je Mail).
 
 ### Passwort vergessen
 
@@ -288,6 +311,20 @@ curl.exe -H "Content-Type: application/json" --data-binary "@accept.json" http:/
 
 Die JSON-Dateien und `service-cookies.txt` danach löschen (sie enthalten Passwörter, Tokens bzw.
 die Sitzung; nie committen). Der Super-Admin bleibt höchstens 1 Stunde ohne Aktivität angemeldet.
+
+### Super-Admins sperren und entsperren
+
+Unter `/firefighting/service/` (nur Super-Admins): `GET api/v1/superadmins` (alle Super-Admins mit
+`locked` und `protected`), `POST api/v1/superadmins/{id}/lock` bzw. `…/unlock` mit `{}`
+(wiederholbar; Sperren beendet die Sitzungen des Kontos). Super-Admins werden nie gelöscht, nur
+gesperrt. Abgelehnt mit 409 `rule_violation`: sich selbst sperren, ein geschütztes Konto sperren,
+den letzten aktiven Super-Admin sperren. Unbekannte ID oder Konto einer Stadt: 404. Anlegen, Passwort
+setzen und Schutz bleiben Sache der Kommandozeile (`bin/user.php`).
+
+```
+curl.exe -b service-cookies.txt http://localhost:8000/firefighting/service/api/v1/superadmins
+curl.exe -b service-cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/service/api/v1/superadmins/2/lock
+```
 
 ### Gerätetypen und Standorte
 
@@ -940,6 +977,8 @@ php bin/user.php superadmin:list                                  # alle Super-A
 php bin/user.php superadmin:password --email=chef@example.org     # neues Passwort setzen
 php bin/user.php superadmin:lock --email=chef@example.org         # sperren
 php bin/user.php superadmin:unlock --email=chef@example.org       # entsperren
+php bin/user.php superadmin:protect --email=chef@example.org      # schützen
+php bin/user.php superadmin:unprotect --email=chef@example.org --confirm=chef@example.org  # Schutz entfernen
 php bin/user.php list --tenant=immendingen                        # Konten einer Stadt
 php bin/user.php superadmin:list --config=PFAD                    # andere Konfiguration
 ```
@@ -963,7 +1002,16 @@ cd ~/htdocs/apps/firefighting-equipment && php85 bin/user.php superadmin:create 
   Ortsnamens oder des Kürzels der Stadt. Allgemeine Wörter wie "Feuerwehr" im Stadtnamen
   zählen dabei nicht als persönliche Daten.
 - Sperren und ein neues Passwort beenden alle Sitzungen des Kontos. Der letzte aktive, nicht
-  gesperrte Super-Admin kann nicht gesperrt werden; zuerst einen weiteren anlegen.
+  gesperrte Super-Admin kann nicht gesperrt werden; zuerst einen weiteren anlegen. Super-Admins
+  werden nie gelöscht (die Datenbank verhindert es), nur gesperrt.
+- **Geschütztes Konto:** `superadmin:protect` schützt einen aktiven, nicht gesperrten Super-Admin.
+  Ein geschütztes Konto kann weder gesperrt noch gelöscht noch in der Rolle oder im Namen geändert
+  werden, auch nicht über die API; erlaubt bleiben das eigene Passwort (ändern, "Passwort
+  vergessen", `superadmin:password`) und die eigene Benachrichtigung. Die Datenbank erzwingt:
+  geschützt nur bei Rolle `superadmin`, Status `active` und nicht gesperrt. Gesetzt und entfernt
+  wird der Schutz nur hier auf dem Server; `superadmin:unprotect` verlangt zur Bestätigung
+  `--confirm=` mit genau derselben Adresse wie `--email=` (sonst Exit-Code 2). `superadmin:list`
+  zeigt die Spalte "Geschützt".
 - Nach `superadmin:password` bekommt das Konto die Mail "Ihr Passwort wurde geändert". Klappt der
   Versand nicht, erscheint ein Hinweis; das Passwort ist trotzdem geändert.
 - `list` zeigt alle Konten einer Stadt (auch gelöschte als "Gelöschter Benutzer #ID"), nie

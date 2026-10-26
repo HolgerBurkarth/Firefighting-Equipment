@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Api\V1\Devices;
 
 use FirefightingEquipment\Api\V1\DeviceErrors;
+use FirefightingEquipment\Device\DeviceEventRecorder;
 use FirefightingEquipment\Device\DeviceException;
 use FirefightingEquipment\Device\DeviceNotFoundException;
 use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
+use FirefightingEquipment\Notification\DeviceLogNotifier;
 
 /**
  * Gerät anzeigen, anlegen bzw. ändern, siehe DeviceAction. Antwort {"device": …} mit allen Feldern
@@ -21,6 +23,9 @@ use FirefightingEquipment\Http\RequestHandler;
  * version_conflict (details {"device": aktueller Stand}), Regelverstoß 409 rule_violation (Standort
  * gesperrt, Gerätetyp deaktiviert, Gerät ausgesondert bzw. beim Wiederaufnehmen nicht ausgesondert).
  * Felder werden vor der Suche gelesen (400 vor 404). Ändert sich nichts, bleibt die Version gleich.
+ *
+ * Nach einer Änderung (nach dem Commit) geht die Benachrichtigung „Log“ an die Empfänger
+ * (DeviceLogNotifier); ohne neues Ereignis keine Mail. Versandfehler ändern die Antwort nie.
  */
 final readonly class DeviceActionHandler implements RequestHandler
 {
@@ -31,7 +36,8 @@ final readonly class DeviceActionHandler implements RequestHandler
     public function handle(RequestContext $context): JsonResponse
     {
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
-        $devices = new DeviceRepository($context->db->get());
+        $recorder = new DeviceEventRecorder();
+        $devices = new DeviceRepository($context->db->get(), $recorder);
 
         try {
             $device = match ($this->action) {
@@ -85,6 +91,10 @@ final readonly class DeviceActionHandler implements RequestHandler
             };
         } catch (DeviceException $e) {
             throw DeviceErrors::http($e);
+        }
+
+        if ($recorder->ids() !== []) {
+            DeviceLogNotifier::fromContext($context)->deviceChanged($tenant, $context->auth()->user, $device, $recorder->ids());
         }
 
         return new JsonResponse(['device' => DeviceJson::device($device)], $this->action === DeviceAction::Create ? 201 : 200);

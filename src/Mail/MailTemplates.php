@@ -4,7 +4,17 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Mail;
 
+use FirefightingEquipment\Device\Device;
+use FirefightingEquipment\Device\DeviceEvent;
+use FirefightingEquipment\Device\DeviceEventType;
+use FirefightingEquipment\Device\DeviceField;
+use FirefightingEquipment\Device\DeviceStatus;
+use FirefightingEquipment\Device\Import\DeviceImportPlan;
+use FirefightingEquipment\Device\Import\ImportChange;
+use FirefightingEquipment\Device\Import\ImportResult;
+use FirefightingEquipment\Device\Import\ImportRowPlan;
 use FirefightingEquipment\Tenant\Tenant;
+use FirefightingEquipment\Time\GermanFormat;
 use FirefightingEquipment\User\EmailAddress;
 use FirefightingEquipment\User\User;
 use FirefightingEquipment\User\UserRepository;
@@ -16,6 +26,9 @@ use FirefightingEquipment\User\UserRepository;
 final class MailTemplates
 {
     public const string TIME_ZONE = 'Europe/Berlin';
+
+    /** Längere Werte (z. B. Notizen) werden in der Benachrichtigung „Log“ gekürzt. */
+    private const int LOG_VALUE_LENGTH = 200;
 
     /** "-- " mit Leerzeichen: Trennzeile einer Signatur (Mailprogramme blenden sie ab hier ab). */
     private const string SIGNATURE = "\n\n-- \nFeuerwehr Geräteverwaltung\n"
@@ -318,6 +331,132 @@ final class MailTemplates
     }
 
     /**
+     * Benachrichtigung „Log“: ein Vorgang an einem Gerät (alle Ereignisse einer Anfrage). Betreff
+     * „Log <Stadt>: <Kennung> <Grund>“. Werte stehen in eigenen Zeilen (können länger als 76 Zeichen
+     * sein; Zeilenumbrüche in Notizen werden zu Leerzeichen, lange Werte gekürzt).
+     *
+     * @param list<DeviceEvent> $events in der Reihenfolge des Schreibens, mindestens eines
+     * @param string            $url    Startseite der Stadt
+     *
+     * @throws MailException
+     */
+    public static function deviceLog(User $recipient, Tenant $tenant, Device $device, array $events, string $url): MailMessage
+    {
+        if ($events === []) {
+            throw new \InvalidArgumentException('Mindestens ein Ereignis erwartet.');
+        }
+        $first = $events[0];
+        $greeting = self::greeting($recipient);
+        $area = self::area($tenant);
+        $lines = [
+            'Vorgang: ' . self::deviceLogAction($events),
+            'Gerät: ' . $device->identifier->value . ' (' . $device->deviceTypeName . ')',
+            'Wer: ' . $first->userName,
+            'Wann: ' . self::when($first->createdAt),
+        ];
+        foreach ($events as $event) {
+            array_push($lines, ...self::deviceLogDetails($event));
+        }
+        if ($first->comment !== null) {
+            $lines[] = 'Kommentar: ' . self::logValue($first->comment);
+        }
+        $details = implode("\n", $lines);
+        $footer = self::deviceLogFooter();
+        $text = <<<TXT
+            {$greeting}
+
+            bei der Feuerwehr Geräteverwaltung ({$area})
+            wurde ein Vorgang protokolliert:
+
+            {$details}
+
+            Zur Anwendung:
+
+            {$url}
+
+            {$footer}
+            TXT;
+
+        $reason = $device->identifier->value . ' ' . self::deviceLogReason($events);
+
+        return self::message($recipient, self::logSubject($tenant, $reason), $text);
+    }
+
+    /**
+     * Benachrichtigung „Log“ für einen CSV-Import: eine Mail mit Zusammenfassung und höchstens
+     * $maxLines Zeilen mit Einzelheiten (neue und geänderte Geräte), danach „… und N weitere“.
+     *
+     * @param string $url Startseite der Stadt
+     *
+     * @throws MailException
+     */
+    public static function deviceImportLog(
+        User $recipient,
+        Tenant $tenant,
+        User $actor,
+        DeviceImportPlan $plan,
+        ?string $comment,
+        \DateTimeImmutable $at,
+        string $url,
+        int $maxLines = 50,
+    ): MailMessage {
+        $new = $plan->count(ImportResult::New);
+        $changed = $plan->count(ImportResult::Changed);
+        $greeting = self::greeting($recipient);
+        $area = self::area($tenant);
+        $lines = [
+            'Vorgang: CSV-Import',
+            sprintf('Ergebnis: %d neu, %d geändert, %d unverändert, %d übersprungen', $new, $changed, $plan->count(ImportResult::Unchanged), $plan->count(ImportResult::Skipped)),
+            'Wer: ' . $actor->label(),
+            'Wann: ' . self::when($at),
+        ];
+        if ($comment !== null) {
+            $lines[] = 'Kommentar: ' . self::logValue($comment);
+        }
+        $details = implode("\n", $lines);
+
+        $rows = array_values(array_filter(
+            $plan->rows,
+            static fn (ImportRowPlan $row): bool => $row->result === ImportResult::New || $row->result === ImportResult::Changed,
+        ));
+        $rowLines = [];
+        foreach (array_slice($rows, 0, max(0, $maxLines)) as $row) {
+            $changes = implode(', ', array_map(
+                static fn (ImportChange $c): string => $row->result === ImportResult::New
+                    ? $c->column->label() . ' ' . self::logValue($c->new ?? '–')
+                    : $c->column->label() . ' ' . self::logValue($c->old ?? '–') . ' → ' . self::logValue($c->new ?? '–'),
+                $row->changes,
+            ));
+            $rowLines[] = sprintf('Zeile %d: %s %s: %s', $row->line, $row->identifier, $row->result === ImportResult::New ? 'neu' : 'geändert', $changes);
+        }
+        if (count($rows) > count($rowLines)) {
+            $rowLines[] = sprintf('… und %d weitere', count($rows) - count($rowLines));
+        }
+        $rowText = implode("\n", $rowLines);
+        $footer = self::deviceLogFooter();
+        $text = <<<TXT
+            {$greeting}
+
+            bei der Feuerwehr Geräteverwaltung ({$area})
+            wurde ein CSV-Import übernommen:
+
+            {$details}
+
+            Einzelheiten:
+
+            {$rowText}
+
+            Zur Anwendung:
+
+            {$url}
+
+            {$footer}
+            TXT;
+
+        return self::message($recipient, self::logSubject($tenant, sprintf('CSV-Import: %d neu, %d geändert', $new, $changed)), $text);
+    }
+
+    /**
      * Testmail für bin/mail-test.php (Zustellung, SPF, DKIM, Umlaute).
      *
      * @throws MailException
@@ -352,6 +491,125 @@ final class MailTemplates
 
         return "Damit unsere E-Mails Sie zuverlässig erreichen, fügen Sie bitte den\n"
             . "Absender {$from} zu Ihren Kontakten hinzu.";
+    }
+
+    /**
+     * Bezeichnung des ganzen Vorgangs: der Zustandswechsel, falls vorhanden (Wiederaufnehmen schreibt
+     * zusätzlich Stammdaten), sonst die Art des ersten Ereignisses.
+     *
+     * @param non-empty-list<DeviceEvent> $events
+     */
+    private static function deviceLogAction(array $events): string
+    {
+        foreach ($events as $event) {
+            if ($event->type === DeviceEventType::StateChanged || $event->type === DeviceEventType::Created) {
+                return $event->label();
+            }
+        }
+
+        return $events[0]->label();
+    }
+
+    /**
+     * Kurzer Grund für den Betreff, z. B. „umgebucht, Status defekt“.
+     *
+     * @param non-empty-list<DeviceEvent> $events
+     */
+    private static function deviceLogReason(array $events): string
+    {
+        foreach ($events as $event) {
+            if ($event->type === DeviceEventType::Created) {
+                return 'angelegt';
+            }
+            if ($event->type === DeviceEventType::StateChanged) {
+                if ($event->toStatus === DeviceStatus::Retired) {
+                    return 'ausgesondert';
+                }
+                if ($event->fromStatus === DeviceStatus::Retired) {
+                    return 'wieder aufgenommen';
+                }
+                $parts = [];
+                if ($event->toLocation !== null) {
+                    $parts[] = 'umgebucht';
+                }
+                if ($event->toStatus !== null) {
+                    $parts[] = 'Status ' . $event->toStatus->label();
+                }
+
+                return implode(', ', $parts);
+            }
+        }
+
+        return $events[0]->type === DeviceEventType::DueChanged ? 'Prüfdatum geändert' : 'Stammdaten geändert';
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function deviceLogDetails(DeviceEvent $event): array
+    {
+        $lines = [];
+        if ($event->type === DeviceEventType::Created || $event->type === DeviceEventType::Imported) {
+            $lines[] = 'Standort: ' . ($event->toLocation?->path() ?? '–');
+            $lines[] = 'Status: ' . ($event->toStatus?->label() ?? '–');
+        } elseif ($event->type === DeviceEventType::StateChanged) {
+            if ($event->toLocation !== null) {
+                $lines[] = 'Standort: ' . ($event->fromLocation?->path() ?? '–') . ' → ' . $event->toLocation->path();
+            }
+            if ($event->toStatus !== null) {
+                $lines[] = 'Status: ' . ($event->fromStatus?->label() ?? '–') . ' → ' . $event->toStatus->label();
+            }
+        } elseif ($event->type === DeviceEventType::DueChanged) {
+            $lines[] = 'Nächste Prüfung: ' . self::logDate($event->fromDue?->value) . ' → ' . self::logDate($event->toDue?->value);
+        } elseif ($event->field !== null) {
+            $format = $event->field === DeviceField::ProcuredOn
+                ? self::logDate(...)
+                : static fn (?string $v): string => $v === null ? '–' : self::logValue($v);
+            $lines[] = $event->field->label() . ': ' . $format($event->oldValue) . ' → ' . $format($event->newValue);
+        }
+
+        return $lines;
+    }
+
+    private static function deviceLogFooter(): string
+    {
+        return "Sie erhalten diese E-Mail, weil die Benachrichtigung „Log“ für Ihr\n"
+            . 'Konto eingeschaltet ist. Abschalten können Sie sie in Ihrem Konto.';
+    }
+
+    /**
+     * Betreff „Log <Stadt>: <Grund>“, höchstens MailMessage::MAX_SUBJECT_LENGTH Zeichen.
+     */
+    private static function logSubject(Tenant $tenant, string $reason): string
+    {
+        $subject = 'Log ' . $tenant->name->value . ': ' . $reason;
+
+        return mb_strlen($subject) > MailMessage::MAX_SUBJECT_LENGTH
+            ? mb_substr($subject, 0, MailMessage::MAX_SUBJECT_LENGTH - 1) . '…'
+            : $subject;
+    }
+
+    /**
+     * Wert einer Zeile: Zeilenumbrüche und mehrfache Leerzeichen als ein Leerzeichen, höchstens
+     * LOG_VALUE_LENGTH Zeichen.
+     */
+    private static function logValue(string $value): string
+    {
+        $value = trim((string) preg_replace('/\s+/u', ' ', $value));
+
+        return mb_strlen($value) > self::LOG_VALUE_LENGTH ? mb_substr($value, 0, self::LOG_VALUE_LENGTH - 1) . '…' : $value;
+    }
+
+    private static function logDate(?string $date): string
+    {
+        return $date === null ? '–' : GermanFormat::date($date);
+    }
+
+    private static function when(\DateTimeImmutable $at): string
+    {
+        $local = $at->setTimezone(new \DateTimeZone(self::TIME_ZONE));
+
+        return $local->format('d.m.Y') . ' um ' . $local->format('H:i') . ' Uhr';
     }
 
     private static function greeting(User $user): string

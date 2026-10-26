@@ -239,18 +239,162 @@ final class UserRepositoryTest extends AuthSchemaTestCase
         self::assertTrue($this->users->lock($user));
     }
 
-    public function testLastSuperAdminCannotBeLockedOrAnonymized(): void
+    public function testLastSuperAdminCannotBeLocked(): void
     {
         $first = $this->createSuperadmin();
         $second = $this->createSuperadmin();
 
         self::assertTrue($this->users->lock($first));
         $this->assertRuleViolation('letzte aktive, nicht gesperrte Super-Admin', fn () => $this->users->lock($second));
-        $this->assertRuleViolation('letzte aktive, nicht gesperrte Super-Admin', fn () => $this->users->anonymize($second));
+        self::assertNull($this->users->findById($second)?->lockedAt);
 
-        // Ein gesperrter Super-Admin zählt nicht mit und darf gelöscht werden.
-        self::assertTrue($this->users->anonymize($first));
+        // Entsperren lässt die Regel wieder zu.
+        self::assertTrue($this->users->unlock($first));
+        self::assertTrue($this->users->lock($second));
+    }
+
+    public function testSuperAdminsAreNeverAnonymized(): void
+    {
+        $first = $this->createSuperadmin();
+        $second = $this->createSuperadmin();
+        $this->users->lock($first);
+
+        // Auch ein gesperrter Super-Admin, und auch wenn ein anderer aktiv bleibt.
+        $this->assertRuleViolation('Super-Admins können nicht gelöscht werden', fn () => $this->users->anonymize($first));
+        $this->assertRuleViolation('Super-Admins können nicht gelöscht werden', fn () => $this->users->anonymize($second));
+        self::assertSame(UserStatus::Active, $this->users->findById($first)?->status);
         self::assertSame(UserStatus::Active, $this->users->findById($second)?->status);
+    }
+
+    // ---- Geschützte Konten -------------------------------------------------------------------
+
+    public function testProtectAndUnprotectSuperAdmin(): void
+    {
+        $id = $this->createSuperadmin();
+
+        self::assertTrue($this->users->protect($id));
+        self::assertTrue($this->users->findById($id)?->protected);
+        self::assertFalse($this->users->protect($id));
+
+        self::assertTrue($this->users->unprotect($id));
+        self::assertFalse($this->users->findById($id)?->protected);
+        self::assertFalse($this->users->unprotect($id));
+    }
+
+    public function testOnlyActiveUnlockedSuperAdminsCanBeProtected(): void
+    {
+        $admin = $this->createAdmin();
+        $user = $this->createUser($this->tenant->id);
+        $locked = $this->createUser(null, ['role' => 'superadmin', 'locked_at' => self::CREATED_AT]);
+
+        foreach ([$admin, $user, $locked] as $id) {
+            $this->assertRuleViolation('kann nicht geschützt werden', fn () => $this->users->protect($id));
+            self::assertFalse($this->users->findById($id)?->protected);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{\Closure(UserRepository, int): mixed}>
+     */
+    public static function refusedForProtectedAccount(): iterable
+    {
+        yield 'lock' => [static fn (UserRepository $r, int $id) => $r->lock($id)];
+        yield 'changeRole' => [static fn (UserRepository $r, int $id) => $r->changeRole($id, UserRole::Admin)];
+        yield 'changeDisplayName' => [static fn (UserRepository $r, int $id) => $r->changeDisplayName($id, PersonName::fromString('Neu'))];
+    }
+
+    /**
+     * @param \Closure(UserRepository, int): mixed $mutation
+     */
+    #[DataProvider('refusedForProtectedAccount')]
+    public function testProtectedAccountCannotBeChanged(\Closure $mutation): void
+    {
+        $this->createSuperadmin();
+        $protected = $this->createUser(null, ['role' => 'superadmin', 'protected' => 1]);
+        $this->createSession($protected);
+        $before = $this->pdo()->query('SELECT * FROM fe_users WHERE id = ' . $protected)->fetch();
+
+        $this->assertRuleViolation('ist geschützt', fn () => $mutation($this->users, $protected));
+        self::assertSame($before, $this->pdo()->query('SELECT * FROM fe_users WHERE id = ' . $protected)->fetch());
+        self::assertSame(1, $this->sessionCount($protected));
+    }
+
+    public function testProtectedAccountCannotBeAnonymized(): void
+    {
+        $this->createSuperadmin();
+        $protected = $this->createUser(null, ['role' => 'superadmin', 'protected' => 1]);
+
+        $this->assertRuleViolation('nicht gelöscht werden', fn () => $this->users->anonymize($protected));
+        self::assertSame(UserStatus::Active, $this->users->findById($protected)?->status);
+    }
+
+    public function testProtectedAccountMayChangeItsPasswordAndNotification(): void
+    {
+        $protected = $this->createUser(null, ['role' => 'superadmin', 'protected' => 1]);
+        $newHash = str_replace('c29tZXNhbHQ', 'YW5kZXJlcw', self::PASSWORD_HASH);
+
+        $this->users->setPassword($protected, $newHash);
+        self::assertTrue($this->users->setDeviceLogNotification($protected, true));
+
+        self::assertSame($newHash, $this->passwordHash($protected));
+        $user = $this->users->findById($protected);
+        self::assertTrue($user?->protected);
+        self::assertTrue($user?->notifyDeviceLog);
+    }
+
+    // ---- Benachrichtigung „Log“ ------------------------------------------------------------
+
+    public function testDeviceLogNotificationForAdmins(): void
+    {
+        $admin = $this->createAdmin();
+
+        self::assertFalse($this->users->findById($admin)?->notifyDeviceLog, 'Standard aus');
+        self::assertTrue($this->users->setDeviceLogNotification($admin, true));
+        self::assertFalse($this->users->setDeviceLogNotification($admin, true));
+        self::assertTrue($this->users->findById($admin)?->notifyDeviceLog);
+        self::assertTrue($this->users->setDeviceLogNotification($admin, false));
+        self::assertFalse($this->users->findById($admin)?->notifyDeviceLog);
+    }
+
+    public function testDeviceLogNotificationNotForUsers(): void
+    {
+        $user = $this->createUser($this->tenant->id);
+
+        $this->assertRuleViolation('nur Admins und Super-Admins', fn () => $this->users->setDeviceLogNotification($user, true));
+        self::assertFalse($this->users->findById($user)?->notifyDeviceLog);
+    }
+
+    public function testDemotionAndAnonymizationSwitchDeviceLogOff(): void
+    {
+        $this->createAdmin();
+        $demoted = $this->createUser($this->tenant->id, ['role' => 'admin', 'notify_device_log' => 1]);
+        $deleted = $this->createUser($this->tenant->id, ['role' => 'admin', 'notify_device_log' => 1]);
+        $promoted = $this->createUser($this->tenant->id);
+
+        self::assertTrue($this->users->changeRole($demoted, UserRole::User));
+        self::assertTrue($this->users->anonymize($deleted));
+        self::assertTrue($this->users->changeRole($promoted, UserRole::Admin));
+
+        self::assertFalse($this->users->findById($demoted)?->notifyDeviceLog);
+        self::assertFalse($this->users->findById($deleted)?->notifyDeviceLog);
+        self::assertFalse($this->users->findById($promoted)?->notifyDeviceLog, 'Hochstufen schaltet nichts ein');
+    }
+
+    public function testDeviceLogRecipientsAreSeparatedByTenant(): void
+    {
+        $other = $this->tenant('tuttlingen');
+        $on = $this->createUser($this->tenant->id, ['role' => 'admin', 'notify_device_log' => 1]);
+        $this->createUser($this->tenant->id, ['role' => 'admin']);
+        $this->createUser($this->tenant->id, ['role' => 'admin', 'notify_device_log' => 1, 'locked_at' => self::CREATED_AT]);
+        $this->createUser($other->id, ['role' => 'admin', 'notify_device_log' => 1]);
+        $superAdmin = $this->createUser(null, ['role' => 'superadmin', 'notify_device_log' => 1]);
+        $this->createUser(null, ['role' => 'superadmin']);
+        $this->createUser(null, ['role' => 'superadmin', 'notify_device_log' => 1, 'locked_at' => self::CREATED_AT]);
+
+        self::assertSame(
+            [$on, $superAdmin],
+            array_map(static fn (User $u): int => $u->id, $this->users->listDeviceLogRecipients($this->tenant)),
+        );
     }
 
     public function testTenantAdminsDoNotCountAsSuperAdmins(): void

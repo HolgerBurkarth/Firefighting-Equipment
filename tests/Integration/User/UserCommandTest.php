@@ -116,9 +116,9 @@ final class UserCommandTest extends AuthSchemaTestCase
         self::assertSame(UserCommand::EXIT_OK, $exitCode);
         $lines = explode(PHP_EOL, rtrim($out));
         self::assertCount(3, $lines);
-        self::assertMatchesRegularExpression('/^ID\s+E-Mail\s+Status\s+Angelegt \(UTC\)\s+Name$/u', $lines[0]);
+        self::assertMatchesRegularExpression('/^ID\s+E-Mail\s+Status\s+Geschützt\s+Angelegt \(UTC\)\s+Name$/u', $lines[0]);
         self::assertMatchesRegularExpression(
-            '/^\d+\s+chef@example\.org\s+aktiv\s+\d{4}-\d\d-\d\d \d\d:\d\d:\d\d  Erika Musterfrau$/u',
+            '/^\d+\s+chef@example\.org\s+aktiv\s+nein\s+\d{4}-\d\d-\d\d \d\d:\d\d:\d\d  Erika Musterfrau$/u',
             $lines[1],
         );
         self::assertSame('1 Super-Admin.', $lines[2]);
@@ -298,6 +298,76 @@ final class UserCommandTest extends AuthSchemaTestCase
         self::assertSame(UserCommand::EXIT_ERROR, $exitCode);
         self::assertSame('', $out);
         self::assertStringContainsString('FEHLER: Das ist der letzte aktive, nicht gesperrte Super-Admin.', $err);
+    }
+
+    public function testProtectAndUnprotect(): void
+    {
+        $this->createSuperadmin();
+        $this->runCommand(['superadmin:create', '--email=chef@example.org', '--name=Erika', '--password-stdin'], stdin: self::PASSWORD);
+
+        [$exitCode, $out, $err] = $this->runCommand(['superadmin:protect', '--email=chef@example.org']);
+        self::assertSame(UserCommand::EXIT_OK, $exitCode, $err);
+        self::assertSame('Super-Admin geschützt: chef@example.org' . PHP_EOL, $out);
+        self::assertMatchesRegularExpression('/chef@example\.org\s+aktiv\s+ja\s/u', $this->runCommand(['superadmin:list'])[1]);
+
+        [, $out] = $this->runCommand(['superadmin:protect', '--email=chef@example.org']);
+        self::assertSame('Super-Admin ist bereits geschützt: chef@example.org' . PHP_EOL, $out);
+
+        // Geschützt: nicht sperrbar, mit Hinweis auf unprotect.
+        [$exitCode, $out, $err] = $this->runCommand(['superadmin:lock', '--email=chef@example.org']);
+        self::assertSame(UserCommand::EXIT_ERROR, $exitCode);
+        self::assertSame('', $out);
+        self::assertStringContainsString('superadmin:unprotect', $err);
+        self::assertStringContainsString('FEHLER: Das Konto #', $err);
+        self::assertStringContainsString('ist geschützt', $err);
+
+        [$exitCode, $out, $err] = $this->runCommand(['superadmin:unprotect', '--email=chef@example.org', '--confirm=chef@example.org']);
+        self::assertSame(UserCommand::EXIT_OK, $exitCode, $err);
+        self::assertSame('Schutz entfernt: chef@example.org' . PHP_EOL, $out);
+
+        [, $out] = $this->runCommand(['superadmin:unprotect', '--email=chef@example.org', '--confirm=chef@example.org']);
+        self::assertSame('Super-Admin ist nicht geschützt: chef@example.org' . PHP_EOL, $out);
+
+        self::assertSame(UserCommand::EXIT_OK, $this->runCommand(['superadmin:lock', '--email=chef@example.org'])[0]);
+    }
+
+    public function testUnprotectNeedsExactConfirmation(): void
+    {
+        $id = $this->createUser(null, ['role' => 'superadmin', 'email' => 'chef@example.org', 'protected' => 1]);
+
+        foreach ([
+            ['superadmin:unprotect', '--email=chef@example.org'],
+            ['superadmin:unprotect', '--email=chef@example.org', '--confirm=andere@example.org'],
+            ['superadmin:unprotect', '--email=chef@example.org', '--confirm=Chef@example.org'],
+            ['superadmin:protect', '--email=chef@example.org', '--confirm=chef@example.org'],
+            ['superadmin:lock', '--email=chef@example.org', '--confirm=chef@example.org'],
+        ] as $args) {
+            [$exitCode, $out] = $this->runCommand($args);
+            self::assertSame(UserCommand::EXIT_USAGE, $exitCode, implode(' ', $args));
+            self::assertSame('', $out);
+        }
+        self::assertSame(1, (int) $this->pdo()->query('SELECT protected FROM fe_users WHERE id = ' . $id)->fetchColumn());
+    }
+
+    public function testOnlyActiveUnlockedSuperAdminsCanBeProtected(): void
+    {
+        $this->createSuperadmin();
+        $this->createUser(null, ['role' => 'superadmin', 'email' => 'chef@example.org', 'locked_at' => self::CREATED_AT]);
+
+        [$exitCode, , $err] = $this->runCommand(['superadmin:protect', '--email=chef@example.org']);
+
+        self::assertSame(UserCommand::EXIT_ERROR, $exitCode);
+        self::assertStringContainsString('kann nicht geschützt werden', $err);
+    }
+
+    public function testPasswordOfProtectedSuperAdminCanBeSet(): void
+    {
+        $this->createUser(null, ['role' => 'superadmin', 'email' => 'chef@example.org', 'protected' => 1]);
+
+        [$exitCode, , $err] = $this->runCommand(['superadmin:password', '--email=chef@example.org', '--password-stdin'], stdin: self::PASSWORD);
+
+        self::assertSame(UserCommand::EXIT_OK, $exitCode, $err);
+        self::assertTrue(password_verify(self::PASSWORD, $this->hashOf('chef@example.org')));
     }
 
     public function testListTenantAccounts(): void

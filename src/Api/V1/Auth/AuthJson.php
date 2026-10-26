@@ -29,6 +29,8 @@ final class AuthJson
                 'name' => $user->name?->value,
                 'display_name' => $user->displayName?->value,
                 'role' => $user->role->value,
+                'protected' => $user->protected,
+                'notifications' => NotificationSettingsHandler::json($user)['notifications'],
             ],
             'tenant' => $tenant === null ? null : ['slug' => $tenant->slug->value, 'name' => $tenant->name->value],
             'session' => self::session($auth->session, $auth->session->id),

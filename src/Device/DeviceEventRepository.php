@@ -63,6 +63,31 @@ final readonly class DeviceEventRepository
     }
 
     /**
+     * Bestimmte Einträge eines Geräts (z. B. die eben geschriebenen, siehe DeviceEventRecorder), nach
+     * ID aufsteigend. IDs anderer Geräte oder Städte werden übergangen.
+     *
+     * @param list<int> $ids
+     *
+     * @return list<DeviceEvent>
+     */
+    public function findForDevice(Tenant $tenant, int $deviceId, array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $stmt = $this->pdo->prepare(sprintf(
+            '%s%s AND e.id IN (%s) ORDER BY e.id',
+            self::SELECT,
+            self::FROM,
+            implode(', ', array_fill(0, count($ids), '?')),
+        ));
+        $stmt->execute([$tenant->id, $deviceId, ...$ids]);
+
+        return array_map(self::hydrate(...), $stmt->fetchAll());
+    }
+
+    /**
      * Anzahl der Einträge, die export() mit diesem Filter liefern würde.
      */
     public function countHistory(Tenant $tenant, DeviceHistoryFilter $filter): int

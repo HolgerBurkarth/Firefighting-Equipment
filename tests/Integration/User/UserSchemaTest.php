@@ -88,7 +88,7 @@ final class UserSchemaTest extends AuthSchemaTestCase
 
         $this->createUser($tenantId, self::anonymized());
         $this->createUser($tenantId, self::anonymized());
-        $this->createUser(null, ['role' => 'superadmin'] + self::anonymized());
+        $this->createUser($tenantId, ['role' => 'admin'] + self::anonymized());
 
         self::assertSame(3, $this->countRows('fe_users'));
     }
@@ -283,6 +283,115 @@ final class UserSchemaTest extends AuthSchemaTestCase
         $this->assertRejected(
             self::ER_CONSTRAINT_FAILED,
             fn () => $this->pdo()->exec("UPDATE fe_users SET role = 'admin' WHERE id = " . $id),
+        );
+    }
+
+    public function testDatabaseRejectsAnonymizedSuperadmin(): void
+    {
+        $this->assertRejected(
+            self::ER_CONSTRAINT_FAILED,
+            fn () => $this->createUser(null, ['role' => 'superadmin'] + self::anonymized()),
+        );
+
+        $id = $this->createSuperadmin();
+        $this->assertRejected(
+            self::ER_CONSTRAINT_FAILED,
+            fn () => $this->pdo()->exec(
+                "UPDATE fe_users SET status = 'deleted', email = NULL, email_verified_at = NULL, password_hash = NULL,"
+                . " name = NULL, display_name = NULL, deleted_at = '" . self::CREATED_AT . "' WHERE id = " . $id,
+            ),
+        );
+    }
+
+    public function testProtectedActiveSuperadminIsAccepted(): void
+    {
+        $id = $this->createUser(null, ['role' => 'superadmin', 'protected' => 1]);
+
+        self::assertSame(1, $this->pdo()->query('SELECT protected FROM fe_users WHERE id = ' . $id)->fetchColumn());
+    }
+
+    public function testProtectedDefaultsToZero(): void
+    {
+        $id = $this->createSuperadmin();
+
+        self::assertSame(0, $this->pdo()->query('SELECT protected FROM fe_users WHERE id = ' . $id)->fetchColumn());
+    }
+
+    /**
+     * @return iterable<string, array{?string, array<string, scalar|null>}>
+     */
+    public static function invalidProtectedUsers(): iterable
+    {
+        yield 'Admin einer Stadt' => ['tenant', ['role' => 'admin', 'protected' => 1]];
+        yield 'Benutzer einer Stadt' => ['tenant', ['protected' => 1]];
+        yield 'gesperrter Super-Admin' => [null, ['role' => 'superadmin', 'protected' => 1, 'locked_at' => self::CREATED_AT]];
+        yield 'Wert 2' => [null, ['role' => 'superadmin', 'protected' => 2]];
+    }
+
+    /**
+     * @param array<string, scalar|null> $overrides
+     */
+    #[DataProvider('invalidProtectedUsers')]
+    public function testDatabaseRejectsInvalidProtectedUser(?string $tenant, array $overrides): void
+    {
+        $tenantId = $tenant === null ? null : $this->createTenant();
+
+        $this->assertRejected(self::ER_CONSTRAINT_FAILED, fn () => $this->createUser($tenantId, $overrides));
+        self::assertSame(0, $this->countRows('fe_users'));
+    }
+
+    public function testDatabaseRejectsLockingProtectedSuperadmin(): void
+    {
+        $id = $this->createUser(null, ['role' => 'superadmin', 'protected' => 1]);
+
+        $this->assertRejected(
+            self::ER_CONSTRAINT_FAILED,
+            fn () => $this->pdo()->exec('UPDATE fe_users SET locked_at = UTC_TIMESTAMP() WHERE id = ' . $id),
+        );
+    }
+
+    public function testDeviceLogNotificationIsAcceptedForAdminsAndSuperadmins(): void
+    {
+        $tenantId = $this->createTenant();
+        $admin = $this->createUser($tenantId, ['role' => 'admin', 'notify_device_log' => 1]);
+        $superadmin = $this->createUser(null, ['role' => 'superadmin', 'notify_device_log' => 1]);
+        $user = $this->createUser($tenantId);
+
+        self::assertSame(
+            [[$admin, 1], [$superadmin, 1], [$user, 0]],
+            $this->pdo()->query('SELECT id, notify_device_log FROM fe_users ORDER BY id')->fetchAll(\PDO::FETCH_NUM),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{array<string, scalar|null>}>
+     */
+    public static function invalidDeviceLogNotifications(): iterable
+    {
+        yield 'Benutzer' => [['notify_device_log' => 1]];
+        yield 'gelöschter Admin' => [['role' => 'admin', 'notify_device_log' => 1] + self::anonymized()];
+        yield 'Wert 2' => [['role' => 'admin', 'notify_device_log' => 2]];
+    }
+
+    /**
+     * @param array<string, scalar|null> $overrides
+     */
+    #[DataProvider('invalidDeviceLogNotifications')]
+    public function testDatabaseRejectsInvalidDeviceLogNotification(array $overrides): void
+    {
+        $tenantId = $this->createTenant();
+
+        $this->assertRejected(self::ER_CONSTRAINT_FAILED, fn () => $this->createUser($tenantId, $overrides));
+        self::assertSame(0, $this->countRows('fe_users'));
+    }
+
+    public function testDatabaseRejectsDemotingAdminWithDeviceLogNotification(): void
+    {
+        $id = $this->createUser($this->createTenant(), ['role' => 'admin', 'notify_device_log' => 1]);
+
+        $this->assertRejected(
+            self::ER_CONSTRAINT_FAILED,
+            fn () => $this->pdo()->exec("UPDATE fe_users SET role = 'user' WHERE id = " . $id),
         );
     }
 
