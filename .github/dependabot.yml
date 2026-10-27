@@ -1,0 +1,16 @@
+# Dependabot hält die Versionen der GitHub Actions in .github/workflows/ aktuell (Pull Request je
+# Woche, alle Actions gemeinsam). Gemergt wird nur nach grünem CI-Lauf.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Berlin
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+    commit-message:
+      prefix: CI

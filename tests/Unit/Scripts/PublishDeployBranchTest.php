@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Tests\Unit\Scripts;
 
 use FirefightingEquipment\Tests\Support\Bash;
+use FirefightingEquipment\Tests\Support\Git;
 use FirefightingEquipment\Tests\Support\TempDirectory;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
@@ -22,9 +23,7 @@ final class PublishDeployBranchTest extends TestCase
     private string $repo;
     private string $remote;
     private string $dist;
-
-    /** @var array<string, string> */
-    private array $env;
+    private Git $gitRunner;
 
     protected function setUp(): void
     {
@@ -35,16 +34,7 @@ final class PublishDeployBranchTest extends TestCase
         $this->repo = $this->dir->file('repo');
         $this->remote = $this->dir->file('remote.git');
         $this->dist = $this->dir->file('dist');
-        $this->dir->write('gitconfig', '');
-        // Eigene, leere Git-Konfiguration: Einstellungen des Rechners (z. B. Signieren) gelten nicht.
-        $this->env = [
-            'GIT_CONFIG_GLOBAL' => Bash::toPath($this->dir->file('gitconfig')),
-            'GIT_CONFIG_NOSYSTEM' => '1',
-            'GIT_AUTHOR_NAME' => 'Test',
-            'GIT_AUTHOR_EMAIL' => 'test@example.org',
-            'GIT_COMMITTER_NAME' => 'Test',
-            'GIT_COMMITTER_EMAIL' => 'test@example.org',
-        ];
+        $this->gitRunner = new Git($this->dir->file('gitconfig'));
 
         mkdir($this->repo);
         mkdir($this->remote);
@@ -160,7 +150,7 @@ final class PublishDeployBranchTest extends TestCase
 
     public function testWrongUsageIsExitCode2(): void
     {
-        [$exitCode] = Bash::run(self::SCRIPT, [$this->head()], $this->repo, $this->env);
+        [$exitCode] = Bash::run(self::SCRIPT, [$this->head()], $this->repo, $this->gitRunner->env);
 
         self::assertSame(2, $exitCode);
     }
@@ -170,7 +160,7 @@ final class PublishDeployBranchTest extends TestCase
      */
     private function publish(string $commit): array
     {
-        return Bash::run(self::SCRIPT, [$commit, Bash::toPath($this->dist)], $this->repo, $this->env);
+        return Bash::run(self::SCRIPT, [$commit, Bash::toPath($this->dist)], $this->repo, $this->gitRunner->env);
     }
 
     private function build(string $indexHtml): void
@@ -228,19 +218,8 @@ final class PublishDeployBranchTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
-    /**
-     * Führt git aus und liefert stdout ohne abschließenden Zeilenumbruch; Fehler beenden den Test.
-     */
     private function git(string $cwd, string ...$args): string
     {
-        $process = proc_open(['git', ...$args], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd, [...getenv(), ...$this->env]);
-        self::assertNotFalse($process);
-        $stdout = (string) stream_get_contents($pipes[1]);
-        $stderr = (string) stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        self::assertSame(0, proc_close($process), sprintf('git %s: %s', implode(' ', $args), $stderr));
-
-        return rtrim($stdout, "\n");
+        return $this->gitRunner->run($cwd, ...$args);
     }
 }

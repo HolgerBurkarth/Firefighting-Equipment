@@ -1473,15 +1473,31 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `frontend/dist` auf `main` versioniert ist (Exit-Code 1; falscher Aufruf 2). Tests:
   `tests/Unit/Scripts/PublishDeployBranchTest` (temporäre Repositorys, eigene leere Git-Konfiguration).
 - Nur der Workflow schreibt in `deploy`; Agenten und Menschen ändern den Branch nie von Hand.
+- Versionen der Actions (Stand: checkout v7, setup-node v7, upload-artifact v7, download-artifact v8,
+  setup-php v2; alle mit `node24`) hält Dependabot aktuell (`.github/dependabot.yml`, wöchentlich
+  montags, alle Actions in einem Pull Request mit Präfix `CI`). Neue Versionen vor dem Eintragen
+  prüfen (Release und `runs.using` im `action.yml` des Tags), nie raten; upload- und
+  download-artifact müssen zueinander passen.
 
 ## Deployment
-- Ablauf: lokal testen (alle Tests grün), committen, zu GitHub synchronisieren, dann auf
-  dem Server per SSH: `cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh`.
+- Ablauf: lokal testen (alle Tests grün: `composer test` und in `frontend/` `npm test`),
+  committen, nach `main` pushen → GitHub Actions testet und legt Code plus Frontend-Build im Branch
+  `deploy` ab (siehe "GitHub Actions (CI)") → von Hand auf dem Server per SSH:
+  `cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh`. Erst deployen, wenn der
+  CI-Lauf grün ist und `deploy` den gewünschten Stand hat.
+- Der Server steht auf dem Branch `deploy` (nie `main`: dort fehlt der Frontend-Build; auf STRATO
+  gibt es kein Node.js). Umstieg einmalig von Hand, README "Umstieg des Servers auf den Branch
+  deploy". Auf `main` bricht das Skript mit Hinweis darauf ab.
 - Das Skript bricht bei lokal geänderten Dateien ab, legt eine Sicherung an, holt per
-  `git fetch` + `git merge --ff-only origin/main`, führt `composer install` aus, prüft mit
-  `php85 bin/migrate.php check` auf offene Migrationen und prüft zum Schluss den
-  Health-Endpunkt. Bei Fehlern springt es nicht automatisch zurück, sondern zeigt die
-  Befehle für den Rücksprung an.
+  `git fetch` + `git merge --ff-only origin/deploy`, prüft, dass `frontend/dist/index.html`
+  vorhanden ist (sonst Abbruch vor Composer), führt `composer install` aus, prüft mit
+  `php85 bin/migrate.php check` auf offene Migrationen, prüft den Health-Endpunkt und zum Schluss
+  die App-Seite `https://www.prodad.de/firefighting/service/` (HTTP 200, `text/html; charset=utf-8`,
+  `<base href="/firefighting/service/" />`; ohne Stadt und ohne Datenbank). Bei Fehlern springt es
+  nicht automatisch zurück, sondern zeigt die Befehle für den Rücksprung an.
+- Nur für Tests (`tests/Unit/Scripts/DeployScriptTest`, nachgebaute Server-Umgebung mit
+  Platzhaltern für `php85` und `curl`): `FF_DEPLOY_COMPOSER_BIN` und `FF_DEPLOY_BASE_URL`; auf dem
+  Server nie setzen.
 - Selbst-Neustart: Hat `git merge` `scripts/deploy.sh` geändert, startet sich das Skript direkt
   nach dem Merge per `exec` mit der neuen Fassung neu. Alter Commit und Pfad der Sicherung gehen
   über `FF_DEPLOY_RESUME_OLD_COMMIT` und `FF_DEPLOY_RESUME_BACKUP_FILE` mit; die neue Fassung
