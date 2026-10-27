@@ -1,4 +1,12 @@
-import { expect, HTTP_ERROR_CONSOLE, meBody, NOT_AUTHENTICATED, test } from './fixtures';
+import {
+    DATABASE_UNAVAILABLE,
+    expect,
+    HTTP_ERROR_CONSOLE,
+    meBody,
+    NETWORK_ERROR_CONSOLE,
+    NOT_AUTHENTICATED,
+    test,
+} from './fixtures';
 
 test.describe('Weiche „/“ und Wächter', () => {
     test.describe('ohne Sitzung', () => {
@@ -63,16 +71,74 @@ test.describe('Weiche „/“ und Wächter', () => {
         });
     });
 
-    test.describe('ohne Verbindung', () => {
-        test.use({
-            api: { 'GET api/v1/auth/me': 'abort' },
-            allowedConsoleError: /internet|network|Failed to load|ERR_/i,
-        });
+    test.describe('Störung bei auth/me', () => {
+        test.use({ allowedConsoleError: NETWORK_ERROR_CONSOLE });
 
-        test('Anmeldeseite mit Hinweis', async ({ page }) => {
-            await page.goto('/firefighting/test/dashboard');
-            await expect(page).toHaveURL(/anmelden\?weiter=\/dashboard$/);
-            await expect(page.getByTestId('login-notice')).toContainText('Keine Verbindung');
+        for (const [label, failure] of [
+            ['keine Verbindung', 'abort'],
+            ['Server nicht erreichbar (503)', DATABASE_UNAVAILABLE],
+        ] as const) {
+            test.describe(label, () => {
+                let calls = 0;
+                test.use({
+                    api: {
+                        'GET api/v1/auth/me': () => {
+                            calls += 1;
+                            return calls === 1 ? failure : { status: 200, body: meBody('admin') };
+                        },
+                    },
+                });
+
+                test.beforeEach(() => {
+                    calls = 0;
+                });
+
+                test('führt nie zur Anmeldung, versucht es erneut', async ({ page }) => {
+                    await page.goto('/firefighting/test/');
+                    await expect(page.getByTestId('connection-notice')).toContainText(
+                        'Keine Verbindung zum Server, neuer Versuch läuft automatisch.',
+                    );
+                    await expect(page).not.toHaveURL(/anmelden/);
+                    // Nach dem erneuten Versuch geht es normal weiter.
+                    await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
+                    await expect(page.getByTestId('connection-notice')).toBeHidden();
+                    expect(calls).toBe(2);
+                });
+
+                test('geschützte Seite bleibt, statt zur Anmeldung zu springen', async ({
+                    page,
+                }) => {
+                    await page.goto('/firefighting/test/dashboard');
+                    await expect(page.getByTestId('connection-notice')).toBeVisible();
+                    await expect(
+                        page.getByRole('heading', { level: 1, name: 'Dashboard' }),
+                    ).toBeVisible();
+                    await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
+                });
+            });
+        }
+
+        test.describe('danach nicht angemeldet', () => {
+            let calls = 0;
+            test.use({
+                api: {
+                    'GET api/v1/auth/me': () => {
+                        calls += 1;
+                        return calls === 1 ? 'abort' : NOT_AUTHENTICATED;
+                    },
+                },
+            });
+
+            test.beforeEach(() => {
+                calls = 0;
+            });
+
+            test('erst die echte 401 führt zur Anmeldung', async ({ page }) => {
+                await page.goto('/firefighting/test/suchen');
+                await expect(page.getByTestId('connection-notice')).toBeVisible();
+                await expect(page).toHaveURL(/anmelden\?weiter=\/suchen$/);
+                await expect(page.getByTestId('connection-notice')).toBeHidden();
+            });
         });
     });
 });

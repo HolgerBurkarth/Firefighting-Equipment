@@ -115,3 +115,16 @@ export const ROLE_LABELS: Readonly<Record<UserRole, string>> = {
     admin: 'Admin',
     superadmin: 'Super-Admin',
 };
+
+/** POST auth/email/resend: immer 202 mit derselben Meldung (nur unter Städten). */
+export function resendVerification(
+    email: string,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<{ readonly message: string }>> {
+    return apiRequest('auth/email/resend', parseMessage, {
+        method: 'POST',
+        body: { email },
+        public: true,
+        ...(fetchFn && { fetchFn }),
+    });
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ApiError } from '../../src/api/client';
-import { errorMessage, formatWaitTime } from '../../src/auth/errorMessages';
+import { errorMessage, formatCountdown, formatWaitTime } from '../../src/auth/errorMessages';
 
 function error(code: string, extra: Partial<ApiError> = {}): ApiError {
     return { code, message: null, status: 400, retryAfterSeconds: null, details: null, ...extra };
@@ -77,5 +77,17 @@ describe('formatWaitTime', () => {
         [3601, 'in etwa 2 Stunden'],
     ])('%j → %s', (seconds, text) => {
         expect(formatWaitTime(seconds)).toBe(text);
+    });
+});
+
+describe('formatCountdown', () => {
+    it.each([
+        [0, '0:00'],
+        [5, '0:05'],
+        [59.1, '1:00'],
+        [75, '1:15'],
+        [900, '15:00'],
+    ])('%j → %s', (seconds, text) => {
+        expect(formatCountdown(seconds)).toBe(text);
     });
 });

@@ -1,27 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import type { ApiError } from './api/client';
-import { fetchTenant, type TenantInfo } from './api/tenant';
+import { onMounted } from 'vue';
 import { errorMessage } from './auth/errorMessages';
+import { sessionCheckError } from './auth/session';
 import type { AppBase } from './runtime/appBase';
-import { applyTenantAppearance } from './runtime/appearance';
+import { loadTenant, tenantState } from './runtime/tenantState';
 
 const props = defineProps<{ base: AppBase }>();
 
-const tenant = ref<TenantInfo | null>(null);
-const tenantError = ref<ApiError | null>(null);
-
-onMounted(async () => {
-    if (props.base.isService) {
-        return;
-    }
-    const result = await fetchTenant();
-    if (!result.ok) {
-        tenantError.value = result.error;
-        return;
-    }
-    tenant.value = result.data;
-    applyTenantAppearance(document, result.data);
+onMounted(() => {
+    void loadTenant(props.base);
 });
 </script>
 
@@ -43,15 +30,26 @@ onMounted(async () => {
         </div>
         <div class="app-header-text">
             <span class="app-header-title" data-testid="app-title">
-                {{ base.isService ? 'Super-Admin' : (tenant?.name ?? 'Feuerwehr') }}
+                {{ base.isService ? 'Super-Admin' : (tenantState.tenant?.name ?? 'Feuerwehr') }}
             </span>
             <span class="app-header-subtitle">Geräteverwaltung</span>
         </div>
     </header>
 
-    <p v-if="tenantError !== null" class="app-error" role="alert">
-        {{ errorMessage(tenantError) }}
-        <small>({{ tenantError.code }})</small>
+    <p v-if="tenantState.error !== null" class="app-error" role="alert">
+        {{ errorMessage(tenantState.error) }}
+        <small>({{ tenantState.error.code }})</small>
+    </p>
+
+    <!-- Sitzungsprüfung gestört (keine Verbindung, 5xx): nie zur Anmeldung, sondern erneut versuchen. -->
+    <p
+        v-if="sessionCheckError !== null"
+        class="app-error app-offline"
+        role="status"
+        data-testid="connection-notice"
+    >
+        Keine Verbindung zum Server, neuer Versuch läuft automatisch.
+        <small>({{ sessionCheckError.code }})</small>
     </p>
 
     <main class="app-main">
@@ -100,6 +98,11 @@ onMounted(async () => {
     background: var(--status-defective-bg);
     color: var(--status-defective-fg);
     font-weight: var(--font-weight-semibold);
+}
+
+.app-offline {
+    background: var(--offline-bg);
+    color: var(--offline-text);
 }
 
 .app-error small {

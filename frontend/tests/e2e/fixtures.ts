@@ -69,8 +69,17 @@ export const NOT_AUTHENTICATED: MockResponse = {
     body: { error: 'not_authenticated', message: 'Bitte melden Sie sich an.' },
 };
 
-/** Meldung der Browser zu 4xx-Antworten (Chromium, WebKit; Firefox meldet sie nicht). */
-export const HTTP_ERROR_CONSOLE = /status of 4\d\d|Failed to load resource/;
+export const DATABASE_UNAVAILABLE: MockResponse = {
+    status: 503,
+    body: { error: 'database_unavailable', message: 'Die Datenbank ist nicht erreichbar.' },
+};
+
+/** Meldung der Browser zu 4xx/5xx-Antworten (Chromium, WebKit; Firefox meldet sie nicht). */
+export const HTTP_ERROR_CONSOLE = /status of [45]\d\d|Failed to load resource/;
+
+/** Meldung der Browser zu abgebrochenen Anfragen (route.abort) und zu 4xx/5xx-Antworten. */
+export const NETWORK_ERROR_CONSOLE =
+    /status of [45]\d\d|Failed to load resource|ERR_INTERNET_DISCONNECTED|NetworkError|network connection/i;
 
 /** 1 × 1 px, transparent (für die Symbole aus api/v1/app-icon/…). */
 const PNG = Buffer.from(

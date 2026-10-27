@@ -79,6 +79,11 @@ Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen")
    senden, danach aus der Adresszeile entfernen.
 
 ### Weitere Regeln
+- Nur eine echte Antwort des Servers entscheidet, ob jemand angemeldet ist (401 = nicht
+  angemeldet). Bei einer Störung der Sitzungsprüfung (keine Verbindung, unlesbare Antwort, 5xx)
+  führt die App nie zur Anmeldung: Sie zeigt oben „Keine Verbindung zum Server, neuer Versuch
+  läuft automatisch“, versucht es selbst erneut (nach 2, 4, 8, dann alle 15 Sekunden und sofort,
+  wenn der Browser wieder online ist) und macht nach Erfolg normal weiter.
 - Jeder Fehlercode der API erscheint in Alltagssprache, der Code nur klein für den Support:
   falsches Passwort, gesperrtes Konto, E-Mail nicht bestätigt (mit „Mail erneut senden“),
   „wartet auf Freischaltung“, zu viele Versuche (mit Wartezeit aus `Retry-After`), Link abgelaufen
@@ -116,6 +121,9 @@ Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen")
 - Status jeder Buchung sichtbar: Uhr-Symbol = wartet, Haken = beim Server angekommen. Oben ein
   grauer Streifen, solange das Gerät offline ist.
 - Der buchende Kamerad erhält das Ergebnis (übernommen, überschrieben, abgelehnt) direkt in der App.
+- Die App merkt sich die letzte vom Server bestätigte Sitzung (Konto, Rolle, Stadt) lokal und
+  arbeitet offline damit weiter. Nur eine echte 401 vom Server beendet sie; keine Verbindung,
+  unlesbare Antworten oder Serverfehler (5xx) nie.
 - Abmelden löscht dann auch alle lokal gespeicherten Daten des Kontos (Kopie der Daten,
   Warteschlange). Liegen noch Buchungen in der Warteschlange, warnt die App vorher deutlich
   (z. B. „3 Buchungen wurden noch nicht gesendet und gehen beim Abmelden verloren“).
