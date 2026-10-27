@@ -165,7 +165,12 @@ final class DeviceListTest extends DeviceApiTestCase
         yield 'Status unbekannt' => ['status=kaputt', 'Der Parameter "status" muss eine kommagetrennte Liste'];
         yield 'Status leer' => ['status=', 'Der Parameter "status"'];
         yield 'Status mit Leerzeichen' => ['status=ready,%20defective', 'Der Parameter "status"'];
-        yield 'Sortierung unbekannt' => ['sort=name', 'Der Parameter "sort" muss einer der Werte'];
+        yield 'Sortierung unbekannt' => ['sort=name', 'Der Parameter "sort" muss einer der Werte "identifier", "device_type", "location", "status", "next_inspection_due" sein.'];
+        yield 'Sortierung leer' => ['sort=', 'Der Parameter "sort"'];
+        yield 'Sortierung groß' => ['sort=Identifier', 'Der Parameter "sort"'];
+        yield 'Richtung unbekannt' => ['dir=up', 'Der Parameter "dir" muss "asc" oder "desc" sein.'];
+        yield 'Richtung groß' => ['dir=DESC', 'Der Parameter "dir"'];
+        yield 'Richtung leer' => ['dir=', 'Der Parameter "dir"'];
         yield 'Suche zu lang' => ['q=' . str_repeat('x', 101), 'Der Suchtext darf höchstens 100 Zeichen'];
         yield 'Suche mit Steuerzeichen' => ['q=a%0Ab', 'Der Suchtext darf keine Steuerzeichen'];
     }

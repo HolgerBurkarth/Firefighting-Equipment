@@ -25,6 +25,7 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
     public static function superAdminRoutes(): iterable
     {
         yield 'Städte auflisten' => ['GET', 'tenants', null];
+        yield 'Kürzel prüfen' => ['GET', 'tenants/slug-available?slug=geisingen', null];
         yield 'Stadt anlegen' => ['POST', 'tenants', ['slug' => 'geisingen', 'name' => 'Feuerwehr Geisingen', 'admin_email' => 'admin@example.org']];
         yield 'Stadt anzeigen' => ['GET', 'tenants/{tenant}', null];
         yield 'umbenennen' => ['POST', 'tenants/{tenant}/rename', ['name' => 'Freiwillige Feuerwehr Immendingen']];

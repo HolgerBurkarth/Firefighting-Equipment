@@ -43,6 +43,7 @@ Nur unter `service` (Super-Admin, siehe "Städte verwalten und Admins einladen")
 | Methode | Pfad                                                   | Antwort                                   |
 |---------|--------------------------------------------------------|-------------------------------------------|
 | GET     | `api/v1/tenants`                                       | `{"tenants":[…]}` mit Status und Zahlen   |
+| GET     | `api/v1/tenants/slug-available?slug=…`                 | `{"slug":…,"valid":…,"available":…,…}`    |
 | POST    | `api/v1/tenants`                                       | 201 `{"tenant":…,"user":…,"mail_sent":…}` |
 | GET     | `api/v1/tenants/{id}`                                  | `{"tenant":…}`                            |
 | POST    | `api/v1/tenants/{id}/rename`                           | `{"tenant":…}`                            |
@@ -59,6 +60,38 @@ nur unter ihrer Stadt; ein Cookie gilt nur dort.
 Unter einer Stadt antwortet die API nur, wenn die Stadt existiert und aktiv ist. Der Health-Check
 prüft die Datenbankverbindung; bei einer Störung antwortet er mit 503 und
 `{"status":"error","database":"error"}`. Das Deploy-Skript ruft ihn unter `service` auf.
+
+### Stadt-Kürzel
+
+Das Kürzel einer Stadt steht im Pfad (`/firefighting/<kürzel>/`). Frontend und Backend prüfen es
+nach denselben Regeln (Backend: `TenantSlug`, zusätzlich CHECK in der Datenbank):
+
+- Regulärer Ausdruck `^[a-z0-9]+(-[a-z0-9]+)*$`: nur Kleinbuchstaben `a-z`, Ziffern `0-9` und
+  Bindestrich; der Bindestrich nicht am Anfang oder Ende und nicht doppelt. Keine Umlaute, kein
+  `ß`, keine Leerzeichen, Punkte oder Unterstriche.
+- Länge: mindestens 1, höchstens 50 Zeichen.
+- Reserviert (nie für eine Stadt): `service` (Bereich des Super-Admins), auch in anderer
+  Schreibweise. Als Teil eines Kürzels ist es erlaubt (`service-stadt`).
+- Großbuchstaben werden abgelehnt, nicht still umgewandelt; ist die Form in Kleinbuchstaben gültig,
+  wird sie vorgeschlagen („Immendingen“ → „immendingen“).
+- Eindeutig über alle Städte, auch gesperrte. Nach dem Anlegen unveränderlich (Umbenennen ändert
+  nur den Namen); Städte werden nie gelöscht, ein Kürzel wird also nie wieder frei.
+
+Reihenfolge der Prüfungen (die erste verletzte Regel bestimmt die Meldung): leer → länger als
+50 Zeichen → reserviert (in Kleinbuchstaben verglichen) → Großbuchstaben, deren Kleinschreibung
+gültig wäre (mit Vorschlag) → Format.
+
+| Eingabe          | Ergebnis                                                         |
+|------------------|------------------------------------------------------------------|
+| `bad-duerrheim`  | gültig                                                           |
+| `stadt-2`, `123` | gültig                                                           |
+| `Bad-Duerrheim`  | ungültig, Vorschlag `bad-duerrheim`                              |
+| `Service`        | ungültig: reserviert                                             |
+| `tübingen`       | ungültig: Format (Umlaut)                                        |
+| `bad--duerrheim` | ungültig: Format (doppelter Bindestrich)                         |
+
+Vor dem Anlegen kann das Frontend `GET api/v1/tenants/slug-available?slug=…` (nur Super-Admin)
+fragen, siehe "Städte verwalten und Admins einladen".
 
 ### Fehler
 
@@ -269,6 +302,16 @@ werden über ihre ID angesprochen (siehe `GET api/v1/tenants`).
    Anzeigename, E-Mail gilt als bestätigt), eine Sitzung entsteht nicht: Anmeldung mit dem neuen
    Passwort. Alle aktiven Super-Admins bekommen die Mail "Einladung angenommen".
 
+Kürzel vorab prüfen (für das Formular „Neue Stadt“): `GET api/v1/tenants/slug-available?slug=…`
+antwortet immer mit 200 und `{"slug":"Geisingen","valid":false,"available":false,"message":"Das
+Kürzel darf keine Großbuchstaben enthalten. Gemeint ist vermutlich „geisingen“.","suggestion":"geisingen"}`.
+`slug` ist die Eingabe unverändert; ungültig → `valid: false` mit der Meldung der verletzten Regel
+(siehe "Stadt-Kürzel") und ggf. `suggestion`; gültig → `available` sagt, ob es frei ist (auch eine
+gesperrte Stadt belegt ihr Kürzel), `message` „Das Kürzel ist verfügbar.“ bzw. „Das Kürzel ist
+bereits vergeben.“, `suggestion` `null`. Der Vorschlag selbst wird nicht auf Verfügbarkeit geprüft.
+Fehlt `slug`: 400. Verbindlich bleibt `POST api/v1/tenants` (409 `slug_taken`), da jemand anderes
+das Kürzel inzwischen vergeben haben kann.
+
 Außerdem: `…/rename` mit `{"name":"…"}` ändert nur den Namen (das Kürzel ist unveränderlich);
 `…/lock` sperrt die Stadt und beendet sofort alle Sitzungen ihrer Konten (nach dem Entsperren gelten
 keine alten Sitzungen); `…/unlock` entsperrt. `GET api/v1/tenants/{id}/users` zeigt die Konten einer
@@ -420,8 +463,12 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
     `retired` angegeben ist oder (ohne `status`) mit `include_retired=1`.
   - `q`: Teil von Kennung, Seriennummer, Hersteller oder Modell, ohne Groß-/Kleinschreibung
     (höchstens 100 Zeichen; `%` und `_` sind keine Platzhalter).
-  - `sort=identifier` (Standard, natürlich: „M2“ vor „M10“) oder `sort=next_inspection_due`
-    (früheste zuerst, Geräte ohne Datum am Ende).
+  - `sort`: `identifier` (Standard, Kennung natürlich: „M2“ vor „M10“), `device_type` (Name des
+    Gerätetyps), `location` (angezeigter Pfad „HLF 20 / G1“), `status` (fachlich: einsatzbereit, in
+    Wartung, defekt, ausgesondert) oder `next_inspection_due` (Geräte ohne Datum immer am Ende,
+    in beiden Richtungen). Texte natürlich und ohne Groß-/Kleinschreibung („LF 8“ vor „LF 10“).
+  - `dir=asc` (Standard) oder `dir=desc`. Bei Gleichstand immer natürlich nach Kennung, dann nach
+    ID (beides aufsteigend), damit Seiten stabil sind. Ungültige Werte für `sort` oder `dir`: 400.
   - `limit` 1–200 (Standard 50), `offset` 0–1000000 (Standard 0); `total` zählt alle Treffer.
 - Kennung: höchstens 30 Zeichen aus Buchstaben, Ziffern, Leerzeichen, `-`, `/`, `.`; Leerraum am
   Rand wird entfernt, mehrere Leerzeichen werden zu einem. Eindeutig je Stadt unter nicht
@@ -477,7 +524,7 @@ Lokal ausprobieren (Admin angemeldet wie unter "Lokal starten"):
 
 ```
 curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/devices
-curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/devices?location_id=1&include_sublocations=1&status=ready,maintenance&q=ma&sort=next_inspection_due&limit=20&offset=0"
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/devices?location_id=1&include_sublocations=1&status=ready,maintenance&q=ma&sort=next_inspection_due&dir=desc&limit=20&offset=0"
 curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/devices?include_retired=1"
 # device.json:   {"identifier":"MA-01","device_type_id":1,"location_id":2,"manufacturer":"Dräger","model":"FPS 7000","next_inspection_due":"2027-03-01","comment":"Neu beschafft"}
 curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@device.json" http://localhost:8000/firefighting/immendingen/api/v1/devices
@@ -577,8 +624,9 @@ Format (für Excel unter Windows gedacht, Doppelklick öffnet die Datei mit korr
 **Geräteliste** (`devices/export`): Spalten Kennung, Gerätetyp, Standort (Pfad wie „HLF 20 / G1“),
 Status, Nächste Prüfung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz. Filter wie in der
 Geräteliste (`device_type_id`, `location_id`, `include_sublocations=1`, `status`, `q`,
-`include_retired=1`), ohne Seitenbegrenzung, immer natürlich nach Kennung sortiert; `sort`, `limit`
-und `offset` werden ignoriert. Die Datei kann wieder importiert werden (siehe "CSV-Import").
+`include_retired=1`), Sortierung ebenso (`sort`, `dir`; Standard natürlich nach Kennung), ohne
+Seitenbegrenzung (`limit` und `offset` werden ignoriert). So kann das Frontend die Parameter der
+angezeigten Liste unverändert weitergeben. Die Datei kann wieder importiert werden (siehe "CSV-Import").
 
 **Historie** (`device-events/export`): alle Ereignisse der Stadt, auch ausgesonderter Geräte.
 Spalten Zeitpunkt, Geräte-Nr. (ID; unterscheidet Geräte, deren Kennung nach dem Aussondern neu
@@ -927,9 +975,8 @@ php bin/tenant.php list --config=PFAD                                    # ander
 ```
 
 Das Kürzel erscheint in der URL (`/firefighting/<kürzel>/`) und ist nach dem Anlegen
-unveränderlich; `rename` ändert nur den Namen. Erlaubt sind Kleinbuchstaben `a-z`, Ziffern und
-Bindestrich (nicht am Anfang oder Ende, nicht doppelt), höchstens 50 Zeichen; `service` ist
-reserviert. Städte werden nicht gelöscht, sondern gesperrt; ihre Daten bleiben erhalten. Sperren
+unveränderlich; `rename` ändert nur den Namen. Regeln siehe "Stadt-Kürzel" (Kleinbuchstaben
+`a-z`, Ziffern, Bindestrich, höchstens 50 Zeichen, `service` reserviert). Städte werden nicht gelöscht, sondern gesperrt; ihre Daten bleiben erhalten. Sperren
 beendet alle Sitzungen der Konten dieser Stadt. Auf dem Server `php85` statt `php` verwenden.
 
 `invite-admin` ist der Notfallweg ohne API (der übliche Weg ist die Städteverwaltung unter

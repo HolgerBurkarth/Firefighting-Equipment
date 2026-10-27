@@ -55,7 +55,7 @@ final readonly class DeviceRepository
     /**
      * Eine Seite der Liste mit Gesamtzahl.
      */
-    public function list(Tenant $tenant, DeviceFilter $filter, DeviceSort $sort, int $limit, int $offset): DevicePage
+    public function list(Tenant $tenant, DeviceFilter $filter, DeviceSort $sort, SortDirection $direction, int $limit, int $offset): DevicePage
     {
         if ($limit < 1 || $offset < 0) {
             throw new \InvalidArgumentException('limit muss positiv, offset nicht negativ sein.');
@@ -68,30 +68,26 @@ final readonly class DeviceRepository
         $count->execute($params);
         $total = (int) $count->fetchColumn();
 
-        $order = match ($sort) {
-            DeviceSort::Identifier => 'NATURAL_SORT_KEY(d.identifier), d.id',
-            DeviceSort::NextInspectionDue => 'd.next_inspection_due IS NULL, d.next_inspection_due, NATURAL_SORT_KEY(d.identifier), d.id',
-        };
         // limit und offset sind geprüfte Ganzzahlen.
-        $stmt = $this->pdo->prepare(sprintf('%s%s%s ORDER BY %s LIMIT %d OFFSET %d', self::SELECT, self::FROM, $where, $order, $limit, $offset));
+        $stmt = $this->pdo->prepare(sprintf('%s%s%s ORDER BY %s LIMIT %d OFFSET %d', self::SELECT, self::FROM, $where, self::orderBy($sort, $direction), $limit, $offset));
         $stmt->execute($params);
 
         return new DevicePage(array_map(self::hydrate(...), $stmt->fetchAll()), $total);
     }
 
     /**
-     * Alle Geräte des Filters für den CSV-Export, natürlich sortiert nach Kennung, ungepuffert
-     * gelesen (siehe UnbufferedQuery: bis zum Ende keine andere Abfrage über diese Verbindung).
+     * Alle Geräte des Filters für den CSV-Export, sortiert wie die Liste, ungepuffert gelesen
+     * (siehe UnbufferedQuery: bis zum Ende keine andere Abfrage über diese Verbindung).
      *
      * @return \Generator<int, Device>
      */
-    public function export(Tenant $tenant, DeviceFilter $filter): \Generator
+    public function export(Tenant $tenant, DeviceFilter $filter, DeviceSort $sort = DeviceSort::Identifier, SortDirection $direction = SortDirection::Asc): \Generator
     {
         [$where, $params] = self::where($filter);
 
         return UnbufferedQuery::rows(
             $this->pdo,
-            self::SELECT . self::FROM . $where . ' ORDER BY NATURAL_SORT_KEY(d.identifier), d.id',
+            self::SELECT . self::FROM . $where . ' ORDER BY ' . self::orderBy($sort, $direction),
             [$tenant->id, ...$params],
             self::hydrate(...),
         );
@@ -582,6 +578,26 @@ final readonly class DeviceRepository
         $row = $stmt->fetch();
 
         return is_array($row) ? $row : null;
+    }
+
+    /**
+     * ORDER BY für Liste und Export (nur feste Ausdrücke, nichts aus der Anfrage). Bei Gleichstand
+     * natürlich nach Kennung, dann nach ID, beides aufsteigend; ohne Prüfdatum immer am Ende.
+     */
+    private static function orderBy(DeviceSort $sort, SortDirection $direction): string
+    {
+        $dir = $direction->sql();
+        $primary = match ($sort) {
+            DeviceSort::Identifier => "NATURAL_SORT_KEY(d.identifier) {$dir}",
+            DeviceSort::DeviceType => "NATURAL_SORT_KEY(t.name) {$dir}",
+            DeviceSort::Location => "NATURAL_SORT_KEY(IF(p.id IS NULL, l.name, CONCAT(p.name, ' / ', l.name))) {$dir}",
+            DeviceSort::Status => "FIELD(d.status, 'ready', 'maintenance', 'defective', 'retired') {$dir}",
+            DeviceSort::NextInspectionDue => "d.next_inspection_due IS NULL, d.next_inspection_due {$dir}",
+        };
+
+        return $sort === DeviceSort::Identifier
+            ? "{$primary}, d.id"
+            : "{$primary}, NATURAL_SORT_KEY(d.identifier), d.id";
     }
 
     /**

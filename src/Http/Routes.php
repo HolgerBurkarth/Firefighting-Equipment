@@ -45,6 +45,7 @@ use FirefightingEquipment\Api\V1\Tenants\TenantAction;
 use FirefightingEquipment\Api\V1\Tenants\TenantActionHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantCreateHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantListHandler;
+use FirefightingEquipment\Api\V1\Tenants\TenantSlugAvailabilityHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantUserListHandler;
 use FirefightingEquipment\Api\V1\Users\UserAction;
 use FirefightingEquipment\Api\V1\Users\UserActionHandler;
@@ -72,6 +73,7 @@ final class Routes
             ->add('GET', 'api/v1/health', Access::Public, new HealthHandler())
             ->add('GET', 'api/v1/tenants', Access::SuperAdmin, new TenantListHandler())
             ->add('POST', 'api/v1/tenants', Access::SuperAdmin, new TenantCreateHandler())
+            ->add('GET', 'api/v1/tenants/slug-available', Access::SuperAdmin, new TenantSlugAvailabilityHandler())
             ->add('GET', 'api/v1/tenants/{id}', Access::SuperAdmin, new TenantActionHandler(TenantAction::Show))
             ->add('POST', 'api/v1/tenants/{id}/rename', Access::SuperAdmin, new TenantActionHandler(TenantAction::Rename))
             ->add('POST', 'api/v1/tenants/{id}/lock', Access::SuperAdmin, new TenantActionHandler(TenantAction::Lock))

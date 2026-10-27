@@ -106,6 +106,40 @@ final class TenantSlugTest extends TestCase
         TenantSlug::fromString($value);
     }
 
+    #[DataProvider('uppercaseSlugs')]
+    public function testUppercaseExceptionCarriesSuggestion(string $value, string $suggestion): void
+    {
+        try {
+            TenantSlug::fromString($value);
+            self::fail('Keine Ausnahme.');
+        } catch (InvalidTenantValueException $e) {
+            self::assertSame($suggestion, $e->suggestion);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function suggestionlessSlugs(): iterable
+    {
+        yield 'leer' => [''];
+        yield 'zu lang' => [str_repeat('A', 51)];
+        yield 'reserviert groß' => ['Service'];
+        yield 'Großbuchstaben und Umlaut' => ['Tübingen'];
+        yield 'nur Format' => ['bad--duerrheim'];
+    }
+
+    #[DataProvider('suggestionlessSlugs')]
+    public function testOtherErrorsHaveNoSuggestion(string $value): void
+    {
+        try {
+            TenantSlug::fromString($value);
+            self::fail('Keine Ausnahme.');
+        } catch (InvalidTenantValueException $e) {
+            self::assertNull($e->suggestion);
+        }
+    }
+
     /**
      * @return iterable<string, array{string}>
      */

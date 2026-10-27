@@ -98,6 +98,15 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   liest bis zu 3 MiB, größere Bodys werden nicht gelesen. Kein anderer Content-Type und kein
   `multipart/form-data` (Formulare fremder Seiten könnten es senden): Dateien kommen als Base64 im
   JSON.
+- Stadt-Kürzel (gemeinsame Prüfung Frontend/Backend, README "Stadt-Kürzel"): regulärer Ausdruck
+  `^[a-z0-9]+(-[a-z0-9]+)*$` (Kleinbuchstaben `a-z`, Ziffern, Bindestrich nicht am Anfang/Ende und
+  nicht doppelt), 1 bis höchstens 50 Zeichen, reserviert `service` (auch in anderer Schreibweise),
+  eindeutig über alle Städte (auch gesperrte), unveränderlich und nie wieder frei. Reihenfolge der
+  Prüfungen in `TenantSlug::fromString` (bestimmt die Meldung): leer → Länge → reserviert →
+  Großbuchstaben, deren Kleinschreibung gültig wäre (Meldung mit Vorschlag,
+  `InvalidTenantValueException::$suggestion`) → Format. Regeln nur gemeinsam in `TenantSlug`,
+  Migration (CHECK), README und hier ändern; `SlugRulesDocumentationTest` gleicht README und
+  CLAUDE.md mit `TenantSlug::PATTERN`, `MAX_LENGTH` und `RESERVED` ab.
 - Fehlerformat immer `{"error":"code","message":"deutscher Text"}`, erzeugt über die Fabriken in
   `HttpException`; Codes: `invalid_request` 400, `invalid_token` 400, `invalid_invitation_code`
   400, `not_authenticated` 401, `invalid_credentials`
@@ -637,6 +646,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   beendet die Sitzungen). Unbekannt oder Konto einer Stadt → 404; sich selbst sperren, geschütztes
   Konto, letzter aktiver Super-Admin → 409 `rule_violation`. Anlegen, Passwort und Schutz nur per
   Kommandozeile.
+- `GET tenants/slug-available?slug=…` (`TenantSlugAvailabilityHandler`): immer 200 `{slug, valid,
+  available, message, suggestion}`; `slug` = Eingabe unverändert. Ungültig → `valid`/`available`
+  false, `message` = Meldung von `TenantSlug`, `suggestion` = Kleinschreibung oder `null`. Gültig →
+  `available` (vergeben auch durch gesperrte Städte), `message` „Das Kürzel ist verfügbar.“ bzw.
+  „Das Kürzel ist bereits vergeben.“, `suggestion` `null`. Der Vorschlag wird nicht auf
+  Verfügbarkeit geprüft. Fehlt `slug` → 400. Nur Vorabprüfung, verbindlich bleibt `POST tenants`
+  (409 `slug_taken`). Exakter Pfad, hat Vorrang vor `tenants/{id}`.
 - `GET tenants` (nach Kürzel, mit `counts`: `users_active` = Status `active` und nicht gesperrt,
   `admins_active`, `admins_invited`), `GET tenants/{id}`, `POST tenants {slug, name, admin_email}`
   → 201 `{tenant, user, mail_sent}`, `POST tenants/{id}/rename {name}`, `POST tenants/{id}/lock`
@@ -820,13 +836,20 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - `GET devices`: Parameter `device_type_id`, `location_id`, `include_sublocations=1` (nur mit
   `location_id`, sonst 400), `status` (kommagetrennt; nennt er `retired`, erscheinen ausgesonderte),
   `include_retired=1` (ohne `status`: alle Status), `q` (`LIKE` auf Kennung, Seriennummer,
-  Hersteller, Modell; `%`, `_`, `\` maskiert; höchstens 100 Zeichen), `sort=identifier` (Standard)
-  bzw. `next_inspection_due` (ohne Datum am Ende), `limit` 1–200 (Standard 50), `offset`
-  0–1000000. Unbekannte oder fremde IDs im Filter → leere Liste. Antwort `{devices, total, limit,
+  Hersteller, Modell; `%`, `_`, `\` maskiert; höchstens 100 Zeichen), `sort` (`DeviceSort`:
+  `identifier` Standard, `device_type`, `location`, `status`, `next_inspection_due`), `dir`
+  (`SortDirection`: `asc` Standard, `desc`; beide nur exakt kleingeschrieben, sonst 400; gelesen von
+  `DeviceListHandler::sort`), `limit` 1–200 (Standard 50), `offset` 0–1000000. Unbekannte oder fremde IDs im Filter → leere Liste. Antwort `{devices, total, limit,
   offset}`; je Gerät `id`, `identifier`, `device_type {id, name}`, `location {id, name, path}`
   (Pfad „HLF 20 / G1“), `status`, `status_label`, `next_inspection_due`, `version`.
-- Natürliche Sortierung mit `NATURAL_SORT_KEY(identifier)` (MariaDB ab 10.7, lokal und STRATO
-  10.11), danach `id`; ohne Index (für die Mengen einer Feuerwehr genügt das). Ein Index wäre später
+- Sortierung (`DeviceRepository::orderBy`, nur feste Ausdrücke): Kennung `NATURAL_SORT_KEY(identifier)`,
+  Gerätetyp `NATURAL_SORT_KEY(t.name)`, Standort `NATURAL_SORT_KEY` des angezeigten Pfads (derselbe
+  Ausdruck wie beim Import), Status fachlich per `FIELD` (ready, maintenance, defective, retired),
+  Prüfdatum mit `next_inspection_due IS NULL` zuerst (immer aufsteigend: ohne Datum in BEIDEN
+  Richtungen am Ende). `NATURAL_SORT_KEY` behält die Kollation (`utf8mb4_unicode_ci`, also ohne
+  Groß-/Kleinschreibung; per Test gesichert). Bei Gleichstand immer `NATURAL_SORT_KEY(identifier)`,
+  dann `id`, beide aufsteigend (stabile Seiten). `NATURAL_SORT_KEY` gibt es ab MariaDB 10.7 (lokal
+  und STRATO 10.11); ohne Index (für die Mengen einer Feuerwehr genügt das). Ein Index wäre später
   über eine generierte Spalte per Migration möglich.
 - `GET devices/{id}`: alle Felder (zusätzlich `serial_number`, `manufacturer`, `model`,
   `procured_on`, `note`, `created_at`, `updated_at`), auch ausgesonderte. Antworten mit einem Gerät
@@ -951,8 +974,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   im Protokoll, letzte Zeile `Export abgebrochen – Datei unvollständig` (`CsvFormat::ABORTED_LINE`;
   der Import lehnt solche Dateien ab).
 - Geräteliste: Filter wie `GET devices` (`DeviceListHandler::filter`: `device_type_id`, `location_id`,
-  `include_sublocations`, `status`, `q`, `include_retired`), ohne Seitenbegrenzung, immer
-  `NATURAL_SORT_KEY(identifier), id`; `sort`, `limit`, `offset` werden ignoriert. Spalten
+  `include_sublocations`, `status`, `q`, `include_retired`), Sortierung ebenso
+  (`DeviceListHandler::sort`: `sort`, `dir`, ungültig 400; Standard Kennung aufsteigend), ohne
+  Seitenbegrenzung; `limit`, `offset` werden ignoriert. Spalten
   (`DeviceCsv::DEVICE_HEADER`): Kennung, Gerätetyp, Standort, Status, Nächste Prüfung,
   Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz. Dateiname
   `geraete-<kürzel>-<JJJJ-MM-TT>.csv` (heute in Europe/Berlin über `Clock`).

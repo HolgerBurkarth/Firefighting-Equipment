@@ -11,6 +11,7 @@ use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\DeviceSort;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\DeviceText;
+use FirefightingEquipment\Device\SortDirection;
 use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\RequestContext;
@@ -35,16 +36,12 @@ final readonly class DeviceListHandler implements RequestHandler
     public function handle(RequestContext $context): JsonResponse
     {
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
-        $query = $context->request->query();
         $filter = self::filter($context);
-        $sort = DeviceSort::tryFrom($query['sort'] ?? DeviceSort::Identifier->value) ?? throw HttpException::invalidRequest(sprintf(
-            'Der Parameter "sort" muss einer der Werte %s sein.',
-            implode(', ', array_map(static fn (DeviceSort $s): string => sprintf('"%s"', $s->value), DeviceSort::cases())),
-        ));
+        [$sort, $direction] = self::sort($context);
         $limit = $context->queryInt('limit', 1, self::MAX_LIMIT) ?? self::DEFAULT_LIMIT;
         $offset = $context->queryInt('offset', 0, self::MAX_OFFSET) ?? 0;
 
-        $page = new DeviceRepository($context->db->get())->list($tenant, $filter, $sort, $limit, $offset);
+        $page = new DeviceRepository($context->db->get())->list($tenant, $filter, $sort, $direction, $limit, $offset);
 
         return new JsonResponse([
             'devices' => array_map(DeviceJson::summary(...), $page->devices),
@@ -75,6 +72,28 @@ final readonly class DeviceListHandler implements RequestHandler
         } catch (DeviceException $e) {
             throw DeviceErrors::http($e);
         }
+    }
+
+    /**
+     * Sortierung aus den Parametern sort und dir (auch für den CSV-Export).
+     *
+     * @return array{DeviceSort, SortDirection}
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public static function sort(RequestContext $context): array
+    {
+        $query = $context->request->query();
+
+        return [
+            DeviceSort::tryFrom($query['sort'] ?? DeviceSort::Identifier->value) ?? throw HttpException::invalidRequest(sprintf(
+                'Der Parameter "sort" muss einer der Werte %s sein.',
+                implode(', ', array_map(static fn (DeviceSort $s): string => sprintf('"%s"', $s->value), DeviceSort::cases())),
+            )),
+            SortDirection::tryFrom($query['dir'] ?? SortDirection::Asc->value) ?? throw HttpException::invalidRequest(
+                'Der Parameter "dir" muss "asc" oder "desc" sein.',
+            ),
+        ];
     }
 
     /**

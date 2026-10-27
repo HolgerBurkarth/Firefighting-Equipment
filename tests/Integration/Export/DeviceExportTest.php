@@ -15,7 +15,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
  * GET devices/export (angemeldet): Geräteliste als CSV (BOM, Semikolon, CRLF, deutsche Überschriften
- * und Werte, Formelschutz), Filter wie GET devices, ohne Seitenbegrenzung, natürlich sortiert.
+ * und Werte, Formelschutz), Filter und Sortierung wie GET devices, ohne Seitenbegrenzung.
  */
 #[CoversClass(DeviceExportHandler::class)]
 #[CoversClass(DeviceListHandler::class)]
@@ -130,13 +130,20 @@ final class DeviceExportTest extends ExportApiTestCase
         self::assertSame([], $this->rows('devices/export?location_id=' . $this->otherLocation));
     }
 
-    public function testIgnoresPagingAndSortParameters(): void
+    public function testIgnoresPagingButUsesSortLikeDeviceList(): void
     {
-        foreach (['MA-2', 'MA-1'] as $identifier) {
-            $this->createDevice($this->tenantId, $this->typeId, $this->g1, ['identifier' => $identifier, 'next_inspection_due' => $identifier === 'MA-2' ? '2026-07-01' : null]);
+        foreach (['MA-2', 'MA-1', 'MA-3'] as $identifier) {
+            $this->createDevice($this->tenantId, $this->typeId, $this->g1, ['identifier' => $identifier, 'next_inspection_due' => match ($identifier) {
+                'MA-2' => '2026-07-01',
+                'MA-3' => '2026-08-01',
+                default => null,
+            }]);
         }
 
-        self::assertSame(['MA-1', 'MA-2'], self::column($this->rows('devices/export?limit=1&offset=1&sort=next_inspection_due'), 0));
+        self::assertSame(['MA-1', 'MA-2', 'MA-3'], self::column($this->rows('devices/export?limit=1&offset=1'), 0));
+        self::assertSame(['MA-3', 'MA-2', 'MA-1'], self::column($this->rows('devices/export?dir=desc'), 0));
+        self::assertSame(['MA-2', 'MA-3', 'MA-1'], self::column($this->rows('devices/export?sort=next_inspection_due&limit=1'), 0));
+        self::assertSame(['MA-3', 'MA-2', 'MA-1'], self::column($this->rows('devices/export?sort=next_inspection_due&dir=desc'), 0));
     }
 
     public function testOnlyDevicesOfOwnTenant(): void
@@ -158,6 +165,8 @@ final class DeviceExportTest extends ExportApiTestCase
         self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?include_sublocations=1', cookie: $this->user));
         self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?status=kaputt', cookie: $this->user));
         self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?location_id=abc', cookie: $this->user));
+        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?sort=name', cookie: $this->user));
+        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?dir=up', cookie: $this->user));
         self::assertError(405, 'method_not_allowed', $this->api('POST', 'devices/export', []));
     }
 

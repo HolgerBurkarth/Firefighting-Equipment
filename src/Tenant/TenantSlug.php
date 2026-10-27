@@ -9,7 +9,9 @@ namespace FirefightingEquipment\Tenant;
  *
  * Erlaubt sind Kleinbuchstaben a-z, Ziffern und Bindestrich; der Bindestrich nicht am Anfang
  * oder Ende und nicht doppelt. Großbuchstaben werden abgelehnt, nicht umgewandelt.
- * Dieselben Regeln prüft die Datenbank (migrations/0001_create_fe_tenants.sql).
+ * Dieselben Regeln prüft die Datenbank (migrations/0001_create_fe_tenants.sql). Reihenfolge der
+ * Prüfungen (für gleiche Meldungen im Frontend, siehe README "Stadt-Kürzel"): leer, Länge,
+ * reserviert, Großbuchstaben (mit Vorschlag), Format.
  */
 final readonly class TenantSlug
 {
@@ -50,7 +52,7 @@ final readonly class TenantSlug
             throw new InvalidTenantValueException(sprintf(
                 'Das Kürzel darf keine Großbuchstaben enthalten. Gemeint ist vermutlich „%s“.',
                 $lower,
-            ));
+            ), $lower);
         }
 
         if (preg_match(self::PATTERN, $value) !== 1) {
