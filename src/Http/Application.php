@@ -16,8 +16,8 @@ use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\Password\PasswordHasher;
 
 /**
- * Bearbeitet eine Anfrage vollständig und liefert eine JSON-Antwort (Fehler immer als JSON) oder
- * einen CSV-Download.
+ * Bearbeitet eine Anfrage vollständig und liefert eine JSON-Antwort (Fehler immer als JSON), einen
+ * CSV-Download oder eine zwischenspeicherbare öffentliche Datei (CacheableResponse).
  *
  * Reihenfolge: Adresse zerlegen, Route suchen, ändernde Anfragen prüfen (CSRF, JSON-Body; ohne
  * Datenbank), erst dann die Stadt laden (Datenbank), Sitzung und Zugriffsstufe prüfen (nur bei

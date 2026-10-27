@@ -89,7 +89,11 @@ final class ApplicationTest extends DomainTestCase
         $response = $this->handle('GET', '/firefighting/immendingen/api/v1/tenant/?x=1');
 
         self::assertSame(200, $response->statusCode());
-        self::assertSame('{"slug":"immendingen","name":"Feuerwehr Immendingen – Süd"}', $response->body());
+        self::assertSame(
+            '{"slug":"immendingen","name":"Feuerwehr Immendingen – Süd","accent_color":"#b71c1c",'
+            . '"accent_color_is_default":true,"logo_url":null,"logo_urls":null}',
+            $response->body(),
+        );
         self::assertSame('no-store', $response->headers()['Cache-Control']);
         self::assertSame('nosniff', $response->headers()['X-Content-Type-Options']);
     }

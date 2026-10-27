@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Http;
 
+use FirefightingEquipment\Api\V1\Appearance\AccentColorHandler;
+use FirefightingEquipment\Api\V1\Appearance\ImageHandler;
+use FirefightingEquipment\Api\V1\Appearance\ManifestHandler;
+use FirefightingEquipment\Api\V1\Appearance\TenantLogoHandler;
 use FirefightingEquipment\Api\V1\Auth\EmailResendHandler;
 use FirefightingEquipment\Api\V1\Auth\EmailVerifyHandler;
 use FirefightingEquipment\Api\V1\Auth\InvitationAcceptHandler;
@@ -102,6 +106,12 @@ final class Routes
         return self::auth(Router::forTenant(), $neutralDuration)
             ->add('GET', 'api/v1/health', Access::Public, new HealthHandler())
             ->add('GET', 'api/v1/tenant', Access::Public, new TenantHandler())
+            ->add('POST', 'api/v1/tenant/appearance', Access::Admin, new AccentColorHandler())
+            ->add('POST', 'api/v1/tenant/logo', Access::Admin, new TenantLogoHandler(delete: false), TenantLogoHandler::MAX_BODY_BYTES)
+            ->add('DELETE', 'api/v1/tenant/logo', Access::Admin, new TenantLogoHandler(delete: true))
+            ->add('GET', 'api/v1/tenant/logo/{size}', Access::Public, new ImageHandler(defaultIcon: false))
+            ->add('GET', 'api/v1/app-icon/{size}', Access::Public, new ImageHandler(defaultIcon: true))
+            ->add('GET', 'manifest.webmanifest', Access::Public, new ManifestHandler())
             ->add('POST', 'api/v1/auth/register', Access::Public, self::withDuration(RegisterHandler::class, $neutralDuration))
             ->add('POST', 'api/v1/auth/email/verify', Access::Public, new EmailVerifyHandler())
             ->add('POST', 'api/v1/auth/email/resend', Access::Public, self::withDuration(EmailResendHandler::class, $neutralDuration))

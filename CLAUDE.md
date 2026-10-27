@@ -34,6 +34,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     Zugangsdaten stehen in `config/config.local.php` (nicht im Repository).
 - URL-Schema: `https://www.prodad.de/firefighting/<stadt>/`
   - REST-API: `/firefighting/<stadt>/api/v1/...`
+  - Web-App-Manifest: `/firefighting/<stadt>/manifest.webmanifest` (einzige Route außerhalb von
+    `api/v1`, siehe "Erscheinungsbild (API)")
   - Super-Admin: `/firefighting/service/`
 - Der Mandant wird aus dem URL-Pfad abgeleitet. Das Kürzel einer Stadt ist unveränderlich.
 - Städte sind keine Ordner: Das Kürzel im Pfad ist virtuell und wird über `fe_tenants`
@@ -94,7 +96,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   JSON-Objekt sein, auch `{}` (z. B. bei Logout und DELETE); höchstens 16 KiB
   (`Request::MAX_BODY_BYTES`). Sonst 400 `invalid_request`. Eine Route kann eine größere Grenze
   deklarieren (`Router::add(…, maxBodyBytes)`, über `RouteMatch::$maxBodyBytes` an `RequestGuard`),
-  höchstens `Request::MAX_UPLOAD_BYTES` (3 MiB); bisher nur die Routen des CSV-Imports. `Request`
+  höchstens `Request::MAX_UPLOAD_BYTES` (3 MiB); bisher nur die Routen des CSV-Imports (3 MiB) und
+  `POST tenant/logo` (720 KiB, `TenantLogoHandler::MAX_BODY_BYTES`; `DELETE tenant/logo` und
+  `POST tenant/appearance` bleiben bei 16 KiB). `Request`
   liest bis zu 3 MiB, größere Bodys werden nicht gelesen. Kein anderer Content-Type und kein
   `multipart/form-data` (Formulare fremder Seiten könnten es senden): Dateien kommen als Base64 im
   JSON.
@@ -126,7 +130,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   z. B. `{"error":"rule_violation","message":"…","details":{"devices":2,"sublocations":1}}` beim
   Sperren eines Standorts, der nicht leer ist (`HttpException::ruleViolation(message, details)`),
   oder `{"line": 4}` bei einer unlesbaren Import-Datei (`HttpException::invalidRequest(message,
-  details)`).
+  details)`), `{"contrast": 4.47, "min_contrast": 4.5}` bei einer zu hellen Akzentfarbe.
   Fehler ohne Angaben haben kein Feld `details` (alle bisherigen unverändert). Nie Interna,
   Zugangsdaten oder personenbezogene Daten in `details`.
 - Einzige Ausnahme vom Fehlerformat: `GET api/v1/health` liefert `{"status":"ok","database":"ok"}`
@@ -137,12 +141,23 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Argumente wie Zugangsdaten). Nie Details oder Zugangsdaten in die Antwort.
 - Jede API-Antwort trägt `Content-Type: application/json; charset=utf-8`,
   `Cache-Control: no-store` und `X-Content-Type-Options: nosniff` (`JsonResponse::DEFAULT_HEADERS`,
-  nicht überschreibbar). Einzige Ausnahme: CSV-Downloads (`CsvResponse`, siehe "CSV-Export (API)")
+  nicht überschreibbar). Ausnahmen: CSV-Downloads (`CsvResponse`, siehe "CSV-Export (API)")
   mit `text/csv; charset=utf-8` und `Content-Disposition: attachment`, ebenfalls `no-store` und
-  `nosniff`; ihre Fehler kommen weiterhin als JSON.
+  `nosniff`; ihre Fehler kommen weiterhin als JSON. Und zwischenspeicherbare öffentliche Dateien
+  (`CacheableResponse`, siehe "Erscheinungsbild (API)").
+- Ausnahmen von `Cache-Control: no-store` (eng begrenzt): NUR `CacheableResponse`, NUR für die drei
+  öffentlichen Routen `GET api/v1/tenant/logo/{size}`, `GET api/v1/app-icon/{size}` und
+  `GET manifest.webmanifest` (ohne personenbezogene Daten, `Access::Public`, also nie eine Sitzung
+  und nie `Set-Cookie`). `CacheableResponse` erlaubt nur die Content-Types `image/png` und
+  `application/manifest+json; charset=utf-8` und nur die beiden Richtlinien aus `CachePolicy`:
+  `Immutable` (`public, max-age=31536000, immutable`, nur wenn `?v=` gleich der aktuellen
+  Versionskennung ist) und `Revalidate` (`no-cache`: ohne oder mit veralteter Kennung und beim
+  Manifest). Immer mit starkem `ETag` und `nosniff`; `If-None-Match` (auch `W/`, Liste, `*`) → 304
+  ohne Body. Fehler dieser Routen bleiben JSON mit `no-store`. Keine weiteren Ausnahmen ohne
+  Rückfrage; neue nur über `CacheableResponse`/`CachePolicy` und hier dokumentiert.
 - Antworten implementieren `Http\Response` (`statusCode()`, `headers()`, `send()`): `JsonResponse`
-  (Regelfall) oder `CsvResponse`. `Application` erzeugt nur JSON vorab (Kodierfehler → 500); ein
-  CSV-Download wird erst beim Senden geschrieben.
+  (Regelfall), `CsvResponse` oder `CacheableResponse`. `Application` erzeugt nur JSON vorab
+  (Kodierfehler → 500); ein CSV-Download wird erst beim Senden geschrieben.
 
 ## Server und .htaccess
 - Die `.htaccess` in der Hauptebene des Webspace (`htdocs/.htaccess`) gehört NICHT zum
@@ -165,9 +180,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Dokumentierte Ausnahmen auf Spaltenebene: `fe_users.email` ist `utf8mb4_bin`, damit z. B.
   "ß"/"ss" oder "é"/"e" nicht als gleich gelten (Kleinschreibung erzwingt ein CHECK); ebenso
   `fe_devices.identifier_key`, `fe_devices.scan_code`/`scan_code_key` (exakter Vergleich) sowie
-  `fe_device_events.old_value`/`new_value` (siehe "Standorte und Geräte"); feste Werte (`role`, `status`, `purpose`, `action`, `kind`, `event_type`, `field`) und
-  `password_hash` sind `ascii`/`ascii_bin`, damit `IN (...)` bzw. `LIKE` Groß- und
-  Kleinschreibung unterscheiden.
+  `fe_device_events.old_value`/`new_value` (siehe "Standorte und Geräte"); feste Werte (`role`, `status`, `purpose`, `action`, `kind`, `event_type`, `field`),
+  `password_hash`, `fe_tenants.accent_color` und `fe_tenant_logos.version` sind
+  `ascii`/`ascii_bin`, damit `IN (...)` bzw. `LIKE` Groß- und Kleinschreibung unterscheiden.
+- Bilddaten: einzige Tabelle mit Binärdaten ist `fe_tenant_logos` (`MEDIUMBLOB`, siehe
+  "Erscheinungsbild (API)"); Dateien liegen nie im Dateisystem.
 - `sql_mode` setzt `ConnectionFactory` ausdrücklich und vollständig, damit lokal und STRATO
   identisch sind: `STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,
   NO_ENGINE_SUBSTITUTION,ONLY_FULL_GROUP_BY`. Zu lange Werte führen daher zu einem Fehler statt
@@ -252,8 +269,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 
 ## Mandanten (Städte)
 - Tabelle `fe_tenants` (Migration `0001`): `id`, `slug`, `name`, `active`, `created_at`,
-  `updated_at` (UTC). Code in `src/Tenant/` (`TenantSlug`, `TenantName`, `Tenant`,
-  `TenantRepository`, `TenantSummary`, `TenantAdministration`).
+  `updated_at` (UTC), dazu `accent_color` (Migration `0021`, siehe "Erscheinungsbild (API)"). Code
+  in `src/Tenant/` (`TenantSlug`, `TenantName`, `Tenant`, `TenantRepository`, `TenantSummary`,
+  `TenantAdministration`; Erscheinungsbild getrennt in `TenantAppearanceRepository`, damit
+  `TenantRepository` nie Bilddaten lädt).
 - Kürzel (`TenantSlug`): nur `a-z`, `0-9` und Bindestrich, Bindestrich nicht am Anfang/Ende
   und nicht doppelt, höchstens 50 Zeichen, eindeutig. Großbuchstaben werden abgelehnt (mit
   Vorschlag der kleingeschriebenen Form), nie still umgewandelt. `service` ist reserviert
@@ -1140,6 +1159,81 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Anfrage (danach `mail_failed` mit „Zeitbudget … überschritten“). Eine SMTP-Verbindung für alle
   Mails (auf STRATO gemessen rund 0,22 s je Mail). Kein Cron, keine Warteschlange.
 
+## Erscheinungsbild (API)
+- Nur unter Städten (unter `service` 404). Ändern `Access::Admin` (in `AdminRoutesAccessTest`),
+  der Super-Admin pflegt das Erscheinungsbild in Version 1 nicht. Lesen öffentlich (Anmeldeseite,
+  App-Symbol); gesperrte Stadt 403 `tenant_inactive` wie überall. Code: `src/Tenant/` (`AccentColor`,
+  `InvalidAccentColorException`, `TenantAppearance`, `TenantAppearanceRepository`),
+  `src/Tenant/Logo/` (`PngInspector`, `LogoRenderer`, `LogoImages`, `LogoSize`, `DefaultAppIcon`,
+  `InvalidLogoException`), `src/Http/CacheableResponse.php` und `CachePolicy.php`, Endpunkte
+  `src/Api/V1/Appearance/` (`AccentColorHandler`, `TenantLogoHandler`, `ImageHandler`,
+  `ManifestHandler`, `AppearanceJson`) und `src/Api/V1/TenantHandler.php`. Tests:
+  `tests/Integration/Appearance/AppearanceApiTest`, `tests/Integration/Tenant/TenantAppearanceSchemaTest`,
+  `tests/Unit/Tenant/AccentColorTest`, `tests/Unit/Tenant/Logo/`, `tests/Unit/Http/CacheableResponseTest`;
+  Test-PNGs zur Laufzeit über `tests/Support/TestPng` (nichts committen).
+- `GET api/v1/tenant` (öffentlich): `{slug, name, accent_color, accent_color_is_default, logo_url,
+  logo_urls}`; `accent_color` immer ein Wert (eigene Farbe oder Standard), `logo_url` = 512 px,
+  `logo_urls` = `{"512", "192", "180"}`, ohne Logo beide `null`. Adressen pfadrelativ
+  (`/firefighting/<kürzel>/api/v1/tenant/logo/<größe>?v=<version>`, ohne `base_url`). Die drei
+  ändernden Routen antworten mit genau diesem Objekt.
+- Akzentfarbe: `POST tenant/appearance {accent_color}` (Feld Pflicht, `null` = Standardfarbe,
+  andere Felder 400). `AccentColor::fromString`: Leerraum am Rand weg, `#` Pflicht, 6 oder 3
+  Hex-Ziffern (Groß-/Kleinschreibung egal, `#a33` = `#aa3333`), gespeichert als `#rrggbb` klein
+  (`fe_tenants.accent_color`, CHECK in Migration `0021`). Kontrast weißer Schrift nach WCAG 2.x
+  (sRGB linearisiert, Schwelle 0,04045; `1,05 / (L + 0,05)`), ungerundet ≥ 4,5
+  (`AccentColor::MIN_CONTRAST`), sonst 400 `invalid_request` mit Meldung und `details: {"contrast",
+  "min_contrast"}`; der Wert wird auf zwei Stellen ABGERUNDET (nie „4,50“ bei Ablehnung). Grenzfälle
+  (per Test): `#ec1400` 4,50003 angenommen, `#ea1c05` 4,49989 abgelehnt. Standard
+  `AccentColor::DEFAULT` = `#b71c1c` (6,57:1, per Test). Gespeicherte Farben werden beim Lesen nicht
+  erneut geprüft (`AccentColor::stored`).
+- Logo hochladen: `POST tenant/logo {file}` (PNG als Base64 wie beim Import, Whitespace erlaubt,
+  andere Felder 400; Body-Grenze 720 KiB nur für diese Route). Prüfung (`PngInspector`, vor dem
+  Dekodieren, Meldungen deutsch, 400 `invalid_request`, ggf. `details`): nicht leer, höchstens
+  500 KB (`MAX_BYTES` = 512 000 Byte, `details {bytes, max_bytes}`), PNG-Signatur, alle Chunks
+  (Länge, CRC, gültiger Typ), `IHDR` zuerst und nur einmal mit gültigen Werten, mindestens ein
+  `IDAT`, `IEND` vorhanden und DANACH NICHTS (angehängte Daten werden abgelehnt, nicht entfernt),
+  kein `acTL` (animiert), quadratisch (`details {width, height}`), Kantenlänge `MIN_EDGE` bis
+  `MAX_EDGE`, beide 512 (also genau 512 × 512 px; `details {width, height, min_edge, max_edge}`).
+  Die Maße stammen aus `IHDR`, große Bilder werden nie dekodiert (Dekompressionsbombe).
+- Neu erzeugen (`LogoRenderer`): `imagecreatefromstring` (Warnungen von libpng abgefangen, nicht
+  protokolliert), Palette → Truecolor, je Größe aus `LogoSize` ein neues Bild per
+  `imagecopyresampled` und `imagepng` (Stufe 9). 512 und 192 transparent (Alpha bleibt erhalten,
+  auch `tRNS`), 180 (apple-touch-icon) auf weißem Hintergrund ohne Alpha (iOS füllt Transparenz
+  schwarz). GD schreibt nur `IHDR`, `pHYs`, `IDAT`, `IEND` (per Test gegen eine Erlaubt-Liste):
+  Text, EXIF, Farbprofile, private Chunks und versteckte Inhalte fallen weg. Gespeichert werden NUR
+  die neuen Dateien, nie die hochgeladene.
+- Speicherung `fe_tenant_logos` (Migration `0022`): `tenant_id` (Primärschlüssel, höchstens ein Logo je
+  Stadt), `version` (die ersten 16 Hex-Zeichen von SHA-256 über die drei Dateien, `LogoImages::version`),
+  `png_512`, `png_192`, `png_180` (`MEDIUMBLOB`, CHECK auf die PNG-Signatur), `updated_by`
+  (Fremdschlüssel `(updated_by, tenant_id)` → `fe_users (id, tenant_id)`, also ein Konto derselben
+  Stadt), `updated_at`. Ersetzen per `INSERT … ON DUPLICATE KEY UPDATE`; `DELETE tenant/logo {}`
+  (wiederholbar) löscht die Zeile: bewusst ein echtes `DELETE`, das Logo ist keine Historie.
+  Ändernde Methoden öffnen eine eigene Transaktion und setzen `fe_tenants.updated_at`. Lesen nur
+  der angefragten Spalte (`LogoSize::column`, feste Werte). `bin/tenant.php purge-device-data`
+  lässt das Erscheinungsbild unberührt.
+- Auslieferung (öffentlich, siehe "HTTP und REST-API" zu den Cache-Ausnahmen):
+  `GET api/v1/tenant/logo/{size}` (ohne Logo 404 `not_found`) und `GET api/v1/app-icon/{size}`
+  (Standard-Symbol), `{size}` nur 512, 192, 180 (sonst 404). `Content-Type: image/png`,
+  `Content-Length`, `nosniff`, `ETag` `"<version>-<größe>"`; `?v=` gleich der aktuellen Version →
+  `Immutable`, sonst die aktuelle Datei mit `Revalidate` (kein Fehler: alte Manifeste verweisen
+  auf alte Versionen).
+- Standard-Symbol (`DefaultAppIcon`): `resources/app-icon/app-icon-<größe>.png`, Platzhalter
+  (Flamme in Weiß auf `#b71c1c`), erzeugt mit `php scripts/generate-default-app-icon.php` (über
+  `LogoRenderer`, Dateien werden committet; `*.png binary` in `.gitattributes`). Version wie beim
+  Logo aus dem Inhalt der Dateien.
+- Web-App-Manifest: `GET /firefighting/<kürzel>/manifest.webmanifest` (`ManifestHandler`, Route
+  `manifest.webmanifest` außerhalb von `api/v1`), `application/manifest+json; charset=utf-8`,
+  `Revalidate` mit ETag über den Inhalt. Felder: `id`, `start_url`, `scope` = `/firefighting/<kürzel>/`,
+  `name` = „<Stadtname> – Geräteverwaltung“, `short_name` = „FF-Geräte“, `lang` `de`, `dir` `ltr`,
+  `display` `standalone`, `theme_color` = Akzentfarbe (immer ein Wert), `background_color` `#ffffff`,
+  `icons` = 192 und 512 px (Logo, sonst Standard-Symbol, versionierte Adressen, `purpose` `any`, kein
+  `maskable`, weil ein Logo sonst beschnitten werden kann).
+- Abhängig von der noch offenen Frontend-Technik (bei deren Festlegung prüfen, siehe "Noch offen"):
+  `start_url` (Startseite der Stadt), `background_color` (Ladebildschirm,
+  `ManifestHandler::BACKGROUND_COLOR`), das Standard-Symbol (Gestaltung und ob es eine statische
+  Datei des Frontends wird) und die Ablage statischer Dateien (Manifest-Link, `apple-touch-icon` im
+  HTML des Frontends). Unabhängig davon: `scope`, `id`, die API-Adressen der Bilder.
+
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".
 - Neue Stadt: Super-Admin legt Name, Kürzel und E-Mail des ersten Admins an (siehe
@@ -1150,6 +1244,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - CSV-Export und CSV-Import mit Vorschau und Fehleranzeige (umgesetzt, siehe "CSV-Export (API)" und
   "CSV-Import (API)"). Der Import legt neue Geräte an und ändert bestehende; er legt nie Gerätetypen
   oder Standorte an und sondert weder aus noch nimmt er wieder auf.
+- Erscheinungsbild je Stadt (Akzentfarbe, Logo, Web-App-Manifest; umgesetzt, siehe
+  "Erscheinungsbild (API)"), gepflegt vom Admin der Stadt.
 - Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
 
 ## Deployment
@@ -1216,5 +1312,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Node.js ist noch nicht installiert.
 
 ## Noch offen
-- Frontend-Technik (Kandidat: Vue 3 mit Vite) – wird festgelegt, wenn die REST-API steht.
+- Frontend-Technik (Kandidat: Vue 3 mit Vite) – wird festgelegt, wenn die REST-API steht. Danach
+  im Manifest prüfen: `start_url`, `background_color`, Standard-Symbol, Ablage statischer Dateien
+  (siehe "Erscheinungsbild (API)").
 - Datenschutz (Verantwortlicher, Datenschutzerklärung, Löschfristen).

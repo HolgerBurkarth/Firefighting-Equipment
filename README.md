@@ -12,7 +12,13 @@ https://www.prodad.de/firefighting/service/<pfad>     # Super-Admin
 | Methode | Pfad                                  | Zugriff    | Antwort                                        |
 |---------|---------------------------------------|------------|------------------------------------------------|
 | GET     | `api/v1/health`                       | öffentlich | `{"status":"ok","database":"ok"}`              |
-| GET     | `api/v1/tenant`                       | öffentlich | `{"slug":"immendingen","name":"Feuerwehr …"}`  |
+| GET     | `api/v1/tenant`                       | öffentlich | `{"slug":…,"name":…,"accent_color":…,…}`       |
+| POST    | `api/v1/tenant/appearance`            | Admin      | wie `api/v1/tenant`                            |
+| POST    | `api/v1/tenant/logo`                  | Admin      | wie `api/v1/tenant`                            |
+| DELETE  | `api/v1/tenant/logo`                  | Admin      | wie `api/v1/tenant`                            |
+| GET     | `api/v1/tenant/logo/{größe}?v=…`      | öffentlich | PNG (512, 192, 180)                            |
+| GET     | `api/v1/app-icon/{größe}?v=…`         | öffentlich | PNG (Standard-Symbol)                          |
+| GET     | `manifest.webmanifest`                | öffentlich | Web-App-Manifest                               |
 | POST    | `api/v1/auth/login`                   | öffentlich | `{"user":…,"tenant":…,"session":…}` + Cookie   |
 | POST    | `api/v1/auth/logout`                  | öffentlich | `{"logged_out":true}`, Cookie wird gelöscht    |
 | GET     | `api/v1/auth/me`                      | angemeldet | wie Login                                      |
@@ -52,7 +58,7 @@ Nur unter `service` (Super-Admin, siehe "Städte verwalten und Admins einladen")
 | POST    | `api/v1/tenants/{id}/users/{user}/resend-invitation`   | `{"user":…,"mail_sent":…}`                |
 | GET     | `api/v1/tenants/{id}/users[?status=…]`                 | `{"users":[…]}` (nur lesend)              |
 
-`api/v1/tenant`, Registrierung, E-Mail-Bestätigung, Einladung annehmen, Einladungscodes und
+`api/v1/tenant`, das Erscheinungsbild (Logo, Standard-Symbol, Manifest), Registrierung, E-Mail-Bestätigung, Einladung annehmen, Einladungscodes und
 Benutzerverwaltung gibt es nur unter einer Stadt (unter `service`: 404), die Städteverwaltung nur
 unter `service`, alle anderen Routen unter `service` und unter jeder Stadt. Super-Admins melden sich nur unter `service` an, Konten einer Stadt
 nur unter ihrer Stadt; ein Cookie gilt nur dort.
@@ -820,6 +826,66 @@ curl -b cookies.txt -H "Content-Type: application/json" --data-binary @apply.jso
 
 Ist `token` `null`, enthält die Datei Fehler (siehe `rows[].messages` in der Vorschau); Übernehmen
 ergibt dann 409 `import_outdated`.
+
+### Erscheinungsbild (Akzentfarbe, Logo, Web-App-Manifest)
+
+Jede Stadt kann eine Akzentfarbe und ein Logo festlegen (nur Admins der Stadt). Beides erscheint in
+`GET api/v1/tenant` (öffentlich, für die Anmeldeseite) und im Web-App-Manifest
+`/firefighting/<kürzel>/manifest.webmanifest` (App auf dem Startbildschirm).
+
+```
+{"slug":"immendingen","name":"Feuerwehr Immendingen","accent_color":"#b71c1c",
+ "accent_color_is_default":true,"logo_url":null,"logo_urls":null}
+```
+
+**Akzentfarbe** (`POST api/v1/tenant/appearance {"accent_color": "#1A237E"}`, `null` = Standard
+`#b71c1c`): `#` und 6 oder 3 Hex-Ziffern, Groß-/Kleinschreibung egal, gespeichert als `#rrggbb`.
+Weiße Schrift auf der Farbe muss einen Kontrast von mindestens 4,5:1 haben (WCAG 2.x), sonst 400
+mit dem erreichten Wert (abgerundet), z. B. `"details":{"contrast":4.47,"min_contrast":4.5}`.
+
+**Logo** (`POST api/v1/tenant/logo {"file": "<Base64>"}`): nur PNG, genau 512 × 512 px, höchstens
+500 KB, keine animierte PNG und keine Daten nach dem Dateiende. Der Server erzeugt das Bild mit GD
+neu (Metadaten und versteckte Inhalte fallen weg, Transparenz bleibt) und speichert es in drei
+Größen in der Datenbank: 512 und 192 px (Manifest) sowie 180 px auf weißem Hintergrund
+(`apple-touch-icon`). `DELETE api/v1/tenant/logo {}` kehrt zum Standard-Symbol zurück.
+
+**Auslieferung und Zwischenspeichern**: Bilder und Manifest sind die einzigen Antworten ohne
+`Cache-Control: no-store`. Die Adressen in `logo_url`, `logo_urls` und im Manifest enthalten die
+Versionskennung (`?v=…`); dann darf der Browser die Datei dauerhaft behalten (`public,
+max-age=31536000, immutable`). Ein neues Logo hat eine neue Kennung und damit eine neue Adresse.
+Ohne oder mit veralteter Kennung und beim Manifest gilt `no-cache` (vor jeder Verwendung per `ETag`
+prüfen, unverändert → 304 ohne Inhalt).
+
+Noch von der Frontend-Technik abhängig: `start_url`, `background_color` und das Standard-Symbol
+(Platzhalter in `resources/app-icon/`, neu erzeugen mit `php scripts/generate-default-app-icon.php`).
+Das Frontend muss das Manifest und das `apple-touch-icon` (Größe 180) im HTML einbinden.
+
+Lokal ausprobieren in PowerShell, angemeldet als Admin wie unter "Lokal starten" (JSON ohne BOM):
+
+```
+[IO.File]::WriteAllText("$PWD\color.json", '{"accent_color":"#1A237E"}')
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@color.json" http://localhost:8000/firefighting/immendingen/api/v1/tenant/appearance
+$b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\logo.png"))
+[IO.File]::WriteAllText("$PWD\logo.json", (@{ file = $b64 } | ConvertTo-Json -Compress))
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@logo.json" http://localhost:8000/firefighting/immendingen/api/v1/tenant/logo
+curl.exe http://localhost:8000/firefighting/immendingen/api/v1/tenant
+curl.exe -i http://localhost:8000/firefighting/immendingen/manifest.webmanifest
+curl.exe -b cookies.txt -X DELETE -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/tenant/logo
+```
+
+Dasselbe in Bash; auf dem Server nur in der Test-Stadt (`/firefighting/test/`):
+
+```
+base=https://www.prodad.de/firefighting/test
+curl -b cookies.txt -H "Content-Type: application/json" --data-binary '{"accent_color":"#1A237E"}' "$base/api/v1/tenant/appearance"
+printf '{"file":"%s"}' "$(base64 -w0 logo.png)" > logo.json
+curl -b cookies.txt -H "Content-Type: application/json" --data-binary @logo.json "$base/api/v1/tenant/logo"
+url=$(curl -s "$base/api/v1/tenant" | jq -r .logo_url)
+curl -s -o logo-512.png -D - "https://www.prodad.de$url"            # 200, immutable, ETag
+etag=$(curl -s -o /dev/null -D - "$base/manifest.webmanifest" | tr -d '\r' | sed -n 's/^[Ee][Tt]ag: //p')
+curl -s -o /dev/null -w "%{http_code}\n" -H "If-None-Match: $etag" "$base/manifest.webmanifest"   # 304
+curl -b cookies.txt -X DELETE -H "Content-Type: application/json" --data-binary '{}' "$base/api/v1/tenant/logo"
+```
 
 ### Lokal starten
 

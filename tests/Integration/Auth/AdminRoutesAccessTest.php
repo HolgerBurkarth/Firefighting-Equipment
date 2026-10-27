@@ -7,6 +7,9 @@ namespace FirefightingEquipment\Tests\Integration\Auth;
 use FirefightingEquipment\Device\Import\DeviceImport;
 use FirefightingEquipment\Device\Import\DeviceImportFile;
 use FirefightingEquipment\Http\Routes;
+use FirefightingEquipment\Tenant\Logo\LogoRenderer;
+use FirefightingEquipment\Tenant\TenantAppearanceRepository;
+use FirefightingEquipment\Tests\Support\TestPng;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -56,6 +59,9 @@ MA-01;defekt
         yield 'Gerät wieder aufnehmen' => ['POST', 'devices/{retired}/reinstate', ['version' => 1, 'status' => 'ready']];
         yield 'Import prüfen' => ['POST', 'devices/import/preview', ['file' => '{import_file}']];
         yield 'Import übernehmen' => ['POST', 'devices/import', ['file' => '{import_file}', 'token' => '{import_token}']];
+        yield 'Akzentfarbe setzen' => ['POST', 'tenant/appearance', ['accent_color' => '#1a237e']];
+        yield 'Logo hochladen' => ['POST', 'tenant/logo', ['file' => '{logo_file}']];
+        yield 'Logo entfernen' => ['DELETE', 'tenant/logo', []];
     }
 
     /**
@@ -83,7 +89,10 @@ MA-01;defekt
         $importToken = new DeviceImport($this->pdo())->preview($this->tenant('immendingen'), DeviceImportFile::parse($import))->token;
         $placeholders = ['{code}' => $code, '{user}' => $user, '{type}' => $type, '{location}' => $location, '{device}' => $device, '{retired}' => $retired];
         $path = strtr($path, array_map('strval', $placeholders));
-        $placeholders += ['{import_file}' => base64_encode($import), '{import_token}' => $importToken];
+        $placeholders += ['{import_file}' => base64_encode($import), '{import_token}' => $importToken, '{logo_file}' => base64_encode(TestPng::create())];
+        if ($method === 'DELETE' && $path === 'tenant/logo') {
+            new TenantAppearanceRepository($this->pdo())->saveLogo($this->tenant('immendingen'), LogoRenderer::fromUpload(TestPng::create()), $admin);
+        }
         // Platzhalter als ganzer Wert im Body werden zur ID (echte JSON-Ganzzahl).
         $body = $body === null ? null : array_map(static fn (mixed $v): mixed => is_string($v) ? ($placeholders[$v] ?? $v) : $v, $body);
         $url = self::url('immendingen', $path);
@@ -117,6 +126,8 @@ MA-01;defekt
             $this->pdo()->query('SELECT * FROM fe_locations ORDER BY id')->fetchAll(),
             $this->pdo()->query('SELECT * FROM fe_devices ORDER BY id')->fetchAll(),
             $this->pdo()->query('SELECT * FROM fe_device_events ORDER BY id')->fetchAll(),
+            $this->pdo()->query('SELECT * FROM fe_tenants ORDER BY id')->fetchAll(),
+            $this->pdo()->query('SELECT tenant_id, version, updated_by FROM fe_tenant_logos ORDER BY tenant_id')->fetchAll(),
         ], JSON_THROW_ON_ERROR);
     }
 }
