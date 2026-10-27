@@ -1,9 +1,9 @@
 import { expect, TEST_TENANT, test } from './fixtures';
 
 test.describe('Grundgerüst', () => {
-    test('Startseite einer Stadt mit Name und Basispfad', async ({ page, apiCalls }) => {
-        await page.goto('/firefighting/test/');
-        await expect(page.getByRole('heading', { level: 1, name: 'Startseite' })).toBeVisible();
+    test('Seite einer Stadt mit Name und Basispfad', async ({ page, apiCalls }) => {
+        await page.goto('/firefighting/test/anmelden');
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
         await expect(page.getByTestId('app-title')).toHaveText('Feuerwehr Test');
         await expect(page).toHaveTitle('Feuerwehr Test – Geräteverwaltung');
         expect(await page.evaluate(() => document.baseURI)).toMatch(/\/firefighting\/test\/$/);
@@ -21,13 +21,6 @@ test.describe('Grundgerüst', () => {
         expect(box?.height).toBeGreaterThanOrEqual(44);
     });
 
-    test('Navigation innerhalb der App behält den Basispfad', async ({ page }) => {
-        await page.goto('/firefighting/test/');
-        await page.getByRole('link', { name: 'Zur Anmeldung' }).click();
-        await expect(page).toHaveURL(/\/firefighting\/test\/anmelden$/);
-        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
-    });
-
     test('Unbekannte Adresse zeigt "Seite nicht gefunden"', async ({ page }) => {
         await page.goto('/firefighting/test/gibt/es/nicht');
         await expect(
@@ -36,7 +29,7 @@ test.describe('Grundgerüst', () => {
     });
 
     test('Bereich des Super-Admins lädt keine Stadt', async ({ page, apiCalls }) => {
-        await page.goto('/firefighting/service/');
+        await page.goto('/firefighting/service/anmelden');
         await expect(page.getByTestId('app-title')).toHaveText('Super-Admin');
         expect(apiCalls).not.toContain('api/v1/tenant');
         // Kein Manifest unter service; Symbole vom Standard-Symbol (gibt es auch unter service).
@@ -49,7 +42,7 @@ test.describe('Grundgerüst', () => {
     });
 
     test('Stadt: Manifest-Link und Standard-Symbol ohne Logo', async ({ page }) => {
-        await page.goto('/firefighting/test/');
+        await page.goto('/firefighting/test/anmelden');
         await expect(page.getByTestId('app-title')).toHaveText('Feuerwehr Test');
         const manifest = await page
             .locator('link[rel="manifest"]')
@@ -70,7 +63,7 @@ test.describe('Grundgerüst', () => {
     });
 
     test('Schrift Source Sans 3 wird geladen', async ({ page }) => {
-        await page.goto('/firefighting/test/');
+        await page.goto('/firefighting/test/anmelden');
         await expect(page.getByTestId('app-title')).toHaveText('Feuerwehr Test');
         const loaded = await page.evaluate(async () => {
             await document.fonts.ready;
@@ -88,7 +81,7 @@ test.describe('Stadt unbekannt', () => {
     });
 
     test('zeigt einen verständlichen Hinweis', async ({ page }) => {
-        await page.goto('/firefighting/gibtsnicht/');
+        await page.goto('/firefighting/gibtsnicht/anmelden');
         await expect(page.getByRole('alert')).toContainText(
             'Diese Feuerwehr gibt es unter dieser Adresse nicht.',
         );
@@ -98,7 +91,7 @@ test.describe('Stadt unbekannt', () => {
 
 test.describe('Stadtfarbe', () => {
     test('Standard ist Feuerwehrrot', async ({ page }) => {
-        await page.goto('/firefighting/test/');
+        await page.goto('/firefighting/test/anmelden');
         await expect(page.getByTestId('app-title')).toHaveText('Feuerwehr Test');
         await expect(page.locator('header')).toHaveCSS('background-color', 'rgb(183, 28, 28)');
     });
@@ -109,7 +102,7 @@ test.describe('Stadtfarbe', () => {
         });
 
         test('färbt Kopfleiste und theme-color', async ({ page }) => {
-            await page.goto('/firefighting/test/');
+            await page.goto('/firefighting/test/anmelden');
             await expect(page.locator('header')).toHaveCSS('background-color', 'rgb(29, 53, 87)');
             await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute(
                 'content',
@@ -132,7 +125,7 @@ test.describe('Stadtfarbe', () => {
         });
 
         test('setzt App-Symbol und apple-touch-icon', async ({ page }) => {
-            await page.goto('/firefighting/test/');
+            await page.goto('/firefighting/test/anmelden');
             await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute(
                 'href',
                 logoUrls['180'],
@@ -147,7 +140,7 @@ test.describe('Anzeigemodus', () => {
         test.use({ colorScheme: 'light' });
 
         test('helle Farben', async ({ page }) => {
-            await page.goto('/firefighting/test/');
+            await page.goto('/firefighting/test/anmelden');
             await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(243, 244, 246)');
         });
 
@@ -155,7 +148,7 @@ test.describe('Anzeigemodus', () => {
             await page.addInitScript(() => {
                 localStorage.setItem('ff-theme', 'dark');
             });
-            await page.goto('/firefighting/test/');
+            await page.goto('/firefighting/test/anmelden');
             await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
             await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(18, 22, 28)');
         });
@@ -165,7 +158,7 @@ test.describe('Anzeigemodus', () => {
         test.use({ colorScheme: 'dark' });
 
         test('dunkle Farben', async ({ page }) => {
-            await page.goto('/firefighting/test/');
+            await page.goto('/firefighting/test/anmelden');
             await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(18, 22, 28)');
         });
 
@@ -173,7 +166,7 @@ test.describe('Anzeigemodus', () => {
             await page.addInitScript(() => {
                 localStorage.setItem('ff-theme', 'light');
             });
-            await page.goto('/firefighting/test/');
+            await page.goto('/firefighting/test/anmelden');
             await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(243, 244, 246)');
         });
     });

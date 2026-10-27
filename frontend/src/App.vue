@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import type { ApiError } from './api/client';
 import { fetchTenant, type TenantInfo } from './api/tenant';
+import { errorMessage } from './auth/errorMessages';
 import type { AppBase } from './runtime/appBase';
 import { applyTenantAppearance } from './runtime/appearance';
 
 const props = defineProps<{ base: AppBase }>();
 
 const tenant = ref<TenantInfo | null>(null);
-const tenantError = ref<string | null>(null);
+const tenantError = ref<ApiError | null>(null);
 
 onMounted(async () => {
     if (props.base.isService) {
@@ -18,14 +20,9 @@ onMounted(async () => {
         tenantError.value = result.error;
         return;
     }
-    tenant.value = result.tenant;
-    applyTenantAppearance(document, result.tenant);
+    tenant.value = result.data;
+    applyTenantAppearance(document, result.data);
 });
-
-const ERROR_MESSAGES: Readonly<Record<string, string>> = {
-    tenant_not_found: 'Diese Feuerwehr gibt es unter dieser Adresse nicht.',
-    tenant_inactive: 'Der Zugang dieser Feuerwehr ist gesperrt.',
-};
 </script>
 
 <template>
@@ -53,10 +50,8 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
     </header>
 
     <p v-if="tenantError !== null" class="app-error" role="alert">
-        {{
-            ERROR_MESSAGES[tenantError] ?? 'Die Angaben der Feuerwehr konnten nicht geladen werden.'
-        }}
-        <small>({{ tenantError }})</small>
+        {{ errorMessage(tenantError) }}
+        <small>({{ tenantError.code }})</small>
     </p>
 
     <main class="app-main">

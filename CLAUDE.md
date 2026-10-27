@@ -216,8 +216,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   verbindliches Konzept in `docs/frontend/KONZEPT.md`, Gestaltung nach `docs/frontend/mockup/`
   (`LIESMICH.md`). Oberflächentexte deutsch, Code und Bezeichner englisch.
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
-  `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`), `src/pages/`,
-  `src/api/` (Zugriffe auf die REST-API, Antworten geprüft), `src/runtime/` (`appBase.ts` Bereich und
+  `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter), `src/pages/`,
+  `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
+  `client.ts`), `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
   `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
@@ -228,6 +229,21 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Dunkel-Blöcke müssen gleich sein, Text- und Statusfarben mindestens 4,5:1 (beides per Test).
   Stadtfarbe zur Laufzeit als `--accent` aus `GET api/v1/tenant`, Standard `#b71c1c`
   (= `AccentColor::DEFAULT`).
+- API-Zugriffe nur über `apiRequest` (`src/api/client.ts`): JSON-Body (ohne Angabe `{}`),
+  `credentials: same-origin`, wirft nie; Ergebnis `{ok, status, data}` oder `ApiError {code,
+  message, status, retryAfterSeconds, details}` (Netzwerkfehler `network`, unerwartete Antwort
+  `invalid_response`). Jede Antwort prüft ein Parser. 401 einer nicht öffentlichen Anfrage ruft den
+  Abmelde-Weg des Routers (Sitzung vergessen, Hinweis, `anmelden?weiter=<Seite>`); öffentliche
+  Aufrufe (`public: true`, z. B. `auth/login`, `auth/me` im Wächter) behandeln 401 selbst.
+- Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
+  `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`. Der Wächter fragt `auth/me`
+  höchstens einmal je Seitenaufruf (`ensureSession`); ohne Sitzung → `anmelden?weiter=…`, falsche
+  Rolle → Startseite der Rolle (`landingRoute`: `user` → `suchen`, `admin`/`superadmin` →
+  `dashboard`). Rückkehradressen nur über `safeReturnPath`/`afterLogin` (Pfad der App, kein `//`,
+  Schema oder Backslash, Rolle muss die Seite öffnen dürfen). Unter `service` gibt es `suchen`,
+  `registrieren`, `email-bestaetigen` und `einladung-annehmen` nicht. Fehlertexte nur über
+  `errorMessage` (`src/auth/errorMessages.ts`), Code klein daneben (`ErrorNotice`). Abmelden vergisst
+  die Sitzung erst nach Erfolg beim Server. Anrede immer „Sie“.
 - Service Worker `sw.js` (Workbox, `generateSW`), registriert aus dem Bundle (kein Inline-Skript),
   Scope `/firefighting/<bereich>/`, Rückfall auf `index.html` außer `api/` und
   `manifest.webmanifest`. Das Manifest liefert PHP (`manifest: false` im Plugin).
@@ -241,7 +257,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   ausgeliefert von PHP (`php -q -S localhost:4173 public/index.php`, startet Playwright selbst), also
   mit echter CSP und echtem Caching. API und Manifest simuliert `page.route()`
   (`tests/e2e/fixtures.ts`) mit denselben Bereichen wie die Routen in PHP (unter `service` nur
-  `api/v1/app-icon/…`), eine Datenbank wird nicht gebraucht. Jeder Konsolenfehler, Skriptfehler,
+  `api/v1/app-icon/…`), eine Datenbank wird nicht gebraucht. Weitere Routen je Test über die
+  Option `api` (`"METHODE pfad"` → Antwort, Funktion je Anfrage oder `'abort'` für einen
+  Netzwerkfehler; gesendete Bodys in `apiRequests`); Hilfen `meBody(role)`, `NOT_AUTHENTICATED`,
+  `HTTP_ERROR_CONSOLE` (Browsermeldung zu 4xx, nur per `allowedConsoleError`). Tests auf öffentlichen
+  Seiten (z. B. `anmelden`) brauchen kein `auth/me`. Jeder Konsolenfehler, Skriptfehler,
   jede CSP-Verletzung und jede nicht simulierte API-Anfrage lässt den Test scheitern (erwartete
   Browsermeldung nur per Option `allowedConsoleError`, nie für CSP). Service Worker sind gesperrt
   außer in `serviceWorker.spec.ts`; der Offline-Test läuft nur in Chromium (`setOffline` umgeht in

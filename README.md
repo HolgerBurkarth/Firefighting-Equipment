@@ -1182,6 +1182,10 @@ Fürs Ansehen mit echter API: `npm run build`, dann im Hauptordner
 `localhost:8000` weiter; für ändernde Anfragen dort `http://localhost:5173` in
 `http.allowed_origins` eintragen.
 
+Anmeldung: `/firefighting/<bereich>/` leitet ohne Sitzung zur Anmeldung, sonst zur Startseite der
+Rolle (User `suchen`, Admin und Super-Admin `dashboard`; beide vorerst Platzhalter). Abläufe und
+Entscheidungen in `docs/frontend/KONZEPT.md`, "Anmeldung und Registrierung".
+
 Die Browser-Tests (Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build, den
 Playwright selbst mit `php -S localhost:4173` ausliefern lässt; die API wird simuliert, eine
 Datenbank ist nicht nötig. Jeder Konsolenfehler und jede Verletzung der Content-Security-Policy

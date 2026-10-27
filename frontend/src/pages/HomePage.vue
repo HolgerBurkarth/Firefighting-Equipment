@@ -1,11 +1,10 @@
+<!-- Weiche „/“: Der Router-Wächter leitet sofort weiter (Anmeldung oder Startseite der Rolle). -->
 <template>
-    <h1>Startseite</h1>
-    <p class="placeholder">Hier entsteht die Startseite.</p>
-    <p><RouterLink :to="{ name: 'login' }">Zur Anmeldung</RouterLink></p>
+    <p class="loading" role="status">Wird geladen …</p>
 </template>
 
 <style scoped>
-.placeholder {
+.loading {
     margin: 0;
     color: var(--muted);
 }
