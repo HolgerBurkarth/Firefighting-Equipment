@@ -5,22 +5,30 @@
 #   cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh
 #
 # Ablauf: Prüfung auf lokale Änderungen, Sicherung (ohne vendor/),
-# git fetch + fast-forward auf origin/main, composer install,
+# git fetch + fast-forward auf origin/deploy (Code plus Frontend-Build, erzeugt von GitHub Actions
+# aus main), Prüfung von frontend/dist/index.html, composer install,
 # bei offenen Migrationen: Datenbanksicherung (bin/db-dump.php), dann
-# bin/migrate.php run; zum Schluss Health-Check.
+# bin/migrate.php run; zum Schluss Health-Check und Check der App-Seite.
 # Hat der Merge dieses Skript geändert, startet es sich direkt danach mit der neuen
 # Fassung neu (exec) und setzt dort fort, ohne Sicherung und Merge zu wiederholen.
 # Bei einem Fehler wird NICHT automatisch zurückgesprungen und keine
 # Sicherung zurückgespielt; das Skript gibt die nötigen Befehle aus.
 #
 # Das Skript verändert nur den Projektordner und ~/htdocs/apps/_backup.
+#
+# Nur für Tests (tests/Unit/Scripts/DeployScriptTest.php): FF_DEPLOY_COMPOSER_BIN und
+# FF_DEPLOY_BASE_URL ersetzen Composer-Pfad und Adresse des Servers; auf dem Server nie setzen.
 
 set -euo pipefail
 
-HEALTH_URL="https://www.prodad.de/firefighting/service/api/v1/health"
+BASE_URL="${FF_DEPLOY_BASE_URL:-https://www.prodad.de}"
+HEALTH_URL="$BASE_URL/firefighting/service/api/v1/health"
+# App-Seite des Super-Admins: braucht keine Stadt und keine Datenbank, nur den Frontend-Build.
+APP_URL="$BASE_URL/firefighting/service/"
+APP_BASE_TAG='<base href="/firefighting/service/" />'
 PHP_BIN="php85"
-COMPOSER_BIN="/usr/bin/composer"
-BRANCH="main"
+COMPOSER_BIN="${FF_DEPLOY_COMPOSER_BIN:-/usr/bin/composer}"
+BRANCH="deploy"
 BACKUP_KEEP=5
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -93,7 +101,10 @@ command -v "$PHP_BIN" >/dev/null || fail "$PHP_BIN nicht gefunden."
 [ -f "$COMPOSER_BIN" ] || fail "$COMPOSER_BIN nicht gefunden."
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-[ "$CURRENT_BRANCH" = "$BRANCH" ] || fail "Aktueller Branch ist '$CURRENT_BRANCH', erwartet '$BRANCH'."
+if [ "$CURRENT_BRANCH" != "$BRANCH" ]; then
+    [ "$CURRENT_BRANCH" != "main" ] || echo "Hinweis: Umstieg von main auf deploy siehe README, \"Umstieg des Servers auf den Branch deploy\"." >&2
+    fail "Aktueller Branch ist '$CURRENT_BRANCH', erwartet '$BRANCH'."
+fi
 
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     git status --short --untracked-files=no >&2
@@ -160,6 +171,15 @@ if [ -z "$RESUME_OLD_COMMIT" ]; then
 fi
 NEW_COMMIT="$(git rev-parse HEAD)"
 
+# Der Branch deploy enthält den Frontend-Build; ohne ihn liefert PHP nur 503 frontend_unavailable.
+if [ ! -f frontend/dist/index.html ]; then
+    trap - ERR
+    echo "FEHLER: frontend/dist/index.html fehlt im neuen Stand – Frontend-Build fehlt." >&2
+    echo "        Der Branch deploy wird nur von GitHub Actions geschrieben (Job deploy prüfen)." >&2
+    print_rollback
+    exit 1
+fi
+
 "${COMPOSER_CMD[@]}"
 
 # --- Datenbank-Migrationen -------------------------------------------------
@@ -220,6 +240,20 @@ if [ "$HTTP_CODE" != "200" ]; then
     exit 1
 fi
 echo "Health-Check OK (HTTP 200)."
+
+# --- App-Seite -------------------------------------------------------------
+
+# Frontend-Auslieferung durch PHP: 200, HTML und der eingesetzte Basispfad.
+echo "App-Seite:       $APP_URL"
+APP_RESPONSE="$(curl -s --max-time 20 -w '\n%{http_code} %{content_type}' "$APP_URL" || true)"
+APP_STATUS="$(printf '%s\n' "$APP_RESPONSE" | tail -n 1)"
+if [ "$APP_STATUS" != "200 text/html; charset=utf-8" ] || ! printf '%s\n' "$APP_RESPONSE" | grep -qF "$APP_BASE_TAG"; then
+    echo "FEHLER: App-Seite lieferte '$APP_STATUS' statt '200 text/html; charset=utf-8' mit $APP_BASE_TAG." >&2
+    trap - ERR
+    print_rollback
+    exit 1
+fi
+echo "App-Seite OK (HTTP 200, Basispfad gesetzt)."
 
 trap - ERR
 

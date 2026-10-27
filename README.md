@@ -1169,22 +1169,35 @@ Auf dem Server immer `php85` statt `php` verwenden. Regeln für Migrationen steh
 
 ## Deployment
 
-Auf dem Server per SSH:
+Ablauf: `main` → GitHub Actions (alle Tests) → Branch `deploy` → Deploy von Hand.
+
+1. Lokal alle Tests grün (`composer test`, in `frontend/` `npm test`), committen, nach `main`
+   pushen.
+2. GitHub Actions (Workflow "CI") testet PHP und Frontend. Nur wenn alles grün ist, legt der Job
+   `deploy` Code plus Frontend-Build (`frontend/dist`) als neuen Commit im Branch `deploy` ab
+   ("Deploy <commit>: <Betreff>"). Prüfen unter "Actions" auf GitHub.
+3. Auf dem Server per SSH:
 
 ```
 cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh
 ```
 
-Ablauf:
+Der Server steht auf dem Branch `deploy`, nie auf `main` (dort fehlt der Frontend-Build, und auf
+STRATO gibt es kein Node.js). Einmaliger Umstieg: siehe "Umstieg des Servers auf den Branch
+deploy" unten.
 
-1. Abbruch, wenn versionierte Dateien auf dem Server geändert sind.
+Ablauf von `scripts/deploy.sh`:
+
+1. Abbruch, wenn versionierte Dateien auf dem Server geändert sind oder der Server nicht auf dem
+   Branch `deploy` steht.
 2. Sicherung des Projektordners (ohne `vendor/`) nach
    `~/htdocs/apps/_backup/ff-deploy-JJJJMMTT-HHMMSSZ-<commit>.tar.gz`; die 5 neuesten (nach
    Änderungsdatum der Datei) bleiben, die gerade erzeugte wird nie gelöscht
    (`scripts/prune-deploy-backups.sh`).
-3. `git fetch` und `git merge --ff-only origin/main`. Hat der Merge `scripts/deploy.sh` geändert,
+3. `git fetch` und `git merge --ff-only origin/deploy`. Hat der Merge `scripts/deploy.sh` geändert,
    startet sich das Skript sofort mit der neuen Fassung neu und setzt dort fort, ohne Sicherung
-   und Merge zu wiederholen. Danach `composer install`.
+   und Merge zu wiederholen. Fehlt danach `frontend/dist/index.html`, bricht es ab. Sonst
+   `composer install`.
 4. `php85 bin/migrate.php check`. Sind Migrationen offen:
    1. Datenbanksicherung mit `php85 bin/db-dump.php --suffix=vor-migration-<alter Commit>`.
       Schlägt sie fehl, bricht das Skript ab, **ohne** zu migrieren. Gibt es noch keine Tabelle
@@ -1195,12 +1208,116 @@ Ablauf:
 5. Health-Check `https://www.prodad.de/firefighting/service/api/v1/health` (erwartet HTTP 200;
    prüft auch die Datenbankverbindung, scheitert also z. B. bei fehlender
    `config/config.local.php`).
+6. App-Seite `https://www.prodad.de/firefighting/service/` (erwartet HTTP 200,
+   `text/html; charset=utf-8` und `<base href="/firefighting/service/" />`; prüft, dass PHP den
+   Frontend-Build ausliefert).
 
 Bei einem Fehler zeigt das Skript außerdem die Befehle für den Rücksprung auf den vorherigen
 Commit. Wichtig: Schlagen Sicherung oder Migration fehl, ist der neue Code bereits eingespielt,
 die Datenbank aber noch nicht (vollständig) migriert.
 
 Alle Zeitstempel in Dateinamen sind in UTC (Kennzeichen `Z`).
+
+### Umstieg des Servers auf den Branch deploy
+
+Einmalig, wenn der Server noch auf `main` steht. Voraussetzung: Der letzte Lauf "CI" auf GitHub
+ist grün, und `origin/deploy` enthält das neue `scripts/deploy.sh` (mit `BRANCH="deploy"`).
+Die Schritte nacheinander ausführen und die Ausgabe jeweils vergleichen; passt etwas nicht,
+abbrechen und den Rücksprung unten verwenden.
+
+1. Ausgangslage prüfen:
+
+   ```
+   cd ~/htdocs/apps/firefighting-equipment
+   git rev-parse --abbrev-ref HEAD
+   git status --short --untracked-files=no
+   git log --oneline -1
+   ```
+
+   Erwartet: `main`, danach keine Ausgabe von `git status` (nichts lokal geändert), dann der
+   bisherige Stand, z. B. `4f47ad2 Offline-Buchungen, …`. Diesen Commit notieren (ALT).
+
+2. Sicherung des Projektordners (wie `deploy.sh`, Zusatz `umstieg`):
+
+   ```
+   (umask 077 && tar -czf ../_backup/ff-deploy-$(date -u +%Y%m%d-%H%M%SZ)-$(git rev-parse --short HEAD)-umstieg.tar.gz --exclude=./vendor .)
+   ls -l ../_backup/ | grep umstieg
+   ```
+
+   Erwartet: keine Ausgabe von `tar`, danach eine Zeile `-rw------- … ff-deploy-…Z-<ALT>-umstieg.tar.gz`.
+
+3. Branch `deploy` holen und prüfen:
+
+   ```
+   git fetch origin
+   git merge-base --is-ancestor HEAD origin/deploy && echo "Fast-Forward möglich"
+   git log --oneline -1 origin/deploy
+   git show origin/deploy:scripts/deploy.sh | grep '^BRANCH='
+   git ls-tree --name-only origin/deploy frontend/dist/
+   ```
+
+   Erwartet: bei `git fetch` u. a. die Zeile `* [new branch]      deploy     -> origin/deploy`;
+   dann `Fast-Forward möglich`; `Deploy <commit>: <Betreff>` (der neueste Stand von `main`);
+   `BRANCH="deploy"`; `frontend/dist/assets`, `frontend/dist/index.html`, `frontend/dist/sw.js`
+   und `frontend/dist/workbox-….js`. Fehlt `Fast-Forward möglich` oder eine dieser Zeilen: hier
+   aufhören (es wurde noch nichts geändert).
+
+4. Auf `deploy` umstellen:
+
+   ```
+   git checkout -b deploy --track origin/deploy
+   git rev-parse --abbrev-ref HEAD
+   ls frontend/dist/index.html
+   ```
+
+   Erwartet: `Switched to a new branch 'deploy'` und `branch 'deploy' set up to track
+   'origin/deploy'.` (Wortlaut je nach Git-Version), dann `deploy` und `frontend/dist/index.html`.
+   Ab hier ist der neue Code eingespielt, aber Composer und Migrationen laufen erst im nächsten
+   Schritt.
+
+5. Deployment wie künftig immer:
+
+   ```
+   bash scripts/deploy.sh
+   ```
+
+   Erwartet (gekürzt): `Aktueller Stand: <deploy-Commit>`, `Sicherung: …`, `Already up to date.`,
+   die Ausgabe von Composer, `Health-Check OK (HTTP 200).`, `App-Seite OK (HTTP 200, Basispfad
+   gesetzt).`, `Deployment erfolgreich.` und `(keine neuen Commits)`. Sind Migrationen offen,
+   erscheinen zusätzlich `Datenbanksicherung vor der Migration ...` und die Ausgabe der Migration.
+
+6. Im Browser prüfen: `https://www.prodad.de/firefighting/test/` zeigt die App (Kopfleiste mit dem
+   Namen der Test-Stadt), `https://www.prodad.de/firefighting/service/` die Kopfleiste
+   „Super-Admin“, `https://www.prodad.de/firefighting/service/api/v1/health` weiterhin
+   `{"status":"ok","database":"ok"}`.
+
+7. Aufräumen (optional, empfohlen): den lokalen Branch `main` auf dem Server löschen, damit nicht
+   versehentlich darauf gewechselt wird:
+
+   ```
+   git branch -d main
+   ```
+
+   Erwartet: `Deleted branch main (was <ALT>).` (`-d` löscht nur, weil `main` in `deploy`
+   enthalten ist.)
+
+**Rücksprung** (nur nötig, wenn ab Schritt 4 etwas nicht passt):
+
+```
+cd ~/htdocs/apps/firefighting-equipment
+git checkout main
+git branch -D deploy
+php85 /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-cache
+curl -s https://www.prodad.de/firefighting/service/api/v1/health
+```
+
+Erwartet: `Switched to branch 'main'`, `Deleted branch deploy (was …).`, die Ausgabe von
+Composer und `{"status":"ok","database":"ok"}`. `git checkout main` entfernt dabei auch
+`frontend/dist` (dort nicht versioniert); `config/config.local.php` und andere nicht versionierte
+Dateien bleiben unberührt. Hat Schritt 5 Migrationen ausgeführt, passt die Datenbank nicht mehr
+zum alten Code: dann die Datenbanksicherung aus der Ausgabe von Schritt 5 zurückspielen
+("Sicherung zurückspielen"). War Schritt 7 schon erledigt, statt `git checkout main`:
+`git checkout -b main <ALT>`.
 
 ## Datenbanksicherung
 
