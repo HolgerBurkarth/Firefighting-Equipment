@@ -44,6 +44,16 @@ final class DeviceText
     }
 
     /**
+     * Notiz beim Erledigen eines Hinweises (höchstens 500 Zeichen, Zeilenumbrüche erlaubt).
+     *
+     * @throws InvalidDeviceValueException
+     */
+    public static function noticeNote(?string $value): ?string
+    {
+        return self::check($value, 'Die Notiz', self::COMMENT_MAX_LENGTH, true);
+    }
+
+    /**
      * @throws InvalidDeviceValueException
      */
     public static function search(?string $value): ?string

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Device;
 
+use FirefightingEquipment\Offline\ActionTime;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -21,7 +22,8 @@ final class DeviceEventWriter
 
     private const array COLUMNS = [
         'tenant_id', 'device_id', 'event_type', 'user_id', 'from_location_id', 'to_location_id', 'from_status',
-        'to_status', 'from_due', 'to_due', 'field', 'old_value', 'new_value', 'comment',
+        'to_status', 'from_due', 'to_due', 'field', 'old_value', 'new_value', 'comment', 'occurred_at', 'applied',
+        'not_applied_reason',
     ];
 
     /** @var list<list<int|string|null>> */
@@ -62,6 +64,8 @@ final class DeviceEventWriter
     /**
      * Umbuchung und/oder Statusänderung in einem Eintrag (auch Aussondern und Wiederaufnehmen): je
      * Paar beide Werte (verschieden) oder keiner, mindestens ein Paar (chk_fe_device_events_state).
+     *
+     * @param ActionTime|null $occurredAt Aktionszeit auf dem Handy; null = Serverzeit (created_at)
      */
     public function stateChanged(
         Tenant $tenant,
@@ -72,12 +76,37 @@ final class DeviceEventWriter
         ?DeviceStatus $fromStatus,
         ?DeviceStatus $toStatus,
         ?string $comment,
+        ?ActionTime $occurredAt = null,
     ): void {
         $this->insert($tenant, $deviceId, $userId, 'state_changed', [
             'from_location_id' => $fromLocationId,
             'to_location_id' => $toLocationId,
             'from_status' => $fromStatus?->value,
             'to_status' => $toStatus?->value,
+            'occurred_at' => $occurredAt?->sql(),
+        ], $comment);
+    }
+
+    /**
+     * Offline-Buchung, die nicht übernommen wurde (nur Historie, applied = 0): nur das Gewünschte,
+     * Standort und/oder Status (nie ausgesondert).
+     */
+    public function stateNotApplied(
+        Tenant $tenant,
+        int $deviceId,
+        int $userId,
+        ?int $toLocationId,
+        ?DeviceStatus $toStatus,
+        NotAppliedReason $reason,
+        ActionTime $occurredAt,
+        ?string $comment,
+    ): void {
+        $this->insert($tenant, $deviceId, $userId, 'state_changed', [
+            'to_location_id' => $toLocationId,
+            'to_status' => $toStatus?->value,
+            'occurred_at' => $occurredAt->sql(),
+            'applied' => 0,
+            'not_applied_reason' => $reason->value,
         ], $comment);
     }
 
@@ -125,6 +154,7 @@ final class DeviceEventWriter
             'device_id' => $deviceId,
             'event_type' => $type,
             'user_id' => $userId,
+            'applied' => 1,
             ...$values,
             'comment' => $comment,
         ];

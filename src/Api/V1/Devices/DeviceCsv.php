@@ -28,9 +28,10 @@ final class DeviceCsv
     ];
 
     public const array EVENT_HEADER = [
-        'Zeitpunkt', 'Geräte-Nr.', 'Kennung', 'Gerätetyp', 'Ereignis', 'Wer', 'Standort von',
-        'Standort nach', 'Status von', 'Status nach', 'Prüfdatum alt', 'Prüfdatum neu', 'Feld',
-        'Alter Wert', 'Neuer Wert', 'Kommentar',
+        'Aktionszeit', 'Eingang beim Server', 'Geräte-Nr.', 'Kennung', 'Gerätetyp', 'Ereignis', 'Wer',
+        'Standort von', 'Standort nach', 'Status von', 'Status nach', 'Prüfdatum alt', 'Prüfdatum neu',
+        'Feld', 'Alter Wert', 'Neuer Wert', 'Kommentar', 'Übernommen', 'Grund (nicht übernommen)',
+        'Buchungs-Kennung',
     ];
 
     /**
@@ -64,6 +65,7 @@ final class DeviceCsv
         $event = $entry->event;
 
         return [
+            GermanFormat::dateTime($event->occurredAt()),
             GermanFormat::dateTime($event->createdAt),
             (string) $entry->deviceId,
             $entry->identifier,
@@ -80,6 +82,9 @@ final class DeviceCsv
             self::fieldValue($event, $event->oldValue),
             self::fieldValue($event, $event->newValue),
             $event->comment,
+            $event->applied ? 'Ja' : 'Nein',
+            $event->notAppliedReason?->label(),
+            $event->clientRef,
         ];
     }
 

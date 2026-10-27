@@ -11,6 +11,7 @@ use FirefightingEquipment\Device\DeviceReinstatement;
 use FirefightingEquipment\Device\DeviceStateChange;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\InvalidDeviceValueException;
+use FirefightingEquipment\Device\NotAppliedReason;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -20,6 +21,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(DeviceEventLocation::class)]
 #[CoversClass(DeviceStateChange::class)]
 #[CoversClass(DeviceReinstatement::class)]
+#[CoversClass(NotAppliedReason::class)]
 final class DeviceEventTest extends TestCase
 {
     public function testTypesMatchSchemaAndHaveGermanLabels(): void
@@ -62,6 +64,34 @@ final class DeviceEventTest extends TestCase
     {
         self::assertSame('Angelegt', self::event(DeviceEventType::Created, false, null, DeviceStatus::Ready)->label());
         self::assertSame('Prüfdatum geändert', self::event(DeviceEventType::DueChanged, false, null, null)->label());
+    }
+
+    public function testNotAppliedLabelsAndActionTime(): void
+    {
+        $at = new \DateTimeImmutable('2026-10-26 08:00:00', new \DateTimeZone('UTC'));
+        $offline = new \DateTimeImmutable('2026-10-25 07:00:00', new \DateTimeZone('UTC'));
+        $lager = new DeviceEventLocation(3, 'Lager', null);
+        $event = static fn (?DeviceEventLocation $to, ?DeviceStatus $status): DeviceEvent => new DeviceEvent(
+            1, DeviceEventType::StateChanged, 7, 'Erika', null, $to, null, $status, null, null, null, null, null, null,
+            $at, $offline, false, NotAppliedReason::Older,
+        );
+
+        self::assertSame('Umbuchung nicht übernommen', $event($lager, null)->label());
+        self::assertSame('Statusänderung nicht übernommen', $event(null, DeviceStatus::Defective)->label());
+        self::assertSame('Umbuchung und Statusänderung nicht übernommen', $event($lager, DeviceStatus::Ready)->label());
+        self::assertSame($offline, $event($lager, null)->occurredAt());
+        self::assertEquals($at, self::event(DeviceEventType::StateChanged, true, null, null)->occurredAt());
+    }
+
+    public function testNotAppliedReasonsMatchSchemaAndHaveGermanLabels(): void
+    {
+        self::assertSame(
+            ['older' => 'Neuerer Stand vorhanden', 'retired' => 'Gerät ausgesondert', 'location_locked' => 'Standort gesperrt'],
+            array_combine(
+                array_map(static fn (NotAppliedReason $r): string => $r->value, NotAppliedReason::cases()),
+                array_map(static fn (NotAppliedReason $r): string => $r->label(), NotAppliedReason::cases()),
+            ),
+        );
     }
 
     public function testLocationPath(): void

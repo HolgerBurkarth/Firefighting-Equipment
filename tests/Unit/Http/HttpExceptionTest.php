@@ -88,6 +88,21 @@ final class HttpExceptionTest extends TestCase
         self::assertSame('{"error":"import_outdated","message":"Vorschau neu erstellen."}', HttpException::importOutdated('Vorschau neu erstellen.')->toResponse()->body());
     }
 
+    public function testOfflineBookingCodes(): void
+    {
+        $response = HttpException::clientRefConflict('Andere Buchung.')->toResponse();
+        self::assertSame(409, $response->statusCode());
+        self::assertSame('{"error":"client_ref_conflict","message":"Andere Buchung."}', $response->body());
+
+        $response = HttpException::staleAction('Alt.', ['queue_max_age_days' => 7])->toResponse();
+        self::assertSame(409, $response->statusCode());
+        self::assertSame('{"error":"stale_action","message":"Alt.","details":{"queue_max_age_days":7}}', $response->body());
+
+        $response = HttpException::clockImplausible('Uhr falsch.', ['max_skew_seconds' => 300])->toResponse();
+        self::assertSame(422, $response->statusCode());
+        self::assertSame('{"error":"clock_implausible","message":"Uhr falsch.","details":{"max_skew_seconds":300}}', $response->body());
+    }
+
     public function testInvalidRequestWithDetails(): void
     {
         $response = HttpException::invalidRequest('Zeile 4 ist kaputt.', ['line' => 4])->toResponse();

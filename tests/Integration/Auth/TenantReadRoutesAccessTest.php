@@ -36,6 +36,7 @@ final class TenantReadRoutesAccessTest extends AuthTestCase
         yield 'Export Geräte' => ['devices/export'];
         yield 'Export Geräte gefiltert' => ['devices/export?location_id={location}&include_sublocations=1&status=ready,retired&q=ma'];
         yield 'Export Historie' => ['device-events/export'];
+        yield 'Einstellungen für das Frontend' => ['client-config'];
         yield 'Export Historie gefiltert' => ['device-events/export?from=2026-01-01&to=2026-12-31&device_id={device}&location_id={location}&include_sublocations=1&order=oldest'];
     }
 

@@ -121,6 +121,10 @@ final readonly class DeviceImport
                 $set[] = 'status = ?';
                 $params[] = $row->status->value;
             }
+            if ($row->locationId !== null || $row->status !== null) {
+                // vor version = version + 1 (siehe DeviceRepository::applyState)
+                $set[] = 'state_changed_at = UTC_TIMESTAMP(), state_version = version + 1';
+            }
             $sql = 'UPDATE fe_devices SET ' . implode(', ', $set) . ', version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?';
             ($statements[$sql] ??= $this->pdo->prepare($sql))->execute([...$params, $device->id, $tenant->id]);
 
@@ -163,7 +167,7 @@ final readonly class DeviceImport
             return [];
         }
 
-        $placeholders = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())';
+        $placeholders = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(), 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())';
         foreach (array_chunk($rows, self::INSERT_ROWS) as $chunk) {
             $params = [];
             foreach ($chunk as $row) {
@@ -186,7 +190,8 @@ final readonly class DeviceImport
             }
             $this->pdo->prepare(
                 'INSERT INTO fe_devices (tenant_id, identifier, scan_code, device_type_id, location_id, status, serial_number,'
-                . ' manufacturer, model, procured_on, next_inspection_due, note, version, created_at, updated_at) VALUES '
+                . ' manufacturer, model, procured_on, next_inspection_due, note, version, state_changed_at, state_version,'
+                . ' created_at, updated_at) VALUES '
                 . implode(', ', array_fill(0, count($chunk), $placeholders)),
             )->execute($params);
         }

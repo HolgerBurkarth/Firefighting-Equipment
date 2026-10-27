@@ -13,21 +13,24 @@ use FirefightingEquipment\Tenant\Tenant;
  * Methoden für UPDATE oder DELETE dürfen nicht hinzukommen.
  *
  * Standorte erscheinen mit ihrem aktuellen Namen und Pfad (die Historie speichert nur IDs), der
- * Benutzer mit seinem Anzeigenamen (anonymisiert: „Gelöschter Benutzer #ID“, nie die E-Mail).
+ * Benutzer mit seinem Anzeigenamen (anonymisiert: „Gelöschter Benutzer #ID“, nie die E-Mail), die
+ * Buchungs-Kennung (client_ref) aus der Quittung (fe_device_bookings), falls vorhanden.
  */
 final readonly class DeviceEventRepository
 {
     private const string SELECT = 'SELECT e.id, e.event_type, e.user_id, u.status AS user_status, u.display_name, u.name AS user_name,'
         . ' e.from_location_id, fl.name AS from_name, fp.name AS from_parent,'
         . ' e.to_location_id, tl.name AS to_name, tp.name AS to_parent,'
-        . ' e.from_status, e.to_status, e.from_due, e.to_due, e.field, e.old_value, e.new_value, e.comment, e.created_at';
+        . ' e.from_status, e.to_status, e.from_due, e.to_due, e.field, e.old_value, e.new_value, e.comment, e.created_at,'
+        . ' e.occurred_at, e.applied, e.not_applied_reason, b.client_ref';
 
     private const string JOINS = ' FROM fe_device_events e'
         . ' JOIN fe_users u ON u.id = e.user_id AND u.tenant_id = e.tenant_id'
         . ' LEFT JOIN fe_locations fl ON fl.id = e.from_location_id AND fl.tenant_id = e.tenant_id'
         . ' LEFT JOIN fe_locations fp ON fp.id = fl.parent_id AND fp.tenant_id = e.tenant_id'
         . ' LEFT JOIN fe_locations tl ON tl.id = e.to_location_id AND tl.tenant_id = e.tenant_id'
-        . ' LEFT JOIN fe_locations tp ON tp.id = tl.parent_id AND tp.tenant_id = e.tenant_id';
+        . ' LEFT JOIN fe_locations tp ON tp.id = tl.parent_id AND tp.tenant_id = e.tenant_id'
+        . ' LEFT JOIN fe_device_bookings b ON b.event_id = e.id AND b.tenant_id = e.tenant_id';
 
     private const string FROM = self::JOINS . ' WHERE e.tenant_id = ? AND e.device_id = ?';
 
@@ -180,9 +183,18 @@ final readonly class DeviceEventRepository
             $row['old_value'] === null ? null : (string) $row['old_value'],
             $row['new_value'] === null ? null : (string) $row['new_value'],
             $row['comment'] === null ? null : (string) $row['comment'],
-            \DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', (string) $row['created_at'], new \DateTimeZone('UTC'))
-                ?: throw new \UnexpectedValueException(sprintf('Ungültiger Zeitstempel: %s', (string) $row['created_at'])),
+            self::utc((string) $row['created_at']),
+            $row['occurred_at'] === null ? null : self::utc((string) $row['occurred_at']),
+            (int) $row['applied'] === 1,
+            $row['not_applied_reason'] === null ? null : NotAppliedReason::from((string) $row['not_applied_reason']),
+            $row['client_ref'] === null ? null : (string) $row['client_ref'],
         );
+    }
+
+    private static function utc(string $value): \DateTimeImmutable
+    {
+        return \DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $value, new \DateTimeZone('UTC'))
+            ?: throw new \UnexpectedValueException(sprintf('Ungültiger Zeitstempel: %s', $value));
     }
 
     /**

@@ -149,6 +149,34 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Optionale Gruppe 'offline' (Schlüssel 'max_age_days', 'queue_max_age_days', je Ganzzahl von
+     * 1 bis 365). Fehlt sie oder ein Schlüssel: Standardwerte (je 7 Tage).
+     *
+     * @throws ConfigException
+     */
+    public function loadOfflineConfig(string $path): OfflineConfig
+    {
+        $offline = $this->optionalGroup($this->loadFile($path), 'offline', ['max_age_days', 'queue_max_age_days'], $path);
+
+        $days = [];
+        foreach (['max_age_days' => OfflineConfig::DEFAULT_MAX_AGE_DAYS, 'queue_max_age_days' => OfflineConfig::DEFAULT_QUEUE_MAX_AGE_DAYS] as $key => $default) {
+            $value = $offline[$key] ?? $default;
+            if (!is_int($value) || $value < OfflineConfig::MIN_DAYS || $value > OfflineConfig::MAX_DAYS) {
+                throw new ConfigException(sprintf(
+                    "'offline.%s' muss in %s eine ganze Zahl von %d bis %d (Tage) sein.",
+                    $key,
+                    $path,
+                    OfflineConfig::MIN_DAYS,
+                    OfflineConfig::MAX_DAYS,
+                ));
+            }
+            $days[] = $value;
+        }
+
+        return new OfflineConfig(...$days);
+    }
+
+    /**
      * Gruppe 'mail.smtp'. Meldungen nennen nie Werte, vor allem nie das Passwort.
      *
      * @param array<array-key, mixed> $mail

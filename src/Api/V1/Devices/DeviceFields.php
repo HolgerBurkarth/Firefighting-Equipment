@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Api\V1\Devices;
 
+use FirefightingEquipment\Device\Booking\ClientRef;
 use FirefightingEquipment\Device\DeviceChanges;
 use FirefightingEquipment\Device\DeviceDate;
 use FirefightingEquipment\Device\DeviceException;
@@ -17,6 +18,7 @@ use FirefightingEquipment\Device\NewDevice;
 use FirefightingEquipment\Device\ScanCode;
 use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\RequestContext;
+use FirefightingEquipment\Offline\ActionTime;
 
 /**
  * Liest die JSON-Bodys der ändernden Geräte-Routen. Unbekannte Felder werden abgelehnt (400), damit
@@ -113,12 +115,40 @@ final class DeviceFields
      */
     public static function stateChange(RequestContext $context): DeviceStateChange
     {
-        self::rejectUnknown($context, ['version', 'location_id', 'status', 'comment']);
+        self::rejectUnknown($context, ['version', 'location_id', 'status', 'comment', 'client_ref', 'occurred_at', 'confirmed_stale']);
 
         return new DeviceStateChange(
             $context->optionalIntField('location_id', 1, self::MAX_ID),
             self::serviceStatus($context, false),
         );
+    }
+
+    /**
+     * Zusatzfelder von POST devices/{id}/state: client_ref (UUID v4), occurred_at (Aktionszeit in
+     * UTC, nur mit client_ref) und confirmed_stale (true/false, nur mit occurred_at). Fehlen sie oder
+     * sind sie null: wie ohne.
+     *
+     * @return array{?ClientRef, ?ActionTime, bool}
+     *
+     * @throws HttpException   400 invalid_request
+     * @throws DeviceException ungültige client_ref oder occurred_at
+     */
+    public static function bookingFields(RequestContext $context): array
+    {
+        $clientRef = $context->optionalStringField('client_ref');
+        $occurredAt = $context->optionalStringField('occurred_at');
+        $confirmedStale = ($context->body['confirmed_stale'] ?? null) === null ? null : $context->boolField('confirmed_stale');
+
+        $clientRef = $clientRef === null ? null : ClientRef::fromString($clientRef);
+        $occurredAt = $occurredAt === null ? null : ActionTime::fromString($occurredAt);
+        if ($occurredAt !== null && $clientRef === null) {
+            throw HttpException::invalidRequest('Eine Buchung mit "occurred_at" braucht eine Buchungs-Kennung "client_ref".');
+        }
+        if ($confirmedStale !== null && $occurredAt === null) {
+            throw HttpException::invalidRequest('Das Feld "confirmed_stale" ist nur zusammen mit "occurred_at" vorgesehen.');
+        }
+
+        return [$clientRef, $occurredAt, $confirmedStale ?? false];
     }
 
     /**

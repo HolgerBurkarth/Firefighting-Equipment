@@ -17,8 +17,6 @@ enum DeviceAction
     case UpdateFields;
     /** POST api/v1/devices/{id}/inspection-due {version, next_inspection_due, comment?} (Admin) */
     case SetInspectionDue;
-    /** POST api/v1/devices/{id}/state {version, location_id?, status?, comment?} (angemeldet) */
-    case ChangeState;
     /** POST api/v1/devices/{id}/retire {version, comment?} (Admin) */
     case Retire;
     /** POST api/v1/devices/{id}/reinstate {version, status, location_id?, identifier?, device_type_id?, comment?} (Admin) */

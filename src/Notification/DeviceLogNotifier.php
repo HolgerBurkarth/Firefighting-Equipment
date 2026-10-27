@@ -8,6 +8,7 @@ use FirefightingEquipment\Device\Device;
 use FirefightingEquipment\Device\DeviceEventRepository;
 use FirefightingEquipment\Device\Import\DeviceImportPlan;
 use FirefightingEquipment\Device\Import\ImportResult;
+use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
 use FirefightingEquipment\Http\AppUrls;
 use FirefightingEquipment\Http\ErrorReporter;
 use FirefightingEquipment\Http\RequestContext;
@@ -32,6 +33,8 @@ use FirefightingEquipment\User\UserRepository;
 final readonly class DeviceLogNotifier
 {
     public const string PURPOSE = 'device_log';
+    /** Zweck der Mails zu Hinweisen (Offline-Buchungen) im Protokoll */
+    public const string NOTICE_PURPOSE = 'device_notice';
     public const int MAX_RECIPIENTS = 25;
     public const float TIME_BUDGET_SECONDS = 10.0;
     public const int MAX_IMPORT_LINES = 50;
@@ -86,6 +89,33 @@ final readonly class DeviceLogNotifier
     }
 
     /**
+     * Hinweis zu einer Offline-Buchung (ersetzt für diese Anfrage die Mail zum Vorgang, damit es nur
+     * eine Mail gibt). Der Kommentar steht im Eintrag der Historie.
+     *
+     * @return int Anzahl übergebener Mails
+     */
+    public function notice(Tenant $tenant, User $actor, int $noticeId, DeviceNoticeRepository $notices): int
+    {
+        try {
+            $notice = $notices->find($tenant, $noticeId) ?? throw new \LogicException(sprintf('Hinweis #%d fehlt.', $noticeId));
+            $event = $notice->eventId === null ? [] : $this->events->findForDevice($tenant, $notice->deviceId, [$notice->eventId]);
+        } catch (\Throwable $e) {
+            $this->errors->report('mail_failed (' . self::NOTICE_PURPOSE . ')', $e);
+
+            return 0;
+        }
+        $comment = ($event[0] ?? null)?->comment;
+        $url = $this->urls->area($tenant);
+
+        return $this->send(
+            $tenant,
+            $actor,
+            static fn (User $recipient): MailMessage => MailTemplates::deviceNotice($recipient, $tenant, $notice, $comment, $url),
+            self::NOTICE_PURPOSE,
+        );
+    }
+
+    /**
      * Übernommener CSV-Import; ohne neue oder geänderte Geräte keine Mail.
      *
      * @return int Anzahl übergebener Mails
@@ -116,7 +146,7 @@ final readonly class DeviceLogNotifier
     /**
      * @param \Closure(User): MailMessage $build
      */
-    private function send(Tenant $tenant, User $actor, \Closure $build): int
+    private function send(Tenant $tenant, User $actor, \Closure $build, string $purpose = self::PURPOSE): int
     {
         $started = microtime(true);
         try {
@@ -126,7 +156,7 @@ final readonly class DeviceLogNotifier
             ));
         } catch (\Throwable $e) {
             // Auch eine Störung beim Lesen der Empfänger darf den Vorgang nicht scheitern lassen.
-            $this->errors->report('mail_failed (' . self::PURPOSE . ')', $e);
+            $this->errors->report('mail_failed (' . $purpose . ')', $e);
 
             return 0;
         }
@@ -143,7 +173,7 @@ final readonly class DeviceLogNotifier
         }
 
         return $this->notifier->sendMany(
-            self::PURPOSE,
+            $purpose,
             array_map(static fn (User $recipient): array => [$recipient->id, static fn (): MailMessage => $build($recipient)], $recipients),
             $started + $this->timeBudgetSeconds,
         );

@@ -5,6 +5,17 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Device;
 
 use FirefightingEquipment\Database\UnbufferedQuery;
+use FirefightingEquipment\Device\Booking\BookingOutcome;
+use FirefightingEquipment\Device\Booking\BookingReason;
+use FirefightingEquipment\Device\Booking\BookingRequest;
+use FirefightingEquipment\Device\Booking\BookingResult;
+use FirefightingEquipment\Device\Booking\DeviceBookingRepository;
+use FirefightingEquipment\Device\Booking\DeviceStateSnapshot;
+use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
+use FirefightingEquipment\Device\Notice\NewNotice;
+use FirefightingEquipment\Device\Notice\NoticeKind;
+use FirefightingEquipment\Device\Booking\DuplicateClientRefException;
+use FirefightingEquipment\Offline\ActionTime;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -41,7 +52,8 @@ final readonly class DeviceRepository
 
     private const string SELECT = 'SELECT d.id, d.identifier, d.scan_code, d.device_type_id, t.name AS type_name, d.location_id,'
         . ' l.name AS location_name, p.name AS parent_name, d.status, d.serial_number, d.manufacturer, d.model,'
-        . ' d.procured_on, d.next_inspection_due, d.note, d.version, d.created_at, d.updated_at';
+        . ' d.procured_on, d.next_inspection_due, d.note, d.version, d.created_at, d.updated_at,'
+        . ' d.state_changed_at, d.state_version';
 
     private const string FROM = ' FROM fe_devices d'
         . ' JOIN fe_device_types t ON t.id = d.device_type_id AND t.tenant_id = d.tenant_id'
@@ -264,8 +276,9 @@ final readonly class DeviceRepository
             try {
                 $this->pdo->prepare(
                     'INSERT INTO fe_devices (tenant_id, identifier, scan_code, device_type_id, location_id, status, serial_number,'
-                    . ' manufacturer, model, procured_on, next_inspection_due, note, version, created_at, updated_at)'
-                    . ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
+                    . ' manufacturer, model, procured_on, next_inspection_due, note, version, state_changed_at, state_version,'
+                    . ' created_at, updated_at)'
+                    . ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(), 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
                 )->execute([
                     $tenant->id,
                     $device->identifier->value,
@@ -400,24 +413,163 @@ final readonly class DeviceRepository
      */
     public function changeState(Tenant $tenant, int $userId, int $id, int $expectedVersion, DeviceStateChange $change, ?string $comment): Device
     {
-        return $this->transaction(function () use ($tenant, $userId, $id, $expectedVersion, $change, $comment): int {
-            $current = $this->lockForChange($tenant, $id, $expectedVersion);
-            if ($current->isRetired()) {
-                throw DeviceRuleViolationException::retiredNotMovable($current->identifier);
+        return $this->book($tenant, $userId, $id, $expectedVersion, $change, $comment)->device;
+    }
+
+    /**
+     * Buchung (POST devices/{id}/state) wie changeState(), mit Ergebnis. Mit client_ref wird in
+     * derselben Transaktion die Quittung gespeichert (fe_device_bookings); ist sie gleichzeitig
+     * vergeben, wird alles zurückgerollt (DuplicateClientRefException, der Aufrufer wiederholt das
+     * gespeicherte Ergebnis).
+     *
+     * Offline-Buchung (mit Aktionszeit, siehe offline()): statt 409 ein Ergebnis, damit das Handy
+     * die Buchung aus der Warteschlange nehmen kann.
+     *
+     * @throws DeviceNotFoundException
+     * @throws DeviceVersionConflictException nur ohne Aktionszeit
+     * @throws DeviceRuleViolationException   ausgesondert, Ziel-Standort gesperrt (nur ohne Aktionszeit)
+     * @throws InvalidDeviceValueException    Ziel-Standort unbekannt oder fremd
+     * @throws DuplicateClientRefException
+     */
+    public function book(Tenant $tenant, int $userId, int $id, int $expectedVersion, DeviceStateChange $change, ?string $comment, ?BookingRequest $booking = null): BookingResult
+    {
+        /** @var array{BookingOutcome, ?BookingReason, ?int, ?int} $result */
+        $result = $this->atomically(function () use ($tenant, $userId, $id, $expectedVersion, $change, $comment, $booking): array {
+            $before = null;
+            if ($booking?->occurredAt !== null) {
+                $current = $this->lockDevice($tenant, $id);
+                $before = $this->stateSnapshot($tenant, $current);
+                [$outcome, $reason, $eventId] = $this->offline($tenant, $userId, $current, $expectedVersion, $change, $comment, $booking->occurredAt);
+            } else {
+                [$outcome, $reason, $eventId] = $this->online($tenant, $userId, $this->lockForChange($tenant, $id, $expectedVersion), $change, $comment);
             }
 
-            $locationId = $change->locationId ?? $current->locationId;
-            $status = $change->status ?? $current->status;
-            if ($locationId === $current->locationId && $status === $current->status) {
-                return $id;
+            if ($booking?->clientRef === null) {
+                return [$outcome, $reason, $eventId, null];
             }
-            if ($locationId !== $current->locationId) {
-                $this->lockActiveLocation($tenant, $locationId);
-            }
-            $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment);
+            $bookingId = new DeviceBookingRepository($this->pdo)->insert(
+                $tenant, $booking->clientRef, $userId, $id, $booking->requestHash, $outcome, $reason, $booking->staleConfirmed, $eventId,
+            );
 
-            return $id;
-        }, $tenant);
+            // Hinweis an die Admins: nur Offline-Buchungen mit besonderem Ergebnis oder nach Rückfrage.
+            $kind = NoticeKind::forResult($reason, $booking->staleConfirmed);
+            $noticeId = $kind === null || $booking->occurredAt === null || $before === null ? null : new DeviceNoticeRepository($this->pdo)->create(
+                $tenant,
+                new NewNotice($kind, $booking->staleConfirmed, $id, $bookingId, $eventId, $userId, $booking->occurredAt, $change, $before),
+            );
+
+            return [$outcome, $reason, $eventId, $noticeId];
+        });
+
+        return new BookingResult(
+            $this->find($tenant, $id) ?? throw new \LogicException('Gerät nach der Änderung nicht gefunden.'),
+            $result[0],
+            $result[1],
+            $booking !== null && $booking->staleConfirmed,
+            $booking?->clientRef,
+            eventId: $result[2],
+            noticeId: $result[3],
+        );
+    }
+
+    /**
+     * Buchung ohne Aktionszeit (Version bereits geprüft): wie bisher, Fehler als Ausnahme.
+     *
+     * @return array{BookingOutcome, ?BookingReason, ?int} Ergebnis, Grund, Ereignis
+     *
+     * @throws DeviceRuleViolationException ausgesondert, Ziel-Standort gesperrt
+     * @throws InvalidDeviceValueException  Ziel-Standort unbekannt oder fremd
+     */
+    private function online(Tenant $tenant, int $userId, Device $current, DeviceStateChange $change, ?string $comment): array
+    {
+        if ($current->isRetired()) {
+            throw DeviceRuleViolationException::retiredNotMovable($current->identifier);
+        }
+
+        $locationId = $change->locationId ?? $current->locationId;
+        $status = $change->status ?? $current->status;
+        if ($locationId === $current->locationId && $status === $current->status) {
+            return [BookingOutcome::Unchanged, null, null];
+        }
+        if ($locationId !== $current->locationId) {
+            $this->lockActiveLocation($tenant, $locationId);
+        }
+
+        return [BookingOutcome::Applied, null, $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment)];
+    }
+
+    /**
+     * Offline-Buchung mit Aktionszeit („der Letzte gewinnt“ nach dem gemeinsamen Stand von Standort
+     * und Status, state_changed_at):
+     * - ausgesondert: nicht übernommen (nur Historie, retired);
+     * - Version veraltet und der Stand hat sich seit der Version des Handys geändert
+     *   (state_version > erwartete Version): Aktionszeit nicht jünger als state_changed_at → nur
+     *   Historie (older), sonst übernehmen und den anderen Stand überschreiben (overwritten);
+     * - sonst (Version aktuell oder nur andere Änderungen dazwischen): buchen wie online;
+     * - neuer Standort gesperrt: nicht übernommen (location_locked); unbekannt oder fremd: Fehler.
+     * Übernommen gilt der Stand ab der Aktionszeit.
+     *
+     * @return array{BookingOutcome, ?BookingReason, ?int} Ergebnis, Grund, Ereignis
+     *
+     * @throws InvalidDeviceValueException Ziel-Standort unbekannt oder fremd
+     */
+    private function offline(Tenant $tenant, int $userId, Device $current, int $expectedVersion, DeviceStateChange $change, ?string $comment, ActionTime $occurredAt): array
+    {
+        $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder);
+        $notApplied = function (NotAppliedReason $reason) use ($tenant, $userId, $current, $change, $comment, $occurredAt, $events): array {
+            $events->stateNotApplied($tenant, $current->id, $userId, $change->locationId, $change->status, $reason, $occurredAt, $comment);
+            $outcome = $reason === NotAppliedReason::Older ? BookingOutcome::HistoryOnly : BookingOutcome::NotApplied;
+
+            return [$outcome, BookingReason::notApplied($reason), (int) $this->pdo->lastInsertId()];
+        };
+
+        if ($current->isRetired()) {
+            return $notApplied(NotAppliedReason::Retired);
+        }
+
+        $stateVersion = $current->stateVersion ?? $current->version;
+        $unchangedSince = $expectedVersion < $current->version && $stateVersion <= $expectedVersion;
+        $conflict = $current->version !== $expectedVersion && !$unchangedSince;
+        if ($conflict && $occurredAt->value <= ($current->stateChangedAt ?? $current->updatedAt)) {
+            return $notApplied(NotAppliedReason::Older);
+        }
+
+        $locationId = $change->locationId ?? $current->locationId;
+        $status = $change->status ?? $current->status;
+        if ($locationId === $current->locationId && $status === $current->status) {
+            return [BookingOutcome::Unchanged, null, null];
+        }
+        if ($locationId !== $current->locationId) {
+            $location = $this->lockLocation($tenant, $locationId)
+                ?? throw new InvalidDeviceValueException('Der Standort wurde nicht gefunden.');
+            if ((int) $location['active'] !== 1) {
+                return $notApplied(NotAppliedReason::LocationLocked);
+            }
+        }
+
+        $eventId = $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment, $occurredAt);
+
+        return [BookingOutcome::Applied, $conflict ? BookingReason::Overwritten : null, $eventId];
+    }
+
+    /**
+     * Aktueller Stand mit Aktionszeit und dem Konto, das ihn gesetzt hat (für Hinweise).
+     */
+    public function stateSnapshot(Tenant $tenant, Device $device): DeviceStateSnapshot
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT user_id FROM fe_device_events WHERE tenant_id = ? AND device_id = ? AND applied = 1"
+            . " AND event_type IN ('created', 'imported', 'state_changed') ORDER BY id DESC LIMIT 1",
+        );
+        $stmt->execute([$tenant->id, $device->id]);
+        $userId = $stmt->fetchColumn();
+
+        return new DeviceStateSnapshot(
+            $device->locationId,
+            $device->status,
+            $device->stateChangedAt ?? $device->updatedAt,
+            $userId === false ? null : (int) $userId,
+        );
     }
 
     /**
@@ -514,15 +666,29 @@ final readonly class DeviceRepository
 
     /**
      * Schreibt Standort, Status und ggf. Stammdaten in einem UPDATE (Version + 1), danach je Feld ein
-     * Ereignis field_changed und zuletzt state_changed mit den Paaren, die sich ändern.
+     * Ereignis field_changed und zuletzt state_changed mit den Paaren, die sich ändern. Der Stand gilt
+     * ab $occurredAt (Offline-Buchung) bzw. ab jetzt (state_changed_at).
      *
      * @param array<string, array{?string, ?string, int|string|null}> $fields Feld => [alt, neu, Spaltenwert]
+     *
+     * @return int ID des Ereignisses state_changed
      */
-    private function applyState(Tenant $tenant, int $userId, Device $current, int $locationId, DeviceStatus $status, array $fields, ?string $comment): void
-    {
+    private function applyState(
+        Tenant $tenant,
+        int $userId,
+        Device $current,
+        int $locationId,
+        DeviceStatus $status,
+        array $fields,
+        ?string $comment,
+        ?ActionTime $occurredAt = null,
+    ): int {
         $set = implode('', array_map(static fn (string $f): string => ', ' . self::COLUMNS[$f] . ' = ?', array_keys($fields)));
-        $this->pdo->prepare('UPDATE fe_devices SET location_id = ?, status = ?' . $set . ', version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?')
-            ->execute([$locationId, $status->value, ...array_column($fields, 2), $current->id, $tenant->id]);
+        // state_version vor version: richtig, ob MariaDB die Zuweisungen nacheinander oder gleichzeitig
+        // auswertet (SIMULTANEOUS_ASSIGNMENT).
+        $this->pdo->prepare('UPDATE fe_devices SET location_id = ?, status = ?' . $set . ', state_changed_at = COALESCE(?, UTC_TIMESTAMP()),'
+            . ' state_version = version + 1, version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?')
+            ->execute([$locationId, $status->value, ...array_column($fields, 2), $occurredAt?->sql(), $current->id, $tenant->id]);
 
         $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder);
         foreach ($fields as $field => [$old, $new]) {
@@ -539,7 +705,10 @@ final readonly class DeviceRepository
             $statusChanged ? $current->status : null,
             $statusChanged ? $status : null,
             $comment,
+            $occurredAt,
         );
+
+        return (int) $this->pdo->lastInsertId();
     }
 
     /**
@@ -551,19 +720,29 @@ final readonly class DeviceRepository
      */
     private function lockForChange(Tenant $tenant, int $id, int $expectedVersion): Device
     {
+        $current = $this->lockDevice($tenant, $id);
+        if ($current->version !== $expectedVersion) {
+            throw new DeviceVersionConflictException($current);
+        }
+
+        return $current;
+    }
+
+    /**
+     * Sperrt das Gerät (FOR UPDATE) und liest es danach (erste nicht sperrende Abfrage nach der
+     * Sperre: sieht den aktuellen Stand).
+     *
+     * @throws DeviceNotFoundException
+     */
+    private function lockDevice(Tenant $tenant, int $id): Device
+    {
         $stmt = $this->pdo->prepare('SELECT id FROM fe_devices WHERE id = ? AND tenant_id = ? FOR UPDATE');
         $stmt->execute([$id, $tenant->id]);
         if ($stmt->fetchColumn() === false) {
             throw DeviceNotFoundException::forId($id);
         }
 
-        // Erste nicht sperrende Abfrage nach der Sperre: sieht den aktuellen Stand.
-        $current = $this->find($tenant, $id) ?? throw DeviceNotFoundException::forId($id);
-        if ($current->version !== $expectedVersion) {
-            throw new DeviceVersionConflictException($current);
-        }
-
-        return $current;
+        return $this->find($tenant, $id) ?? throw DeviceNotFoundException::forId($id);
     }
 
     /**
@@ -703,6 +882,22 @@ final readonly class DeviceRepository
      */
     private function transaction(\Closure $work, Tenant $tenant): Device
     {
+        $id = $this->atomically($work);
+
+        return $this->find($tenant, $id) ?? throw new \LogicException('Gerät nach der Änderung nicht gefunden.');
+    }
+
+    /**
+     * Führt $work in einer eigenen Transaktion aus und liefert dessen Ergebnis.
+     *
+     * @template T
+     *
+     * @param \Closure(): T $work
+     *
+     * @return T
+     */
+    private function atomically(\Closure $work): mixed
+    {
         if ($this->pdo->inTransaction()) {
             throw new \LogicException('DeviceRepository startet eine eigene Transaktion; keine offene Transaktion erlaubt.');
         }
@@ -710,7 +905,7 @@ final readonly class DeviceRepository
         $this->recorder?->reset();
         $this->pdo->beginTransaction();
         try {
-            $id = $work();
+            $result = $work();
             $this->pdo->commit();
         } catch (\Throwable $e) {
             $this->recorder?->reset();
@@ -720,7 +915,7 @@ final readonly class DeviceRepository
             throw $e;
         }
 
-        return $this->find($tenant, $id) ?? throw new \LogicException('Gerät nach der Änderung nicht gefunden.');
+        return $result;
     }
 
     /**
@@ -747,6 +942,8 @@ final readonly class DeviceRepository
             self::utc((string) $row['created_at']),
             self::utc((string) $row['updated_at']),
             $row['scan_code'] === null ? null : ScanCode::fromDatabase((string) $row['scan_code']),
+            self::utc((string) $row['state_changed_at']),
+            (int) $row['state_version'],
         );
     }
 

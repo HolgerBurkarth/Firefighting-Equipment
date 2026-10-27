@@ -20,6 +20,13 @@ return [
     // 'app' => [
     //     'base_url' => 'http://localhost:8000',
     // ],
+    // Optional: Zeitlimits der Offline-Buchungen (je 1 bis 365 Tage, Standard je 7). max_age_days: so
+    // lange darf das Handy nach der letzten Synchronisierung offline buchen; queue_max_age_days: ab
+    // diesem Alter einer Buchung fragt das Handy vor dem Senden nach.
+    // 'offline' => [
+    //     'max_age_days'       => 7,
+    //     'queue_max_age_days' => 7,
+    // ],
     // Optional: Versand von Mails. Standard 'sendmail' (mail(), ohne DKIM).
     // Lokal 'file': jede Mail als .eml-Datei in file_dir (relativ zum Projektordner oder absolut,
     // Standard var/mail; steht in .gitignore).

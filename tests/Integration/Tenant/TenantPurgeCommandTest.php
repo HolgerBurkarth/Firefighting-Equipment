@@ -127,11 +127,14 @@ final class TenantPurgeCommandTest extends DeviceSchemaTestCase
         self::assertMatchesRegularExpression('/^  Geräte:     3\r?$/m', $out);
         self::assertMatchesRegularExpression('/^  Ereignisse: 5\r?$/m', $out);
         self::assertMatchesRegularExpression('/^  Standorte:  3\r?$/m', $out);
+        self::assertMatchesRegularExpression('/^  Buchungen:  1\r?$/m', $out);
+        self::assertMatchesRegularExpression('/^  Hinweise:   1\r?$/m', $out);
 
-        // Erwartet: alles wie vorher außer Geräten, Ereignissen und Standorten dieser Stadt. Damit bleiben
-        // die andere Stadt vollständig, Gerätetypen, Benutzer, Codes, Sitzungen und die Stadt selbst gleich.
+        // Erwartet: alles wie vorher außer Geräten, Ereignissen, Standorten, Quittungen und Hinweisen
+        // dieser Stadt. Damit bleiben die andere Stadt vollständig, Gerätetypen, Benutzer, Codes,
+        // Sitzungen und die Stadt selbst gleich.
         $expected = $before;
-        foreach (['fe_device_events', 'fe_devices', 'fe_locations'] as $table) {
+        foreach (['fe_device_events', 'fe_devices', 'fe_locations', 'fe_device_bookings', 'fe_device_notices', 'fe_device_notice_actions'] as $table) {
             $expected[$table] = array_values(array_filter(
                 $before[$table],
                 fn (array $row): bool => (int) $row['tenant_id'] !== $this->tenantId,
@@ -141,7 +144,7 @@ final class TenantPurgeCommandTest extends DeviceSchemaTestCase
         }
         self::assertSame($expected, $this->snapshot());
         self::assertEquals(new DeviceDataCounts(0, 0, 0), $this->counts($this->tenantId));
-        self::assertEquals(new DeviceDataCounts(3, 5, 3), $this->counts($this->otherTenantId));
+        self::assertEquals(new DeviceDataCounts(3, 5, 3, 1, 1), $this->counts($this->otherTenantId));
     }
 
     public function testBackupIsCreatedBeforeDeleting(): void
@@ -277,7 +280,7 @@ final class TenantPurgeCommandTest extends DeviceSchemaTestCase
 
     /**
      * Gerätetyp, zwei Standorte der Ebene 1 (einer mit Unterstandort), drei Geräte mit fünf Ereignissen,
-     * dazu Benutzer, Einladungscode und Sitzung.
+     * eine Offline-Buchung mit Hinweis (erledigt, mit Verlauf), dazu Benutzer, Einladungscode und Sitzung.
      */
     private function fillTenant(int $tenantId): void
     {
@@ -307,11 +310,22 @@ final class TenantPurgeCommandTest extends DeviceSchemaTestCase
             'from_location_id' => $vehicle,
             'to_location_id' => $compartment,
         ]);
-        $this->createEvent($tenantId, $devices[2], $userId, [
+        $event = $this->createEvent($tenantId, $devices[2], $userId, [
             'event_type' => 'state_changed',
             'from_location_id' => $vehicle,
             'to_location_id' => $room,
         ]);
+        $booking = $this->insert('fe_device_bookings', [
+            'tenant_id' => $tenantId, 'client_ref' => '3f2c8a1e-5b7d-4c9e-8f10-2a3b4c5d6e7f', 'user_id' => $userId,
+            'device_id' => $devices[2], 'request_hash' => str_repeat("\0", 32), 'outcome' => 'applied', 'reason' => 'overwritten',
+            'event_id' => $event,
+        ]);
+        $notice = $this->insert('fe_device_notices', [
+            'tenant_id' => $tenantId, 'device_id' => $devices[2], 'booking_id' => $booking, 'event_id' => $event,
+            'kind' => 'overwritten', 'user_id' => $userId, 'occurred_at' => '2026-01-01 08:00:00', 'requested_location_id' => $room,
+            'other_occurred_at' => '2025-12-01 08:00:00', 'other_location_id' => $vehicle, 'other_status' => 'ready', 'status' => 'resolved',
+        ]);
+        $this->insert('fe_device_notice_actions', ['tenant_id' => $tenantId, 'notice_id' => $notice, 'action' => 'resolve', 'user_id' => $userId]);
     }
 
     private function counts(int $tenantId): DeviceDataCounts

@@ -49,7 +49,8 @@ final class DeviceSummaryTest extends InspectionApiTestCase
             ],
             'inspection' => ['overdue' => 1, 'due_soon' => 2, 'due_soon_days' => 30, 'without_date' => 2],
         ], $json);
-        self::assertSame($json, $this->get('device-summary', $this->admin));
+        // Admins sehen zusätzlich die offenen Hinweise.
+        self::assertSame([...$json, 'notices' => ['open' => 0]], $this->get('device-summary', $this->admin));
     }
 
     public function testEmptyTenantHasZeros(): void

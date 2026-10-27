@@ -130,8 +130,11 @@ nicht leer ist: `{"error":"rule_violation","message":"…","details":{"devices":
 | 409  | `scan_code_taken`          | Scan-Code eines Geräts schon vergeben (exakter Vergleich)  |
 | 409  | `version_conflict`         | Gerät inzwischen geändert; aktueller Stand in `details.device` |
 | 409  | `import_outdated`          | CSV-Import: seit der Vorschau geändert oder Datei fehlerhaft; Vorschau neu erstellen |
+| 409  | `client_ref_conflict`      | Buchung: dieselbe `client_ref` schon für eine andere Buchung verwendet |
+| 409  | `stale_action`             | Offline-Buchung zu alt; nach Rückfrage mit `confirmed_stale` senden |
 | 415  | `unsupported_media_type`   | ändernde Anfrage ohne `Content-Type: application/json`     |
 | 422  | `weak_password`            | neues Passwort verletzt die Passwortregeln                 |
+| 422  | `clock_implausible`        | Offline-Buchung: Aktionszeit mehr als 5 Minuten in der Zukunft |
 | 429  | `too_many_attempts`        | zu viele Fehlversuche (Wartezeit im Header `Retry-After`)  |
 | 503  | `database_unavailable`     | Datenbank nicht erreichbar                                 |
 | 500  | `internal_error`           | unerwarteter Fehler; Details nur im Server-Log             |
@@ -177,6 +180,12 @@ Anwendung (Trennzeichen eines Scan-Codes als [GS], [RS], [EOT]). Gesendet wird e
 (zuerst die Admins der Stadt; Überschreitung als `device_log_recipients_capped` im Log) und 10 s
 Zeitbudget je Anfrage für den Versand. Mehrere Mails gehen über eine SMTP-Verbindung (eine
 Anmeldung; gemessen auf STRATO rund 0,22 s je Mail).
+
+Legt eine Offline-Buchung einen Hinweis an (siehe "Hinweise"), geht statt der Mail zum Vorgang eine
+Hinweis-Mail an dieselben Empfänger: Betreff „Log <Stadt>: Hinweis – <Kennung> <Grund>“ (z. B.
+„Log Feuerwehr Immendingen: Hinweis – MA-01 Stand überschrieben“), Text mit Art, Gerät, der Buchung
+(Wer mit E-Mail, Aktionszeit, Eingang, Wunsch, Kommentar) und dem anderen Stand. Versandfehler stehen
+als `mail_failed (device_notice, Konto #ID)` im Log.
 
 ### Passwort vergessen
 
@@ -452,7 +461,7 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
 | POST    | `api/v1/devices`                      | Admin      | 201 `{"device":…}`                          |
 | POST    | `api/v1/devices/{id}/fields`          | Admin      | `{"device":…}`                              |
 | POST    | `api/v1/devices/{id}/inspection-due`  | Admin      | `{"device":…}`                              |
-| POST    | `api/v1/devices/{id}/state`           | angemeldet | `{"device":…}`                              |
+| POST    | `api/v1/devices/{id}/state`           | angemeldet | `{"device":…,"result":…}` (siehe "Offline-Buchungen") |
 | POST    | `api/v1/devices/{id}/retire`          | Admin      | `{"device":…}`                              |
 | POST    | `api/v1/devices/{id}/reinstate`       | Admin      | `{"device":…}`                              |
 | GET     | `api/v1/devices/{id}/events`          | angemeldet | `{"events":[…],"total":…,"limit":…,"offset":…}` |
@@ -506,7 +515,9 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
   - `…/inspection-due`: `next_inspection_due` (Datum oder `null` zum Entfernen), optional `comment`.
   - `…/state` (auch `user`): `location_id` (neuer Standort) und/oder `status` (`ready`,
     `maintenance`, `defective`), optional `comment`. Umbuchung und Statusänderung ergeben EINEN
-    Eintrag in der Historie. Der neue Standort muss aktiv sein.
+    Eintrag in der Historie. Der neue Standort muss aktiv sein. Optional `client_ref`,
+    `occurred_at`, `confirmed_stale` (siehe "Offline-Buchungen"); die Antwort enthält zusätzlich
+    `result` mit dem Ergebnis für den Kameraden.
   - `…/retire` (Admin): nur `version` und optional `comment`. Das Gerät ist danach ausgesondert,
     erscheint nicht mehr in normalen Listen, und seine Kennung ist frei.
   - `…/reinstate` (Admin): `status` (Pflicht, nicht `retired`), optional `location_id` (sonst der
@@ -521,12 +532,17 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
   - Ausgesonderte Geräte lassen sich nur wieder aufnehmen (alles andere 409 `rule_violation`).
 - Historie (`…/events`, auch für ausgesonderte Geräte): neueste zuerst, `limit`/`offset` wie bei der
   Liste. Je Eintrag `type` mit `type_label` (z. B. „Umgebucht“, „Status geändert“, „Ausgesondert“,
-  „Wieder aufgenommen“, „Prüfdatum geändert“, „Stammdaten geändert“), `created_at` (UTC), `user`
+  „Wieder aufgenommen“, „Prüfdatum geändert“, „Stammdaten geändert“, „Umbuchung nicht übernommen“),
+  `created_at` = `received_at` (Eingang beim Server, UTC), `occurred_at` (Aktionszeit: bei
+  Offline-Buchungen die Zeit auf dem Handy, sonst wie `received_at`), `applied` (`false` = nicht
+  übernommen, nur Historie; dann nur „nach“ gefüllt) mit `not_applied_reason`/`not_applied_label`,
+  `client_ref` (falls die Buchung eine hatte), `user`
   (`id`, `name` = Anzeigename bzw. „Gelöschter Benutzer #ID“), `comment` sowie je nach Art
   `location` (`from`/`to` mit `id`, `name`, `path`), `status` (`from`/`to` mit deutscher
   Bezeichnung), `inspection_due` (`from`/`to`) und `field` (`name`, `label`, `old`, `new`); was die
   Art nicht kennt, ist `null`. Standorte erscheinen mit ihrem heutigen Namen (nach dem Umbenennen
-  also mit dem neuen).
+  also mit dem neuen). Reihenfolge nach Eingang beim Server (so, wie der Server die Buchungen
+  verarbeitet hat); die Aktionszeit steht daneben.
 
 | Fall                                                                    | Antwort                |
 |-------------------------------------------------------------------------|------------------------|
@@ -575,6 +591,133 @@ curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/d
 Hinweis zum letzten Aufruf: Beim zweiten Senden ist das Datum unverändert, die Version wird aber
 trotzdem zuerst geprüft, daher der Konflikt.
 
+### Offline-Buchungen
+
+Umbuchen und Status setzen (`POST api/v1/devices/{id}/state`) geht auch ohne Netz: Das Handy merkt
+sich die Buchung und sendet sie später. Andere Aktionen (Admin) gibt es offline nicht. Zusätzliche
+Felder (alle optional):
+
+| Feld              | Format                                         | Bedeutung |
+|-------------------|------------------------------------------------|-----------|
+| `client_ref`      | UUID Version 4 (z. B. `crypto.randomUUID()`)    | Kennung der Buchung; dieselbe Buchung erneut gesendet wirkt nicht noch einmal |
+| `occurred_at`     | `JJJJ-MM-TTTHH:MM:SSZ` (UTC, Bruchteile erlaubt, werden abgeschnitten) | Aktionszeit auf dem Handy; nur mit `client_ref` |
+| `confirmed_stale` | `true`/`false`                                 | alte Buchung nach Rückfrage trotzdem senden; nur mit `occurred_at` |
+
+`client_ref` lohnt sich auch online: Geht die Antwort verloren, darf das Handy dieselbe Anfrage
+gefahrlos wiederholen.
+
+**Ablauf beim Server:**
+
+1. Felder prüfen (400).
+2. Gibt es die `client_ref` in der Stadt schon und ist der Inhalt gleich (Konto, Gerät, Version,
+   Standort, Status, Kommentar, Aktionszeit; `confirmed_stale` zählt nicht), kommt das gespeicherte
+   Ergebnis mit `"replayed": true` und dem aktuellen Gerätestand zurück; nichts wird geschrieben.
+   Mit anderem Inhalt: 409 `client_ref_conflict`.
+3. Aktionszeit prüfen: mehr als 5 Minuten (300 s) nach der Serverzeit → 422 `clock_implausible`
+   (`details`: `server_time`, `occurred_at`, `max_skew_seconds`); älter als
+   `offline.queue_max_age_days` ohne `confirmed_stale` → 409 `stale_action` (`details`:
+   `occurred_at`, `queue_max_age_days`, `server_time`). Genau auf der Grenze ist erlaubt.
+4. Buchen. Standort und Status haben am Gerät EINEN gemeinsamen Zeitstempel (Aktionszeit der
+   Änderung, die den aktuellen Stand bestimmt). Mit `occurred_at` gilt „der Letzte gewinnt“:
+
+| Lage                                                                  | Ergebnis (`outcome` / `reason`)   |
+|-----------------------------------------------------------------------|-----------------------------------|
+| Version aktuell, oder seitdem nur Stammdaten/Prüfdatum geändert       | `applied` (übernommen)            |
+| Version veraltet, Stand inzwischen geändert, Aktionszeit jünger       | `applied` / `overwritten` + Hinweis |
+| Version veraltet, Stand inzwischen geändert, Aktionszeit älter oder gleich | `history_only` / `older` + Hinweis |
+| Gerät inzwischen ausgesondert                                         | `not_applied` / `retired` + Hinweis |
+| neuer Standort inzwischen gesperrt                                    | `not_applied` / `location_locked` + Hinweis |
+| Gerät hat schon diesen Standort und Status                            | `unchanged`                       |
+| alte Buchung nach Rückfrage (sonst unauffällig)                       | wie oben, `stale_confirmed: true` + Hinweis |
+
+Ohne `occurred_at` bleibt alles wie bisher (veraltete Version → 409 `version_conflict`, gesperrter
+Standort oder ausgesondertes Gerät → 409 `rule_violation`). Ein unbekannter oder fremder Standort
+ist immer 400. „Nur Historie“ und „nicht übernommen“ stehen in der Historie mit `applied: false` und
+Grund; der aktuelle Stand bleibt.
+
+Antwort (immer 200):
+
+```json
+{"device":{…aktueller Stand…},
+ "result":{"outcome":"applied","outcome_label":"übernommen","reason":"overwritten",
+           "reason_label":"Anderen Stand überschrieben",
+           "message":"Übernommen. Ein zwischenzeitlich gebuchter, älterer Stand wurde überschrieben; …",
+           "stale_confirmed":false,"client_ref":"3f2c8a1e-5b7d-4c9e-8f10-2a3b4c5d6e7f",
+           "replayed":false,"notice_id":12}}
+```
+
+So behandelt das Handy die Antworten: 2xx → Buchung erledigt (aus der Warteschlange nehmen,
+`message` anzeigen). 400, 404, `client_ref_conflict` → dauerhaft fehlerhaft, entfernen und Meldung
+zeigen. `stale_action` → nachfragen und ggf. mit `"confirmed_stale": true` erneut senden.
+`clock_implausible` → Uhr prüfen lassen; ggf. ohne `occurred_at` senden (dann gilt die Serverzeit
+und die Versionsprüfung). 401 → neu anmelden, Buchung behalten. 5xx oder kein Netz → später erneut.
+
+**Zeitlimits** (`GET api/v1/client-config`, angemeldet):
+
+```json
+{"server_time":"2026-10-27T13:05:09Z","offline":{"max_age_days":7,"queue_max_age_days":7},
+ "max_clock_skew_seconds":300}
+```
+
+- `max_age_days`: So lange darf das Handy nach der letzten Synchronisierung offline buchen (prüft
+  nur das Handy; der Server kennt die Synchronisierung nicht).
+- `queue_max_age_days`: Ab diesem Alter fragt das Handy vor dem Senden nach.
+- Einstellbar in der Konfigurationsdatei, Gruppe `offline` (je 1–365 Tage, Standard 7; siehe
+  `config/config.example.php`). `server_time` hilft dem Handy, eine falsche Uhr zu erkennen.
+
+Lokal ausprobieren (Benutzer oder Admin angemeldet wie unter "Lokal starten"):
+
+```
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/client-config
+# offline.json:  {"version":3,"location_id":1,"status":"defective","comment":"Nach Einsatz","client_ref":"3f2c8a1e-5b7d-4c9e-8f10-2a3b4c5d6e7f","occurred_at":"2026-10-27T08:15:00Z"}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@offline.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/state
+# Dieselbe Datei noch einmal: "replayed": true, keine zweite Buchung
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@offline.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/state
+# Ältere Buchung (z. B. 10 Tage) → 409 stale_action; nach Rückfrage:
+# stale.json:    {"version":3,"status":"maintenance","client_ref":"9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d","occurred_at":"2026-10-17T08:15:00Z","confirmed_stale":true}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@stale.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/state
+```
+
+### Hinweise (nur Admins)
+
+Offline-Buchungen mit besonderem Ergebnis legen einen Hinweis für die Admins der Stadt an: anderer
+Stand überschrieben, nur Historie, nicht übernommen (ausgesondert), nicht übernommen (Standort
+gesperrt), alte Buchung nach Rückfrage. Hinweise werden nie automatisch erledigt und nie gelöscht.
+
+| Methode | Pfad                                | Body       | Antwort |
+|---------|-------------------------------------|------------|---------|
+| GET     | `api/v1/notices[?status=open\|resolved\|all]` | – | `{"notices":[…],"total":…,"open":…,"limit":…,"offset":…}` |
+| GET     | `api/v1/notices/{id}`               | –          | `{"notice":…}` |
+| POST    | `api/v1/notices/{id}/resolve`       | `{note?}`  | `{"notice":…}` (erledigt) |
+| POST    | `api/v1/notices/{id}/reopen`        | `{}`       | `{"notice":…}` (wieder offen) |
+
+- Liste: Standard `status=open`, neueste zuerst, `limit` 1–200 (Standard 50), `offset`; `open` zählt
+  alle offenen Hinweise der Stadt.
+- Ein Hinweis enthält `kind` mit `kind_label`, `status` (`open`/`resolved`, „offen“/„erledigt“),
+  `stale_confirmed`, `device` (`id`, `identifier`, `device_type`), `booking` (Konto mit Anzeigename
+  und E-Mail, `occurred_at` = Aktionszeit, `received_at` = Eingang, gewünschter `location`/`status`,
+  `client_ref`, `event_id`) und `other` (der andere Stand: Konto, Aktionszeit, Standort, Status; bei
+  „überschrieben“ der überschriebene, sonst der Stand beim Eingang) sowie `history` (Verlauf:
+  `action` `resolve`/`reopen`, Konto, Zeitpunkt, Notiz). Gelöschte Konten erscheinen als
+  „Gelöschter Benutzer #ID“ ohne E-Mail.
+- Erledigen mit optionaler Notiz (höchstens 500 Zeichen, Zeilenumbrüche erlaubt); Wiederöffnen ohne
+  Notiz. Beides ist wiederholbar: Hat der Hinweis den Status schon, ändert sich nichts. Notizen
+  bleiben im Verlauf erhalten, auch nach dem Wiederöffnen.
+- `GET api/v1/device-summary` zeigt Admins zusätzlich `"notices":{"open":…}`; für Benutzer fehlt
+  das Feld (Vorschlag fürs Frontend: bei `user` keinen Hinweis-Zähler anzeigen).
+- Mail an alle Empfänger der Benachrichtigung „Log“ (siehe dort), nie an den Auslöser.
+
+Lokal ausprobieren (Admin angemeldet):
+
+```
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/notices
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/notices?status=all&limit=20"
+curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/notices/12
+# resolve.json:  {"note":"Mit dem Kameraden geklärt, Maske liegt im HLF."}
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@resolve.json" http://localhost:8000/firefighting/immendingen/api/v1/notices/12/resolve
+curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" http://localhost:8000/firefighting/immendingen/api/v1/notices/12/reopen
+```
+
 ### Prüffristen und Zusammenfassung
 
 Nur unter einer Stadt, für alle angemeldeten Konten der Stadt (`user` und `admin`). Ausgesonderte
@@ -601,7 +744,7 @@ Geräte sind nie enthalten. „Heute“ ist der Kalendertag in deutscher Zeit (E
 - `device-summary` (Startseite, eine Abfrage, keine Parameter): `devices.total` und
   `devices.by_status` (immer `ready`, `maintenance`, `defective` mit `status_label` und `count`, auch
   0), `inspection` mit `overdue`, `due_soon` (heute bis heute + 30 Tage, `due_soon_days`) und
-  `without_date`.
+  `without_date`. Nur für Admins zusätzlich `notices` mit `open` (offene Hinweise, siehe "Hinweise").
 
 Lokal ausprobieren (angemeldet wie unter "Lokal starten"):
 
@@ -654,9 +797,12 @@ Seitenbegrenzung (`limit` und `offset` werden ignoriert). So kann das Frontend d
 angezeigten Liste unverändert weitergeben. Die Datei kann wieder importiert werden (siehe "CSV-Import").
 
 **Historie** (`device-events/export`): alle Ereignisse der Stadt, auch ausgesonderter Geräte.
-Spalten Zeitpunkt, Geräte-Nr. (ID; unterscheidet Geräte, deren Kennung nach dem Aussondern neu
-vergeben wurde), Kennung und Gerätetyp (aktueller Stand), Ereignis, Wer, Standort von/nach, Status
-von/nach, Prüfdatum alt/neu, Feld, Alter Wert, Neuer Wert, Kommentar. Parameter (alle optional):
+Spalten Aktionszeit (bei Offline-Buchungen die Zeit auf dem Handy), Eingang beim Server, Geräte-Nr.
+(ID; unterscheidet Geräte, deren Kennung nach dem Aussondern neu vergeben wurde), Kennung und
+Gerätetyp (aktueller Stand), Ereignis, Wer, Standort von/nach, Status von/nach, Prüfdatum alt/neu,
+Feld, Alter Wert, Neuer Wert, Kommentar, Übernommen (Ja/Nein), Grund (nicht übernommen),
+Buchungs-Kennung (`client_ref`). Zeitraum und Reihenfolge richten sich nach dem Eingang beim Server.
+Parameter (alle optional):
 
 - `from`, `to` (`JJJJ-MM-TT`, Kalendertage in deutscher Zeit, beide einschließlich). Standard: die
   letzten 90 Tage bis heute; nur `to` → 90 Tage bis dahin, nur `from` → bis heute. Höchstens 366
@@ -1090,12 +1236,13 @@ php bin/tenant.php purge-device-data --slug=immendingen                         
 php bin/tenant.php purge-device-data --slug=immendingen --execute --confirm=immendingen          # löschen
 ```
 
-Löscht **alle** Geräte, Ereignisse (Historie) und Standorte einer Stadt, z. B. Testdaten vor der
-Erstbefüllung. Bewusste Ausnahme von „Geräte und Historie werden nie gelöscht“: nur für Städte
+Löscht **alle** Geräte, Ereignisse (Historie), Standorte, Quittungen der Buchungen und Hinweise
+(samt Verlauf) einer Stadt, z. B. Testdaten vor der Erstbefüllung. Bewusste Ausnahme von „Geräte und Historie werden nie gelöscht“: nur für Städte
 ohne echte Daten verwenden. Gerätetypen, Benutzer, Einladungscodes, Sitzungen und die Stadt selbst
 bleiben unverändert; andere Städte sind nie betroffen.
 
-- Ohne `--execute`: Probelauf, zeigt die Anzahl Geräte, Ereignisse und Standorte; ändert nichts.
+- Ohne `--execute`: Probelauf, zeigt die Anzahl Geräte, Ereignisse, Standorte, Buchungen und
+  Hinweise; ändert nichts.
 - Mit `--execute` muss `--confirm` genau dem Kürzel entsprechen (sonst Abbruch, Exit-Code 2).
 - Vorher wird die Datenbank gesichert wie mit `bin/db-dump.php` (alle Tabellen `fe_*`, nach
   `~/htdocs/apps/_backup/`, Zusatz `vor-purge-<kürzel>`). Schlägt die Sicherung fehl, wird nichts

@@ -13,7 +13,9 @@ use FirefightingEquipment\Device\DeviceEventType;
  * JSON-Darstellung eines Eintrags der Historie. Immer alle Schlüssel; location, status,
  * inspection_due und field sind null, wenn die Art des Eintrags sie nicht kennt. Bei created und
  * imported ist "from" jeweils null. Zeit in UTC, Datumsfelder als JJJJ-MM-TT, feste Werte mit
- * deutscher Bezeichnung (type_label, from_label/to_label, field.label).
+ * deutscher Bezeichnung (type_label, from_label/to_label, field.label). occurred_at = Aktionszeit
+ * (Offline-Buchung: auf dem Handy, sonst wie received_at), received_at = created_at = Eingang beim
+ * Server. applied = false: nicht übernommen, nur Historie (Grund in not_applied_reason/-label).
  */
 final class DeviceEventJson
 {
@@ -31,6 +33,12 @@ final class DeviceEventJson
             'type' => $event->type->value,
             'type_label' => $event->label(),
             'created_at' => AuthJson::time($event->createdAt),
+            'occurred_at' => AuthJson::time($event->occurredAt()),
+            'received_at' => AuthJson::time($event->createdAt),
+            'applied' => $event->applied,
+            'not_applied_reason' => $event->notAppliedReason?->value,
+            'not_applied_label' => $event->notAppliedReason?->label(),
+            'client_ref' => $event->clientRef,
             'user' => ['id' => $event->userId, 'name' => $event->userName],
             'comment' => $event->comment,
             'location' => $hasLocation

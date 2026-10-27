@@ -405,6 +405,8 @@ final readonly class TenantCommand
         $this->line(sprintf('  Geräte:     %d', $counts->devices));
         $this->line(sprintf('  Ereignisse: %d', $counts->events));
         $this->line(sprintf('  Standorte:  %d', $counts->locations));
+        $this->line(sprintf('  Buchungen:  %d', $counts->bookings));
+        $this->line(sprintf('  Hinweise:   %d', $counts->notices));
     }
 
     /**

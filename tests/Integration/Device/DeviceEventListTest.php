@@ -106,9 +106,55 @@ final class DeviceEventListTest extends DeviceApiTestCase
         foreach ($expected as $i => $entry) {
             $actual = $events[$i];
             self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $actual['created_at']);
-            unset($actual['id'], $actual['created_at']);
+            // Serveraktionen: Aktionszeit = Eingang, übernommen, ohne Buchungs-Kennung.
+            self::assertSame([$actual['created_at'], $actual['created_at'], true, null, null, null], [
+                $actual['occurred_at'], $actual['received_at'], $actual['applied'],
+                $actual['not_applied_reason'], $actual['not_applied_label'], $actual['client_ref'],
+            ]);
+            unset($actual['id'], $actual['created_at'], $actual['occurred_at'], $actual['received_at'], $actual['applied'],
+                $actual['not_applied_reason'], $actual['not_applied_label'], $actual['client_ref']);
             self::assertSame($entry, $actual, sprintf('Eintrag %d', $i));
         }
+    }
+
+    public function testOfflineEntriesShowActionTimeAndNotApplied(): void
+    {
+        $id = $this->createDevice($this->tenantId, $this->typeId, $this->g1, ['identifier' => 'MA-01']);
+        $this->insert('fe_device_events', [
+            'tenant_id' => $this->tenantId, 'device_id' => $id, 'user_id' => $this->userId, 'event_type' => 'state_changed',
+            'from_location_id' => $this->g1, 'to_location_id' => $this->room, 'occurred_at' => '2026-06-14 08:00:00',
+            'created_at' => '2026-06-15 09:30:00',
+        ]);
+        $this->insert('fe_device_events', [
+            'tenant_id' => $this->tenantId, 'device_id' => $id, 'user_id' => $this->userId, 'event_type' => 'state_changed',
+            'to_location_id' => $this->g1, 'to_status' => 'defective', 'occurred_at' => '2026-06-13 07:00:00',
+            'applied' => 0, 'not_applied_reason' => 'older', 'created_at' => '2026-06-15 09:31:00',
+        ]);
+
+        $events = self::json($this->api('GET', 'devices/' . $id . '/events', cookie: $this->user))['events'];
+
+        $keys = ['type_label', 'created_at', 'occurred_at', 'received_at', 'applied', 'not_applied_reason', 'not_applied_label'];
+        $pick = static fn (array $event): array => array_intersect_key($event, array_flip($keys));
+        self::assertSame([
+            'type_label' => 'Umbuchung und Statusänderung nicht übernommen',
+            'created_at' => '2026-06-15T09:31:00Z',
+            'occurred_at' => '2026-06-13T07:00:00Z',
+            'received_at' => '2026-06-15T09:31:00Z',
+            'applied' => false,
+            'not_applied_reason' => 'older',
+            'not_applied_label' => 'Neuerer Stand vorhanden',
+        ], $pick($events[0]));
+        self::assertSame(['from' => null, 'to' => ['id' => $this->g1, 'name' => 'G1', 'path' => 'HLF 20 / G1']], $events[0]['location']);
+        self::assertSame(['from' => null, 'from_label' => null, 'to' => 'defective', 'to_label' => 'defekt'], $events[0]['status']);
+        self::assertSame([
+            'type_label' => 'Umgebucht',
+            'created_at' => '2026-06-15T09:30:00Z',
+            'occurred_at' => '2026-06-14T08:00:00Z',
+            'received_at' => '2026-06-15T09:30:00Z',
+            'applied' => true,
+            'not_applied_reason' => null,
+            'not_applied_label' => null,
+        ], $pick($events[1]));
     }
 
     public function testPagesAndCurrentLocationNames(): void

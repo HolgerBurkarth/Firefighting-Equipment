@@ -66,6 +66,21 @@ final class DeviceEventSchemaTest extends DeviceSchemaTestCase
         yield 'Gerätetyp' => [[
             'event_type' => 'field_changed', 'field' => 'device_type', 'old_value' => 'Funkgerät', 'new_value' => 'Atemschutzgerät',
         ]];
+        yield 'Offline-Umbuchung mit Aktionszeit' => [[
+            'event_type' => 'state_changed', 'from_location_id' => self::LOCATION_A, 'to_location_id' => self::LOCATION_B,
+            'occurred_at' => '2026-01-01 08:00:00',
+        ]];
+        yield 'nicht übernommen, älter' => [[
+            'event_type' => 'state_changed', 'to_location_id' => self::LOCATION_B, 'applied' => 0, 'not_applied_reason' => 'older',
+            'occurred_at' => '2026-01-01 08:00:00',
+        ]];
+        yield 'nicht übernommen, gleicher Standort wie aktuell' => [[
+            'event_type' => 'state_changed', 'to_location_id' => self::LOCATION_A, 'to_status' => 'ready', 'applied' => 0,
+            'not_applied_reason' => 'retired',
+        ]];
+        yield 'nicht übernommen, Standort gesperrt' => [[
+            'event_type' => 'state_changed', 'to_status' => 'defective', 'applied' => 0, 'not_applied_reason' => 'location_locked',
+        ]];
     }
 
     /**
@@ -134,6 +149,20 @@ final class DeviceEventSchemaTest extends DeviceSchemaTestCase
             'event_type' => 'state_changed', 'from_location_id' => self::LOCATION_A, 'to_location_id' => self::LOCATION_B, 'old_value' => 'x',
         ]];
         yield 'leerer Kommentar' => [[...$created, 'comment' => '  ']];
+        $notApplied = ['event_type' => 'state_changed', 'to_location_id' => self::LOCATION_B, 'applied' => 0, 'not_applied_reason' => 'older'];
+        yield 'nicht übernommen ohne Grund' => [[...$notApplied, 'not_applied_reason' => null]];
+        yield 'übernommen mit Grund' => [['event_type' => 'state_changed', 'from_status' => 'ready', 'to_status' => 'defective', 'not_applied_reason' => 'older']];
+        yield 'Grund unbekannt' => [[...$notApplied, 'not_applied_reason' => 'late']];
+        yield 'Grund großgeschrieben' => [[...$notApplied, 'not_applied_reason' => 'Older']];
+        yield 'applied 2' => [[...$notApplied, 'applied' => 2]];
+        yield 'nicht übernommen mit Von-Standort' => [[...$notApplied, 'from_location_id' => self::LOCATION_A]];
+        yield 'nicht übernommen mit Von-Status' => [[...$notApplied, 'from_status' => 'ready', 'to_status' => 'defective']];
+        yield 'nicht übernommen ohne Ziel' => [['event_type' => 'state_changed', 'applied' => 0, 'not_applied_reason' => 'older']];
+        yield 'nicht übernommen ausgesondert' => [['event_type' => 'state_changed', 'to_status' => 'retired', 'applied' => 0, 'not_applied_reason' => 'older']];
+        yield 'angelegt nicht übernommen' => [[...$created, 'applied' => 0, 'not_applied_reason' => 'older']];
+        yield 'Prüfdatum nicht übernommen' => [['event_type' => 'due_changed', 'to_due' => '2027-01-01', 'applied' => 0, 'not_applied_reason' => 'older']];
+        yield 'Aktionszeit bei Anlegen' => [[...$created, 'occurred_at' => '2026-01-01 08:00:00']];
+        yield 'Aktionszeit bei Stammdaten' => [['event_type' => 'field_changed', 'field' => 'note', 'new_value' => 'x', 'occurred_at' => '2026-01-01 08:00:00']];
     }
 
     /**

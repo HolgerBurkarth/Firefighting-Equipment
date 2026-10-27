@@ -110,6 +110,7 @@ abstract class DeviceApiTestCase extends AuthTestCase
         return json_encode([
             $this->pdo()->query('SELECT * FROM fe_devices ORDER BY id')->fetchAll(),
             $this->pdo()->query('SELECT * FROM fe_device_events ORDER BY id')->fetchAll(),
+            $this->pdo()->query('SELECT id, client_ref, outcome, reason, event_id FROM fe_device_bookings ORDER BY id')->fetchAll(),
         ], JSON_THROW_ON_ERROR);
     }
 }

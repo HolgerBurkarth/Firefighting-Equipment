@@ -193,6 +193,37 @@ final class HttpException extends \RuntimeException
     }
 
     /**
+     * Buchung: Dieselbe client_ref wurde bereits für eine andere Buchung verwendet (anderes Konto,
+     * Gerät oder anderer Inhalt); nichts geschrieben.
+     */
+    public static function clientRefConflict(string $message): self
+    {
+        return new self('client_ref_conflict', $message, 409);
+    }
+
+    /**
+     * Offline-Buchung älter als offline.queue_max_age_days ohne confirmed_stale: Das Handy fragt
+     * nach und sendet sie ggf. mit confirmed_stale erneut; nichts geschrieben.
+     *
+     * @param array<string, mixed> $details z. B. {"occurred_at": …, "queue_max_age_days": 7}
+     */
+    public static function staleAction(string $message, array $details): self
+    {
+        return new self('stale_action', $message, 409, details: $details);
+    }
+
+    /**
+     * Offline-Buchung mit einer Aktionszeit zu weit in der Zukunft (Uhr des Handys falsch);
+     * nichts geschrieben.
+     *
+     * @param array<string, mixed> $details z. B. {"server_time": …, "occurred_at": …, "max_skew_seconds": 300}
+     */
+    public static function clockImplausible(string $message, array $details): self
+    {
+        return new self('clock_implausible', $message, 422, details: $details);
+    }
+
+    /**
      * Das Kürzel einer neuen Stadt ist bereits vergeben (nur Super-Admin).
      *
      * @param string $message Meldung mit dem Kürzel

@@ -7,6 +7,7 @@ namespace FirefightingEquipment\Tests\Unit\Config;
 use FirefightingEquipment\Config\ConfigException;
 use FirefightingEquipment\Config\ConfigLoader;
 use FirefightingEquipment\Config\AppConfig;
+use FirefightingEquipment\Config\OfflineConfig;
 use FirefightingEquipment\Database\DatabaseConfig;
 use FirefightingEquipment\Mail\MailConfig;
 use FirefightingEquipment\Mail\MailTransport;
@@ -21,6 +22,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(ConfigLoader::class)]
 #[CoversClass(ConfigException::class)]
 #[CoversClass(AppConfig::class)]
+#[CoversClass(OfflineConfig::class)]
 #[UsesClass(DatabaseConfig::class)]
 #[UsesClass(MailConfig::class)]
 #[UsesClass(SmtpConfig::class)]
@@ -294,6 +296,50 @@ final class ConfigLoaderTest extends TestCase
         }
     }
 
+    public function testOfflineConfigDefaultsToSevenDays(): void
+    {
+        $config = new ConfigLoader()->loadOfflineConfig(self::FIXTURES . 'valid.php');
+
+        self::assertSame(7, $config->maxAgeDays);
+        self::assertSame(7, $config->queueMaxAgeDays);
+        self::assertSame(7, $this->loadGroup('offline', [])->queueMaxAgeDays);
+    }
+
+    public function testOfflineConfigIsLoaded(): void
+    {
+        $config = $this->loadGroup('offline', ['max_age_days' => 14, 'queue_max_age_days' => 1]);
+        self::assertSame(14, $config->maxAgeDays);
+        self::assertSame(1, $config->queueMaxAgeDays);
+
+        self::assertSame(365, $this->loadGroup('offline', ['max_age_days' => 365])->maxAgeDays);
+        self::assertSame(7, $this->loadGroup('offline', ['max_age_days' => 365])->queueMaxAgeDays);
+    }
+
+    /**
+     * @return iterable<string, array{mixed, string}>
+     */
+    public static function invalidOfflineGroups(): iterable
+    {
+        yield 'kein Array' => [7, "'offline' muss"];
+        yield 'unbekannter Schlüssel' => [['max_age' => 7], "Unbekannter Schlüssel 'offline.max_age'"];
+        yield '0 Tage' => [['max_age_days' => 0], "'offline.max_age_days' muss"];
+        yield 'zu viele Tage' => [['queue_max_age_days' => 366], "'offline.queue_max_age_days' muss"];
+        yield 'als String' => [['max_age_days' => '7'], "'offline.max_age_days' muss"];
+        yield 'als Kommazahl' => [['queue_max_age_days' => 7.0], "'offline.queue_max_age_days' muss"];
+    }
+
+    #[DataProvider('invalidOfflineGroups')]
+    public function testInvalidOfflineGroupIsReported(mixed $offline, string $expectedMessage): void
+    {
+        try {
+            $this->loadGroup('offline', $offline);
+            self::fail('ConfigException erwartet.');
+        } catch (ConfigException $e) {
+            self::assertStringContainsString($expectedMessage, $e->getMessage());
+            self::assertStringNotContainsString(self::SECRET_MARKER, $e->getMessage());
+        }
+    }
+
     public function testOtherLoadersIgnoreAppAndMailGroups(): void
     {
         self::assertSame('pass-nicht-ausgeben', $this->load('mail-file')->pass);
@@ -324,6 +370,26 @@ final class ConfigLoaderTest extends TestCase
         }
 
         return $smtp;
+    }
+
+    /**
+     * Lädt die Gruppe 'offline' aus einer temporären Konfigurationsdatei mit gültiger Gruppe 'db'.
+     */
+    private function loadGroup(string $group, mixed $values): OfflineConfig
+    {
+        $dir = new TempDirectory();
+        try {
+            $dir->write('config.php', "<?php
+return " . var_export([
+                'db' => ['host' => 'h', 'name' => 'n', 'user' => 'u', 'pass' => 'pass-nicht-ausgeben'],
+                $group => $values,
+            ], true) . ";
+");
+
+            return new ConfigLoader()->loadOfflineConfig($dir->file('config.php'));
+        } finally {
+            $dir->remove();
+        }
     }
 
     /**

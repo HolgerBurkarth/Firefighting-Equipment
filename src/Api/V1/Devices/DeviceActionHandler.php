@@ -15,7 +15,7 @@ use FirefightingEquipment\Http\RequestHandler;
 use FirefightingEquipment\Notification\DeviceLogNotifier;
 
 /**
- * Gerät anzeigen, anlegen bzw. ändern, siehe DeviceAction. Antwort {"device": …} mit allen Feldern
+ * Gerät anzeigen, anlegen bzw. ändern, siehe DeviceAction (Umbuchen und Status: DeviceStateHandler). Antwort {"device": …} mit allen Feldern
  * und dem Stand danach, beim Anlegen 201.
  *
  * Ungültige Felder 400 (auch ein unbekannter oder fremder Gerätetyp bzw. Standort im Body), fremde
@@ -64,14 +64,6 @@ final readonly class DeviceActionHandler implements RequestHandler
                     $context->param('id'),
                     DeviceFields::version($context),
                     DeviceFields::inspectionDue($context),
-                    DeviceFields::comment($context),
-                ),
-                DeviceAction::ChangeState => $devices->changeState(
-                    $tenant,
-                    $context->auth()->user->id,
-                    $context->param('id'),
-                    DeviceFields::version($context),
-                    DeviceFields::stateChange($context),
                     DeviceFields::comment($context),
                 ),
                 DeviceAction::Retire => $devices->retire(

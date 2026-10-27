@@ -29,6 +29,7 @@ use FirefightingEquipment\Api\V1\Devices\DeviceExportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceHistoryExportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceImportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceListHandler;
+use FirefightingEquipment\Api\V1\Devices\DeviceStateHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceSummaryHandler;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeAction;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeActionHandler;
@@ -41,6 +42,10 @@ use FirefightingEquipment\Api\V1\Invitation\InvitationCodeRevokeHandler;
 use FirefightingEquipment\Api\V1\Locations\LocationAction;
 use FirefightingEquipment\Api\V1\Locations\LocationActionHandler;
 use FirefightingEquipment\Api\V1\Locations\LocationListHandler;
+use FirefightingEquipment\Api\V1\Notices\NoticeAction;
+use FirefightingEquipment\Api\V1\Notices\NoticeActionHandler;
+use FirefightingEquipment\Api\V1\Notices\NoticeListHandler;
+use FirefightingEquipment\Api\V1\Offline\ClientConfigHandler;
 use FirefightingEquipment\Api\V1\SuperAdmins\SuperAdminListHandler;
 use FirefightingEquipment\Api\V1\SuperAdmins\SuperAdminLockHandler;
 use FirefightingEquipment\Api\V1\TenantHandler;
@@ -54,6 +59,7 @@ use FirefightingEquipment\Api\V1\Tenants\TenantUserListHandler;
 use FirefightingEquipment\Api\V1\Users\UserAction;
 use FirefightingEquipment\Api\V1\Users\UserActionHandler;
 use FirefightingEquipment\Api\V1\Users\UserListHandler;
+use FirefightingEquipment\Offline\OfflineSettings;
 use FirefightingEquipment\Time\Clock;
 use FirefightingEquipment\Time\SystemClock;
 
@@ -98,10 +104,13 @@ final class Routes
      * @param MinimumDuration|null $neutralDuration wie bei service()
      * @param Clock|null           $clock           Uhr für „heute“ der Prüffristen und Exporte
      *                                              (null = Systemzeit, andere nur für Tests)
+     * @param OfflineSettings|null $offline         Zeitlimits der Offline-Buchungen (null =
+     *                                              Standardwerte; Anwendung: aus der Konfiguration)
      */
-    public static function tenant(?MinimumDuration $neutralDuration = null, ?Clock $clock = null): Router
+    public static function tenant(?MinimumDuration $neutralDuration = null, ?Clock $clock = null, ?OfflineSettings $offline = null): Router
     {
         $clock ??= new SystemClock();
+        $offline ??= new OfflineSettings();
 
         return self::auth(Router::forTenant(), $neutralDuration)
             ->add('GET', 'api/v1/health', Access::Public, new HealthHandler())
@@ -150,12 +159,17 @@ final class Routes
             ->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceActionHandler(DeviceAction::Show))
             ->add('POST', 'api/v1/devices/{id}/fields', Access::Admin, new DeviceActionHandler(DeviceAction::UpdateFields))
             ->add('POST', 'api/v1/devices/{id}/inspection-due', Access::Admin, new DeviceActionHandler(DeviceAction::SetInspectionDue))
-            ->add('POST', 'api/v1/devices/{id}/state', Access::Authenticated, new DeviceActionHandler(DeviceAction::ChangeState))
+            ->add('POST', 'api/v1/devices/{id}/state', Access::Authenticated, new DeviceStateHandler($clock, $offline))
             ->add('POST', 'api/v1/devices/{id}/retire', Access::Admin, new DeviceActionHandler(DeviceAction::Retire))
             ->add('POST', 'api/v1/devices/{id}/reinstate', Access::Admin, new DeviceActionHandler(DeviceAction::Reinstate))
             ->add('GET', 'api/v1/devices/{id}/events', Access::Authenticated, new DeviceEventListHandler())
             ->add('GET', 'api/v1/device-summary', Access::Authenticated, new DeviceSummaryHandler($clock))
-            ->add('GET', 'api/v1/inspection-due', Access::Authenticated, new InspectionDueHandler($clock));
+            ->add('GET', 'api/v1/inspection-due', Access::Authenticated, new InspectionDueHandler($clock))
+            ->add('GET', 'api/v1/client-config', Access::Authenticated, new ClientConfigHandler($clock, $offline))
+            ->add('GET', 'api/v1/notices', Access::Admin, new NoticeListHandler())
+            ->add('GET', 'api/v1/notices/{id}', Access::Admin, new NoticeActionHandler(NoticeAction::Show))
+            ->add('POST', 'api/v1/notices/{id}/resolve', Access::Admin, new NoticeActionHandler(NoticeAction::Resolve))
+            ->add('POST', 'api/v1/notices/{id}/reopen', Access::Admin, new NoticeActionHandler(NoticeAction::Reopen));
     }
 
     /** Anmeldung, Sitzungen und Passwort; unter service und unter jeder Stadt gleich. */

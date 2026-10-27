@@ -122,9 +122,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   vergeben), `identifier_taken` 409 (Kennung eines Geräts vergeben), `scan_code_taken` 409
   (Scan-Code eines Geräts vergeben), `version_conflict` 409
   (Gerät inzwischen geändert, aktueller Stand in `details`), `import_outdated` 409 (CSV-Import: seit
-  der Vorschau geändert, Vorschau neu erstellen), `unsupported_media_type` 415, `weak_password`
-  422, `too_many_attempts` 429 (mit `Retry-After`), `database_unavailable` 503, `internal_error`
-  500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
+  der Vorschau geändert, Vorschau neu erstellen), `client_ref_conflict` 409 (Buchung: `client_ref`
+  schon für eine andere Buchung verwendet), `stale_action` 409 (Offline-Buchung zu alt, ohne
+  `confirmed_stale`), `unsupported_media_type` 415, `weak_password` 422, `clock_implausible` 422
+  (Aktionszeit einer Offline-Buchung zu weit in der Zukunft), `too_many_attempts` 429 (mit
+  `Retry-After`), `database_unavailable` 503, `internal_error` 500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
   Passwort beim Ändern 403, nicht 401.
 - Optionales Feld `details` (immer ein JSON-Objekt) mit maschinenlesbaren Angaben zum Fehler,
   z. B. `{"error":"rule_violation","message":"…","details":{"devices":2,"sublocations":1}}` beim
@@ -180,8 +182,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Dokumentierte Ausnahmen auf Spaltenebene: `fe_users.email` ist `utf8mb4_bin`, damit z. B.
   "ß"/"ss" oder "é"/"e" nicht als gleich gelten (Kleinschreibung erzwingt ein CHECK); ebenso
   `fe_devices.identifier_key`, `fe_devices.scan_code`/`scan_code_key` (exakter Vergleich) sowie
-  `fe_device_events.old_value`/`new_value` (siehe "Standorte und Geräte"); feste Werte (`role`, `status`, `purpose`, `action`, `kind`, `event_type`, `field`),
-  `password_hash`, `fe_tenants.accent_color` und `fe_tenant_logos.version` sind
+  `fe_device_events.old_value`/`new_value` (siehe "Standorte und Geräte"); feste Werte (`role`, `status`, `purpose`, `action`, `kind`, `event_type`, `field`,
+  `not_applied_reason`, `outcome`, `reason`, `requested_status`, `other_status`),
+  `password_hash`, `fe_tenants.accent_color`, `fe_tenant_logos.version` und
+  `fe_device_bookings.client_ref` sind
   `ascii`/`ascii_bin`, damit `IN (...)` bzw. `LIKE` Groß- und Kleinschreibung unterscheiden.
 - Bilddaten: einzige Tabelle mit Binärdaten ist `fe_tenant_logos` (`MEDIUMBLOB`, siehe
   "Erscheinungsbild (API)"); Dateien liegen nie im Dateisystem.
@@ -205,7 +209,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   weglassen): `app` → `base_url` (Standard `https://www.prodad.de`, Format wie ein Origin) und
   `mail` → `transport` (`sendmail` Standard, `smtp`, `file`), `file_dir` (Standard `var/mail`) und
   `smtp` (Schlüssel siehe "E-Mail-Versand"; Pflicht bei `transport = smtp`, sonst geprüft, aber
-  nicht verwendet). Die Gruppen werden erst geladen, wenn ein Link bzw. eine Mail gebraucht wird.
+  nicht verwendet) sowie `offline` → `max_age_days`, `queue_max_age_days` (je 1–365, Standard 7;
+  siehe "Offline-Buchungen (API)"). Die Gruppen werden erst geladen, wenn ein Link, eine Mail bzw.
+  die Zeitlimits gebraucht werden.
   Meldungen von `ConfigLoader` nennen nie Werte.
 - Tests: Testsuiten `unit` und `integration` (`composer test`, `composer test:unit`,
   `composer test:integration`). Die ganze Suite dauert lokal unter einer Minute;
@@ -709,11 +715,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Europe/Berlin). Zwecke im Protokoll: `admin_invitation`, `invitation_accepted`.
 
 ## Standorte und Geräte
-- Stand: Schema (Migrationen `0011`–`0015`, Scan-Code `0019`/`0020`), Start-Gerätetypen neuer Städte, die API für
+- Stand: Schema (Migrationen `0011`–`0015`, Scan-Code `0019`/`0020`, Offline-Buchungen und Hinweise
+  `0023`–`0028`), Start-Gerätetypen neuer Städte, die API für
   Gerätetypen und Standorte (siehe "Gerätetypen und Standorte (API)") und für Geräte (anlegen,
   Stammdaten, Prüfdatum, Liste, Einzelansicht, Umbuchen/Status, Aussondern/Wiederaufnehmen,
   Historie; siehe "Geräte (API)"), Prüffristen und Zusammenfassung (siehe "Prüffristen und
-  Zusammenfassung (API)"), CSV-Export und -Import (siehe "CSV-Export (API)" und "CSV-Import (API)").
+  Zusammenfassung (API)"), CSV-Export und -Import (siehe "CSV-Export (API)" und "CSV-Import (API)"),
+  Offline-Buchungen und Hinweise (siehe "Offline-Buchungen (API)" und "Hinweise (API)").
   Schema-Tests in
   `tests/Integration/Device/` (`DeviceSchemaTestCase`), Zeilen per SQL über
   den Trait `DeviceRows` (auch in API-Tests auf Basis von `AuthTestCase`).
@@ -753,6 +761,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   zurücksetzen").
 - Gleichzeitige Änderungen: Versionszähler `fe_devices.version` (ab 1, jede Änderung erhöht ihn); eine
   Änderung mit veralteter Version wird mit 409 `version_conflict` abgelehnt (siehe "Geräte (API)").
+  Ausnahme: Offline-Buchungen mit Aktionszeit („der Letzte gewinnt“ über `state_changed_at` und
+  `state_version`, siehe "Offline-Buchungen (API)").
 - Gerätetypen (`fe_device_types`): je Stadt, Name je Stadt eindeutig (ohne Groß-/Kleinschreibung),
   vom Admin pflegbar, deaktivierbar (`active = 0`) statt löschbar. Start: Atemschutzmaske,
   Atemschutzgerät, Funkgerät, Wärmebildkamera (`DefaultDeviceTypes::NAMES`); bestehende Städte per
@@ -778,6 +788,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   ein Eintrag je Feld `identifier`, `scan_code` (seit Migration `0020`), `device_type`,
   `serial_number`, `manufacturer`, `model`, `procured_on`, `note`, alter/neuer Wert als Text in `utf8mb4_bin`, beim Gerätetyp dessen Name zum
   Zeitpunkt der Änderung). Welche Spalten je Ereignis gefüllt sind, prüfen CHECK-Bedingungen.
+  Seit Migration `0025`: `occurred_at` (Aktionszeit einer Offline-Buchung, nur `state_changed`; NULL =
+  Serveraktion, Aktionszeit = `created_at` = Eingang), `applied` (0 = nicht übernommen, nur
+  Historie; dann nur `to_*`, nie `retired`) und `not_applied_reason` (`older`, `retired`,
+  `location_locked`; gesetzt genau bei `applied = 0`). Bestehende Einträge bleiben unverändert.
 - Was nur der Code sichert (ohne Trigger nicht möglich): Standort nur leer sperren, gesperrter Standort
   und deaktivierter Gerätetyp sind kein Ziel, Ereignis passend zur Änderung am Gerät, Versionsprüfung.
 
@@ -788,15 +802,17 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Code: `src/Device/TenantDeviceDataPurge.php` (`count`, `purge`; eigene Klasse, kein Repository
   bekommt Lösch-Methoden), `DeviceDataCounts`, Befehl in `TenantCommand`. Sicherung über
   `src/Backup/DatabaseBackup` (derselbe Ablauf wie `bin/db-dump.php`, das ihn ebenfalls nutzt).
-- Ohne `--execute`: Probelauf (Anzahl Geräte, Ereignisse, Standorte), ändert nichts, keine Sicherung.
+- Ohne `--execute`: Probelauf (Anzahl Geräte, Ereignisse, Standorte, Buchungen, Hinweise), ändert
+  nichts, keine Sicherung.
   `--execute` nur mit `--confirm` exakt gleich `--slug` (sonst Exit-Code 2); `--confirm` ohne
   `--execute` oder bei anderen Befehlen ebenso. `service` ist ungültig (`TenantSlug`), unbekannte
   Stadt Exit-Code 1, gesperrte Stadt erlaubt.
 - Mit `--execute`: nichts vorhanden → Hinweis, keine Sicherung, Exit-Code 0. Sonst zuerst Sicherung
   aller `fe_*` mit Zusatz `vor-purge-<kürzel>` (`TenantCommand::PURGE_BACKUP_SUFFIX_PREFIX`); Fehler
   (auch keine Tabellen) → Abbruch ohne Löschen, Exit-Code 1. Dann in EINER Transaktion (eine offene
-  ist ein Fehler): Standorte der Stadt `FOR UPDATE`, `DELETE` von `fe_device_events`, `fe_devices`,
-  `fe_locations` Ebene 2, dann Ebene 1, jeweils `WHERE tenant_id = ?`. Gerätetypen, Benutzer,
+  ist ein Fehler): Standorte der Stadt `FOR UPDATE`, `DELETE` von `fe_device_notice_actions`,
+  `fe_device_notices`, `fe_device_bookings`, `fe_device_events`, `fe_devices`, `fe_locations` Ebene 2,
+  dann Ebene 1, jeweils `WHERE tenant_id = ?`. Gerätetypen, Benutzer,
   Einladungscodes, Sitzungen und die Stadt bleiben. Ausgabe: gelöschte Anzahlen und Pfad der Sicherung.
 - Tests (`tests/Integration/Tenant/TenantPurgeCommandTest`) übergeben eine Fake-Sicherung per
   Konstruktor (`backup`) bzw. einen temporären Ordner (`backupDir`); sie vergleichen alle Zeilen
@@ -907,12 +923,14 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   und ohne neue Version.
 - `POST devices/{id}/inspection-due {version, next_inspection_due, comment?}` (`null` = entfernen):
   `due_changed`, Version + 1; gleiches Datum wie oben ohne Änderung.
-- `POST devices/{id}/state {version, location_id?, status?, comment?}` (angemeldet): mindestens eines
-  von beiden (sonst 400); `status` nur `ready`, `maintenance`, `defective` (`retired` → 400, dafür
+- `POST devices/{id}/state {version, location_id?, status?, comment?, client_ref?, occurred_at?,
+  confirmed_stale?}` (angemeldet, `DeviceStateHandler`): mindestens eines von Standort und Status
+  (sonst 400); `status` nur `ready`, `maintenance`, `defective` (`retired` → 400, dafür
   `retire`). Gleicher Standort bzw. Status wird ignoriert; ändert sich insgesamt nichts, 200 ohne
   Ereignis und ohne neue Version. Ziel-Standort nur bei einem Wechsel gelesen: unbekannt oder fremd
   → 400, gesperrt → 409. Ausgesondert → 409. Sonst EIN `state_changed` mit den Paaren, die sich
-  ändern, Version + 1.
+  ändern, Version + 1. Antwort `{"device": …, "result": …}`; Zusatzfelder und Offline-Regeln siehe
+  "Offline-Buchungen (API)".
 - `POST devices/{id}/retire {version, comment?}` (Admin): bereits ausgesondert → 409; sonst Status
   `retired`, `state_changed` (nur Status), Version + 1. Standort und Prüfdatum bleiben gespeichert,
   Kennung und Scan-Code werden frei (`identifier_key`, `scan_code_key` `NULL`).
@@ -934,7 +952,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Anzeigename, sonst Name; anonymisiert „Gelöschter Benutzer #ID“; nie die E-Mail), `comment`,
   `location {from, to}` (je `{id, name, path}` oder `null`), `status {from, from_label, to,
   to_label}`, `inspection_due {from, to}`, `field {name, label, old, new}`; was die Art nicht kennt,
-  ist `null`. `type_label` bei `state_changed` nach Inhalt: „Ausgesondert“, „Wieder aufgenommen“,
+  ist `null`. Dazu `occurred_at` (Aktionszeit, sonst wie `created_at`), `received_at` (=
+  `created_at`, Eingang), `applied`, `not_applied_reason`/`not_applied_label` und `client_ref` (aus
+  der Quittung per LEFT JOIN). Reihenfolge bleibt nach Eingang (`id`); nicht übernommene Einträge
+  heißen „Umbuchung nicht übernommen“, „Statusänderung nicht übernommen“ bzw. „Umbuchung und
+  Statusänderung nicht übernommen“. `type_label` bei `state_changed` nach Inhalt: „Ausgesondert“, „Wieder aufgenommen“,
   „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“; sonst „Angelegt“, „Importiert“,
   „Prüfdatum geändert“, „Stammdaten geändert“. Standorte erscheinen mit ihrem aktuellen Namen und
   Pfad (die Historie speichert nur die ID; nach dem Umbenennen steht dort der neue Name; bewusst so
@@ -953,6 +975,91 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   2099-12-31.
 - Kennung (`DeviceIdentifier`): ohne intl werden nur zerlegte Umlaute zusammengesetzt; andere
   kombinierende Zeichen (`\p{M}`) werden mit Meldung abgelehnt.
+
+## Offline-Buchungen (API)
+- Nur `POST devices/{id}/state` (Umbuchen/Status, `Access::Authenticated`); alle anderen Routen
+  lehnen die Felder als unbekannt ab (400). Code: `src/Api/V1/Devices/DeviceStateHandler.php` (eigener
+  Handler mit `Clock` und `OfflineSettings` aus `Routes::tenant`), `DeviceBookingJson` (Feld
+  `result`), `src/Device/Booking/` (`ClientRef`, `BookingRequest` mit `hash()`, `BookingOutcome`,
+  `BookingReason`, `BookingResult`, `StoredBooking`, `DeviceStateSnapshot`,
+  `DeviceBookingRepository`, `ClientRefConflictException`, `DuplicateClientRefException`),
+  `src/Offline/` (`ActionTime`, `OfflineSettings`), `DeviceRepository::book` (`changeState` ruft es
+  ohne Zusatzangaben). Tests: `tests/Integration/Device/DeviceBookingClientRefTest`,
+  `DeviceOfflineBookingTest`, `DeviceBookingSchemaTest`, `DeviceStateColumnsTest`,
+  `DeviceStateColumnsMigrationTest`, Trait `OfflineBookings` (feste Uhr auf der Zeit der Datenbank).
+- Felder (optional): `client_ref` (UUID v4, Groß-/Kleinschreibung egal, gespeichert klein),
+  `occurred_at` (Aktionszeit auf dem Handy, genau `JJJJ-MM-TTTHH:MM:SS[.ffffff]Z`, ab 2000, auf Sekunden
+  gekürzt; nur mit `client_ref`, sonst 400), `confirmed_stale` (nur echte JSON-Werte, nur mit
+  `occurred_at`, sonst 400). Ohne `occurred_at` gilt die Serverzeit und alles wie bisher.
+- Reihenfolge im Handler: Felder (400) → Wiederholung → Aktionszeit → `DeviceRepository::book`.
+  - Wiederholung (`fe_device_bookings`, Migration `0026`): `client_ref` je Stadt eindeutig. Gibt es sie,
+    und passen Konto, Gerät und `request_hash` (SHA-256 über Gerät, Version, Standort, Status,
+    Kommentar, Aktionszeit; `confirmed_stale` zählt nicht), wird das gespeicherte Ergebnis mit
+    `replayed: true` und dem aktuellen Gerätestand wiederholt (nichts geschrieben, keine Mail, auch
+    nach den Zeitgrenzen); sonst 409 `client_ref_conflict`. Die Quittung entsteht in derselben
+    Transaktion wie die Buchung; gleichzeitig dieselbe `client_ref` → Fehler 1062 auf
+    `uq_fe_device_bookings_tenant_ref` → Rollback (`DuplicateClientRefException`) → Wiederholung.
+    Abgelehnte Buchungen (Fehler) speichern keine Quittung.
+  - Aktionszeit: mehr als `OfflineSettings::MAX_CLOCK_SKEW_SECONDS` (300) nach der Serverzeit → 422
+    `clock_implausible` (`details {server_time, occurred_at, max_skew_seconds}`); älter als
+    `offline.queue_max_age_days` ohne `confirmed_stale` → 409 `stale_action` (`details {occurred_at,
+    queue_max_age_days, server_time}`). Genau auf der Grenze ist erlaubt (per Test). Mit
+    `confirmed_stale` verarbeitet, `stale_confirmed` im Ergebnis und Hinweis.
+- Gemeinsamer Stand (Migrationen `0023`/`0024`): `fe_devices.state_changed_at` = Aktionszeit der
+  Änderung, die Standort und Status bestimmt; `state_version` = `version` nach der letzten Änderung
+  von Standort oder Status (CHECK `1 ≤ state_version ≤ version`). Startwerte: `created_at` des neuesten
+  Ereignisses `created`/`imported`/`state_changed` (nach `id`), sonst `fe_devices.created_at`;
+  `state_version` = `version`. Alle Schreibwege (Anlegen, Import, Umbuchen/Status, Aussondern,
+  Wiederaufnehmen) setzen beide (Serverzeit bzw. Aktionszeit; `state_version = version + 1` in der
+  SET-Liste VOR `version = version + 1`); Stammdaten und Prüfdatum ändern sie nicht.
+- Regeln mit `occurred_at` (`DeviceRepository::offline`), Gerät `FOR UPDATE`, keine Versionsprüfung:
+  ausgesondert → `not_applied`/`retired`. Konflikt = Version veraltet UND der Stand hat sich seit der
+  Version des Handys geändert (nicht `erwartet < version` mit `state_version ≤ erwartet`); bei
+  Konflikt und Aktionszeit ≤ `state_changed_at` → `history_only`/`older`. Gleicher Standort und
+  Status → `unchanged`. Neuer Standort `LOCK IN SHARE MODE`: unbekannt/fremd 400, gesperrt →
+  `not_applied`/`location_locked`. Sonst übernehmen (`state_changed_at` = Aktionszeit), bei Konflikt
+  `reason = overwritten`. „Nur Historie“ und „nicht übernommen“ schreiben ein `state_changed` mit
+  `applied = 0` und nur dem Gewünschten (`to_*`), Gerät und Version bleiben.
+- Antwort immer 200 `{"device": …, "result": {outcome, outcome_label, reason, reason_label,
+  message, stale_confirmed, client_ref, replayed, notice_id}}`; `message` ist ein deutscher Satz.
+- Konfiguration: Gruppe `offline` (`max_age_days`, `queue_max_age_days`, je 1–365, Standard 7;
+  `OfflineConfig`, `ConfigLoader::loadOfflineConfig`), geladen erst bei Bedarf
+  (`OfflineSettings::fromConfigFile` in `Application::create`; Tests: `OfflineSettings::fixed`).
+  `max_age_days` prüft nur das Handy. `GET client-config` (`Access::Authenticated`,
+  `ClientConfigHandler`, in `TenantReadRoutesAccessTest`): `{server_time (UTC, …Z), offline
+  {max_age_days, queue_max_age_days}, max_clock_skew_seconds}`.
+
+## Hinweise (API)
+- Nur Admins der Stadt (`Access::Admin`, in `AdminRoutesAccessTest`): `GET notices[?status=open|
+  resolved|all]` (Standard `open`, neueste zuerst, `limit` 1–200/50, `offset`; Antwort `{notices,
+  total, open, limit, offset}`), `GET notices/{id}`, `POST notices/{id}/resolve {note?}` (Notiz
+  höchstens 500 Zeichen, Zeilenumbrüche erlaubt, `DeviceText::noticeNote`), `POST notices/{id}/reopen
+  {}`; Antwort `{"notice": …}`. Beide wiederholbar (Ziel-Status schon erreicht: nichts, kein Eintrag
+  im Verlauf). Fremd/unbekannt 404, unbekannte Felder 400 (vor 404). Kein automatisches Erledigen.
+- Code: `src/Device/Notice/` (`NoticeKind` mit `forResult`, `NoticeStatus`, `NoticeChange`,
+  `DeviceNotice`, `NewNotice`, `NoticeUser`, `NoticeHistoryEntry`, `DeviceNoticePage`,
+  `DeviceNoticeRepository`, `NoticeNotFoundException`), Endpunkte `src/Api/V1/Notices/`
+  (`NoticeListHandler`, `NoticeActionHandler` mit `NoticeAction`, `NoticeJson`). Tests:
+  `tests/Integration/Device/DeviceNoticeTest`, `DeviceNoticeSchemaTest`,
+  `tests/Integration/Notification/DeviceNoticeNotificationTest`.
+- Tabellen: `fe_device_notices` (Migration `0027`; ein Hinweis je Quittung, `booking_id` eindeutig;
+  `kind` `overwritten`, `history_only`, `not_applied_retired`, `not_applied_location_locked`,
+  `stale_confirmed`; `stale_confirmed` auch bei den anderen Arten; Buchung: Konto, Aktionszeit,
+  Wunsch; `other_*`: Stand beim Eingang, bei `overwritten` der überschriebene, mit Aktionszeit und
+  Konto des letzten übernommenen `created`/`imported`/`state_changed`; `status` `open`/`resolved`)
+  und `fe_device_notice_actions` (Migration `0028`, Verlauf `resolve`/`reopen` mit Konto, Zeit,
+  Notiz nur bei `resolve`; nur `INSERT`, Notizen bleiben nach dem Wiederöffnen). Alle Bezüge mit
+  Stadt (zusammengesetzte Fremdschlüssel). Angelegt nur in der Transaktion der Buchung, nur bei
+  Offline-Buchungen mit Grund oder `stale_confirmed` (`NoticeKind::forResult`).
+- Ausnahme zu „nie die E-Mail“: Hinweise zeigen Anzeigename UND E-Mail der beteiligten Konten (nur
+  Admins sehen sie); anonymisiert „Gelöschter Benutzer #ID“ ohne E-Mail.
+- `GET device-summary`: nur für Admins zusätzlich `notices {open}` (zweite Abfrage); bei `user` fehlt
+  das Feld.
+- Mail (`DeviceLogNotifier::notice`, Vorlage `MailTemplates::deviceNotice`, Zweck `device_notice`): an
+  die Empfänger der Benachrichtigung „Log“, nie an den Auslöser, nach dem Commit, statt der Mail zum
+  Vorgang (eine Mail je Anfrage). Betreff „Log <Stadt>: Hinweis – <Kennung> <Grund>“
+  (`NoticeKind::subjectReason`). Text: Art, Gerät, Buchung (Wer mit E-Mail in Klammern, Aktionszeit,
+  Eingang, Wunsch, Kommentar aus dem Ereignis), anderer Stand, ggf. „alte Buchung nach Rückfrage“.
 
 ## Prüffristen und Zusammenfassung (API)
 - Nur unter Städten (unter `service` 404), beide `Access::Authenticated` (in
@@ -980,7 +1087,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   aufsteigend (am stärksten überfällig zuerst), dann `NATURAL_SORT_KEY(identifier)`, `id`;
   `without_date` nur nach Kennung.
 - `GET device-summary` (Startseite, keine Parameter): EINE Abfrage (`GROUP BY status`) ohne
-  Geräteliste. Antwort `{today, devices {total, by_status [{status, status_label, count}]},
+  Geräteliste (für Admins eine zweite für `notices {open}`, siehe "Hinweise (API)"). Antwort `{today, devices {total, by_status [{status, status_label, count}]},
   inspection {overdue, due_soon, due_soon_days, without_date}}`; `by_status` immer `ready`,
   `maintenance`, `defective` in dieser Reihenfolge, auch mit 0. Fenster fest 30 Tage, Grenzen wie bei
   `inspection-due` (per Test gleiche Zahlen).
@@ -1040,11 +1147,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   fremde IDs → leere Datei. `order=newest` (Standard) bzw. `oldest`, sortiert nach `created_at`,
   dann `id`. Vor dem Download wird gezählt: mehr als 100.000 Einträge (`MAX_ROWS`; im Konstruktor
   nur für Tests änderbar) → 409 `rule_violation` mit `details: {"events": n, "max": 100000}`.
-- Spalten der Historie (`DeviceCsv::EVENT_HEADER`): Zeitpunkt, Geräte-Nr. (ID; Kennungen können nach
+- Spalten der Historie (`DeviceCsv::EVENT_HEADER`): Aktionszeit, Eingang beim Server, Geräte-Nr. (ID; Kennungen können nach
   dem Aussondern neu vergeben werden), Kennung und Gerätetyp (aktueller Stand), Ereignis
   (`DeviceEvent::label()`), Wer (Anzeigename, anonymisiert „Gelöschter Benutzer #ID“, nie die
   E-Mail), Standort von/nach (aktueller Pfad), Status von/nach, Prüfdatum alt/neu, Feld (deutsch),
-  Alter/Neuer Wert (Beschaffungsdatum als `TT.MM.JJJJ`), Kommentar. Dateiname
+  Alter/Neuer Wert (Beschaffungsdatum als `TT.MM.JJJJ`), Kommentar, Übernommen (Ja/Nein), Grund (nicht
+  übernommen), Buchungs-Kennung (`client_ref`). Zeitraum und Reihenfolge nach Eingang (`created_at`). Dateiname
   `historie-<kürzel>-<von>-bis-<bis>.csv`.
 
 ## CSV-Import (API)
@@ -1154,7 +1262,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   das Frontend Geräteseiten hat). Werte einzeilig, höchstens 200 Zeichen, Trennzeichen eines
   Scan-Codes sichtbar (`ScanCode::display`).
 - Versand über `Notifier::sendMany` (Zweck `device_log`; Fehler nur im Protokoll, der Vorgang ist
-  bereits gespeichert). Begrenzung: höchstens `MAX_RECIPIENTS` = 25 Empfänger (zuerst Admins der
+  bereits gespeichert; Hinweis-Mails mit Zweck `device_notice`, siehe "Hinweise (API)"). Begrenzung:
+  höchstens `MAX_RECIPIENTS` = 25 Empfänger (zuerst Admins der
   Stadt; Überschreitung als `device_log_recipients_capped`) und `TIME_BUDGET_SECONDS` = 10 s je
   Anfrage (danach `mail_failed` mit „Zeitbudget … überschritten“). Eine SMTP-Verbindung für alle
   Mails (auf STRATO gemessen rund 0,22 s je Mail). Kein Cron, keine Warteschlange.
@@ -1246,6 +1355,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   oder Standorte an und sondert weder aus noch nimmt er wieder auf.
 - Erscheinungsbild je Stadt (Akzentfarbe, Logo, Web-App-Manifest; umgesetzt, siehe
   "Erscheinungsbild (API)"), gepflegt vom Admin der Stadt.
+- Offline-Buchungen (nur Umbuchen und Status, keine Admin-Aktionen): Aktionszeit vom Handy,
+  `client_ref` gegen doppelte Wirkung, „der Letzte gewinnt“ nach dem gemeinsamen Stand von Standort
+  und Status, nicht übernommene Buchungen nur in der Historie, Zeitlimits in der Konfiguration;
+  besondere Ergebnisse als Hinweis an die Admins mit Mail (umgesetzt, siehe "Offline-Buchungen
+  (API)" und "Hinweise (API)").
 - Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
 
 ## Deployment

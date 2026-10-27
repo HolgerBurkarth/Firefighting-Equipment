@@ -26,8 +26,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(DeviceHistoryFilter::class)]
 final class DeviceHistoryExportTest extends ExportApiTestCase
 {
-    private const string HEADER = "\xEF\xBB\xBFZeitpunkt;Geräte-Nr.;Kennung;Gerätetyp;Ereignis;Wer;Standort von;Standort nach;"
-        . "Status von;Status nach;Prüfdatum alt;Prüfdatum neu;Feld;Alter Wert;Neuer Wert;Kommentar\r\n";
+    private const string HEADER = "\xEF\xBB\xBFAktionszeit;Eingang beim Server;Geräte-Nr.;Kennung;Gerätetyp;Ereignis;Wer;"
+        . "Standort von;Standort nach;Status von;Status nach;Prüfdatum alt;Prüfdatum neu;Feld;Alter Wert;Neuer Wert;"
+        . "Kommentar;Übernommen;Grund (nicht übernommen);Buchungs-Kennung\r\n";
 
     private int $device;
 
@@ -65,11 +66,36 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         $id = (string) $this->device;
         self::assertSame(
             self::HEADER
-            . "15.06.2026 00:30;$id;MA-01;Atemschutzmaske;Angelegt;Kommandant;;HLF 20 / G1;;einsatzbereit;;;;;;Neu beschafft\r\n"
-            . "15.06.2026 10:05;$id;MA-01;Atemschutzmaske;Umgebucht und Status geändert;Gerätewart;HLF 20 / G1;Lager;einsatzbereit;defekt;;;;;;\"Riss; \"\"Ventil\"\"\"\r\n"
-            . "15.06.2026 10:06;$id;MA-01;Atemschutzmaske;Prüfdatum geändert;Kommandant;;;;;;01.03.2027;;;;\r\n"
-            . "15.06.2026 10:07;$id;MA-01;Atemschutzmaske;Stammdaten geändert;Kommandant;;;;;;;Beschaffungsdatum;01.05.2024;02.05.2024;\r\n"
-            . "15.06.2026 10:08;$id;MA-01;Atemschutzmaske;Stammdaten geändert;Kommandant;;;;;;;Notiz;alt;\"'=Größe\nM\";\r\n",
+            . "15.06.2026 00:30;15.06.2026 00:30;$id;MA-01;Atemschutzmaske;Angelegt;Kommandant;;HLF 20 / G1;;einsatzbereit;;;;;;Neu beschafft;Ja;;\r\n"
+            . "15.06.2026 10:05;15.06.2026 10:05;$id;MA-01;Atemschutzmaske;Umgebucht und Status geändert;Gerätewart;HLF 20 / G1;Lager;einsatzbereit;defekt;;;;;;\"Riss; \"\"Ventil\"\"\";Ja;;\r\n"
+            . "15.06.2026 10:06;15.06.2026 10:06;$id;MA-01;Atemschutzmaske;Prüfdatum geändert;Kommandant;;;;;;01.03.2027;;;;;Ja;;\r\n"
+            . "15.06.2026 10:07;15.06.2026 10:07;$id;MA-01;Atemschutzmaske;Stammdaten geändert;Kommandant;;;;;;;Beschaffungsdatum;01.05.2024;02.05.2024;;Ja;;\r\n"
+            . "15.06.2026 10:08;15.06.2026 10:08;$id;MA-01;Atemschutzmaske;Stammdaten geändert;Kommandant;;;;;;;Notiz;alt;\"'=Größe\nM\";;Ja;;\r\n",
+            $body,
+        );
+    }
+
+    public function testOfflineColumns(): void
+    {
+        $moved = $this->event('2026-06-15 08:05:00', [
+            'event_type' => 'state_changed', 'from_location_id' => $this->g1, 'to_location_id' => $this->room, 'occurred_at' => '2026-06-14 06:00:00',
+        ], $this->userId);
+        $this->insert('fe_device_bookings', [
+            'tenant_id' => $this->tenantId, 'client_ref' => '3f2c8a1e-5b7d-4c9e-8f10-2a3b4c5d6e7f', 'user_id' => $this->userId,
+            'device_id' => $this->device, 'request_hash' => str_repeat("\0", 32), 'outcome' => 'applied', 'event_id' => $moved,
+        ]);
+        $this->event('2026-06-15 08:06:00', [
+            'event_type' => 'state_changed', 'to_status' => 'defective', 'occurred_at' => '2026-06-13 06:00:00',
+            'applied' => 0, 'not_applied_reason' => 'retired',
+        ], $this->userId);
+
+        [, $body] = $this->download('device-events/export?order=oldest');
+
+        $id = (string) $this->device;
+        self::assertSame(
+            self::HEADER
+            . "14.06.2026 08:00;15.06.2026 10:05;$id;MA-01;Atemschutzmaske;Umgebucht;Gerätewart;HLF 20 / G1;Lager;;;;;;;;;Ja;;3f2c8a1e-5b7d-4c9e-8f10-2a3b4c5d6e7f\r\n"
+            . "13.06.2026 08:00;15.06.2026 10:06;$id;MA-01;Atemschutzmaske;Statusänderung nicht übernommen;Gerätewart;;;;defekt;;;;;;;Nein;Gerät ausgesondert;\r\n",
             $body,
         );
     }
@@ -81,9 +107,9 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         $this->event('2026-06-15 08:00:00', ['event_type' => 'due_changed', 'to_due' => '2027-03-01']);
         $this->event('2026-06-14 08:00:00', ['event_type' => 'due_changed', 'to_due' => '2027-04-01']);
 
-        self::assertSame(['Prüfdatum geändert', 'Angelegt', 'Prüfdatum geändert'], self::column($this->rows('device-events/export'), 4));
-        self::assertSame(['01.03.2027', '', '01.04.2027'], self::column($this->rows('device-events/export'), 11));
-        self::assertSame(['01.04.2027', '', '01.03.2027'], self::column($this->rows('device-events/export?order=oldest'), 11));
+        self::assertSame(['Prüfdatum geändert', 'Angelegt', 'Prüfdatum geändert'], self::column($this->rows('device-events/export'), 5));
+        self::assertSame(['01.03.2027', '', '01.04.2027'], self::column($this->rows('device-events/export'), 12));
+        self::assertSame(['01.04.2027', '', '01.03.2027'], self::column($this->rows('device-events/export?order=oldest'), 12));
     }
 
     public function testPeriodUsesCalendarDaysInGermanTime(): void
@@ -95,7 +121,7 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         $rows = $this->rows('device-events/export?from=2026-06-10&to=2026-06-10&order=oldest');
 
         self::assertSame(['10.06.2026 00:00', '10.06.2026 23:59'], self::column($rows, 0));
-        self::assertSame(['02.01.2027', '03.01.2027'], self::column($rows, 11));
+        self::assertSame(['02.01.2027', '03.01.2027'], self::column($rows, 12));
     }
 
     public function testDefaultPeriodIsNinetyDaysUntilToday(): void
@@ -140,10 +166,10 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         $this->event('2026-06-15 08:02:00', ['event_type' => 'field_changed', 'field' => 'device_type', 'old_value' => 'Atemschutzmaske', 'new_value' => 'Funkgerät'], device: $other);
         $this->pdo()->prepare('UPDATE fe_devices SET device_type_id = ? WHERE id = ?')->execute([$radio, $other]);
 
-        self::assertSame(['MA-01'], self::column($this->rows('device-events/export?device_id=' . $this->device), 2));
-        self::assertSame(['FU-01', 'FU-01'], self::column($this->rows('device-events/export?device_type_id=' . $radio), 2));
-        self::assertSame(['Funkgerät', 'Funkgerät'], self::column($this->rows('device-events/export?device_type_id=' . $radio), 3));
-        self::assertSame(['MA-01'], self::column($this->rows('device-events/export?device_type_id=' . $this->typeId), 2));
+        self::assertSame(['MA-01'], self::column($this->rows('device-events/export?device_id=' . $this->device), 3));
+        self::assertSame(['FU-01', 'FU-01'], self::column($this->rows('device-events/export?device_type_id=' . $radio), 3));
+        self::assertSame(['Funkgerät', 'Funkgerät'], self::column($this->rows('device-events/export?device_type_id=' . $radio), 4));
+        self::assertSame(['MA-01'], self::column($this->rows('device-events/export?device_type_id=' . $this->typeId), 3));
     }
 
     public function testFilterByFromOrToLocation(): void
@@ -155,9 +181,9 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         $toHlf = $this->event('2026-06-15 08:04:00', ['event_type' => 'state_changed', 'from_location_id' => $this->room, 'to_location_id' => $this->hlf]);
         self::assertSame(5, count([$created, $toRoom, $statusOnly, $due, $toHlf]));
 
-        self::assertSame(['Angelegt', 'Umgebucht'], self::column($this->rows('device-events/export?order=oldest&location_id=' . $this->g1), 4));
+        self::assertSame(['Angelegt', 'Umgebucht'], self::column($this->rows('device-events/export?order=oldest&location_id=' . $this->g1), 5));
         self::assertSame([['HLF 20 / G1', 'Lager'], ['Lager', 'HLF 20']], array_map(
-            static fn (array $row): array => [$row[6], $row[7]],
+            static fn (array $row): array => [$row[7], $row[8]],
             $this->rows('device-events/export?order=oldest&location_id=' . $this->room),
         ));
         self::assertSame(['10:04'], array_map(static fn (string $at): string => substr($at, -5), self::column($this->rows('device-events/export?location_id=' . $this->hlf), 0)));
@@ -177,7 +203,7 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         $rows = $this->rows('device-events/export?order=oldest');
 
         self::assertSame([[(string) $this->device, 'MA-01', 'Ausgesondert'], [(string) $new, 'MA-01', 'Angelegt']], array_map(
-            static fn (array $row): array => [$row[1], $row[2], $row[4]],
+            static fn (array $row): array => [$row[2], $row[3], $row[5]],
             $rows,
         ));
     }
@@ -192,13 +218,13 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
             'to_location_id' => $this->otherLocation, 'to_status' => 'ready', 'created_at' => '2026-06-15 08:00:00',
         ]);
 
-        self::assertSame(['MA-01'], self::column($this->rows('device-events/export'), 2));
+        self::assertSame(['MA-01'], self::column($this->rows('device-events/export'), 3));
         self::assertSame([], $this->rows('device-events/export?device_id=' . $otherDevice));
         self::assertSame([], $this->rows('device-events/export?location_id=' . $this->otherLocation));
 
         $response = $this->sendAny('GET', self::url('tuttlingen', 'device-events/export'), cookie: $this->loginCookie('tuttlingen', 'user@example.org'));
         $rows = array_slice(self::parse(self::responseBody($response)), 1);
-        self::assertSame(['MA-99'], self::column($rows, 2));
+        self::assertSame(['MA-99'], self::column($rows, 3));
     }
 
     public function testRowLimitIsCheckedBeforeStreaming(): void

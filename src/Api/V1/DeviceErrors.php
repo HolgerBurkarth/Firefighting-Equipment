@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Api\V1;
 
 use FirefightingEquipment\Api\V1\Devices\DeviceJson;
+use FirefightingEquipment\Device\Booking\ClientRefConflictException;
 use FirefightingEquipment\Device\DeviceException;
 use FirefightingEquipment\Device\DeviceNotFoundException;
 use FirefightingEquipment\Device\DeviceRuleViolationException;
@@ -15,13 +16,15 @@ use FirefightingEquipment\Device\DuplicateDeviceNameException;
 use FirefightingEquipment\Device\DuplicateDeviceScanCodeException;
 use FirefightingEquipment\Device\InvalidDeviceValueException;
 use FirefightingEquipment\Device\LocationNotFoundException;
+use FirefightingEquipment\Device\Notice\NoticeNotFoundException;
 use FirefightingEquipment\Http\HttpException;
 
 /**
  * Fachliche Fehler zu Gerätetypen, Standorten und Geräten als HTTP-Fehler: ungültiger Wert 400,
  * fremde oder unbekannte ID 404 not_found, Name vergeben 409 name_taken, Kennung vergeben 409
  * identifier_taken, Scan-Code vergeben 409 scan_code_taken, veraltete Version 409 version_conflict (details {"device": aktueller Stand}),
- * Regelverstoß 409 rule_violation (mit "details", falls vorhanden).
+ * Regelverstoß 409 rule_violation (mit "details", falls vorhanden), client_ref für eine andere
+ * Buchung verwendet 409 client_ref_conflict.
  */
 final class DeviceErrors
 {
@@ -34,7 +37,7 @@ final class DeviceErrors
         return match (true) {
             $e instanceof InvalidDeviceValueException => HttpException::invalidRequest($e->getMessage()),
             $e instanceof DeviceTypeNotFoundException, $e instanceof LocationNotFoundException,
-            $e instanceof DeviceNotFoundException => HttpException::notFound(),
+            $e instanceof DeviceNotFoundException, $e instanceof NoticeNotFoundException => HttpException::notFound(),
             $e instanceof DuplicateDeviceNameException => HttpException::nameTaken($e->getMessage()),
             $e instanceof DuplicateDeviceIdentifierException => HttpException::identifierTaken($e->getMessage()),
             $e instanceof DuplicateDeviceScanCodeException => HttpException::scanCodeTaken($e->getMessage()),
@@ -43,6 +46,7 @@ final class DeviceErrors
                 ['device' => DeviceJson::device($e->current)],
             ),
             $e instanceof DeviceRuleViolationException => HttpException::ruleViolation($e->getMessage(), $e->details),
+            $e instanceof ClientRefConflictException => HttpException::clientRefConflict($e->getMessage()),
             default => throw new \LogicException(sprintf('Unbekannter Fehler: %s', $e::class), previous: $e),
         };
     }

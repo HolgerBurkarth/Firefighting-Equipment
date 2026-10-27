@@ -12,6 +12,7 @@ use FirefightingEquipment\Database\LazyConnection;
 use FirefightingEquipment\Mail\ConfiguredMailer;
 use FirefightingEquipment\Mail\Mailer;
 use FirefightingEquipment\Mail\SendmailMailer;
+use FirefightingEquipment\Offline\OfflineSettings;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\Password\PasswordHasher;
 
@@ -41,13 +42,14 @@ final readonly class Application
 
     /**
      * Produktion: Argon2id immer mit den Standardparametern, nie aus der Konfigurationsdatei.
-     * Mail-Versand und base_url aus der Konfiguration, geladen erst bei der ersten Mail.
+     * Mail-Versand, base_url und Offline-Zeitlimits aus der Konfiguration, jeweils erst bei Bedarf
+     * geladen.
      */
     public static function create(string $configPath): self
     {
         return new self(
             Routes::service(),
-            Routes::tenant(),
+            Routes::tenant(offline: OfflineSettings::fromConfigFile($configPath)),
             LazyConnection::fromConfigFile($configPath),
             guard: new RequestGuard(AllowedOrigins::fromConfigFile($configPath)),
             mailer: ConfiguredMailer::fromConfigFile($configPath, dirname(__DIR__, 2)),

@@ -13,6 +13,9 @@ use FirefightingEquipment\Device\Import\DeviceImportPlan;
 use FirefightingEquipment\Device\Import\ImportChange;
 use FirefightingEquipment\Device\Import\ImportResult;
 use FirefightingEquipment\Device\Import\ImportRowPlan;
+use FirefightingEquipment\Device\Notice\DeviceNotice;
+use FirefightingEquipment\Device\Notice\NoticeKind;
+use FirefightingEquipment\Device\Notice\NoticeUser;
 use FirefightingEquipment\Device\ScanCode;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Time\GermanFormat;
@@ -384,6 +387,73 @@ final class MailTemplates
     }
 
     /**
+     * Benachrichtigung „Log“ für einen Hinweis zu einer Offline-Buchung: Art, Gerät, die Buchung
+     * (Konto mit E-Mail, Aktionszeit, Eingang, Wunsch, Kommentar) und der andere Stand (bei
+     * overwritten der überschriebene, sonst der Stand beim Eingang). Betreff „Log <Stadt>: Hinweis –
+     * <Kennung> <Grund>“.
+     *
+     * @param string $url Startseite der Stadt
+     *
+     * @throws MailException
+     */
+    public static function deviceNotice(User $recipient, Tenant $tenant, DeviceNotice $notice, ?string $comment, string $url): MailMessage
+    {
+        $greeting = self::greeting($recipient);
+        $area = self::area($tenant);
+        $wanted = [];
+        if ($notice->requestedLocation !== null) {
+            $wanted[] = 'Standort ' . $notice->requestedLocation->path();
+        }
+        if ($notice->requestedStatus !== null) {
+            $wanted[] = 'Status ' . $notice->requestedStatus->label();
+        }
+        $lines = [
+            'Hinweis: ' . $notice->kind->label(),
+            'Gerät: ' . self::logValue($notice->deviceIdentifier) . ' (' . $notice->deviceTypeName . ')',
+            '',
+            'Buchung vom Handy:',
+            'Wer: ' . self::noticeUser($notice->user),
+            'Aktionszeit: ' . self::when($notice->occurredAt),
+            'Eingang: ' . self::when($notice->createdAt),
+            'Gewünscht: ' . implode(', ', $wanted),
+        ];
+        if ($comment !== null) {
+            $lines[] = 'Kommentar: ' . self::logValue($comment);
+        }
+        array_push(
+            $lines,
+            '',
+            $notice->kind === NoticeKind::Overwritten ? 'Überschriebener Stand:' : 'Stand beim Eingang:',
+            'Wer: ' . ($notice->otherUser === null ? '–' : self::noticeUser($notice->otherUser)),
+            'Aktionszeit: ' . self::when($notice->otherOccurredAt),
+            'Stand: ' . $notice->otherLocation->path() . ', ' . $notice->otherStatus->label(),
+        );
+        if ($notice->staleConfirmed) {
+            array_push($lines, '', 'Die Buchung war älter als erlaubt und wurde nach Rückfrage', 'gesendet.');
+        }
+        $details = implode("\n", $lines);
+        $footer = self::deviceLogFooter();
+        $text = <<<TXT
+            {$greeting}
+
+            bei der Feuerwehr Geräteverwaltung ({$area}) gibt es einen
+            neuen Hinweis zu einer Offline-Buchung:
+
+            {$details}
+
+            Bitte prüfen und den Hinweis in der Anwendung erledigen:
+
+            {$url}
+
+            {$footer}
+            TXT;
+
+        $reason = 'Hinweis – ' . $notice->deviceIdentifier . ' ' . $notice->kind->subjectReason();
+
+        return self::message($recipient, self::logSubject($tenant, $reason), $text);
+    }
+
+    /**
      * Benachrichtigung „Log“ für einen CSV-Import: eine Mail mit Zusammenfassung und höchstens
      * $maxLines Zeilen mit Einzelheiten (neue und geänderte Geräte), danach „… und N weitere“.
      *
@@ -570,6 +640,14 @@ final class MailTemplates
         }
 
         return $lines;
+    }
+
+    /**
+     * Konto in einem Hinweis: Anzeigename und E-Mail in Klammern (Mailtexte ohne „<“).
+     */
+    private static function noticeUser(NoticeUser $user): string
+    {
+        return self::logValue($user->name) . ($user->email === null ? '' : ' (' . $user->email . ')');
     }
 
     private static function deviceLogFooter(): string

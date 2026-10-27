@@ -8,6 +8,8 @@ namespace FirefightingEquipment\Device;
  * Ein Eintrag der Historie eines Geräts. Welche Angaben gefüllt sind, hängt von der Art ab
  * (siehe Migration 0015): created/imported nur $toLocation und $toStatus, state_changed je Paar
  * beide oder keiner, due_changed $fromDue/$toDue, field_changed $field mit $oldValue/$newValue.
+ * Nicht übernommene Offline-Buchungen (applied = false, Migration 0025) haben nur $toLocation
+ * und/oder $toStatus.
  */
 final readonly class DeviceEvent
 {
@@ -27,9 +29,24 @@ final readonly class DeviceEvent
         public ?string $oldValue,
         public ?string $newValue,
         public ?string $comment,
-        /** UTC */
+        /** Eingang beim Server (UTC) */
         public \DateTimeImmutable $createdAt,
+        /** Aktionszeit auf dem Handy (UTC); null = Serveraktion, siehe occurredAt() */
+        public ?\DateTimeImmutable $clientOccurredAt = null,
+        /** false = Offline-Buchung nicht übernommen, nur Historie (nur state_changed, ohne „von“) */
+        public bool $applied = true,
+        public ?NotAppliedReason $notAppliedReason = null,
+        /** Kennung der Buchung vom Handy (client_ref), falls mitgesendet */
+        public ?string $clientRef = null,
     ) {
+    }
+
+    /**
+     * Aktionszeit: auf dem Handy (Offline-Buchung), sonst der Eingang beim Server.
+     */
+    public function occurredAt(): \DateTimeImmutable
+    {
+        return $this->clientOccurredAt ?? $this->createdAt;
     }
 
     /**
@@ -40,6 +57,13 @@ final readonly class DeviceEvent
     {
         if ($this->type !== DeviceEventType::StateChanged) {
             return $this->type->label();
+        }
+        if (!$this->applied) {
+            return match (true) {
+                $this->toLocation !== null && $this->toStatus !== null => 'Umbuchung und Statusänderung nicht übernommen',
+                $this->toLocation !== null => 'Umbuchung nicht übernommen',
+                default => 'Statusänderung nicht übernommen',
+            };
         }
 
         return match (true) {

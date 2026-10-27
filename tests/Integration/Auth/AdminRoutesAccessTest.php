@@ -62,6 +62,10 @@ MA-01;defekt
         yield 'Akzentfarbe setzen' => ['POST', 'tenant/appearance', ['accent_color' => '#1a237e']];
         yield 'Logo hochladen' => ['POST', 'tenant/logo', ['file' => '{logo_file}']];
         yield 'Logo entfernen' => ['DELETE', 'tenant/logo', []];
+        yield 'Hinweise auflisten' => ['GET', 'notices?status=all', null];
+        yield 'Hinweis anzeigen' => ['GET', 'notices/{notice}', null];
+        yield 'Hinweis erledigen' => ['POST', 'notices/{notice}/resolve', ['note' => 'Geklärt']];
+        yield 'Hinweis wieder öffnen' => ['POST', 'notices/{notice}/reopen', []];
     }
 
     /**
@@ -85,9 +89,10 @@ MA-01;defekt
         $retired = $this->insert('fe_devices', [
             'tenant_id' => $this->tenant('immendingen')->id, 'identifier' => 'MA-09', 'device_type_id' => $type, 'location_id' => $vehicle, 'status' => 'retired',
         ]);
+        $notice = $this->createNotice($device, $vehicle, $this->userIdOf('immendingen', 'user@example.org'), $method === 'POST' && str_ends_with($path, '/reopen'));
         $import = self::IMPORT_FILE;
         $importToken = new DeviceImport($this->pdo())->preview($this->tenant('immendingen'), DeviceImportFile::parse($import))->token;
-        $placeholders = ['{code}' => $code, '{user}' => $user, '{type}' => $type, '{location}' => $location, '{device}' => $device, '{retired}' => $retired];
+        $placeholders = ['{code}' => $code, '{user}' => $user, '{type}' => $type, '{location}' => $location, '{device}' => $device, '{retired}' => $retired, '{notice}' => $notice];
         $path = strtr($path, array_map('strval', $placeholders));
         $placeholders += ['{import_file}' => base64_encode($import), '{import_token}' => $importToken, '{logo_file}' => base64_encode(TestPng::create())];
         if ($method === 'DELETE' && $path === 'tenant/logo') {
@@ -128,6 +133,35 @@ MA-01;defekt
             $this->pdo()->query('SELECT * FROM fe_device_events ORDER BY id')->fetchAll(),
             $this->pdo()->query('SELECT * FROM fe_tenants ORDER BY id')->fetchAll(),
             $this->pdo()->query('SELECT tenant_id, version, updated_by FROM fe_tenant_logos ORDER BY tenant_id')->fetchAll(),
+            $this->pdo()->query('SELECT * FROM fe_device_notices ORDER BY id')->fetchAll(),
+            $this->pdo()->query('SELECT * FROM fe_device_notice_actions ORDER BY id')->fetchAll(),
         ], JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Hinweis (offen bzw. erledigt) zu einer Buchung des Benutzers, per SQL.
+     */
+    private function createNotice(int $device, int $location, int $userId, bool $resolved): int
+    {
+        $tenantId = $this->tenant('immendingen')->id;
+        $booking = $this->insert('fe_device_bookings', [
+            'tenant_id' => $tenantId, 'client_ref' => '3f2c8a1e-5b7d-4c9e-8f10-2a3b4c5d6e7f', 'user_id' => $userId,
+            'device_id' => $device, 'request_hash' => str_repeat(" ", 32), 'outcome' => 'unchanged',
+        ]);
+
+        return $this->insert('fe_device_notices', [
+            'tenant_id' => $tenantId, 'device_id' => $device, 'booking_id' => $booking, 'kind' => 'stale_confirmed',
+            'stale_confirmed' => 1, 'user_id' => $userId, 'occurred_at' => '2026-01-01 08:00:00', 'requested_status' => 'ready',
+            'other_occurred_at' => '2025-12-01 08:00:00', 'other_location_id' => $location, 'other_status' => 'ready',
+            'status' => $resolved ? 'resolved' : 'open',
+        ]);
+    }
+
+    private function userIdOf(string $slug, string $email): int
+    {
+        $stmt = $this->pdo()->prepare('SELECT id FROM fe_users WHERE tenant_id = ? AND email = ?');
+        $stmt->execute([$this->tenant($slug)->id, $email]);
+
+        return (int) $stmt->fetchColumn();
     }
 }

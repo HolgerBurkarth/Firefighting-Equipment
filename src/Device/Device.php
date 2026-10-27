@@ -33,6 +33,10 @@ final readonly class Device
         /** UTC */
         public \DateTimeImmutable $updatedAt,
         public ?ScanCode $scanCode = null,
+        /** Aktionszeit der Änderung, die Standort und Status bestimmt (UTC); null = updatedAt */
+        public ?\DateTimeImmutable $stateChangedAt = null,
+        /** Version nach der letzten Änderung von Standort oder Status; null = version */
+        public ?int $stateVersion = null,
     ) {
     }
 

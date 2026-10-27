@@ -6,10 +6,15 @@ namespace FirefightingEquipment\Tests\Unit\Mail;
 
 use FirefightingEquipment\Device\Device;
 use FirefightingEquipment\Device\DeviceEvent;
+use FirefightingEquipment\Device\DeviceEventLocation;
 use FirefightingEquipment\Device\DeviceEventType;
 use FirefightingEquipment\Device\DeviceField;
 use FirefightingEquipment\Device\DeviceIdentifier;
 use FirefightingEquipment\Device\DeviceStatus;
+use FirefightingEquipment\Device\Notice\DeviceNotice;
+use FirefightingEquipment\Device\Notice\NoticeKind;
+use FirefightingEquipment\Device\Notice\NoticeStatus;
+use FirefightingEquipment\Device\Notice\NoticeUser;
 use FirefightingEquipment\Mail\MailException;
 use FirefightingEquipment\Mail\MailMessage;
 use FirefightingEquipment\Mail\MailTemplates;
@@ -274,6 +279,45 @@ angelegt.", $mail->text);
 
         self::assertStringContainsString("\nScan-Code: 4006381333931 → 0104006381333931[GS]10AB\n", $mail->text);
         self::assertStringNotContainsString("\x1D", $mail->text);
+        self::assertTextRules($mail, self::URL);
+    }
+
+    public function testDeviceNoticeInGermanTimeWithUnknownOtherUser(): void
+    {
+        $utc = new \DateTimeZone('UTC');
+        $notice = new DeviceNotice(
+            5,
+            NoticeKind::HistoryOnly,
+            NoticeStatus::Open,
+            true,
+            3,
+            'MA-01',
+            'Atemschutzmaske',
+            '3f2c8a1e-5b7d-4c9e-8f10-2a3b4c5d6e7f',
+            11,
+            new NoticeUser(9, 'Gerätewart', 'geraetewart@example.org'),
+            new \DateTimeImmutable('2026-07-01 06:00:00', $utc),
+            null,
+            DeviceStatus::Defective,
+            null,
+            new \DateTimeImmutable('2026-07-01 07:15:00', $utc),
+            new DeviceEventLocation(2, 'G1', 'HLF 20'),
+            DeviceStatus::Ready,
+            new \DateTimeImmutable('2026-07-02 08:30:00', $utc),
+            new \DateTimeImmutable('2026-07-02 08:30:00', $utc),
+        );
+
+        $mail = MailTemplates::deviceNotice(self::user(), self::tenant(), $notice, null, self::URL);
+
+        self::assertSame('Log Feuerwehr Immendingen: Hinweis – MA-01 nur Historie', $mail->subject);
+        self::assertStringContainsString(
+            "Hinweis: Nur Historie (neuerer Stand vorhanden)\nGerät: MA-01 (Atemschutzmaske)\n\n"
+            . "Buchung vom Handy:\nWer: Gerätewart (geraetewart@example.org)\nAktionszeit: 01.07.2026 um 08:00 Uhr\n"
+            . "Eingang: 02.07.2026 um 10:30 Uhr\nGewünscht: Status defekt\n\n"
+            . "Stand beim Eingang:\nWer: –\nAktionszeit: 01.07.2026 um 09:15 Uhr\nStand: HLF 20 / G1, einsatzbereit\n\n"
+            . "Die Buchung war älter als erlaubt und wurde nach Rückfrage\ngesendet.\n",
+            $mail->text,
+        );
         self::assertTextRules($mail, self::URL);
     }
 
