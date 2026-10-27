@@ -162,3 +162,37 @@ h2 {
     background: var(--status-retired-bg);
     color: var(--status-retired-fg);
 }
+
+/* Meldungen (Fehler, Hinweis, Erfolg); Fehlercodes nur klein für den Support */
+.notice {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    font-weight: var(--font-weight-semibold);
+}
+
+.notice p {
+    margin: 0;
+}
+
+.notice-error {
+    background: var(--status-defective-bg);
+    color: var(--status-defective-fg);
+}
+
+.notice-success {
+    background: var(--status-ready-bg);
+    color: var(--status-ready-fg);
+}
+
+.notice-info {
+    background: var(--selected-bg);
+    color: var(--text);
+}
+
+.notice-code {
+    font-weight: var(--font-weight-normal);
+    opacity: 0.8;
+}

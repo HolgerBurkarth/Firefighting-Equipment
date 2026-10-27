@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fetchTenant, parseTenant } from '../../src/api/tenant';
+import { respond } from './support/fetch';
 
 const TENANT = {
     slug: 'test',
@@ -9,16 +10,6 @@ const TENANT = {
     logo_url: null,
     logo_urls: null,
 };
-
-function respond(status: number, body: unknown): typeof fetch {
-    return () =>
-        Promise.resolve(
-            new Response(JSON.stringify(body), {
-                status,
-                headers: { 'Content-Type': 'application/json' },
-            }),
-        );
-}
 
 describe('parseTenant', () => {
     it('liest eine Stadt ohne Logo', () => {
@@ -45,19 +36,19 @@ describe('parseTenant', () => {
 
 describe('fetchTenant', () => {
     it('liefert die Stadt', async () => {
-        const result = await fetchTenant(respond(200, TENANT));
-        expect(result.ok && result.tenant.name).toBe('Feuerwehr Test');
+        const result = await fetchTenant(respond(200, TENANT).fetch);
+        expect(result.ok && result.data.name).toBe('Feuerwehr Test');
     });
 
     it('liefert den Fehlercode der API', async () => {
         const result = await fetchTenant(
-            respond(404, { error: 'tenant_not_found', message: 'Unbekannt.' }),
+            respond(404, { error: 'tenant_not_found', message: 'Unbekannt.' }).fetch,
         );
-        expect(result).toEqual({ ok: false, error: 'tenant_not_found' });
+        expect(!result.ok && result.error.code).toBe('tenant_not_found');
     });
 
     it('meldet Netzwerkfehler', async () => {
         const result = await fetchTenant(() => Promise.reject(new TypeError('offline')));
-        expect(result).toEqual({ ok: false, error: 'network' });
+        expect(!result.ok && result.error.code).toBe('network');
     });
 });

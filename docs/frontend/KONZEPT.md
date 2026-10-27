@@ -36,6 +36,61 @@ Das Mockup liegt in `docs/frontend/mockup/` (siehe dortige `LIESMICH.md`).
   `apple-touch-icon` zuerst Standard-Symbol, nach dem Laden der Stadt deren Logo; unter `service`
   kein Manifest.
 
+## Anmeldung und Registrierung
+
+Die API ist fertig (`CLAUDE.md`: "Benutzer und Anmeldung", "Passwort vergessen", "Einladung,
+Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen").
+
+### Seiten
+| Adresse | Bereich | Zweck |
+|---|---|---|
+| `anmelden` | Stadt und `service` | Anmeldung; Logo, Name und Farbe der Stadt (unter `service`: „Super-Admin“), Link „Passwort vergessen?“, **kein** Link zum Registrieren |
+| `registrieren` | nur Stadt | Registrierung mit Einladungscode, Name, E-Mail, Passwort |
+| `email-bestaetigen` | nur Stadt | Mail-Link nach der Registrierung |
+| `passwort-vergessen` | Stadt und `service` | Link zum Zurücksetzen anfordern |
+| `passwort-zuruecksetzen` | Stadt und `service` | Mail-Link, neues Passwort setzen |
+| `einladung-annehmen` | nur Stadt | Mail-Link für neue Admins: Name und Passwort |
+| `suchen` | nur Stadt | Startseite des Users am Handy (vorerst Platzhalter) |
+| `dashboard` | Stadt und `service` | Startseite von Admin bzw. Super-Admin (vorerst Platzhalter) |
+
+`/` ist nur eine Weiche: ohne Sitzung zur Anmeldung, sonst zur Startseite der Rolle.
+
+### Entscheidungen
+1. **Einladung per QR-Code:** Der QR-Code eines Einladungscodes enthält einen fertigen Link
+   `/firefighting/<stadt>/registrieren#code=XXXX-XXXX-XXXX`. Die Seite übernimmt den Code aus dem
+   Fragment (er erreicht nie die Server-Adresse), entfernt ihn danach aus der Adresszeile und
+   funktioniert auch ohne Code (Feld leer). Die Anmeldeseite hat keinen Registrieren-Link. Die
+   Erzeugung des QR-Codes kommt später mit der Benutzerverwaltung des Admins.
+2. **Nach der Anmeldung:** User → `suchen`, Admin → immer `dashboard` (PC und Handy), Super-Admin
+   → `dashboard` unter `/service/`. Läuft die Sitzung ab (401), geht es zur Anmeldung und danach
+   zurück zur vorherigen Seite (`anmelden?weiter=…`; nur Pfade innerhalb der App, die die Rolle
+   öffnen darf, sonst die Startseite der Rolle). Ruft man angemeldet die Anmeldeseite auf, erscheint
+   einfach das Formular (eine neue Anmeldung ersetzt die alte Sitzung).
+3. **Neues Passwort:** EIN Feld mit Auge-Symbol (anzeigen/verbergen), darunter Live-Prüfung:
+   10 bis 128 Zeichen, keine Teile von Name, E-Mail oder Stadt (Verfahren wie `PasswordPolicy` im
+   Backend). Absenden erst, wenn die Live-Prüfung bestanden ist; daher darf das Frontend
+   nachweislich nie strenger sein als der Server: Eine gemeinsame Datei mit Testfällen
+   (`tests/Fixtures/password-policy-cases.json`, Grenzfälle wie Umlaute, ß/ss, NFC, Stoppwörter,
+   genau 4 Zeichen, Länge 10/128) läuft in PHPUnit gegen `PasswordPolicy` und in Vitest gegen die
+   Prüfung des Frontends. Die Sperrliste prüft nur der Server (422 `weak_password`); seine Meldung
+   erscheint verständlich am Feld, die Liste wird nicht ins Frontend kopiert. Auch die
+   Anmeldeseite hat das Auge-Symbol.
+4. **Tokens aus Mail-Links** (`#token=…`) wie der Einladungscode: aus dem Fragment lesen, per POST
+   senden, danach aus der Adresszeile entfernen.
+
+### Weitere Regeln
+- Jeder Fehlercode der API erscheint in Alltagssprache, der Code nur klein für den Support:
+  falsches Passwort, gesperrtes Konto, E-Mail nicht bestätigt (mit „Mail erneut senden“),
+  „wartet auf Freischaltung“, zu viele Versuche (mit Wartezeit aus `Retry-After`), Link abgelaufen
+  oder benutzt (mit Weg zu einem neuen Link), ungültiger Einladungscode, Stadt gesperrt oder
+  unbekannt, keine Verbindung. Eingaben bleiben bei Fehlern erhalten.
+- Nach Registrierung und „Passwort vergessen“: Hinweis auf den Spam-Ordner und darauf,
+  `feuerwehr-app@prodad.de` zu den Kontakten hinzuzufügen.
+- `autocomplete` passend für Passwort-Manager und Handys: `username` (E-Mail des Kontos),
+  `current-password` beim Anmelden, `new-password` beim Setzen, `name` beim Namen.
+- Bedienelemente mindestens 44 px, alles per Tastatur und Bildschirmleser bedienbar (Reka UI wo
+  sinnvoll, z. B. `Label`).
+
 ## Rollen und Rechte
 
 | Rolle | Arbeitet meist am | Darf |
@@ -61,6 +116,9 @@ Das Mockup liegt in `docs/frontend/mockup/` (siehe dortige `LIESMICH.md`).
 - Status jeder Buchung sichtbar: Uhr-Symbol = wartet, Haken = beim Server angekommen. Oben ein
   grauer Streifen, solange das Gerät offline ist.
 - Der buchende Kamerad erhält das Ergebnis (übernommen, überschrieben, abgelehnt) direkt in der App.
+- Abmelden löscht dann auch alle lokal gespeicherten Daten des Kontos (Kopie der Daten,
+  Warteschlange). Liegen noch Buchungen in der Warteschlange, warnt die App vorher deutlich
+  (z. B. „3 Buchungen wurden noch nicht gesendet und gehen beim Abmelden verloren“).
 
 ## Fehlerbehandlung
 - Fehler in Alltagssprache, gut sichtbar (z. B. farbiger Hinweis oben: „Keine Verbindung, wird
@@ -74,7 +132,7 @@ Das Mockup liegt in `docs/frontend/mockup/` (siehe dortige `LIESMICH.md`).
   Hinweise, gezählt auf dem Dashboard.
 - Jeder Hinweis zeigt Gerät, beide Benutzer, beide Stände und Zeiten; der Admin korrigiert den
   Status direkt von dort und erledigt den Hinweis mit optionaler Notiz (kann wieder geöffnet werden).
-- Rückfrage per E-Mail-Link mit vorausgefülltem Betreff, z. B. „Rückfrage zu deiner Buchung von Maske M1“.
+- Rückfrage per E-Mail-Link mit vorausgefülltem Betreff, z. B. „Rückfrage zu Ihrer Buchung von Maske M1“.
 
 ## Endgeräte
 
@@ -92,6 +150,7 @@ Das Mockup liegt in `docs/frontend/mockup/` (siehe dortige `LIESMICH.md`).
   Scanner fehlt in Safari). Am PC tippt ein USB-Barcode-Scanner wie eine Tastatur.
 
 ## Oberfläche: Grundsätze
+- **Anrede:** in der ganzen App und in allen Mails „Sie“, nie „du“.
 - **Statusfarben** fest und überall gleich, immer mit Symbol und Wort: ✓ einsatzbereit (grün),
   ◐ in Wartung (gelb), ✕ defekt (rot).
 - **Formulare** prüfen beim Tippen: Fehler rot umrandet mit kurzem Tipp darunter; passt alles,

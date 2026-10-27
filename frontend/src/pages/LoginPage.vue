@@ -1,9 +1,28 @@
 <script setup lang="ts">
 import { Label } from 'reka-ui';
+import { takeLoginNotice, type LoginNotice } from '../auth/session';
+
+const NOTICES: Readonly<Record<LoginNotice, string>> = {
+    logged_out: 'Sie wurden abgemeldet.',
+    session_expired: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
+    network:
+        'Keine Verbindung zum Server. Bitte prüfen Sie die Internetverbindung und versuchen Sie es erneut.',
+};
+
+const notice = takeLoginNotice();
 </script>
 
 <template>
     <h1>Anmelden</h1>
+    <p
+        v-if="notice !== null"
+        class="notice"
+        :class="notice === 'logged_out' ? 'notice-success' : 'notice-info'"
+        role="status"
+        data-testid="login-notice"
+    >
+        {{ NOTICES[notice] }}
+    </p>
     <form class="card login-form" novalidate @submit.prevent>
         <p class="placeholder">Platzhalter: Die Anmeldung folgt in einem späteren Schritt.</p>
         <div class="field">
