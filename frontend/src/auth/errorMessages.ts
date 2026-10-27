@@ -27,6 +27,12 @@ export function formatWaitTime(seconds: number | null): string {
     return h === 1 ? 'in etwa 1 Stunde' : `in etwa ${h} Stunden`;
 }
 
+/** Restzeit als „m:ss“ für einen Countdown, z. B. 75 → „1:15“. */
+export function formatCountdown(seconds: number): string {
+    const total = Math.max(0, Math.ceil(seconds));
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
 function invalidTokenMessage(context: ErrorContext): string {
     switch (context) {
         case 'password_reset':

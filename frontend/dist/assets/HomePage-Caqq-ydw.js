@@ -1,0 +1,1 @@
+import{O as e,i as t,z as n}from"./index-DqG_Be9v.js";var r={},i={class:`loading`,role:`status`};function a(t,r){return n(),e(`p`,i,`Wird geladen …`)}var o=t(r,[[`render`,a],[`__scopeId`,`data-v-70a9a5bb`]]);export{o as default};

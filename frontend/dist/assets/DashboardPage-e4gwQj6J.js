@@ -1,1 +1,0 @@
-import{T as e,_ as t,b as n,d as r,m as i,s as a,y as o}from"./index-w74Sfo4j.js";import{t as s}from"./AccountPanel-BKilaERE.js";var c=a(n({__name:`DashboardPage`,setup(n){return(n,a)=>(e(),t(r,null,[a[0]||=i(`h1`,null,`Dashboard`,-1),a[1]||=i(`p`,{class:`placeholder`},`Hier entsteht das Dashboard.`,-1),o(s)],64))}}),[[`__scopeId`,`data-v-f66d6328`]]);export{c as default};

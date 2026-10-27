@@ -1,0 +1,1 @@
+import{A as e,O as t,S as n,T as r,i,j as a,z as o}from"./index-DqG_Be9v.js";import{t as s}from"./AccountPanel-R4ZHpJrV.js";var c=i(a({__name:`SearchPage`,setup(i){return(i,a)=>(o(),t(n,null,[a[0]||=r(`h1`,null,`Suchen`,-1),a[1]||=r(`p`,{class:`placeholder`},`Hier entsteht die Suche nach Geräten.`,-1),e(s)],64))}}),[[`__scopeId`,`data-v-3954207a`]]);export{c as default};

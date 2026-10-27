@@ -14,9 +14,9 @@ test.describe('Grundgerüst', () => {
         await page.goto('/firefighting/test/anmelden');
         await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
         await expect(page.getByLabel('E-Mail-Adresse')).toBeVisible();
-        await expect(page.getByLabel('Passwort')).toBeVisible();
+        await expect(page.getByLabel('Passwort', { exact: true })).toBeVisible();
         const button = page.getByRole('button', { name: 'Anmelden' });
-        await expect(button).toBeDisabled();
+        await expect(button).toBeEnabled();
         const box = await button.boundingBox();
         expect(box?.height).toBeGreaterThanOrEqual(44);
     });
