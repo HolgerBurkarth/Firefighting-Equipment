@@ -17,7 +17,8 @@ use FirefightingEquipment\Tenant\TenantAppearanceRepository;
  * Öffentliche PNG-Dateien einer Stadt (für Anmeldeseite und App-Symbol):
  *
  * - GET api/v1/tenant/logo/{size}: Logo der Stadt; ohne Logo 404 not_found.
- * - GET api/v1/app-icon/{size}: Standard-Symbol (DefaultAppIcon).
+ * - GET api/v1/app-icon/{size}: Standard-Symbol (DefaultAppIcon); auch unter service (Symbol der
+ *   App-Seite des Super-Admins, ohne Stadt).
  *
  * {size} nur 512, 192 oder 180 (sonst 404). Passt ?v= zur aktuellen Versionskennung, darf die Datei
  * dauerhaft zwischengespeichert werden (CachePolicy::Immutable); sonst (fehlt oder veraltet, z. B. aus
@@ -32,13 +33,13 @@ final readonly class ImageHandler implements RequestHandler
 
     public function handle(RequestContext $context): CacheableResponse
     {
-        $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
         $size = LogoSize::tryFrom($context->param('size')) ?? throw HttpException::notFound();
 
         if ($this->defaultIcon) {
             $version = DefaultAppIcon::version();
             $png = DefaultAppIcon::png($size);
         } else {
+            $tenant = $context->tenant ?? throw new \LogicException('Logo nur unter einer Stadt.');
             $logo = new TenantAppearanceRepository($context->db->get())->logo($tenant, $size)
                 ?? throw HttpException::notFound();
             ['version' => $version, 'png' => $png] = $logo;

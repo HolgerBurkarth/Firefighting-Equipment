@@ -81,6 +81,7 @@ final class Routes
     {
         return self::auth(Router::forService(), $neutralDuration)
             ->add('GET', 'api/v1/health', Access::Public, new HealthHandler())
+            ->add('GET', 'api/v1/app-icon/{size}', Access::Public, new ImageHandler(defaultIcon: true))
             ->add('GET', 'api/v1/tenants', Access::SuperAdmin, new TenantListHandler())
             ->add('POST', 'api/v1/tenants', Access::SuperAdmin, new TenantCreateHandler())
             ->add('GET', 'api/v1/tenants/slug-available', Access::SuperAdmin, new TenantSlugAvailabilityHandler())

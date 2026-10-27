@@ -1,17 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { fetchTenant, type TenantInfo } from './api/tenant';
-import { applyAccent } from './runtime/accent';
 import type { AppBase } from './runtime/appBase';
+import { applyTenantAppearance } from './runtime/appearance';
 
 const props = defineProps<{ base: AppBase }>();
 
 const tenant = ref<TenantInfo | null>(null);
 const tenantError = ref<string | null>(null);
-
-function setIcon(rel: string, href: string): void {
-    document.querySelector(`link[rel="${rel}"]`)?.setAttribute('href', href);
-}
 
 onMounted(async () => {
     if (props.base.isService) {
@@ -23,12 +19,7 @@ onMounted(async () => {
         return;
     }
     tenant.value = result.tenant;
-    applyAccent(document.documentElement, result.tenant.accentColor);
-    document.title = `${result.tenant.name} – Geräteverwaltung`;
-    if (result.tenant.logoUrls !== null) {
-        setIcon('icon', result.tenant.logoUrls['192']);
-        setIcon('apple-touch-icon', result.tenant.logoUrls['180']);
-    }
+    applyTenantAppearance(document, result.tenant);
 });
 
 const ERROR_MESSAGES: Readonly<Record<string, string>> = {

@@ -17,7 +17,7 @@ https://www.prodad.de/firefighting/service/<pfad>     # Super-Admin
 | POST    | `api/v1/tenant/logo`                  | Admin      | wie `api/v1/tenant`                            |
 | DELETE  | `api/v1/tenant/logo`                  | Admin      | wie `api/v1/tenant`                            |
 | GET     | `api/v1/tenant/logo/{größe}?v=…`      | öffentlich | PNG (512, 192, 180)                            |
-| GET     | `api/v1/app-icon/{größe}?v=…`         | öffentlich | PNG (Standard-Symbol)                          |
+| GET     | `api/v1/app-icon/{größe}?v=…`         | öffentlich | PNG (Standard-Symbol, auch unter `service`)    |
 | GET     | `manifest.webmanifest`                | öffentlich | Web-App-Manifest                               |
 | POST    | `api/v1/auth/login`                   | öffentlich | `{"user":…,"tenant":…,"session":…}` + Cookie   |
 | POST    | `api/v1/auth/logout`                  | öffentlich | `{"logged_out":true}`, Cookie wird gelöscht    |
@@ -58,7 +58,7 @@ Nur unter `service` (Super-Admin, siehe "Städte verwalten und Admins einladen")
 | POST    | `api/v1/tenants/{id}/users/{user}/resend-invitation`   | `{"user":…,"mail_sent":…}`                |
 | GET     | `api/v1/tenants/{id}/users[?status=…]`                 | `{"users":[…]}` (nur lesend)              |
 
-`api/v1/tenant`, das Erscheinungsbild (Logo, Standard-Symbol, Manifest), Registrierung, E-Mail-Bestätigung, Einladung annehmen, Einladungscodes und
+`api/v1/tenant`, das Erscheinungsbild (Logo, Manifest; das Standard-Symbol gibt es auch unter `service`), Registrierung, E-Mail-Bestätigung, Einladung annehmen, Einladungscodes und
 Benutzerverwaltung gibt es nur unter einer Stadt (unter `service`: 404), die Städteverwaltung nur
 unter `service`, alle anderen Routen unter `service` und unter jeder Stadt. Super-Admins melden sich nur unter `service` an, Konten einer Stadt
 nur unter ihrer Stadt; ein Cookie gilt nur dort.
@@ -1002,9 +1002,13 @@ max-age=31536000, immutable`). Ein neues Logo hat eine neue Kennung und damit ei
 Ohne oder mit veralteter Kennung und beim Manifest gilt `no-cache` (vor jeder Verwendung per `ETag`
 prüfen, unverändert → 304 ohne Inhalt).
 
-Noch von der Frontend-Technik abhängig: `start_url`, `background_color` und das Standard-Symbol
-(Platzhalter in `resources/app-icon/`, neu erzeugen mit `php scripts/generate-default-app-icon.php`).
-Das Frontend muss das Manifest und das `apple-touch-icon` (Größe 180) im HTML einbinden.
+Das Standard-Symbol (Platzhalter in `resources/app-icon/`, neu erzeugen mit
+`php scripts/generate-default-app-icon.php`) liefert das Backend. Im Manifest sind `start_url` und
+`scope` die Startseite der Stadt (`/firefighting/<kürzel>/`), `background_color` ist der helle
+Hintergrund der App (`#f3f4f6`). Das Frontend verweist in `index.html` auf das Standard-Symbol
+(`api/v1/app-icon/192` und `/180` als `apple-touch-icon`), setzt den Link auf das Manifest nur
+unter Städten und ersetzt nach `GET api/v1/tenant` Farbe (`theme-color`), Titel und – wenn es ein
+Logo gibt – die Symbole durch die Logo-Adressen.
 
 Lokal ausprobieren in PowerShell, angemeldet als Admin wie unter "Lokal starten" (JSON ohne BOM):
 
@@ -1154,6 +1158,68 @@ Standorte und Geräte über die API anlegen (Beispiele oben unter "Gerätetypen 
    Antworten mit echter Datenbank.
 4. Endpunkt in der Tabelle oben eintragen.
 
+## Frontend
+
+Vue 3 mit Vite, TypeScript, Reka UI und Workbox (PWA) im Ordner `frontend/`; Konzept und Gestaltung
+in `docs/frontend/`. Node.js 24 LTS wird nur lokal und in GitHub Actions gebraucht, auf dem Server
+liegt nur der fertige Build (`frontend/dist/`, im Branch `deploy`). Ausgeliefert wird er von PHP:
+Alle GET-Adressen unter `/firefighting/<bereich>/` außerhalb von `api/` bekommen die App-Seite
+oder eine Datei des Builds (Regeln in `CLAUDE.md`, "Frontend ausliefern").
+
+```
+cd frontend
+npm ci                                            # Abhängigkeiten
+npx playwright install chromium firefox webkit    # einmalig: Browser für die Tests
+npm test                                          # Lint, Vitest, Typprüfung + Build, Playwright
+npm run build                                     # nur Build nach frontend/dist
+npm run dev                                       # Entwicklung: http://localhost:5173/firefighting/test/
+npm run format                                    # Prettier und ESLint --fix
+```
+
+Fürs Ansehen mit echter API: `npm run build`, dann im Hauptordner
+`php -S localhost:8000 public/index.php` und `http://localhost:8000/firefighting/test/` öffnen
+(Daten siehe "Lokale Entwicklungsdatenbank mit Test-Stadt"). `npm run dev` leitet API-Anfragen an
+`localhost:8000` weiter; für ändernde Anfragen dort `http://localhost:5173` in
+`http.allowed_origins` eintragen.
+
+Die Browser-Tests (Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build, den
+Playwright selbst mit `php -S localhost:4173` ausliefern lässt; die API wird simuliert, eine
+Datenbank ist nicht nötig. Jeder Konsolenfehler und jede Verletzung der Content-Security-Policy
+lässt einen Test scheitern.
+
+## GitHub Actions und Branch deploy
+
+Bei jedem Push auf `main` und bei Pull Requests testet der Workflow "CI" PHP (mit MariaDB 10.11)
+und Frontend. Nur nach einem grünen Lauf auf `main` legt der Job `deploy` Code plus Build im Branch
+`deploy` ab; auf den Server kommt er von Hand ("Deployment"). Die Versionen der Actions hält
+Dependabot aktuell (wöchentlicher Pull Request "CI: …", nach grünem Lauf mergen).
+
+### Branch deploy schützen
+
+Ruleset auf GitHub, damit `deploy` weder gelöscht noch per Force-Push überschrieben werden kann. Den
+normalen Push des Workflows erlaubt es weiter:
+
+1. Auf GitHub das Repository öffnen → **Settings**.
+2. Links unter "Code, planning, and automation": **Rules** → **Rulesets**.
+3. **New ruleset** → **New branch ruleset**.
+4. **Ruleset name**: `deploy schützen`.
+5. **Enforcement status**: **Active**.
+6. **Bypass list**: leer lassen (dann gelten die Regeln auch für Admins).
+7. **Target branches** → **Add target** → **Include by pattern** → `deploy` → **Add Inclusion
+   pattern**.
+8. Unter **Branch rules** nur diese beiden anhaken:
+   - **Restrict deletions**
+   - **Block force pushes**
+
+   Alles andere aus lassen, insbesondere **Restrict updates** (dann dürfte nur noch die Bypass-Liste
+   pushen; den `GITHUB_TOKEN` des Workflows kann man dort nicht eintragen, der Job `deploy` würde
+   scheitern) und **Require linear history** (die deploy-Commits haben zwei Eltern).
+9. **Create**.
+
+Prüfen: Beim nächsten Push auf `main` muss der Job `deploy` weiter grün werden. Ein
+`git push --force origin <x>:deploy` oder `git push origin --delete deploy` wird abgelehnt
+(`GH013: Repository rule violations found`).
+
 ## Datenbank-Migrationen
 
 ```
@@ -1183,8 +1249,9 @@ cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh
 ```
 
 Der Server steht auf dem Branch `deploy`, nie auf `main` (dort fehlt der Frontend-Build, und auf
-STRATO gibt es kein Node.js). Einmaliger Umstieg: siehe "Umstieg des Servers auf den Branch
-deploy" unten.
+STRATO gibt es kein Node.js). Der Umstieg ist erledigt (27.10.2026, erster Stand `0912203`); der
+lokale Branch `main` bleibt dort vorerst für einen Rücksprung. Die Anleitung unten gilt nur noch
+für einen neu eingerichteten Server.
 
 Ablauf von `scripts/deploy.sh`:
 
@@ -1220,7 +1287,7 @@ Alle Zeitstempel in Dateinamen sind in UTC (Kennzeichen `Z`).
 
 ### Umstieg des Servers auf den Branch deploy
 
-Einmalig, wenn der Server noch auf `main` steht. Voraussetzung: Der letzte Lauf "CI" auf GitHub
+Erledigt am 27.10.2026. Nur noch nötig, wenn ein Server noch auf `main` steht. Voraussetzung: Der letzte Lauf "CI" auf GitHub
 ist grün, und `origin/deploy` enthält das neue `scripts/deploy.sh` (mit `BRANCH="deploy"`).
 Die Schritte nacheinander ausführen und die Ausgabe jeweils vergleichen; passt etwas nicht,
 abbrechen und den Rücksprung unten verwenden.

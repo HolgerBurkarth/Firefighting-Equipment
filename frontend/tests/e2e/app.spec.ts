@@ -39,6 +39,34 @@ test.describe('Grundgerüst', () => {
         await page.goto('/firefighting/service/');
         await expect(page.getByTestId('app-title')).toHaveText('Super-Admin');
         expect(apiCalls).not.toContain('api/v1/tenant');
+        // Kein Manifest unter service; Symbole vom Standard-Symbol (gibt es auch unter service).
+        await expect(page.locator('link[rel="manifest"]')).toHaveCount(0);
+        await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute(
+            'href',
+            'api/v1/app-icon/180',
+        );
+        expect(apiCalls).not.toContain('manifest.webmanifest');
+    });
+
+    test('Stadt: Manifest-Link und Standard-Symbol ohne Logo', async ({ page }) => {
+        await page.goto('/firefighting/test/');
+        await expect(page.getByTestId('app-title')).toHaveText('Feuerwehr Test');
+        const manifest = await page
+            .locator('link[rel="manifest"]')
+            .evaluate((link) => (link as HTMLLinkElement).href);
+        expect(new URL(manifest).pathname).toBe('/firefighting/test/manifest.webmanifest');
+        await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute(
+            'href',
+            'api/v1/app-icon/180',
+        );
+        await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+            'href',
+            'api/v1/app-icon/192',
+        );
+        await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute(
+            'content',
+            '#b71c1c',
+        );
     });
 
     test('Schrift Source Sans 3 wird geladen', async ({ page }) => {

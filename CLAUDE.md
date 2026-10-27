@@ -153,8 +153,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `nosniff`; ihre Fehler kommen weiterhin als JSON. Und zwischenspeicherbare öffentliche Dateien
   (`CacheableResponse`, siehe "Erscheinungsbild (API)" und "Frontend ausliefern").
 - Ausnahmen von `Cache-Control: no-store` (eng begrenzt): NUR `CacheableResponse`, NUR für die drei
-  öffentlichen Routen `GET api/v1/tenant/logo/{size}`, `GET api/v1/app-icon/{size}` und
-  `GET manifest.webmanifest` sowie die Auslieferung des Frontends (`FrontendHandler`; alles ohne
+  öffentlichen Routen `GET api/v1/tenant/logo/{size}`, `GET api/v1/app-icon/{size}` (auch unter
+  `service`) und `GET manifest.webmanifest` sowie die Auslieferung des Frontends (`FrontendHandler`; alles ohne
   personenbezogene Daten, ohne Sitzung und nie `Set-Cookie`). `CacheableResponse` erlaubt nur die
   Content-Types `image/png`, `application/manifest+json; charset=utf-8` und für das Frontend
   `text/html; charset=utf-8`, `text/javascript; charset=utf-8`, `text/css; charset=utf-8`,
@@ -219,7 +219,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`), `src/pages/`,
   `src/api/` (Zugriffe auf die REST-API, Antworten geprüft), `src/runtime/` (`appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
-  `serviceWorker.ts` Registrierung), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
+  `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
   `tests/unit/` (Vitest), `tests/e2e/` (Playwright). Build nach `frontend/dist/` (in `.gitignore`).
 - Design-Variablen nur in `src/styles/tokens.css` (Farben hell/dunkel aus dem Mockup, Statusfarben,
@@ -240,7 +240,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Browser-Tests (Playwright: Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build,
   ausgeliefert von PHP (`php -q -S localhost:4173 public/index.php`, startet Playwright selbst), also
   mit echter CSP und echtem Caching. API und Manifest simuliert `page.route()`
-  (`tests/e2e/fixtures.ts`), eine Datenbank wird nicht gebraucht. Jeder Konsolenfehler, Skriptfehler,
+  (`tests/e2e/fixtures.ts`) mit denselben Bereichen wie die Routen in PHP (unter `service` nur
+  `api/v1/app-icon/…`), eine Datenbank wird nicht gebraucht. Jeder Konsolenfehler, Skriptfehler,
   jede CSP-Verletzung und jede nicht simulierte API-Anfrage lässt den Test scheitern (erwartete
   Browsermeldung nur per Option `allowedConsoleError`, nie für CSP). Service Worker sind gesperrt
   außer in `serviceWorker.spec.ts`; der Offline-Test läuft nur in Chromium (`setOffline` umgeht in
@@ -1356,8 +1357,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Mails (auf STRATO gemessen rund 0,22 s je Mail). Kein Cron, keine Warteschlange.
 
 ## Erscheinungsbild (API)
-- Nur unter Städten (unter `service` 404). Ändern `Access::Admin` (in `AdminRoutesAccessTest`),
-  der Super-Admin pflegt das Erscheinungsbild in Version 1 nicht. Lesen öffentlich (Anmeldeseite,
+- Nur unter Städten (unter `service` 404); einzige Ausnahme: `GET api/v1/app-icon/{size}` (Standard-Symbol)
+  gibt es auch unter `service` (Symbol der App-Seite des Super-Admins). Ändern `Access::Admin` (in
+  `AdminRoutesAccessTest`), der Super-Admin pflegt das Erscheinungsbild in Version 1 nicht. Lesen öffentlich (Anmeldeseite,
   App-Symbol); gesperrte Stadt 403 `tenant_inactive` wie überall. Code: `src/Tenant/` (`AccentColor`,
   `InvalidAccentColorException`, `TenantAppearance`, `TenantAppearanceRepository`),
   `src/Tenant/Logo/` (`PngInspector`, `LogoRenderer`, `LogoImages`, `LogoSize`, `DefaultAppIcon`,
@@ -1421,14 +1423,26 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `manifest.webmanifest` außerhalb von `api/v1`), `application/manifest+json; charset=utf-8`,
   `Revalidate` mit ETag über den Inhalt. Felder: `id`, `start_url`, `scope` = `/firefighting/<kürzel>/`,
   `name` = „<Stadtname> – Geräteverwaltung“, `short_name` = „FF-Geräte“, `lang` `de`, `dir` `ltr`,
-  `display` `standalone`, `theme_color` = Akzentfarbe (immer ein Wert), `background_color` `#ffffff`,
+  `display` `standalone`, `theme_color` = Akzentfarbe (immer ein Wert), `background_color` `#f3f4f6`,
   `icons` = 192 und 512 px (Logo, sonst Standard-Symbol, versionierte Adressen, `purpose` `any`, kein
   `maskable`, weil ein Logo sonst beschnitten werden kann).
-- Abhängig von der noch offenen Frontend-Technik (bei deren Festlegung prüfen, siehe "Noch offen"):
-  `start_url` (Startseite der Stadt), `background_color` (Ladebildschirm,
-  `ManifestHandler::BACKGROUND_COLOR`), das Standard-Symbol (Gestaltung und ob es eine statische
-  Datei des Frontends wird) und die Ablage statischer Dateien (Manifest-Link, `apple-touch-icon` im
-  HTML des Frontends). Unabhängig davon: `scope`, `id`, die API-Adressen der Bilder.
+- Entscheidungen mit dem Frontend (Vue, siehe "Frontend"):
+  - `start_url` = `scope` = `/firefighting/<kürzel>/`: die Startseite der Stadt im Frontend (die App
+    leitet von dort selbst weiter).
+  - `background_color` (Ladebildschirm, `ManifestHandler::BACKGROUND_COLOR`) = `--bg` hell aus
+    `frontend/src/styles/tokens.css` (`#f3f4f6`, per Test `FrontendAssetsTest` gleich). Das Manifest
+    kennt nur einen Wert, daher hell.
+  - Standard-Symbol bleibt eine Datei des Backends (`DefaultAppIcon`, versioniert, auch im
+    Manifest), keine statische Datei des Frontends.
+  - `index.html` verweist relativ (zu `<base href>`) auf `api/v1/app-icon/192` (`icon`) und
+    `api/v1/app-icon/180` (`apple-touch-icon`), ohne `?v=` (also `Revalidate`). Den Link auf
+    `manifest.webmanifest` setzt die App beim Start nur unter Städten (`linkManifest` in
+    `frontend/src/runtime/appearance.ts`; unter `service` gibt es kein Manifest).
+  - Nach `GET api/v1/tenant` (`applyTenantAppearance`): `--accent` und
+    `<meta name="theme-color">` = `accent_color`, Titel „<Stadtname> – Geräteverwaltung“ (wie
+    `NAME_FORMAT`), und nur mit Logo `icon` = `logo_urls["192"]`, `apple-touch-icon` =
+    `logo_urls["180"]` (versioniert). Ohne Logo bleibt das Standard-Symbol; bei einem Fehler
+    (z. B. unbekannte Stadt) bleiben alle Standardwerte.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".
@@ -1447,6 +1461,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   und Status, nicht übernommene Buchungen nur in der Historie, Zeitlimits in der Konfiguration;
   besondere Ergebnisse als Hinweis an die Admins mit Mail (umgesetzt, siehe "Offline-Buchungen
   (API)" und "Hinweise (API)").
+- Frontend: Vue 3 mit Vite, TypeScript, Reka UI, als PWA; ein Build für alle Städte, ausgeliefert
+  von PHP (siehe "Frontend" und "Frontend ausliefern"); Konzept in `docs/frontend/KONZEPT.md`.
 - Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
 
 ## GitHub Actions (CI)
@@ -1473,6 +1489,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `frontend/dist` auf `main` versioniert ist (Exit-Code 1; falscher Aufruf 2). Tests:
   `tests/Unit/Scripts/PublishDeployBranchTest` (temporäre Repositorys, eigene leere Git-Konfiguration).
 - Nur der Workflow schreibt in `deploy`; Agenten und Menschen ändern den Branch nie von Hand.
+- Ruleset auf GitHub für `deploy` (README "Branch deploy schützen"): nur "Restrict deletions" und
+  "Block force pushes". Nicht "Restrict updates" (dann dürften nur Bypass-Akteure pushen, und der
+  `GITHUB_TOKEN` des Workflows lässt sich nicht als Bypass eintragen) und nicht "Require linear
+  history" (die deploy-Commits haben zwei Eltern). Ein strengerer Schutz bräuchte eine eigene
+  GitHub App mit Token im Workflow (bisher nicht vorgesehen).
 - Versionen der Actions (Stand: checkout v7, setup-node v7, upload-artifact v7, download-artifact v8,
   setup-php v2; alle mit `node24`) hält Dependabot aktuell (`.github/dependabot.yml`, wöchentlich
   montags, alle Actions in einem Pull Request mit Präfix `CI`). Neue Versionen vor dem Eintragen
@@ -1486,8 +1507,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh`. Erst deployen, wenn der
   CI-Lauf grün ist und `deploy` den gewünschten Stand hat.
 - Der Server steht auf dem Branch `deploy` (nie `main`: dort fehlt der Frontend-Build; auf STRATO
-  gibt es kein Node.js). Umstieg einmalig von Hand, README "Umstieg des Servers auf den Branch
-  deploy". Auf `main` bricht das Skript mit Hinweis darauf ab.
+  gibt es kein Node.js). Der Umstieg ist erledigt (27.10.2026, erster Stand `0912203`); der lokale
+  Branch `main` bleibt auf dem Server vorerst für einen Rücksprung bestehen. Die Anleitung (README
+  "Umstieg des Servers auf den Branch deploy") gilt nur noch für einen neu eingerichteten Server.
+  Auf `main` bricht das Skript mit Hinweis darauf ab.
 - Das Skript bricht bei lokal geänderten Dateien ab, legt eine Sicherung an, holt per
   `git fetch` + `git merge --ff-only origin/deploy`, prüft, dass `frontend/dist/index.html`
   vorhanden ist (sonst Abbruch vor Composer), führt `composer install` aus, prüft mit
@@ -1555,7 +1578,4 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   kein Node.js.
 
 ## Noch offen
-- Frontend-Technik (Kandidat: Vue 3 mit Vite) – wird festgelegt, wenn die REST-API steht. Danach
-  im Manifest prüfen: `start_url`, `background_color`, Standard-Symbol, Ablage statischer Dateien
-  (siehe "Erscheinungsbild (API)").
 - Datenschutz (Verantwortlicher, Datenschutzerklärung, Löschfristen).

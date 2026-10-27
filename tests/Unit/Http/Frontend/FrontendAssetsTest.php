@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tests\Unit\Http\Frontend;
 
+use FirefightingEquipment\Api\V1\Appearance\ManifestHandler;
 use FirefightingEquipment\Http\CacheableResponse;
 use FirefightingEquipment\Http\Frontend\FrontendAssets;
 use FirefightingEquipment\Http\Frontend\FrontendFile;
 use FirefightingEquipment\Http\Frontend\FrontendUnavailableException;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -18,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(FrontendAssets::class)]
 #[CoversClass(FrontendFile::class)]
 #[CoversClass(FrontendUnavailableException::class)]
+#[UsesClass(ManifestHandler::class)]
 final class FrontendAssetsTest extends TestCase
 {
     private const string FRONTEND = __DIR__ . '/../../../../frontend';
@@ -30,6 +33,15 @@ final class FrontendAssetsTest extends TestCase
         self::assertSame(1, substr_count($indexHtml, FrontendAssets::BASE_PLACEHOLDER));
         self::assertStringContainsString(sprintf('<base href="%s" />', FrontendAssets::BASE_PLACEHOLDER), $indexHtml);
         self::assertStringContainsString(sprintf("export const BASE_PLACEHOLDER = '%s';", FrontendAssets::BASE_PLACEHOLDER), $appBase);
+    }
+
+    public function testManifestBackgroundIsLightBackgroundOfFrontend(): void
+    {
+        $tokens = (string) file_get_contents(self::FRONTEND . '/src/styles/tokens.css');
+        $light = substr($tokens, 0, (int) strpos($tokens, "[data-theme='dark']"));
+
+        self::assertSame(1, preg_match('/^\s*--bg:\s*(#[0-9a-f]{6});/m', $light, $m));
+        self::assertSame($m[1], ManifestHandler::BACKGROUND_COLOR);
     }
 
     public function testIndexHtmlWithBasePath(): void
