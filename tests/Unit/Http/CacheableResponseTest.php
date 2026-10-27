@@ -76,9 +76,51 @@ final class CacheableResponseTest extends TestCase
     {
         yield 'JSON' => ['application/json; charset=utf-8', self::ETAG];
         yield 'CSV' => ['text/csv; charset=utf-8', self::ETAG];
-        yield 'HTML' => ['text/html', self::ETAG];
+        yield 'HTML ohne charset' => ['text/html', self::ETAG];
+        yield 'Text' => ['text/plain; charset=utf-8', self::ETAG];
+        yield 'SVG' => ['image/svg+xml', self::ETAG];
         yield 'ETag ohne Anführungszeichen' => [CacheableResponse::PNG, 'abc'];
         yield 'ETag mit Zeilenumbruch' => [CacheableResponse::PNG, "\"a\nb\""];
+    }
+
+    public function testFrontendContentTypes(): void
+    {
+        foreach (['text/html; charset=utf-8', 'text/javascript; charset=utf-8', 'text/css; charset=utf-8', 'font/woff2', 'font/woff'] as $type) {
+            $response = new CacheableResponse(new Request('GET', '/x'), $type, 'x', self::ETAG, CachePolicy::Revalidate);
+            self::assertSame($type, $response->headers()['Content-Type']);
+        }
+    }
+
+    public function testSecurityHeadersAlsoOnNotModified(): void
+    {
+        $security = ['Content-Security-Policy' => "default-src 'self'", 'Referrer-Policy' => 'same-origin', 'X-Frame-Options' => 'DENY'];
+        foreach (['', self::ETAG] as $ifNoneMatch) {
+            $request = new Request('GET', '/x', $ifNoneMatch === '' ? [] : ['if-none-match' => $ifNoneMatch]);
+            $headers = new CacheableResponse($request, CacheableResponse::HTML, '<p>', self::ETAG, CachePolicy::Revalidate, $security)->headers();
+
+            self::assertSame($security, array_intersect_key($headers, $security));
+            self::assertSame('nosniff', $headers['X-Content-Type-Options']);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>}>
+     */
+    public static function rejectedSecurityHeaders(): iterable
+    {
+        yield 'Cache-Control' => [['Cache-Control' => 'public']];
+        yield 'Set-Cookie' => [['Set-Cookie' => 'a=b']];
+        yield 'Zeilenumbruch' => [['Referrer-Policy' => "same-origin\r\nSet-Cookie: a=b"]];
+    }
+
+    /**
+     * @param array<string, string> $headers
+     */
+    #[DataProvider('rejectedSecurityHeaders')]
+    public function testOnlyAllowedSecurityHeaders(array $headers): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new CacheableResponse(new Request('GET', '/x'), CacheableResponse::HTML, 'x', self::ETAG, CachePolicy::Revalidate, $headers);
     }
 
     #[DataProvider('rejectedArguments')]

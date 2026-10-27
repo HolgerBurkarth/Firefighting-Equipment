@@ -43,17 +43,21 @@ final class Bash
     }
 
     /**
-     * @param list<string> $args
+     * @param list<string>               $args
+     * @param string|null                $cwd Arbeitsordner (Standard: der aktuelle)
+     * @param array<string, string>|null $env zusätzliche Umgebungsvariablen
      *
      * @return array{int, string, string} Exit-Code, stdout, stderr
      */
-    public static function run(string $script, array $args): array
+    public static function run(string $script, array $args, ?string $cwd = null, ?array $env = null): array
     {
         $bash = self::path() ?? throw new \RuntimeException('bash nicht gefunden.');
         $process = proc_open(
             [$bash, self::toPath($script), ...$args],
             [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
+            $cwd,
+            $env === null ? null : [...getenv(), ...$env],
         );
         if ($process === false) {
             throw new \RuntimeException('bash konnte nicht gestartet werden.');

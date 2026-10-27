@@ -10,7 +10,7 @@ ini_set('display_errors', '0');
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-// Front-Controller, auch für lokal: php -S 127.0.0.1:8000 public/index.php
+// Front-Controller, auch für lokal: php -S localhost:8000 public/index.php
 Application::create(dirname(__DIR__) . '/config/config.local.php')
     ->handle(Request::fromGlobals())
     ->send();

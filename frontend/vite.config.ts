@@ -36,10 +36,6 @@ export default defineConfig({
             '^/firefighting/[a-z0-9-]+/(api/|manifest\\.webmanifest)': PHP_DEV_SERVER,
         },
     },
-    preview: {
-        port: 4173,
-        strictPort: true,
-    },
     build: {
         outDir: 'dist',
         emptyOutDir: true,

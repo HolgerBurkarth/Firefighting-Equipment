@@ -277,6 +277,17 @@ final class HttpException extends \RuntimeException
         );
     }
 
+    /** Build des Frontends fehlt (Details nur im Protokoll). */
+    public static function frontendUnavailable(\Throwable $previous): self
+    {
+        return new self(
+            'frontend_unavailable',
+            'Die Oberfläche ist zurzeit nicht verfügbar.',
+            503,
+            previous: $previous,
+        );
+    }
+
     public static function internalError(): self
     {
         return new self('internal_error', 'Interner Fehler.', 500);

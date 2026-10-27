@@ -37,6 +37,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   - Web-App-Manifest: `/firefighting/<stadt>/manifest.webmanifest` (einzige Route außerhalb von
     `api/v1`, siehe "Erscheinungsbild (API)")
   - Super-Admin: `/firefighting/service/`
+  - Alle anderen GET-Adressen unter `/firefighting/<bereich>/` liefern das Frontend (App-Seite
+    oder Datei aus dem Build, siehe "Frontend" und "Frontend ausliefern").
 - Der Mandant wird aus dem URL-Pfad abgeleitet. Das Kürzel einer Stadt ist unveränderlich.
 - Städte sind keine Ordner: Das Kürzel im Pfad ist virtuell und wird über `fe_tenants`
   in der Datenbank aufgelöst.
@@ -48,14 +50,16 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 ## HTTP und REST-API
 - Code in `src/Http/` (Ablauf, Router, Fehler) und `src/Api/V1/` (Handler). `public/index.php`
   bleibt dünn: nur `Application::create(...)->handle(Request::fromGlobals())->send()`.
-- Präfix `/firefighting` nur in `AppPath::PREFIX`; lokal gilt dasselbe Schema mit
-  `php -S localhost:8000 public/index.php` (`localhost`, nicht `127.0.0.1`: nur dort nehmen
-  Browser und curl das `Secure`-Cookie über `http://` an).
+- Präfix `/firefighting` nur in `AppPath::PREFIX` (die App im Browser kennt es nicht, sie liest den
+  Basispfad aus `<base href>`; nur Entwicklungswerkzeuge und Tests in `frontend/` nennen es); lokal
+  gilt dasselbe Schema mit `php -S localhost:8000 public/index.php` (`localhost`, nicht
+  `127.0.0.1`: nur dort nehmen Browser und curl das `Secure`-Cookie über `http://` an).
 - Adresse `/firefighting/<bereich>/<rest>` (`AppPath::parse`): Query-String wird ignoriert, ein
   abschließender `/` toleriert; leere Segmente, fehlendes Präfix oder ein Bereich außerhalb
   `[a-z0-9-]+` → 404. Der Pfad wird nicht URL-dekodiert.
 - Reihenfolge in `Application::handle` (nicht ändern): Adresse zerlegen → Route suchen
-  (404/405) → ändernde Anfrage prüfen (`RequestGuard`, ohne Datenbank; 415/403/400) → erst dann
+  (404/405; keine Route, Methode `GET` und Pfad nicht `api` bzw. `api/…` → Frontend, ohne Datenbank
+  und Sitzung, siehe "Frontend ausliefern") → ändernde Anfrage prüfen (`RequestGuard`, ohne Datenbank; 415/403/400) → erst dann
   die Stadt laden → Sitzung und Zugriffsstufe prüfen (nur bei nicht öffentlichen Routen; 401/403)
   → Handler. Unbekannte Adressen und abgelehnte ändernde Anfragen verbinden sich so nie mit der
   Datenbank.
@@ -126,7 +130,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   schon für eine andere Buchung verwendet), `stale_action` 409 (Offline-Buchung zu alt, ohne
   `confirmed_stale`), `unsupported_media_type` 415, `weak_password` 422, `clock_implausible` 422
   (Aktionszeit einer Offline-Buchung zu weit in der Zukunft), `too_many_attempts` 429 (mit
-  `Retry-After`), `database_unavailable` 503, `internal_error` 500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
+  `Retry-After`), `database_unavailable` 503, `frontend_unavailable` 503 (Build des Frontends fehlt, siehe
+  "Frontend ausliefern"), `internal_error` 500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
   Passwort beim Ändern 403, nicht 401.
 - Optionales Feld `details` (immer ein JSON-Objekt) mit maschinenlesbaren Angaben zum Fehler,
   z. B. `{"error":"rule_violation","message":"…","details":{"devices":2,"sublocations":1}}` beim
@@ -146,20 +151,102 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   nicht überschreibbar). Ausnahmen: CSV-Downloads (`CsvResponse`, siehe "CSV-Export (API)")
   mit `text/csv; charset=utf-8` und `Content-Disposition: attachment`, ebenfalls `no-store` und
   `nosniff`; ihre Fehler kommen weiterhin als JSON. Und zwischenspeicherbare öffentliche Dateien
-  (`CacheableResponse`, siehe "Erscheinungsbild (API)").
+  (`CacheableResponse`, siehe "Erscheinungsbild (API)" und "Frontend ausliefern").
 - Ausnahmen von `Cache-Control: no-store` (eng begrenzt): NUR `CacheableResponse`, NUR für die drei
   öffentlichen Routen `GET api/v1/tenant/logo/{size}`, `GET api/v1/app-icon/{size}` und
-  `GET manifest.webmanifest` (ohne personenbezogene Daten, `Access::Public`, also nie eine Sitzung
-  und nie `Set-Cookie`). `CacheableResponse` erlaubt nur die Content-Types `image/png` und
-  `application/manifest+json; charset=utf-8` und nur die beiden Richtlinien aus `CachePolicy`:
-  `Immutable` (`public, max-age=31536000, immutable`, nur wenn `?v=` gleich der aktuellen
-  Versionskennung ist) und `Revalidate` (`no-cache`: ohne oder mit veralteter Kennung und beim
-  Manifest). Immer mit starkem `ETag` und `nosniff`; `If-None-Match` (auch `W/`, Liste, `*`) → 304
-  ohne Body. Fehler dieser Routen bleiben JSON mit `no-store`. Keine weiteren Ausnahmen ohne
-  Rückfrage; neue nur über `CacheableResponse`/`CachePolicy` und hier dokumentiert.
+  `GET manifest.webmanifest` sowie die Auslieferung des Frontends (`FrontendHandler`; alles ohne
+  personenbezogene Daten, ohne Sitzung und nie `Set-Cookie`). `CacheableResponse` erlaubt nur die
+  Content-Types `image/png`, `application/manifest+json; charset=utf-8` und für das Frontend
+  `text/html; charset=utf-8`, `text/javascript; charset=utf-8`, `text/css; charset=utf-8`,
+  `font/woff2`, `font/woff` (Konstanten in `CacheableResponse`), und nur die beiden Richtlinien aus
+  `CachePolicy`: `Immutable` (`public, max-age=31536000, immutable`: Logo/Symbol nur, wenn `?v=`
+  gleich der aktuellen Versionskennung ist; Frontend nur `assets/…` mit Hash im Namen) und
+  `Revalidate` (`no-cache`: Logo/Symbol ohne oder mit veralteter Kennung, Manifest, App-Seite,
+  `sw.js`/`workbox-….js`). Immer mit starkem `ETag` und `nosniff`; `If-None-Match` (auch `W/`,
+  Liste, `*`) → 304 ohne Body. Zusätzliche Header nur aus der festen Liste
+  `Content-Security-Policy`, `Referrer-Policy`, `X-Frame-Options` (ohne Steuerzeichen, sonst
+  `InvalidArgumentException`), bisher nur auf der App-Seite. Fehler dieser Routen bleiben JSON mit
+  `no-store`. Keine weiteren Ausnahmen ohne Rückfrage; neue nur über
+  `CacheableResponse`/`CachePolicy` und hier dokumentiert.
 - Antworten implementieren `Http\Response` (`statusCode()`, `headers()`, `send()`): `JsonResponse`
   (Regelfall), `CsvResponse` oder `CacheableResponse`. `Application` erzeugt nur JSON vorab
   (Kodierfehler → 500); ein CSV-Download wird erst beim Senden geschrieben.
+
+## Frontend ausliefern
+- Code in `src/Http/Frontend/` (`FrontendHandler`, `FrontendAssets`, `FrontendFile`,
+  `ContentSecurityPolicy`, `FrontendUnavailableException`). `Application::create` setzt
+  `FrontendHandler` mit `FrontendAssets::defaultDirectory()` (= `frontend/dist`, außerhalb von
+  `public/`; nur PHP liest es). Ohne `FrontendHandler` (Konstruktor-Standard `null`, Tests mit eigenen
+  Routern) bleiben unbekannte Pfade 404. `.htaccess` und `public/index.php` brauchen dafür nichts:
+  Die Regel in `htdocs/.htaccess` schickt schon alles unter `/firefighting/<bereich>/` an PHP.
+- Fallback nur, wenn der Router 404 `not_found` meldet, die Methode genau `GET` ist und der Pfad nicht
+  `api` oder `api/…` ist (`FrontendHandler::handles`). Alle anderen Methoden (auch `HEAD`), API-Pfade
+  und vorhandene Routen (405) verhalten sich wie vorher (per Test, `FrontendDeliveryTest`). Keine
+  Datenbank, keine Sitzung, kein Cookie: Ob die Stadt existiert, fragt die App über `api/v1/tenant`;
+  ein ungültiges Kürzel (`TenantSlug`, ohne Datenbank) → 404.
+- Pfade (relativ zum Bereich): `assets/<datei>` → Datei aus `frontend/dist/assets/`, `Immutable`.
+  Andere Pfade mit Dateiendung (z. B. `sw.js`, `workbox-….js`) → Datei direkt in `frontend/dist/`,
+  `Revalidate`. Fehlt die Datei oder ist sie nicht erlaubt → 404 `not_found` (JSON), NIE die App-Seite
+  (sonst würde HTML als Skript geladen). Alles andere (`""`, `index.html`, `geraete/12`,
+  `passwort-zuruecksetzen` …) → `index.html` mit Basispfad, `Revalidate`.
+- Erlaubte Dateien (`FrontendAssets`): nur Endungen aus `FrontendAssets::CONTENT_TYPES` (`js`, `css`,
+  `woff2`, `woff`), Name `[A-Za-z0-9][A-Za-z0-9_.-]*` (höchstens 128 Zeichen), keine Unterordner
+  außer `assets/`, kein `..`, keine versteckten Dateien, zusätzlich per `realpath` innerhalb von
+  `frontend/dist`. Neue Endungen nur, wenn der Build sie wirklich enthält (Content-Type in
+  `CacheableResponse` ergänzen).
+- Basispfad: `index.html` des Builds enthält genau einmal `<base href="/__FF_BASE__/" />`
+  (`FrontendAssets::BASE_PLACEHOLDER` = `BASE_PLACEHOLDER` in `frontend/build/appBase.ts`, per Test
+  gleich). PHP ersetzt ihn durch `AppPath::PREFIX/<bereich>/` (HTML-maskiert). Ein Build für alle
+  Städte; die App liest Bereich und Basispfad aus `document.baseURI`.
+- App-Seite mit zusätzlichen Headern: `Content-Security-Policy` (`ContentSecurityPolicy::header()`),
+  `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`.
+- CSP (`ContentSecurityPolicy::DIRECTIVES`, eine Liste je Direktive): `default-src`, `script-src`,
+  `style-src`, `img-src`, `font-src`, `connect-src`, `manifest-src`, `worker-src`, `base-uri`,
+  `form-action` je `'self'`; `object-src` und `frame-ancestors` `'none'`. Nie `'unsafe-inline'`,
+  `'unsafe-eval'`, `'unsafe-hashes'`, `*`, `http:` oder `https:` (per Test). Spätere Bausteine
+  ergänzen gezielt nur, was sie brauchen, mit Begründung im Kommentar (z. B. Kamera-Scanner:
+  `worker-src blob:`, `script-src 'wasm-unsafe-eval'`; QR-Code/Logo-Vorschau: `img-src data: blob:`).
+  Daher im Frontend keine Inline-Skripte, keine `<style>`-Elemente und kein `style=""` im HTML;
+  Schriften liegen im Build (kein Google Fonts).
+- Build fehlt oder `index.html` ohne Platzhalter → 503 `frontend_unavailable` (Einzelheiten nur im
+  Protokoll); die API läuft weiter.
+
+## Frontend
+- Ordner `frontend/` (Vue 3, Vite, TypeScript strikt, Vue Router, Reka UI, vite-plugin-pwa);
+  verbindliches Konzept in `docs/frontend/KONZEPT.md`, Gestaltung nach `docs/frontend/mockup/`
+  (`LIESMICH.md`). Oberflächentexte deutsch, Code und Bezeichner englisch.
+- Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
+  `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`), `src/pages/`,
+  `src/api/` (Zugriffe auf die REST-API, Antworten geprüft), `src/runtime/` (`appBase.ts` Bereich und
+  Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
+  `serviceWorker.ts` Registrierung), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
+  `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
+  `tests/unit/` (Vitest), `tests/e2e/` (Playwright). Build nach `frontend/dist/` (in `.gitignore`).
+- Design-Variablen nur in `src/styles/tokens.css` (Farben hell/dunkel aus dem Mockup, Statusfarben,
+  Radien, Schatten, Mindestgröße 44 px); Komponenten verwenden nur `var(--…)`. Anzeigemodus: ohne
+  `data-theme` gilt `prefers-color-scheme`, `data-theme="light"`/`"dark"` erzwingt; die beiden
+  Dunkel-Blöcke müssen gleich sein, Text- und Statusfarben mindestens 4,5:1 (beides per Test).
+  Stadtfarbe zur Laufzeit als `--accent` aus `GET api/v1/tenant`, Standard `#b71c1c`
+  (= `AccentColor::DEFAULT`).
+- Service Worker `sw.js` (Workbox, `generateSW`), registriert aus dem Bundle (kein Inline-Skript),
+  Scope `/firefighting/<bereich>/`, Rückfall auf `index.html` außer `api/` und
+  `manifest.webmanifest`. Das Manifest liefert PHP (`manifest: false` im Plugin).
+- Befehle (in `frontend/`): `npm ci`, einmalig `npx playwright install chromium firefox webkit`;
+  `npm test` (ESLint + Prettier, Vitest, `vue-tsc` + Build, Playwright) muss vor jedem Commit grün
+  sein. Einzeln: `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test:unit`,
+  `npm run build`, `npm run test:e2e` (braucht den Build). Entwicklung: `npm run dev`
+  (`http://localhost:5173/firefighting/test/`, API per Proxy an `php -S localhost:8000`; für
+  ändernde Anfragen `http://localhost:5173` in `http.allowed_origins`).
+- Browser-Tests (Playwright: Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build,
+  ausgeliefert von PHP (`php -q -S localhost:4173 public/index.php`, startet Playwright selbst), also
+  mit echter CSP und echtem Caching. API und Manifest simuliert `page.route()`
+  (`tests/e2e/fixtures.ts`), eine Datenbank wird nicht gebraucht. Jeder Konsolenfehler, Skriptfehler,
+  jede CSP-Verletzung und jede nicht simulierte API-Anfrage lässt den Test scheitern (erwartete
+  Browsermeldung nur per Option `allowedConsoleError`, nie für CSP). Service Worker sind gesperrt
+  außer in `serviceWorker.spec.ts`; der Offline-Test läuft nur in Chromium (`setOffline` umgeht in
+  Firefox/WebKit den Service Worker).
+- Formatierung: Prettier (4 Leerzeichen laut `.editorconfig`, JSON 2), ESLint mit typgeprüften
+  strikten Regeln, `no-console`, nur `<script setup lang="ts">`, kein `v-html`.
 
 ## Server und .htaccess
 - Die `.htaccess` in der Hauptebene des Webspace (`htdocs/.htaccess`) gehört NICHT zum
@@ -1361,6 +1448,31 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   besondere Ergebnisse als Hinweis an die Admins mit Mail (umgesetzt, siehe "Offline-Buchungen
   (API)" und "Hinweise (API)").
 - Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
+
+## GitHub Actions (CI)
+- Workflow `.github/workflows/ci.yml` bei jedem Push auf `main`, bei Pull Requests und von Hand
+  (`workflow_dispatch`). Standardrecht `contents: read`; nur der Job `deploy` hat `contents: write`.
+- Job `php`: Ubuntu 24.04, PHP 8.5 mit den Erweiterungen von STRATO (ohne intl/sodium),
+  Service-Container `mariadb:10.11` mit Datenbank `firefighting_test`; die Workflow-Datei schreibt
+  `config/config.test.php` mit Wegwerf-Zugangsdaten nur für diesen Container (keine echten
+  Zugangsdaten, keine Secrets). `innodb_flush_log_at_trx_commit = 2` nur dort. `mariadb-client`
+  (mysqldump wie auf dem Server), dann `composer validate --strict`, `composer install`,
+  `composer test`. Unter Linux laufen auch die Tests der Unix-Dateirechte und mit mysqldump.
+- Job `frontend`: PHP (für `php -S` in den Browser-Tests) und Node aus `frontend/.nvmrc`; `npm ci`,
+  `npm run lint`, `npm run test:unit`, `npm run build`, Playwright mit Chromium, Firefox, WebKit.
+  Der getestete Build wird als Artefakt `frontend-dist` hochgeladen (bei Fehlern zusätzlich der
+  Playwright-Bericht).
+- Job `deploy`: nur bei Push auf `main` und nur, wenn `php` und `frontend` grün sind; nie parallel
+  (`concurrency: deploy-branch`). Lädt das Artefakt und ruft
+  `bash scripts/publish-deploy-branch.sh <main-commit> <dist-ordner>` auf.
+- `scripts/publish-deploy-branch.sh`: baut mit eigenem temporärem Index den Baum von `main` plus den
+  Build als `frontend/dist` und legt einen Commit in `deploy` an. Eltern: der bisherige
+  `deploy`-Stand (falls vorhanden) und der `main`-Commit, damit jeder Stand per Fast-Forward
+  erreichbar ist (auch vom alten `main` aus). Kein `--force`; gleicher Baum → kein neuer Commit.
+  Bricht ab, wenn `index.html` oder `sw.js` fehlen, der Platzhalter nicht genau einmal vorkommt oder
+  `frontend/dist` auf `main` versioniert ist (Exit-Code 1; falscher Aufruf 2). Tests:
+  `tests/Unit/Scripts/PublishDeployBranchTest` (temporäre Repositorys, eigene leere Git-Konfiguration).
+- Nur der Workflow schreibt in `deploy`; Agenten und Menschen ändern den Branch nie von Hand.
 
 ## Deployment
 - Ablauf: lokal testen (alle Tests grün), committen, zu GitHub synchronisieren, dann auf

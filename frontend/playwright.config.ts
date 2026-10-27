@@ -4,9 +4,10 @@ const isCi = process.env['CI'] !== undefined;
 const PORT = 4173;
 
 /**
- * Browser-Tests gegen den Build (`npm run build`, dann `vite preview`). API und Manifest kommen
- * aus page.route() (tests/e2e/fixtures.ts); jeder Konsolenfehler und jede CSP-Verletzung lässt
- * den Test scheitern.
+ * Browser-Tests gegen den Build (`npm run build`), ausgeliefert wie auf dem Server von PHP
+ * (`php -S` mit public/index.php, also mit CSP und Caching aus FrontendHandler). Die Datenbank wird
+ * dafür nicht gebraucht: API und Manifest kommen aus page.route() (tests/e2e/fixtures.ts). Jeder
+ * Konsolenfehler und jede CSP-Verletzung lässt den Test scheitern.
  */
 export default defineConfig({
     testDir: 'tests/e2e',
@@ -31,7 +32,8 @@ export default defineConfig({
         { name: 'handy-chromium', use: { ...devices['Pixel 7'] } },
     ],
     webServer: {
-        command: `npm run preview -- --port ${PORT}`,
+        command: `php -q -S localhost:${PORT} public/index.php`,
+        cwd: '..',
         url: `http://localhost:${PORT}/firefighting/test/`,
         reuseExistingServer: !isCi,
         timeout: 60_000,

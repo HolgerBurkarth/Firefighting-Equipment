@@ -9,7 +9,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --build && vite build",
-    "preview": "vite preview",
     "typecheck": "vue-tsc --build",
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write . && eslint . --fix",

@@ -60,7 +60,13 @@ final readonly class TempDirectory
                 continue;
             }
             $child = $path . DIRECTORY_SEPARATOR . $entry;
-            is_dir($child) ? self::removeRecursive($child) : unlink($child);
+            if (is_dir($child)) {
+                self::removeRecursive($child);
+            } else {
+                // Git legt Objekte schreibgeschützt an; unter Windows scheitert unlink() sonst.
+                chmod($child, 0600);
+                unlink($child);
+            }
         }
         rmdir($path);
     }

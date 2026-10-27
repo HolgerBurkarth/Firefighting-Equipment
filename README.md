@@ -1060,6 +1060,73 @@ curl.exe -b cookies.txt -c cookies.txt -H "Content-Type: application/json" --dat
 `login.json` und `cookies.txt` (enthält das Sitzungs-Token im Klartext) danach löschen und nie
 committen.
 
+### Lokale Entwicklungsdatenbank mit Test-Stadt
+
+Zum Ansehen der App braucht die Anwendung lokal eine eigene Datenbank. Nie dafür
+`firefighting_test` verwenden: Die Tests leeren deren Tabellen bei jedem Lauf.
+
+1. Datenbank und Benutzer anlegen (als root in der MariaDB-Konsole, Passwort frei wählen):
+
+   ```sql
+   CREATE DATABASE firefighting_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   CREATE USER 'ff_dev'@'localhost' IDENTIFIED BY 'EIN-PASSWORT';
+   GRANT ALL PRIVILEGES ON firefighting_dev.* TO 'ff_dev'@'localhost';
+   ```
+
+2. `config/config.example.php` nach `config/config.local.php` kopieren (wird nie committet) und
+   anpassen:
+
+   ```php
+   return [
+       'db' => [
+           'host' => '127.0.0.1',
+           'name' => 'firefighting_dev',
+           'user' => 'ff_dev',
+           'pass' => 'EIN-PASSWORT',
+       ],
+       // Links in Mails zeigen auf den lokalen Server.
+       'app' => ['base_url' => 'http://localhost:8000'],
+       // Mails als .eml-Dateien in var/mail statt Versand.
+       'mail' => ['transport' => 'file'],
+       // Nur für den Vite-Entwicklungsserver (npm run dev) nötig.
+       'http' => ['allowed_origins' => ['http://localhost:5173']],
+   ];
+   ```
+
+3. Tabellen anlegen, Test-Stadt mit den Start-Gerätetypen anlegen und ihren ersten Admin einladen:
+
+   ```
+   php bin/migrate.php run
+   php bin/tenant.php create --slug=test --name="Feuerwehr Test"
+   php bin/tenant.php invite-admin --slug=test --email=admin@example.org --print-link
+   ```
+
+   `--print-link` zeigt den Einladungslink (`…/einladung-annehmen#token=…`); dieselbe Mail liegt
+   auch in `var/mail/`.
+
+4. Frontend bauen und den Server starten:
+
+   ```
+   cd frontend
+   npm ci
+   npm run build
+   cd ..
+   php -S localhost:8000 public/index.php
+   ```
+
+5. Einladung annehmen. Solange das Frontend die Seite `einladung-annehmen` noch nicht hat, per
+   curl (Token = Teil hinter `#token=` im Link; Datei danach löschen):
+
+   ```
+   # accept.json: {"token":"<Token>","name":"Erika Musterfrau","password":"<mindestens 10 Zeichen>"}
+   curl.exe -H "Content-Type: application/json" --data-binary "@accept.json" http://localhost:8000/firefighting/test/api/v1/auth/invitation/accept
+   ```
+
+Danach `http://localhost:8000/firefighting/test/` öffnen. Mit dem Admin-Konto lassen sich
+Standorte und Geräte über die API anlegen (Beispiele oben unter "Gerätetypen und Standorte" und
+"Geräte", Adresse `http://localhost:8000/firefighting/test/…`) oder per CSV-Import. Ganz von vorn:
+`DROP DATABASE firefighting_dev;` und ab Schritt 1 wiederholen.
+
 ### Neuen Endpunkt anlegen
 
 1. Handler in `src/Api/V1/` anlegen, der `FirefightingEquipment\Http\RequestHandler` implementiert.

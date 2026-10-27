@@ -9,6 +9,8 @@ use FirefightingEquipment\Auth\SessionCookie;
 use FirefightingEquipment\Auth\SessionManager;
 use FirefightingEquipment\Database\ConnectionException;
 use FirefightingEquipment\Database\LazyConnection;
+use FirefightingEquipment\Http\Frontend\FrontendAssets;
+use FirefightingEquipment\Http\Frontend\FrontendHandler;
 use FirefightingEquipment\Mail\ConfiguredMailer;
 use FirefightingEquipment\Mail\Mailer;
 use FirefightingEquipment\Mail\SendmailMailer;
@@ -18,12 +20,14 @@ use FirefightingEquipment\User\Password\PasswordHasher;
 
 /**
  * Bearbeitet eine Anfrage vollständig und liefert eine JSON-Antwort (Fehler immer als JSON), einen
- * CSV-Download oder eine zwischenspeicherbare öffentliche Datei (CacheableResponse).
+ * CSV-Download oder eine zwischenspeicherbare öffentliche Datei (CacheableResponse), darunter das
+ * Frontend.
  *
- * Reihenfolge: Adresse zerlegen, Route suchen, ändernde Anfragen prüfen (CSRF, JSON-Body; ohne
- * Datenbank), erst dann die Stadt laden (Datenbank), Sitzung und Zugriffsstufe prüfen (nur bei
- * Routen, die nicht öffentlich sind), zum Schluss den Handler aufrufen. Unbekannte Adressen
- * verbinden sich so nie mit der Datenbank.
+ * Reihenfolge: Adresse zerlegen, Route suchen (keine Route, GET und nicht unter api/: Frontend, ohne
+ * Datenbank und Sitzung), ändernde Anfragen prüfen (CSRF, JSON-Body; ohne Datenbank), erst dann
+ * die Stadt laden (Datenbank), Sitzung und Zugriffsstufe prüfen (nur bei Routen, die nicht
+ * öffentlich sind), zum Schluss den Handler aufrufen. Unbekannte Adressen verbinden sich so nie
+ * mit der Datenbank.
  */
 final readonly class Application
 {
@@ -37,6 +41,8 @@ final readonly class Application
         private PasswordHasher $hasher = new PasswordHasher(),
         private Mailer $mailer = new SendmailMailer(),
         private AppUrls $urls = new AppUrls(),
+        /** null = kein Frontend (Tests mit eigenen Routern): unbekannte Pfade bleiben 404. */
+        private ?FrontendHandler $frontend = null,
     ) {
     }
 
@@ -54,6 +60,7 @@ final readonly class Application
             guard: new RequestGuard(AllowedOrigins::fromConfigFile($configPath)),
             mailer: ConfiguredMailer::fromConfigFile($configPath, dirname(__DIR__, 2)),
             urls: AppUrls::fromConfigFile($configPath),
+            frontend: new FrontendHandler(new FrontendAssets(FrontendAssets::defaultDirectory())),
         );
     }
 
@@ -62,7 +69,10 @@ final readonly class Application
         try {
             $path = AppPath::parse($request->uri) ?? throw HttpException::notFound();
             $routes = $path->isService() ? $this->serviceRoutes : $this->tenantRoutes;
-            $route = $routes->match($request->method, $path->rest);
+            $route = $this->matchRoute($routes, $request, $path);
+            if ($route === null) {
+                return $this->frontend?->respond($request, $path) ?? throw HttpException::notFound();
+            }
             $body = $this->guard->check($request, $route->maxBodyBytes);
             $tenant = $path->isService() ? null : $this->tenants->resolve($path->scope, $this->db);
 
@@ -98,6 +108,24 @@ final readonly class Application
             $this->errors->report('internal_error', $e);
 
             return HttpException::internalError()->toResponse();
+        }
+    }
+
+    /**
+     * @return RouteMatch|null null: keine Route, das Frontend antwortet (nur GET außerhalb von api/)
+     *
+     * @throws HttpException 404, 405
+     */
+    private function matchRoute(Router $routes, Request $request, AppPath $path): ?RouteMatch
+    {
+        try {
+            return $routes->match($request->method, $path->rest);
+        } catch (HttpException $e) {
+            if ($e->errorCode === 'not_found' && $this->frontend !== null && FrontendHandler::handles($request->method, $path->rest)) {
+                return null;
+            }
+
+            throw $e;
         }
     }
 
