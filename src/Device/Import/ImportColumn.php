@@ -13,6 +13,7 @@ use FirefightingEquipment\Device\DeviceField;
 enum ImportColumn: string
 {
     case Identifier = 'identifier';
+    case ScanCode = 'scan_code';
     case DeviceType = 'device_type';
     case Location = 'location';
     case Status = 'status';
@@ -30,6 +31,7 @@ enum ImportColumn: string
     {
         return match ($this) {
             self::Identifier => 'Kennung',
+            self::ScanCode => 'Scan-Code',
             self::DeviceType => 'Gerätetyp',
             self::Location => 'Standort',
             self::Status => 'Status',

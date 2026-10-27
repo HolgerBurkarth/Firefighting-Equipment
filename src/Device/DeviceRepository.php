@@ -11,8 +11,10 @@ use FirefightingEquipment\Tenant\Tenant;
  * Zugriff auf fe_devices, immer gefiltert nach Stadt. Geräte werden nie gelöscht (es gibt bewusst
  * keine Methode dafür). Jede Änderung schreibt in derselben Transaktion ihr Ereignis
  * (DeviceEventWriter) und erhöht den Versionszähler einmal; eine veraltete erwartete Version wird
- * abgelehnt (DeviceVersionConflictException), ohne etwas zu schreiben. Ob eine Kennung vergeben
- * ist, entscheidet der UNIQUE-Index auf identifier_key (Fehler 1062), nicht eine Vorabfrage.
+ * abgelehnt (DeviceVersionConflictException), ohne etwas zu schreiben. Ob eine Kennung bzw. ein
+ * Scan-Code vergeben ist, entscheidet der UNIQUE-Index auf identifier_key bzw. scan_code_key (Fehler
+ * 1062, unterschieden am Namen des Index), nicht eine Vorabfrage. Verletzt eine Änderung beide,
+ * meldet MariaDB nur den ersten.
  *
  * Sperren gegen gleichzeitige Änderungen (siehe LocationRepository): Ziel-Standort und Gerätetyp
  * werden mit LOCK IN SHARE MODE gelesen und erst dann auf active geprüft, bevor das Gerät
@@ -23,9 +25,12 @@ final readonly class DeviceRepository
 {
     private const int ER_DUP_ENTRY = 1062;
 
+    private const string SCAN_CODE_INDEX = 'uq_fe_devices_tenant_scan_code';
+
     /** Spalte in fe_devices je Stammdatenfeld */
     private const array COLUMNS = [
         'identifier' => 'identifier',
+        'scan_code' => 'scan_code',
         'device_type' => 'device_type_id',
         'serial_number' => 'serial_number',
         'manufacturer' => 'manufacturer',
@@ -34,7 +39,7 @@ final readonly class DeviceRepository
         'note' => 'note',
     ];
 
-    private const string SELECT = 'SELECT d.id, d.identifier, d.device_type_id, t.name AS type_name, d.location_id,'
+    private const string SELECT = 'SELECT d.id, d.identifier, d.scan_code, d.device_type_id, t.name AS type_name, d.location_id,'
         . ' l.name AS location_name, p.name AS parent_name, d.status, d.serial_number, d.manufacturer, d.model,'
         . ' d.procured_on, d.next_inspection_due, d.note, d.version, d.created_at, d.updated_at';
 
@@ -103,7 +108,7 @@ final readonly class DeviceRepository
         if ($limit < 1) {
             throw new \InvalidArgumentException('limit muss positiv sein.');
         }
-        if ($filter->statuses !== [] || $filter->includeRetired || $filter->search !== null) {
+        if ($filter->statuses !== [] || $filter->includeRetired || $filter->search !== null || $filter->scanCode !== null) {
             throw new \InvalidArgumentException('Die Prüffristen filtern nur nach Gerätetyp und Standort.');
         }
 
@@ -206,6 +211,41 @@ final readonly class DeviceRepository
     }
 
     /**
+     * Nicht ausgesonderte Geräte zu Scan-Codes (exakt über scan_code_key) für den CSV-Import. $lock
+     * wie bei findByIdentifierKeys().
+     *
+     * @param list<string> $scanCodes
+     *
+     * @return array<string, Device> Scan-Code => Gerät (Ziffernfolgen macht PHP zu int-Schlüsseln)
+     */
+    public function findByScanCodes(Tenant $tenant, array $scanCodes, bool $lock): array
+    {
+        if ($scanCodes === []) {
+            return [];
+        }
+        if ($lock && !$this->pdo->inTransaction()) {
+            throw new \LogicException('Sperren nur innerhalb einer Transaktion.');
+        }
+
+        $in = implode(', ', array_fill(0, count($scanCodes), '?'));
+        if ($lock) {
+            $this->pdo->prepare('SELECT id FROM fe_devices WHERE tenant_id = ? AND scan_code_key IN (' . $in . ') FOR UPDATE')
+                ->execute([$tenant->id, ...$scanCodes]);
+        }
+        $stmt = $this->pdo->prepare(
+            self::SELECT . self::FROM . ' AND d.scan_code_key IN (' . $in . ')' . ($lock ? ' LOCK IN SHARE MODE' : ''),
+        );
+        $stmt->execute([$tenant->id, ...$scanCodes]);
+
+        $devices = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $devices[(string) $row['scan_code']] = self::hydrate($row);
+        }
+
+        return $devices;
+    }
+
+    /**
      * Legt ein Gerät an und schreibt das Ereignis created.
      *
      * @param int $userId Konto der Stadt, das anlegt
@@ -213,6 +253,7 @@ final readonly class DeviceRepository
      * @throws InvalidDeviceValueException          Standort oder Gerätetyp unbekannt oder fremd
      * @throws DeviceRuleViolationException         Standort gesperrt, Gerätetyp deaktiviert
      * @throws DuplicateDeviceIdentifierException
+     * @throws DuplicateDeviceScanCodeException
      */
     public function create(Tenant $tenant, int $userId, NewDevice $device, ?string $comment): Device
     {
@@ -222,12 +263,13 @@ final readonly class DeviceRepository
 
             try {
                 $this->pdo->prepare(
-                    'INSERT INTO fe_devices (tenant_id, identifier, device_type_id, location_id, status, serial_number,'
+                    'INSERT INTO fe_devices (tenant_id, identifier, scan_code, device_type_id, location_id, status, serial_number,'
                     . ' manufacturer, model, procured_on, next_inspection_due, note, version, created_at, updated_at)'
-                    . ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
+                    . ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
                 )->execute([
                     $tenant->id,
                     $device->identifier->value,
+                    $device->scanCode?->value,
                     $device->deviceTypeId,
                     $device->locationId,
                     $device->status->value,
@@ -239,7 +281,11 @@ final readonly class DeviceRepository
                     $device->note,
                 ]);
             } catch (\PDOException $e) {
-                throw self::isDuplicate($e) ? DuplicateDeviceIdentifierException::forIdentifier($device->identifier) : $e;
+                throw match (self::duplicateIndex($e)) {
+                    DeviceField::Identifier => DuplicateDeviceIdentifierException::forIdentifier($device->identifier),
+                    DeviceField::ScanCode => DuplicateDeviceScanCodeException::forScanCode($device->scanCode ?? throw new \LogicException('Scan-Code fehlt.')),
+                    default => $e,
+                };
             }
             $id = (int) $this->pdo->lastInsertId();
 
@@ -259,6 +305,7 @@ final readonly class DeviceRepository
      * @throws DeviceRuleViolationException       ausgesondert, Gerätetyp deaktiviert
      * @throws InvalidDeviceValueException        Gerätetyp unbekannt oder fremd
      * @throws DuplicateDeviceIdentifierException
+     * @throws DuplicateDeviceScanCodeException
      */
     public function updateFields(Tenant $tenant, int $userId, int $id, int $expectedVersion, DeviceChanges $changes, ?string $comment): Device
     {
@@ -276,6 +323,7 @@ final readonly class DeviceRepository
                 }
                 [$new, $column] = match ($field) {
                     DeviceField::Identifier => [$changes->identifier()?->value, $changes->identifier()?->value],
+                    DeviceField::ScanCode => [$changes->scanCode()?->value, $changes->scanCode()?->value],
                     DeviceField::DeviceType => $this->newDeviceType($tenant, $current, (int) $changes->deviceTypeId()),
                     DeviceField::ProcuredOn => [$changes->procuredOn()?->value, $changes->procuredOn()?->value],
                     default => [$changes->text($field), $changes->text($field)],
@@ -294,9 +342,13 @@ final readonly class DeviceRepository
                 $this->pdo->prepare('UPDATE fe_devices SET ' . $set . ', version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?')
                     ->execute([...array_column($changed, 2), $id, $tenant->id]);
             } catch (\PDOException $e) {
-                throw self::isDuplicate($e) && $changes->identifier() !== null
-                    ? DuplicateDeviceIdentifierException::forIdentifier($changes->identifier())
-                    : $e;
+                $identifier = $changes->identifier();
+                $scanCode = $changes->scanCode();
+                throw match (self::duplicateIndex($e)) {
+                    DeviceField::Identifier => $identifier === null ? $e : DuplicateDeviceIdentifierException::forIdentifier($identifier),
+                    DeviceField::ScanCode => $scanCode === null ? $e : DuplicateDeviceScanCodeException::forScanCode($scanCode),
+                    default => $e,
+                };
             }
 
             $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder);
@@ -392,16 +444,17 @@ final readonly class DeviceRepository
     /**
      * Nimmt ein ausgesondertes Gerät wieder auf: neuer Status; Standort (angegeben oder bisheriger)
      * und Gerätetyp (angegeben oder bisheriger) werden mit LOCK IN SHARE MODE gelesen und müssen
-     * aktiv sein. Optional neue Kennung bzw. neuer Gerätetyp: je geändertem Feld ein Ereignis
-     * field_changed, danach state_changed (alle mit demselben Kommentar); die Version steigt einmal.
-     * Gleiche Werte werden ignoriert. Ist die Kennung inzwischen vergeben, entscheidet der
-     * UNIQUE-Index (Fehler 1062).
+     * aktiv sein. Optional neue Kennung, neuer oder kein Scan-Code bzw. neuer Gerätetyp: je geändertem
+     * Feld ein Ereignis field_changed, danach state_changed (alle mit demselben Kommentar); die
+     * Version steigt einmal. Gleiche Werte werden ignoriert. Ist die Kennung oder der Scan-Code
+     * inzwischen vergeben, entscheidet der UNIQUE-Index (Fehler 1062).
      *
      * @throws DeviceNotFoundException
      * @throws DeviceVersionConflictException
      * @throws DeviceRuleViolationException       nicht ausgesondert, Standort gesperrt, Gerätetyp deaktiviert
      * @throws InvalidDeviceValueException        Standort oder Gerätetyp unbekannt oder fremd
      * @throws DuplicateDeviceIdentifierException
+     * @throws DuplicateDeviceScanCodeException
      */
     public function reinstate(Tenant $tenant, int $userId, int $id, int $expectedVersion, DeviceReinstatement $reinstatement, ?string $comment): Device
     {
@@ -427,6 +480,10 @@ final readonly class DeviceRepository
             if ($identifier !== null && $identifier->value !== $current->identifier->value) {
                 $changed[DeviceField::Identifier->value] = [$current->identifier->value, $identifier->value, $identifier->value];
             }
+            $scanCode = $reinstatement->hasScanCode ? $reinstatement->scanCode : $current->scanCode;
+            if ($scanCode?->value !== $current->scanCode?->value) {
+                $changed[DeviceField::ScanCode->value] = [$current->scanCode?->value, $scanCode?->value, $scanCode?->value];
+            }
             $typeId = $reinstatement->deviceTypeId ?? $current->deviceTypeId;
             if ($typeId !== $current->deviceTypeId) {
                 $changed[DeviceField::DeviceType->value] = [$current->deviceTypeName, $this->lockActiveDeviceType($tenant, $typeId), $typeId];
@@ -440,12 +497,15 @@ final readonly class DeviceRepository
             try {
                 $this->applyState($tenant, $userId, $current, $locationId, $reinstatement->status, $changed, $comment);
             } catch (\PDOException $e) {
-                if (!self::isDuplicate($e)) {
-                    throw $e;
-                }
-                throw $identifier !== null && isset($changed[DeviceField::Identifier->value])
-                    ? DuplicateDeviceIdentifierException::forIdentifier($identifier)
-                    : DuplicateDeviceIdentifierException::onReinstatement($current->identifier);
+                throw match (self::duplicateIndex($e)) {
+                    DeviceField::Identifier => $identifier !== null && isset($changed[DeviceField::Identifier->value])
+                        ? DuplicateDeviceIdentifierException::forIdentifier($identifier)
+                        : DuplicateDeviceIdentifierException::onReinstatement($current->identifier),
+                    DeviceField::ScanCode => isset($changed[DeviceField::ScanCode->value])
+                        ? DuplicateDeviceScanCodeException::forScanCode($scanCode ?? throw new \LogicException('Scan-Code fehlt.'))
+                        : DuplicateDeviceScanCodeException::onReinstatement($current->scanCode ?? throw new \LogicException('Scan-Code fehlt.')),
+                    default => $e,
+                };
             }
 
             return $id;
@@ -622,8 +682,14 @@ final readonly class DeviceRepository
             $where .= " AND d.status <> 'retired'";
         }
         if ($filter->search !== null) {
-            $where .= ' AND (d.identifier LIKE ? OR d.serial_number LIKE ? OR d.manufacturer LIKE ? OR d.model LIKE ?)';
-            array_push($params, ...array_fill(0, 4, '%' . addcslashes($filter->search, '\\%_') . '%'));
+            // scan_code ist binär; die Suche bleibt wie bei den anderen Feldern ohne Groß- und Kleinschreibung.
+            $where .= ' AND (d.identifier LIKE ? OR d.scan_code COLLATE utf8mb4_unicode_ci LIKE ? OR d.serial_number LIKE ?'
+                . ' OR d.manufacturer LIKE ? OR d.model LIKE ?)';
+            array_push($params, ...array_fill(0, 5, '%' . addcslashes($filter->search, '\\%_') . '%'));
+        }
+        if ($filter->scanCode !== null) {
+            $where .= ' AND d.scan_code = ?';
+            $params[] = $filter->scanCode->value;
         }
 
         return [$where, $params];
@@ -680,6 +746,7 @@ final readonly class DeviceRepository
             (int) $row['version'],
             self::utc((string) $row['created_at']),
             self::utc((string) $row['updated_at']),
+            $row['scan_code'] === null ? null : ScanCode::fromDatabase((string) $row['scan_code']),
         );
     }
 
@@ -688,9 +755,17 @@ final readonly class DeviceRepository
         return $value === null ? null : (string) $value;
     }
 
-    private static function isDuplicate(\PDOException $e): bool
+    /**
+     * Welcher UNIQUE-Index bei Fehler 1062 verletzt wurde (am Namen in der Meldung): Kennung oder
+     * Scan-Code; null bei einem anderen Fehler.
+     */
+    private static function duplicateIndex(\PDOException $e): ?DeviceField
     {
-        return ($e->errorInfo[1] ?? null) === self::ER_DUP_ENTRY;
+        if (($e->errorInfo[1] ?? null) !== self::ER_DUP_ENTRY) {
+            return null;
+        }
+
+        return str_contains((string) ($e->errorInfo[2] ?? ''), self::SCAN_CODE_INDEX) ? DeviceField::ScanCode : DeviceField::Identifier;
     }
 
     private static function utc(string $value): \DateTimeImmutable

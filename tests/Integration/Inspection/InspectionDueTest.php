@@ -45,7 +45,7 @@ final class InspectionDueTest extends InspectionApiTestCase
 
         $device = $json['overdue']['devices'][1];
         self::assertSame(
-            ['id', 'identifier', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version', 'days_overdue'],
+            ['id', 'identifier', 'scan_code', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version', 'days_overdue'],
             array_keys($device),
         );
         self::assertSame(['id' => $this->g1, 'name' => 'G1', 'path' => 'HLF 20 / G1'], $device['location']);
@@ -86,7 +86,7 @@ final class InspectionDueTest extends InspectionApiTestCase
         self::assertSame(['M2', 'M10'], self::identifiers($json['without_date']));
         self::assertSame(2, $json['without_date']['total']);
         self::assertSame(
-            ['id', 'identifier', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version'],
+            ['id', 'identifier', 'scan_code', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version'],
             array_keys($json['without_date']['devices'][0]),
         );
         self::assertArrayNotHasKey('without_date', $this->get('inspection-due?include_without_date=0'));

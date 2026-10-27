@@ -24,6 +24,7 @@ final readonly class NewDevice
         public ?DeviceDate $procuredOn = null,
         public ?DeviceDate $nextInspectionDue = null,
         public ?string $note = null,
+        public ?ScanCode $scanCode = null,
     ) {
         if ($status === DeviceStatus::Retired) {
             throw new InvalidDeviceValueException('Ein neues Gerät kann nicht ausgesondert sein.');

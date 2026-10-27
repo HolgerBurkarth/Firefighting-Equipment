@@ -21,6 +21,7 @@ final class DeviceJson
         return [
             'id' => $device->id,
             'identifier' => $device->identifier->value,
+            'scan_code' => $device->scanCode?->value,
             'device_type' => ['id' => $device->deviceTypeId, 'name' => $device->deviceTypeName],
             'location' => ['id' => $device->locationId, 'name' => $device->locationName, 'path' => $device->locationPath()],
             'status' => $device->status->value,

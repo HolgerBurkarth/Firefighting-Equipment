@@ -12,6 +12,7 @@ namespace FirefightingEquipment\Device;
 enum DeviceField: string
 {
     case Identifier = 'identifier';
+    case ScanCode = 'scan_code';
     case DeviceType = 'device_type';
     case SerialNumber = 'serial_number';
     case Manufacturer = 'manufacturer';
@@ -34,6 +35,7 @@ enum DeviceField: string
     {
         return match ($this) {
             self::Identifier => 'Kennung',
+            self::ScanCode => 'Scan-Code',
             self::DeviceType => 'Gerätetyp',
             self::SerialNumber => 'Seriennummer',
             self::Manufacturer => 'Hersteller',
@@ -50,6 +52,7 @@ enum DeviceField: string
     {
         return match ($this) {
             self::Identifier => 'Die Kennung',
+            self::ScanCode => 'Der Scan-Code',
             self::DeviceType => 'Der Gerätetyp',
             self::SerialNumber => 'Die Seriennummer',
             self::Manufacturer => 'Der Hersteller',

@@ -161,6 +161,17 @@ final class HttpException extends \RuntimeException
     }
 
     /**
+     * Der Scan-Code eines Geräts ist unter den nicht ausgesonderten Geräten der Stadt schon vergeben
+     * (exakter Vergleich).
+     *
+     * @param string $message Meldung mit dem Scan-Code
+     */
+    public static function scanCodeTaken(string $message): self
+    {
+        return new self('scan_code_taken', $message, 409);
+    }
+
+    /**
      * Ein Datensatz wurde seit dem Laden geändert (erwartete Version veraltet); nichts geschrieben.
      *
      * @param array<string, mixed> $details aktueller Stand, z. B. {"device": {…}}

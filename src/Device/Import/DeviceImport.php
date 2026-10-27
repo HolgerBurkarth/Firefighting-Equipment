@@ -33,6 +33,7 @@ final readonly class DeviceImport
     /** Spalte in fe_devices je Stammdatenfeld */
     private const array COLUMNS = [
         'identifier' => 'identifier',
+        'scan_code' => 'scan_code',
         'device_type' => 'device_type_id',
         'serial_number' => 'serial_number',
         'manufacturer' => 'manufacturer',
@@ -162,7 +163,7 @@ final readonly class DeviceImport
             return [];
         }
 
-        $placeholders = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())';
+        $placeholders = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())';
         foreach (array_chunk($rows, self::INSERT_ROWS) as $chunk) {
             $params = [];
             foreach ($chunk as $row) {
@@ -171,6 +172,7 @@ final readonly class DeviceImport
                     $params,
                     $tenant->id,
                     $device->identifier->value,
+                    $device->scanCode?->value,
                     $device->deviceTypeId,
                     $device->locationId,
                     $device->status->value,
@@ -183,7 +185,7 @@ final readonly class DeviceImport
                 );
             }
             $this->pdo->prepare(
-                'INSERT INTO fe_devices (tenant_id, identifier, device_type_id, location_id, status, serial_number,'
+                'INSERT INTO fe_devices (tenant_id, identifier, scan_code, device_type_id, location_id, status, serial_number,'
                 . ' manufacturer, model, procured_on, next_inspection_due, note, version, created_at, updated_at) VALUES '
                 . implode(', ', array_fill(0, count($chunk), $placeholders)),
             )->execute($params);

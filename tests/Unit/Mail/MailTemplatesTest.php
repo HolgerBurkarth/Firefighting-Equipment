@@ -265,6 +265,18 @@ angelegt.", $mail->text);
         self::assertDoesNotMatchRegularExpression('/^Lange Notiz$/m', $mail->text, 'keine Zeilenumbrüche aus der Notiz');
     }
 
+    public function testDeviceLogShowsSeparatorsOfScanCode(): void
+    {
+        $at = new \DateTimeImmutable('2026-01-01 08:30:00', new \DateTimeZone('UTC'));
+        $event = self::event(DeviceEventType::FieldChanged, $at, field: DeviceField::ScanCode, old: '4006381333931', new: "0104006381333931\x1D10AB");
+
+        $mail = MailTemplates::deviceLog(self::user(), self::tenant(), self::device(), [$event], self::URL);
+
+        self::assertStringContainsString("\nScan-Code: 4006381333931 → 0104006381333931[GS]10AB\n", $mail->text);
+        self::assertStringNotContainsString("\x1D", $mail->text);
+        self::assertTextRules($mail, self::URL);
+    }
+
     public function testDeviceLogNeedsEvents(): void
     {
         $this->expectException(\InvalidArgumentException::class);

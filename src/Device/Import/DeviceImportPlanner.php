@@ -11,6 +11,7 @@ use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\DeviceTypeName;
 use FirefightingEquipment\Device\NewDevice;
+use FirefightingEquipment\Device\ScanCode;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Time\GermanFormat;
 
@@ -24,10 +25,16 @@ use FirefightingEquipment\Time\GermanFormat;
  * Kleinschreibung, „Straße“ = „Strasse“). Der Pfad wird mit den Pfaden aller Standorte verglichen,
  * nie an „ / “ getrennt (Namen dürfen „/“ enthalten); passen mehrere, ist er mehrdeutig.
  *
+ * Scan-Codes werden exakt verglichen (scan_code_key, binär). Ein Scan-Code darf in der Datei nur
+ * einmal vorkommen und nicht schon einem anderen nicht ausgesonderten Gerät gehören, auch wenn jenes
+ * ihn in derselben Datei abgibt: Scan-Codes lassen sich per Import nicht tauschen oder übertragen
+ * (die UPDATEs würden zwischendurch am UNIQUE-Index scheitern).
+ *
  * Mit $lock (Übernehmen, in der Transaktion von DeviceImport): Geräte FOR UPDATE samt Lücken der
- * neuen Kennungen (DeviceRepository::findByIdentifierKeys), dann alle genannten Standorte und
- * danach alle genannten Gerätetypen LOCK IN SHARE MODE; geprüft wird active aus diesen gesperrten
- * Zeilen. Reihenfolge wie bei Einzeländerungen: Gerät, Standort, Gerätetyp.
+ * neuen Kennungen (DeviceRepository::findByIdentifierKeys), ebenso die Scan-Codes
+ * (findByScanCodes), dann alle genannten Standorte und danach alle genannten Gerätetypen LOCK IN
+ * SHARE MODE; geprüft wird active aus diesen gesperrten Zeilen. Reihenfolge wie bei Einzeländerungen:
+ * Gerät, Standort, Gerätetyp.
  */
 final readonly class DeviceImportPlanner
 {
@@ -44,7 +51,10 @@ final readonly class DeviceImportPlanner
         $active = array_values(array_filter($file->rows, static fn (ImportRow $row): bool => !$row->retired));
 
         $keys = $this->identifierKeys($active);
-        $devices = new DeviceRepository($this->pdo)->findByIdentifierKeys($tenant, array_values(array_unique($keys)), $lock);
+        $repository = new DeviceRepository($this->pdo);
+        $devices = $repository->findByIdentifierKeys($tenant, array_values(array_unique($keys)), $lock);
+        $scanCodes = self::scanCodes($active);
+        $owners = $repository->findByScanCodes($tenant, array_values(array_unique($scanCodes)), $lock);
         $locations = $this->locations($tenant, self::distinct(array_map(static fn (ImportRow $r): ?string => $r->location, $active)), $lock);
         $types = $this->deviceTypes($tenant, self::distinct(array_map(static fn (ImportRow $r): ?string => $r->deviceType, $active)), $lock);
 
@@ -53,7 +63,13 @@ final readonly class DeviceImportPlanner
         foreach ($keys as $line => $key) {
             $linesByKey[$key][] = $line;
         }
+        /** @var array<string, list<int>> $linesByScanCode */
+        $linesByScanCode = [];
+        foreach ($scanCodes as $line => $scanCode) {
+            $linesByScanCode[$scanCode][] = $line;
+        }
         $digitIdentifiers = null;
+        $digitScanCodes = null;
 
         $rows = [];
         $unknownTypes = [];
@@ -75,6 +91,14 @@ final readonly class DeviceImportPlanner
                     'Die Kennung „%s“ kommt in der Datei mehrfach vor (Zeilen %s).',
                     $row->identifierText,
                     implode(', ', $linesByKey[$key]),
+                );
+            }
+            $scanCode = $scanCodes[$row->line] ?? null;
+            if ($scanCode !== null && count($linesByScanCode[$scanCode]) > 1) {
+                $errors[] = sprintf(
+                    'Der Scan-Code „%s“ kommt in der Datei mehrfach vor (Zeilen %s).',
+                    ScanCode::display($scanCode),
+                    implode(', ', $linesByScanCode[$scanCode]),
                 );
             }
 
@@ -100,13 +124,29 @@ final readonly class DeviceImportPlanner
             }
 
             $device = $key === null ? null : ($devices[$key] ?? null);
+            $scanCodeWarnings = [];
+            if ($scanCode !== null) {
+                $owner = $owners[$scanCode] ?? null;
+                if ($owner !== null && $owner->id !== $device?->id) {
+                    $errors[] = sprintf(
+                        'Der Scan-Code „%s“ ist bereits an das Gerät „%s“ vergeben. Per Import lassen sich Scan-Codes nicht übertragen; dazu den Scan-Code zuerst bei „%s“ entfernen.',
+                        ScanCode::display($scanCode),
+                        $owner->identifier->value,
+                        $owner->identifier->value,
+                    );
+                }
+                if (ImportWarnings::withoutLeadingZeros($scanCode) !== null) {
+                    $digitScanCodes ??= $this->digitScanCodes($tenant);
+                }
+                $scanCodeWarnings = self::scanCodeWarnings($scanCode, $digitScanCodes ?? []);
+            }
             if ($device === null) {
                 if ($row->identifier !== null && ImportWarnings::withoutLeadingZeros($row->identifier->value) !== null) {
                     $digitIdentifiers ??= $this->digitIdentifiers($tenant);
                 }
-                $rows[] = $this->planNew($row, $key, $type, $location, $errors, $digitIdentifiers ?? []);
+                $rows[] = $this->planNew($row, $key, $type, $location, $errors, $digitIdentifiers ?? [], $scanCodeWarnings);
             } else {
-                $rows[] = $this->planUpdate($row, $device, $type, $location, $errors);
+                $rows[] = $this->planUpdate($row, $device, $type, $location, $errors, $scanCodeWarnings);
             }
         }
 
@@ -119,8 +159,9 @@ final readonly class DeviceImportPlanner
      * @param array{id: int, path: string, active: bool}|null $location
      * @param list<string>                                    $errors
      * @param array<string, list<string>>                     $digitIdentifiers ohne führende Nullen => vorhandene Kennungen
+     * @param list<string>                                    $scanCodeWarnings Hinweise zum Scan-Code der Zeile
      */
-    private function planNew(ImportRow $row, ?string $key, ?array $type, ?array $location, array $errors, array $digitIdentifiers): ImportRowPlan
+    private function planNew(ImportRow $row, ?string $key, ?array $type, ?array $location, array $errors, array $digitIdentifiers, array $scanCodeWarnings): ImportRowPlan
     {
         if ($row->deviceType === null) {
             $errors[] = 'Für ein neues Gerät fehlt der Gerätetyp.';
@@ -148,14 +189,19 @@ final readonly class DeviceImportPlanner
             $row->date(ImportColumn::ProcuredOn),
             $row->date(ImportColumn::NextInspectionDue),
             $row->text(ImportColumn::Note),
+            $row->scanCode(),
         );
 
-        $changes = [
-            new ImportChange(ImportColumn::Identifier, null, $row->identifier->value),
+        $changes = [new ImportChange(ImportColumn::Identifier, null, $row->identifier->value)];
+        if ($row->scanCode() !== null) {
+            $changes[] = new ImportChange(ImportColumn::ScanCode, null, $row->scanCode()->value);
+        }
+        array_push(
+            $changes,
             new ImportChange(ImportColumn::DeviceType, null, $type['name']),
             new ImportChange(ImportColumn::Location, null, $location['path']),
             new ImportChange(ImportColumn::Status, null, $status->label()),
-        ];
+        );
         foreach ([ImportColumn::NextInspectionDue, ImportColumn::SerialNumber, ImportColumn::Manufacturer, ImportColumn::Model, ImportColumn::ProcuredOn, ImportColumn::Note] as $column) {
             $value = self::display($row, $column);
             if ($value !== null) {
@@ -175,6 +221,9 @@ final readonly class DeviceImportPlanner
         if (ImportWarnings::looksLikeDate($row->identifier->value)) {
             $warnings[] = self::dateWarning($row->identifier->value);
         }
+        if ($row->scanCode() !== null) {
+            array_push($warnings, ...$scanCodeWarnings);
+        }
 
         return ImportRowPlan::created($row->line, $key, $device, $changes, $warnings);
     }
@@ -183,8 +232,9 @@ final readonly class DeviceImportPlanner
      * @param array{id: int, name: string, active: bool}|null $type
      * @param array{id: int, path: string, active: bool}|null $location
      * @param list<string>                                    $errors
+     * @param list<string>                                    $scanCodeWarnings Hinweise zum Scan-Code der Zeile
      */
-    private function planUpdate(ImportRow $row, Device $device, ?array $type, ?array $location, array $errors): ImportRowPlan
+    private function planUpdate(ImportRow $row, Device $device, ?array $type, ?array $location, array $errors, array $scanCodeWarnings): ImportRowPlan
     {
         $identifier = $row->identifier ?? throw new \LogicException('Gerät ohne Kennung zugeordnet.');
         $changes = [];
@@ -230,18 +280,25 @@ final readonly class DeviceImportPlanner
             $changes[] = new ImportChange(ImportColumn::NextInspectionDue, self::date($device->nextInspectionDue), self::date($due));
         }
 
-        foreach ([ImportColumn::SerialNumber, ImportColumn::Manufacturer, ImportColumn::Model, ImportColumn::ProcuredOn, ImportColumn::Note] as $column) {
+        foreach ([ImportColumn::ScanCode, ImportColumn::SerialNumber, ImportColumn::Manufacturer, ImportColumn::Model, ImportColumn::ProcuredOn, ImportColumn::Note] as $column) {
             if (!$row->has($column)) {
                 continue;
             }
             $field = $column->deviceField() ?? throw new \LogicException('Kein Stammdatenfeld.');
-            $new = $column === ImportColumn::ProcuredOn ? $row->date($column)?->value : $row->text($column);
+            $new = match ($column) {
+                ImportColumn::ProcuredOn => $row->date($column)?->value,
+                ImportColumn::ScanCode => $row->scanCode()?->value,
+                default => $row->text($column),
+            };
             $old = $device->fieldText($field);
             if ($old !== $new) {
                 $fields[$field->value] = [$old, $new, $new];
                 $changes[] = $column === ImportColumn::ProcuredOn
                     ? new ImportChange($column, self::date($device->procuredOn), self::date($row->date($column)))
                     : new ImportChange($column, $old, $new);
+                if ($column === ImportColumn::ScanCode && $new !== null) {
+                    array_push($warnings, ...$scanCodeWarnings);
+                }
             }
         }
 
@@ -281,6 +338,59 @@ final readonly class DeviceImportPlanner
         }
 
         return $keys;
+    }
+
+    /**
+     * Scan-Code je Zeile (nur Zeilen mit Spalte Scan-Code und gültigem, nicht leerem Wert).
+     *
+     * @param list<ImportRow> $rows
+     *
+     * @return array<int, string> Zeilennummer => Scan-Code
+     */
+    private static function scanCodes(array $rows): array
+    {
+        $scanCodes = [];
+        foreach ($rows as $row) {
+            $scanCode = $row->scanCode();
+            if ($scanCode !== null) {
+                $scanCodes[$row->line] = $scanCode->value;
+            }
+        }
+
+        return $scanCodes;
+    }
+
+    /**
+     * Hinweise zu einem neuen oder geänderten Scan-Code: wissenschaftliche Schreibweise, verlorene
+     * führende Nullen gegenüber einem vorhandenen Scan-Code (desselben oder eines anderen Geräts).
+     *
+     * @param array<string, list<array{string, string}>> $digitScanCodes ohne führende Nullen => [Scan-Code, Kennung]
+     *
+     * @return list<string>
+     */
+    private static function scanCodeWarnings(string $scanCode, array $digitScanCodes): array
+    {
+        $warnings = [];
+        if (ImportWarnings::looksScientific($scanCode)) {
+            $warnings[] = sprintf(
+                'Der Scan-Code „%s“ sieht wie eine Zahl in wissenschaftlicher Schreibweise aus. Hat Excel ihn umgewandelt (dabei gehen Ziffern verloren)? Dann die Datei mit der Spalte Scan-Code als Text öffnen.',
+                ScanCode::display($scanCode),
+            );
+        }
+        $digits = ImportWarnings::withoutLeadingZeros($scanCode);
+        $longer = array_values(array_filter(
+            $digits === null ? [] : $digitScanCodes[$digits] ?? [],
+            static fn (array $existing): bool => strlen($existing[0]) > strlen($scanCode),
+        ));
+        if ($longer !== []) {
+            $warnings[] = sprintf(
+                'Der Scan-Code „%s“ entspricht ohne führende Nullen dem vorhandenen Scan-Code %s. Hat Excel führende Nullen entfernt? Dann die Datei mit der Spalte Scan-Code als Text öffnen.',
+                $scanCode,
+                implode(', ', array_map(static fn (array $e): string => sprintf('„%s“ (Gerät „%s“)', $e[0], $e[1]), $longer)),
+            );
+        }
+
+        return $warnings;
     }
 
     /**
@@ -407,6 +517,28 @@ final readonly class DeviceImportPlanner
         }
 
         return $identifiers;
+    }
+
+    /**
+     * Scan-Codes nicht ausgesonderter Geräte, die nur aus Ziffern bestehen (für die Warnung zu
+     * führenden Nullen).
+     *
+     * @return array<string, list<array{string, string}>> ohne führende Nullen => [Scan-Code, Kennung]
+     */
+    private function digitScanCodes(Tenant $tenant): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT scan_code, identifier FROM fe_devices WHERE tenant_id = ? AND scan_code_key IS NOT NULL'
+            . " AND scan_code_key REGEXP '^[0-9]+\\\\z' ORDER BY scan_code_key",
+        );
+        $stmt->execute([$tenant->id]);
+
+        $scanCodes = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $scanCodes[ImportWarnings::withoutLeadingZeros((string) $row['scan_code']) ?? ''][] = [(string) $row['scan_code'], (string) $row['identifier']];
+        }
+
+        return $scanCodes;
     }
 
     private static function display(ImportRow $row, ImportColumn $column): ?string

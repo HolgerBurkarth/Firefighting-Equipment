@@ -32,6 +32,7 @@ final readonly class Device
         public \DateTimeImmutable $createdAt,
         /** UTC */
         public \DateTimeImmutable $updatedAt,
+        public ?ScanCode $scanCode = null,
     ) {
     }
 
@@ -57,6 +58,7 @@ final readonly class Device
     {
         return match ($field) {
             DeviceField::Identifier => $this->identifier->value,
+            DeviceField::ScanCode => $this->scanCode?->value,
             DeviceField::DeviceType => $this->deviceTypeName,
             DeviceField::SerialNumber => $this->serialNumber,
             DeviceField::Manufacturer => $this->manufacturer,

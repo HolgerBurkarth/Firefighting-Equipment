@@ -42,7 +42,7 @@ final class DeviceListTest extends DeviceApiTestCase
         self::assertSame([5, 50, 0], [$json['total'], $json['limit'], $json['offset']]);
         self::assertSame(['M1', 'M2', 'm3', 'M10', 'MA-1'], array_column($json['devices'], 'identifier'));
         self::assertSame(
-            ['id', 'identifier', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version'],
+            ['id', 'identifier', 'scan_code', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version'],
             array_keys($json['devices'][0]),
         );
         self::assertSame(['id' => $this->g1, 'name' => 'G1', 'path' => 'HLF 20 / G1'], $json['devices'][0]['location']);

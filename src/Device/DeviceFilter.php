@@ -17,8 +17,8 @@ final readonly class DeviceFilter
 
     /**
      * @param list<DeviceStatus> $statuses
-     * @param string|null        $search   Teil von Kennung, Seriennummer, Hersteller oder Modell
-     *                                     (ohne Groß- und Kleinschreibung; geprüft über
+     * @param string|null        $search   Teil von Kennung, Scan-Code, Seriennummer, Hersteller oder
+     *                                     Modell (ohne Groß- und Kleinschreibung; geprüft über
      *                                     DeviceText::search())
      *
      * @throws InvalidDeviceValueException Unterstandorte ohne Standort, Suchtext ungültig
@@ -31,6 +31,8 @@ final readonly class DeviceFilter
         array $statuses = [],
         public ?string $search = null,
         public bool $includeRetired = false,
+        /** genau dieser Scan-Code (binär verglichen) */
+        public ?ScanCode $scanCode = null,
     ) {
         if ($includeSublocations && $locationId === null) {
             throw new InvalidDeviceValueException('Unterstandorte lassen sich nur zusammen mit einem Standort (location_id) einschließen.');

@@ -13,6 +13,7 @@ use FirefightingEquipment\Device\DeviceDate;
 use FirefightingEquipment\Device\DeviceIdentifier;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\DeviceText;
+use FirefightingEquipment\Device\ScanCode;
 use FirefightingEquipment\Device\Import\DeviceImportFile;
 use FirefightingEquipment\Device\Import\ImportColumn;
 use FirefightingEquipment\Device\Import\ImportDate;
@@ -38,21 +39,24 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(DeviceIdentifier::class)]
 #[UsesClass(DeviceDate::class)]
 #[UsesClass(DeviceText::class)]
+#[UsesClass(ScanCode::class)]
 final class DeviceImportFileTest extends TestCase
 {
-    private const string HEADER = "Kennung;Gerätetyp;Standort;Status;Nächste Prüfung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n";
+    private const string HEADER = "Kennung;Scan-Code;Gerätetyp;Standort;Status;Nächste Prüfung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n";
 
     public function testAllColumnsAreRead(): void
     {
         $file = DeviceImportFile::parse(CsvFormat::BOM . self::HEADER
-            . "MA-01;Atemschutzmaske;HLF 20 / G1;in Wartung;01.03.2027;'-12;Dräger;\"FPS \"\"7000\"\"\";1.5.2024;\"Ventil\r\nprüfen\"\r\n");
+            . "MA-01;'+0104006381333931\x1D10AB\t;Atemschutzmaske;HLF 20 / G1;in Wartung;01.03.2027;'-12;Dräger;\"FPS \"\"7000\"\"\";1.5.2024;\"Ventil\r\nprüfen\"\r\n");
 
         self::assertSame(ImportColumn::cases(), $file->columns);
         self::assertSame(hash('sha256', CsvFormat::BOM . self::HEADER
-            . "MA-01;Atemschutzmaske;HLF 20 / G1;in Wartung;01.03.2027;'-12;Dräger;\"FPS \"\"7000\"\"\";1.5.2024;\"Ventil\r\nprüfen\"\r\n"), $file->hash);
+            . "MA-01;'+0104006381333931\x1D10AB\t;Atemschutzmaske;HLF 20 / G1;in Wartung;01.03.2027;'-12;Dräger;\"FPS \"\"7000\"\"\";1.5.2024;\"Ventil\r\nprüfen\"\r\n"), $file->hash);
         $row = $file->rows[0];
         self::assertSame(2, $row->line);
         self::assertSame('MA-01', $row->identifier?->value);
+        self::assertSame("+0104006381333931\x1D10AB", $row->scanCode()?->value, 'Formelschutz und Tab am Ende entfernt, GS bleibt');
+        self::assertTrue($row->has(ImportColumn::ScanCode));
         self::assertSame('Atemschutzmaske', $row->deviceType);
         self::assertSame('HLF 20 / G1', $row->location);
         self::assertSame(DeviceStatus::Maintenance, $row->status);
@@ -150,7 +154,7 @@ final class DeviceImportFileTest extends TestCase
         $e = self::fileError("Kennung;Seriennumer;Farbe\r\nMA-01;1;rot\r\n");
 
         self::assertSame(
-            'Unbekannte Spalten: „Seriennumer“, „Farbe“. Möglich sind: Kennung, Gerätetyp, Standort, Status, Nächste Prüfung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz.',
+            'Unbekannte Spalten: „Seriennumer“, „Farbe“. Möglich sind: Kennung, Scan-Code, Gerätetyp, Standort, Status, Nächste Prüfung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz.',
             $e->getMessage(),
         );
         self::assertSame(['line' => 1, 'columns' => ['Seriennumer', 'Farbe']], $e->details);
@@ -179,7 +183,7 @@ final class DeviceImportFileTest extends TestCase
 
     public function testAbortedExportIsRejected(): void
     {
-        $e = self::fileError(CsvFormat::BOM . self::HEADER . "MA-01;Atemschutzmaske;HLF 20;einsatzbereit;;;;;;\r\n" . CsvFormat::line([CsvFormat::ABORTED_LINE]));
+        $e = self::fileError(CsvFormat::BOM . self::HEADER . "MA-01;;Atemschutzmaske;HLF 20;einsatzbereit;;;;;;\r\n" . CsvFormat::line([CsvFormat::ABORTED_LINE]));
 
         self::assertSame('Die Datei stammt aus einem abgebrochenen Export und ist unvollständig. Bitte den Export wiederholen.', $e->getMessage());
         self::assertSame(['line' => 3], $e->details);
@@ -195,7 +199,7 @@ final class DeviceImportFileTest extends TestCase
     public function testEmptyAndHeaderOnlyFilesAreRejected(): void
     {
         self::assertSame('Die Datei ist leer.', self::fileError('')->getMessage());
-        self::assertSame('Die Datei enthält keine Geräte (nur die Kopfzeile).', self::fileError(self::HEADER . ";;;;;;;;;\r\n")->getMessage());
+        self::assertSame('Die Datei enthält keine Geräte (nur die Kopfzeile).', self::fileError(self::HEADER . ";;;;;;;;;;\r\n")->getMessage());
     }
 
     public function testUnreadableFileHasLine(): void

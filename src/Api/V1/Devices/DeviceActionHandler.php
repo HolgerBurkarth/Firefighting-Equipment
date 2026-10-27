@@ -19,9 +19,10 @@ use FirefightingEquipment\Notification\DeviceLogNotifier;
  * und dem Stand danach, beim Anlegen 201.
  *
  * Ungültige Felder 400 (auch ein unbekannter oder fremder Gerätetyp bzw. Standort im Body), fremde
- * oder unbekannte ID im Pfad 404, Kennung vergeben 409 identifier_taken, veraltete Version 409
- * version_conflict (details {"device": aktueller Stand}), Regelverstoß 409 rule_violation (Standort
- * gesperrt, Gerätetyp deaktiviert, Gerät ausgesondert bzw. beim Wiederaufnehmen nicht ausgesondert).
+ * oder unbekannte ID im Pfad 404, Kennung vergeben 409 identifier_taken, Scan-Code vergeben 409
+ * scan_code_taken, veraltete Version 409 version_conflict (details {"device": aktueller Stand}),
+ * Regelverstoß 409 rule_violation (Standort gesperrt, Gerätetyp deaktiviert, Gerät ausgesondert bzw.
+ * beim Wiederaufnehmen nicht ausgesondert).
  * Felder werden vor der Suche gelesen (400 vor 404). Ändert sich nichts, bleibt die Version gleich.
  *
  * Nach einer Änderung (nach dem Commit) geht die Benachrichtigung „Log“ an die Empfänger

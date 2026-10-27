@@ -13,6 +13,7 @@ use FirefightingEquipment\Device\Import\DeviceImportPlan;
 use FirefightingEquipment\Device\Import\ImportChange;
 use FirefightingEquipment\Device\Import\ImportResult;
 use FirefightingEquipment\Device\Import\ImportRowPlan;
+use FirefightingEquipment\Device\ScanCode;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Time\GermanFormat;
 use FirefightingEquipment\User\EmailAddress;
@@ -590,12 +591,12 @@ final class MailTemplates
     }
 
     /**
-     * Wert einer Zeile: Zeilenumbrüche und mehrfache Leerzeichen als ein Leerzeichen, höchstens
-     * LOG_VALUE_LENGTH Zeichen.
+     * Wert einer Zeile: Trennzeichen eines Scan-Codes sichtbar ([GS], [RS], [EOT]), Zeilenumbrüche
+     * und mehrfache Leerzeichen als ein Leerzeichen, höchstens LOG_VALUE_LENGTH Zeichen.
      */
     private static function logValue(string $value): string
     {
-        $value = trim((string) preg_replace('/\s+/u', ' ', $value));
+        $value = trim((string) preg_replace('/\s+/u', ' ', ScanCode::display($value)));
 
         return mb_strlen($value) > self::LOG_VALUE_LENGTH ? mb_substr($value, 0, self::LOG_VALUE_LENGTH - 1) . '…' : $value;
     }

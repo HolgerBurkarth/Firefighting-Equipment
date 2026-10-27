@@ -11,7 +11,7 @@ namespace FirefightingEquipment\Device;
 final readonly class DeviceChanges
 {
     /**
-     * @param array<string, DeviceIdentifier|int|string|DeviceDate|null> $values nach DeviceField->value
+     * @param array<string, DeviceIdentifier|ScanCode|int|string|DeviceDate|null> $values nach DeviceField->value
      *
      * @throws InvalidDeviceValueException keine Felder angegeben
      */
@@ -27,6 +27,7 @@ final readonly class DeviceChanges
             $field = DeviceField::from($key);
             $valid = match ($field) {
                 DeviceField::Identifier => $value instanceof DeviceIdentifier,
+                DeviceField::ScanCode => $value === null || $value instanceof ScanCode,
                 DeviceField::DeviceType => is_int($value),
                 DeviceField::ProcuredOn => $value === null || $value instanceof DeviceDate,
                 default => $value === null || is_string($value),
@@ -47,6 +48,13 @@ final readonly class DeviceChanges
         $value = $this->values[DeviceField::Identifier->value] ?? null;
 
         return $value instanceof DeviceIdentifier ? $value : null;
+    }
+
+    public function scanCode(): ?ScanCode
+    {
+        $value = $this->values[DeviceField::ScanCode->value] ?? null;
+
+        return $value instanceof ScanCode ? $value : null;
     }
 
     public function deviceTypeId(): ?int

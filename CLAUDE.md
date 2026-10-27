@@ -115,7 +115,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `tenant_not_found` 404, `method_not_allowed` 405, `rule_violation` 409 (Meldung der verletzten
   Regel), `slug_taken` 409, `email_taken` 409 (beide nur für den Super-Admin; öffentliche Abläufe
   verraten nie, ob eine Adresse existiert), `name_taken` 409 (Name eines Gerätetyps bzw. Standorts
-  vergeben), `identifier_taken` 409 (Kennung eines Geräts vergeben), `version_conflict` 409
+  vergeben), `identifier_taken` 409 (Kennung eines Geräts vergeben), `scan_code_taken` 409
+  (Scan-Code eines Geräts vergeben), `version_conflict` 409
   (Gerät inzwischen geändert, aktueller Stand in `details`), `import_outdated` 409 (CSV-Import: seit
   der Vorschau geändert, Vorschau neu erstellen), `unsupported_media_type` 415, `weak_password`
   422, `too_many_attempts` 429 (mit `Retry-After`), `database_unavailable` 503, `internal_error`
@@ -163,8 +164,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `utf8mb4_unicode_ci`. Die Verbindung läuft mit Sitzungs-Zeitzone UTC (`+00:00`).
   Dokumentierte Ausnahmen auf Spaltenebene: `fe_users.email` ist `utf8mb4_bin`, damit z. B.
   "ß"/"ss" oder "é"/"e" nicht als gleich gelten (Kleinschreibung erzwingt ein CHECK); ebenso
-  `fe_devices.identifier_key` sowie `fe_device_events.old_value`/`new_value` (siehe "Standorte und
-  Geräte"); feste Werte (`role`, `status`, `purpose`, `action`, `kind`, `event_type`, `field`) und
+  `fe_devices.identifier_key`, `fe_devices.scan_code`/`scan_code_key` (exakter Vergleich) sowie
+  `fe_device_events.old_value`/`new_value` (siehe "Standorte und Geräte"); feste Werte (`role`, `status`, `purpose`, `action`, `kind`, `event_type`, `field`) und
   `password_hash` sind `ascii`/`ascii_bin`, damit `IN (...)` bzw. `LIKE` Groß- und
   Kleinschreibung unterscheiden.
 - `sql_mode` setzt `ConnectionFactory` ausdrücklich und vollständig, damit lokal und STRATO
@@ -689,7 +690,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Europe/Berlin). Zwecke im Protokoll: `admin_invitation`, `invitation_accepted`.
 
 ## Standorte und Geräte
-- Stand: Schema (Migrationen `0011`–`0015`), Start-Gerätetypen neuer Städte, die API für
+- Stand: Schema (Migrationen `0011`–`0015`, Scan-Code `0019`/`0020`), Start-Gerätetypen neuer Städte, die API für
   Gerätetypen und Standorte (siehe "Gerätetypen und Standorte (API)") und für Geräte (anlegen,
   Stammdaten, Prüfdatum, Liste, Einzelansicht, Umbuchen/Status, Aussondern/Wiederaufnehmen,
   Historie; siehe "Geräte (API)"), Prüffristen und Zusammenfassung (siehe "Prüffristen und
@@ -701,8 +702,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   exportieren. `admin` zusätzlich: aussondern und wieder aufnehmen, Prüfdatum ("nächste Prüfung
   fällig") ändern, Geräte anlegen und Stammdaten bearbeiten, Gerätetypen und Standorte verwalten,
   CSV importieren.
-- Gerät (`fe_devices`): Pflicht Kennung, Gerätetyp, Standort, Status; optional Seriennummer,
-  Hersteller, Modell (zwei Felder), Beschaffungsdatum, Notiz (höchstens 1000 Zeichen), nächste
+- Gerät (`fe_devices`): Pflicht Kennung, Gerätetyp, Standort, Status; optional Scan-Code,
+  Seriennummer, Hersteller, Modell (zwei Felder), Beschaffungsdatum, Notiz (höchstens 1000 Zeichen), nächste
   Prüfung fällig. Datumsfelder sind `DATE` zwischen 1950-01-01 und 2099-12-31 (fängt Tippfehler wie
   "0202" ab). Leere Texte werden als `NULL` gespeichert. Typ und Standort nur aus derselben Stadt.
 - Kennung: höchstens 30 Zeichen aus Buchstaben (alle Unicode-Buchstaben, zusammengesetzte Form),
@@ -714,6 +715,18 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Spalte `identifier_key` = `REPLACE(LOWER(identifier), 'ẞ', 'ß')` in `utf8mb4_bin`, bei
   ausgesonderten Geräten `NULL`, mit UNIQUE-Index (`LOWER()` kennt unter `utf8mb4_unicode_ci` das
   große ẞ nicht). Format per CHECK mit `REGEXP` und `\p{L}`.
+- Scan-Code (`scan_code`, Migration `0019`, `ScanCode`): Inhalt eines Barcodes/QR-Codes/GS1-DataMatrix,
+  höchstens 200 Zeichen, `utf8mb4_bin`, gespeichert wie eingegeben und exakt verglichen (Groß- und
+  Kleinschreibung zählt, ß ≠ ss). Regeln (Code und CHECK `chk_fe_devices_scan_code` gemeinsam
+  ändern): Leerzeichen, Tab, CR, LF an BEIDEN Enden entfernt (Scanner-Präfix/-Suffix), danach leer =
+  `NULL`; im Inhalt erlaubt sind die Trennzeichen EOT (0x04), GS (0x1D) und RS (0x1E) (GS1,
+  ISO/IEC 15434), alle anderen Steuerzeichen (`\p{Cc}`, auch Tab/CR/LF im Inhalt), `\p{Cf}` und
+  U+2028/2029 werden abgelehnt; Leerzeichen im Inhalt bleiben unverändert. Lesbar in Meldungen und
+  Mails über `ScanCode::display` (`[GS]`, `[RS]`, `[EOT]`; kein `<…>`, Mailtexte dürfen kein `<`
+  enthalten). Eindeutig je Stadt nur unter nicht ausgesonderten Geräten über `scan_code_key` =
+  `IF(status = 'retired', NULL, scan_code)` mit UNIQUE-Index `uq_fe_devices_tenant_scan_code`; der
+  Scan-Code bleibt am ausgesonderten Gerät gespeichert. In der CHECK-Bedingung stehen die Zeichen als
+  `'\\x{1D}'` (in SQL-Strings doppelter Backslash, sonst wird aus `\x` ein `x`).
 - Status (`status`, `ascii_bin`): `ready` (einsatzbereit), `maintenance` (in Wartung), `defective`
   (defekt), `retired` (ausgesondert). Ausgesonderte Geräte sind aus normalen Listen und Prüffristen
   ausgeblendet, nicht umbuchbar; der Admin kann sie wieder aufnehmen. Geräte werden nie gelöscht
@@ -743,8 +756,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `created` bzw. `imported` (CSV-Import; Ziel-Standort und -Status, nicht ausgesondert), `state_changed`
   (Umbuchung und/oder Statusänderung in EINEM Eintrag, Von/Nach je Paar, verschieden; auch Aussondern
   und Wiederaufnehmen), `due_changed` (Prüfdatum alt/neu, je auch leer), `field_changed` (Stammdaten:
-  ein Eintrag je Feld `identifier`, `device_type`, `serial_number`, `manufacturer`, `model`,
-  `procured_on`, `note`, alter/neuer Wert als Text in `utf8mb4_bin`, beim Gerätetyp dessen Name zum
+  ein Eintrag je Feld `identifier`, `scan_code` (seit Migration `0020`), `device_type`,
+  `serial_number`, `manufacturer`, `model`, `procured_on`, `note`, alter/neuer Wert als Text in `utf8mb4_bin`, beim Gerätetyp dessen Name zum
   Zeitpunkt der Änderung). Welche Spalten je Ereignis gefüllt sind, prüfen CHECK-Bedingungen.
 - Was nur der Code sichert (ohne Trigger nicht möglich): Standort nur leer sperren, gesperrter Standort
   und deaktivierter Gerätetyp sind kein Ziel, Ereignis passend zur Änderung am Gerät, Versionsprüfung.
@@ -823,24 +836,32 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Routen in `AdminRoutesAccessTest` bzw. `TenantReadRoutesAccessTest`); einzige Ausnahme:
   `POST devices/{id}/state` ist `Access::Authenticated` (`user` bucht um und setzt den Status;
   Rechte in `DeviceStateTest::testOnlyAccountsOfOwnTenant`). Code in `src/Device/`
-  (`DeviceIdentifier`, `DeviceStatus` mit `label()`, `DeviceDate`, `DeviceText`, `DeviceField` mit
+  (`DeviceIdentifier`, `ScanCode`, `DeviceStatus` mit `label()`, `DeviceDate`, `DeviceText`, `DeviceField` mit
   `label()`, `Device`, `NewDevice`, `DeviceChanges`, `DeviceStateChange`, `DeviceReinstatement`,
   `DeviceFilter`, `DeviceSort`, `DevicePage`, `DeviceRepository`, `DeviceEventWriter`; Historie
   lesen: `DeviceEventRepository` (nur lesend), `DeviceEvent`, `DeviceEventType`,
   `DeviceEventLocation`, `DeviceEventPage`; Fehler `DeviceNotFoundException`,
-  `DuplicateDeviceIdentifierException`, `DeviceVersionConflictException`, dazu
+  `DuplicateDeviceIdentifierException`, `DuplicateDeviceScanCodeException`,
+  `DeviceVersionConflictException`, dazu
   `DeviceRuleViolationException`), Endpunkte in `src/Api/V1/Devices/` (`DeviceListHandler`,
   `DeviceActionHandler` mit `DeviceAction`, `DeviceFields` liest die Bodys, `DeviceJson`,
   `DeviceEventListHandler`, `DeviceEventJson`), Fehlerumsetzung in `DeviceErrors`. Tests in
-  `tests/Integration/Device/` auf Basis von `DeviceApiTestCase`.
+  `tests/Integration/Device/` auf Basis von `DeviceApiTestCase` (Scan-Code: `DeviceScanCodeTest`,
+  `DeviceScanCodeSchemaTest`).
+- Fehler 1062 beim Schreiben eines Geräts: `DeviceRepository::duplicateIndex` unterscheidet am Namen
+  des Index in der Meldung (`uq_fe_devices_tenant_scan_code` → Scan-Code, sonst Kennung). Verletzt
+  eine Änderung beide Indizes, meldet MariaDB nur den ersten.
 - `GET devices`: Parameter `device_type_id`, `location_id`, `include_sublocations=1` (nur mit
   `location_id`, sonst 400), `status` (kommagetrennt; nennt er `retired`, erscheinen ausgesonderte),
-  `include_retired=1` (ohne `status`: alle Status), `q` (`LIKE` auf Kennung, Seriennummer,
-  Hersteller, Modell; `%`, `_`, `\` maskiert; höchstens 100 Zeichen), `sort` (`DeviceSort`:
+  `include_retired=1` (ohne `status`: alle Status), `q` (`LIKE` auf Kennung, Scan-Code (mit
+  `COLLATE utf8mb4_unicode_ci`, also wie die anderen ohne Groß-/Kleinschreibung), Seriennummer,
+  Hersteller, Modell; `%`, `_`, `\` maskiert; höchstens 100 Zeichen), `scan_code` (exakt
+  `d.scan_code = ?`, Normalisierung wie `ScanCode`, leer oder ungültig 400; kombinierbar; ausgesonderte
+  nur über `status`/`include_retired`), `sort` (`DeviceSort`:
   `identifier` Standard, `device_type`, `location`, `status`, `next_inspection_due`), `dir`
   (`SortDirection`: `asc` Standard, `desc`; beide nur exakt kleingeschrieben, sonst 400; gelesen von
   `DeviceListHandler::sort`), `limit` 1–200 (Standard 50), `offset` 0–1000000. Unbekannte oder fremde IDs im Filter → leere Liste. Antwort `{devices, total, limit,
-  offset}`; je Gerät `id`, `identifier`, `device_type {id, name}`, `location {id, name, path}`
+  offset}`; je Gerät `id`, `identifier`, `scan_code`, `device_type {id, name}`, `location {id, name, path}`
   (Pfad „HLF 20 / G1“), `status`, `status_label`, `next_inspection_due`, `version`.
 - Sortierung (`DeviceRepository::orderBy`, nur feste Ausdrücke): Kennung `NATURAL_SORT_KEY(identifier)`,
   Gerätetyp `NATURAL_SORT_KEY(t.name)`, Standort `NATURAL_SORT_KEY` des angezeigten Pfads (derselbe
@@ -854,13 +875,14 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - `GET devices/{id}`: alle Felder (zusätzlich `serial_number`, `manufacturer`, `model`,
   `procured_on`, `note`, `created_at`, `updated_at`), auch ausgesonderte. Antworten mit einem Gerät
   immer `{"device": …}` mit allen Feldern.
-- `POST devices {identifier, device_type_id, location_id, status?, serial_number?, manufacturer?,
-  model?, procured_on?, next_inspection_due?, note?, comment?}` → 201. Status Standard `ready`,
-  `retired` → 400. Typ und Standort: unbekannt oder fremd → 400, deaktiviert bzw. gesperrt → 409
-  `rule_violation`. Kennung vergeben (UNIQUE-Index, Fehler 1062) → 409 `identifier_taken`. Schreibt
+- `POST devices {identifier, scan_code?, device_type_id, location_id, status?, serial_number?,
+  manufacturer?, model?, procured_on?, next_inspection_due?, note?, comment?}` → 201. Status Standard
+  `ready`, `retired` → 400. Typ und Standort: unbekannt oder fremd → 400, deaktiviert bzw. gesperrt →
+  409 `rule_violation`. Kennung vergeben (UNIQUE-Index, Fehler 1062) → 409 `identifier_taken`,
+  Scan-Code vergeben → 409 `scan_code_taken`. Schreibt
   nur das Ereignis `created` (ein Prüfdatum steht nur am Gerät).
-- `POST devices/{id}/fields {version, comment?, identifier?, device_type_id?, serial_number?,
-  manufacturer?, model?, procured_on?, note?}`: nur mitgesendete Felder (`null` leert ein optionales
+- `POST devices/{id}/fields {version, comment?, identifier?, scan_code?, device_type_id?,
+  serial_number?, manufacturer?, model?, procured_on?, note?}` (`scan_code_taken` wie beim Anlegen): nur mitgesendete Felder (`null` leert ein optionales
   Feld; Kennung und Typ nicht leerbar); ohne Stammdaten 400. Je Feld mit binär anderem Wert ein
   `field_changed` (gemeinsamer Kommentar), Version einmal + 1. Ohne Unterschied: 200 ohne Ereignis
   und ohne neue Version.
@@ -874,9 +896,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   ändern, Version + 1.
 - `POST devices/{id}/retire {version, comment?}` (Admin): bereits ausgesondert → 409; sonst Status
   `retired`, `state_changed` (nur Status), Version + 1. Standort und Prüfdatum bleiben gespeichert,
-  die Kennung wird frei (`identifier_key` `NULL`).
-- `POST devices/{id}/reinstate {version, status, location_id?, identifier?, device_type_id?,
-  comment?}` (Admin): nur ausgesonderte (sonst 409); `status` Pflicht, nicht `retired`. Standort:
+  Kennung und Scan-Code werden frei (`identifier_key`, `scan_code_key` `NULL`).
+- `POST devices/{id}/reinstate {version, status, location_id?, identifier?, scan_code?,
+  device_type_id?, comment?}` (Admin): nur ausgesonderte (sonst 409); `status` Pflicht, nicht `retired`. Standort:
   angegeben oder der bisherige, `LOCK IN SHARE MODE`, gesperrt → 409 (beim bisherigen mit Hinweis auf
   `location_id`), unbekannt/fremd → 400. Gerätetyp: angegeben oder der bisherige, ebenso gelesen,
   deaktiviert → 409 (beim bisherigen mit Hinweis auf `device_type_id`). `identifier` (nicht leerbar)
@@ -884,6 +906,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   gleiche Werte werden ignoriert. Je geändertem Feld ein `field_changed`, danach ein `state_changed`
   (gemeinsamer Kommentar, eine Transaktion), Version einmal + 1. Kennung inzwischen vergeben
   (UNIQUE-Index, Fehler 1062) → 409 `identifier_taken` mit Hinweis, eine neue Kennung anzugeben.
+  Ebenso der Scan-Code: `scan_code` angegeben (auch `null` = entfernen, `DeviceReinstatement::
+  $hasScanCode`) ersetzt den bisherigen (`field_changed`); sonst bleibt er, und ist er inzwischen
+  vergeben → 409 `scan_code_taken` mit Hinweis, einen neuen anzugeben oder ihn mit `null` zu entfernen.
 - `GET devices/{id}/events` (angemeldet, auch ausgesonderte; fremd/unbekannt 404): neueste zuerst
   (nach `id`), `limit` 1–200 (Standard 50), `offset` 0–1000000; Antwort `{events, total, limit,
   offset}`. Je Eintrag immer `id`, `type`, `type_label`, `created_at`, `user {id, name}`
@@ -974,11 +999,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   im Protokoll, letzte Zeile `Export abgebrochen – Datei unvollständig` (`CsvFormat::ABORTED_LINE`;
   der Import lehnt solche Dateien ab).
 - Geräteliste: Filter wie `GET devices` (`DeviceListHandler::filter`: `device_type_id`, `location_id`,
-  `include_sublocations`, `status`, `q`, `include_retired`), Sortierung ebenso
+  `include_sublocations`, `status`, `q`, `include_retired`, `scan_code`), Sortierung ebenso
   (`DeviceListHandler::sort`: `sort`, `dir`, ungültig 400; Standard Kennung aufsteigend), ohne
   Seitenbegrenzung; `limit`, `offset` werden ignoriert. Spalten
-  (`DeviceCsv::DEVICE_HEADER`): Kennung, Gerätetyp, Standort, Status, Nächste Prüfung,
-  Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz. Dateiname
+  (`DeviceCsv::DEVICE_HEADER`): Kennung, Scan-Code (unverändert, auch mit GS/RS/EOT; Formelschutz
+  gilt), Gerätetyp, Standort, Status, Nächste Prüfung, Seriennummer, Hersteller, Modell,
+  Beschaffungsdatum, Notiz. Dateiname
   `geraete-<kürzel>-<JJJJ-MM-TT>.csv` (heute in Europe/Berlin über `Clock`).
 - Die Geräteliste ist das Format des Imports; Spalten nur gemeinsam mit `ImportColumn` ändern (per
   Test gleich): Kennung ist der Schlüssel, Gerätetyp über den Namen, Standort über den vollständigen
@@ -1012,7 +1038,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `ImportWarnings`, `DeviceImportPlanner` Abgleich mit der Datenbank, `DeviceImportPlan` mit
   Kennzeichen, `ImportRowPlan`, `ImportChange`, `ImportResult`, `DeviceImport` Vorschau und
   Übernehmen, Fehler `ImportFileException`, `ImportOutdatedException`),
-  `DeviceRepository::findByIdentifierKeys`, `DeviceEventWriter` (gepuffert, `imported`), Endpunkte
+  `DeviceRepository::findByIdentifierKeys` und `::findByScanCodes`, `DeviceEventWriter` (gepuffert,
+  `imported`), Endpunkte
   `src/Api/V1/Devices/DeviceImportHandler.php` und `DeviceImportJson.php`. Tests in
   `tests/Integration/Import/` (`ImportApiTestCase`) sowie `tests/Unit/Csv/` und
   `tests/Unit/Device/Import/`.
@@ -1038,8 +1065,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Bezeichnung ohne Groß-/Kleinschreibung, nur einsatzbereit, in Wartung, defekt; „ausgesondert“ →
   Zeile übersprungen (kein Aussondern oder Wiederaufnehmen per Import; zählt nicht als doppelte
   Kennung). Datum `TT.MM.JJJJ`, `T.M.JJJJ` oder `JJJJ-MM-TT` (`ImportDate`; keine zweistelligen
-  Jahre). Texte und Kennung wie `DeviceText` bzw. `DeviceIdentifier`. Falsche Anzahl Felder → Fehler
-  der Zeile (nie still als leer werten).
+  Jahre). Texte, Kennung und Scan-Code wie `DeviceText`, `DeviceIdentifier` bzw. `ScanCode`
+  (`ImportRow::scanCode()`). Falsche Anzahl Felder → Fehler der Zeile (nie still als leer werten).
 - Abgleich (`DeviceImportPlanner`), alle Vergleiche rechnet die Datenbank (wie die UNIQUE-Indizes):
   Schlüssel der Kennung mit der Formel von `identifier_key` über `JSON_TABLE`; Gerätetyp über den Namen
   und Standort über den Pfad (`IF(p.id IS NULL, l.name, CONCAT(p.name, ' / ', l.name))`, nie an
@@ -1047,11 +1074,20 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Fehler „nicht eindeutig“. Doppelte Kennung in der Datei → Fehler in allen betroffenen Zeilen.
   Neues bzw. geändertes Ziel: Standort gesperrt bzw. Gerätetyp deaktiviert → Fehler; ein schon
   zugeordneter darf bleiben. Kennung nur in anderer Schreibweise → `field_changed` (binär verglichen).
+  Scan-Code exakt (binär, `scan_code_key`): doppelt in der Datei (ohne übersprungene Zeilen) → Fehler
+  in allen betroffenen Zeilen; gehört er einem ANDEREN nicht ausgesonderten Gerät → Fehler, auch wenn
+  jenes ihn in derselben Datei abgibt (kein Tausch oder Übertragen per Import; sonst scheiterten die
+  UPDATEs zwischendurch am UNIQUE-Index). Gleiche Scan-Codes anderer Städte zählen nicht.
 - Ergebnis je Zeile: `new`, `changed` (je Feld alt → neu in der Schreibweise der Datei),
   `unchanged`, `skipped`, `error` (verständliche Meldungen; die Zeilennummer steht in `line`).
   Warnungen (`warnings`, blockieren nicht; `ImportWarnings`): eine NEUE Kennung aus Ziffern, die ohne
   führende Nullen einem vorhandenen Gerät entspricht („7“ ↔ „007“); eine Kennung, die wie ein Datum
-  aussieht (neu oder geänderte Schreibweise; „01.03.2026“, „1-Mar“, „01. Mrz“ …). Zusammenfassung
+  aussieht (neu oder geänderte Schreibweise; „01.03.2026“, „1-Mar“, „01. Mrz“ …); ein neuer oder
+  geänderter Scan-Code in wissenschaftlicher Schreibweise (`ImportWarnings::looksScientific`,
+  „4,00638E+12“) oder aus Ziffern, der ohne führende Nullen einem LÄNGEREN vorhandenen Scan-Code
+  (desselben oder eines anderen nicht ausgesonderten Geräts) entspricht („4006381333931“ ↔
+  „04006381333931“). Mehr als 15 Ziffern rundet Excel auf Nullen; das ist nicht erkennbar (README).
+  Zusammenfassung
   `summary {rows, new, changed, unchanged, skipped, errors, warnings}` (Warnungen = Zeilen mit
   Warnung).
 - Kennzeichen (`token`, nur ohne Fehler): SHA-256 über den Hash der Datei und den Plan aller Zeilen
@@ -1059,11 +1095,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Übernehmen alles neu geprüft wird. Übernehmen (`DeviceImport::apply`, eigene Transaktion, eine offene
   ist ein Fehler): erneut prüfen MIT Sperren; Fehler oder anderes Kennzeichen → 409 `import_outdated`
   (`details.summary` der neuen Prüfung; Meldung: Vorschau neu erstellen), nichts geschrieben.
-  Fehler 1062 (Kennung gleichzeitig vergeben) oder 1213 (Verklemmung) → ebenfalls `import_outdated`.
+  Fehler 1062 (Kennung oder Scan-Code gleichzeitig vergeben) oder 1213 (Verklemmung) → ebenfalls
+  `import_outdated`.
   Alles oder nichts.
 - Sperren beim Übernehmen, Reihenfolge Gerät → Standort → Gerätetyp: Geräte `FOR UPDATE` über
   `identifier_key IN (…)` (sperrt auf dem UNIQUE-Index auch die Lücken neuer Kennungen), dann mit
-  `LOCK IN SHARE MODE` gelesen (aktueller Stand, unabhängig vom Snapshot); alle genannten Standorte,
+  `LOCK IN SHARE MODE` gelesen (aktueller Stand, unabhängig vom Snapshot); danach ebenso über
+  `scan_code_key IN (…)` (Besitzer der Scan-Codes und Lücken neuer); alle genannten Standorte,
   danach alle genannten Gerätetypen `LOCK IN SHARE MODE`, `active` aus diesen Zeilen.
 - Schreiben wie bei der Einzelbearbeitung: neues Gerät Version 1 und Ereignis `imported`; bestehendes
   ein `UPDATE` (Version einmal + 1) und Ereignisse `field_changed` (je Feld, Reihenfolge von
@@ -1094,7 +1132,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Betreff „Log <Stadtname>: <Grund>“ (z. B. „MA-01 umgebucht, Status defekt“, „CSV-Import: 2 neu,
   1 geändert“, höchstens 200 Zeichen). Text: Vorgang, Gerät (Kennung, Typ), Wer (Anzeigename), Wann
   (Europe/Berlin), Von/Nach je Ereignis, Kommentar, Link `AppUrls::area` (Startseite der Stadt, bis
-  das Frontend Geräteseiten hat). Werte einzeilig, höchstens 200 Zeichen.
+  das Frontend Geräteseiten hat). Werte einzeilig, höchstens 200 Zeichen, Trennzeichen eines
+  Scan-Codes sichtbar (`ScanCode::display`).
 - Versand über `Notifier::sendMany` (Zweck `device_log`; Fehler nur im Protokoll, der Vorgang ist
   bereits gespeichert). Begrenzung: höchstens `MAX_RECIPIENTS` = 25 Empfänger (zuerst Admins der
   Stadt; Überschreitung als `device_log_recipients_capped`) und `TIME_BUDGET_SECONDS` = 10 s je

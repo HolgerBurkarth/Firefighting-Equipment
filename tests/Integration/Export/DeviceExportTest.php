@@ -36,7 +36,7 @@ final class DeviceExportTest extends ExportApiTestCase
         self::assertSame('no-store', $response->headers()['Cache-Control']);
         self::assertSame('nosniff', $response->headers()['X-Content-Type-Options']);
         self::assertSame(
-            "\xEF\xBB\xBFKennung;Gerätetyp;Standort;Status;Nächste Prüfung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n",
+            "\xEF\xBB\xBFKennung;Scan-Code;Gerätetyp;Standort;Status;Nächste Prüfung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n",
             $body,
         );
     }
@@ -53,6 +53,7 @@ final class DeviceExportTest extends ExportApiTestCase
     public function testAllColumnsWithQuotingLineBreaksAndUmlauts(): void
     {
         $this->createViaApi('MA-01', [
+            'scan_code' => "0104006381333931\x1D10AB 7",
             'status' => 'maintenance',
             'serial_number' => 'S;1',
             'manufacturer' => 'Dräger',
@@ -66,14 +67,14 @@ final class DeviceExportTest extends ExportApiTestCase
         [, $body] = $this->download('devices/export');
 
         self::assertSame(
-            "\xEF\xBB\xBFKennung;Gerätetyp;Standort;Status;Nächste Prüfung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n"
-            . "MA-01;Atemschutzmaske;HLF 20 / G1;in Wartung;01.03.2027;\"S;1\";Dräger;\"FPS \"\"7000\"\"\";01.05.2024;\"Ventil prüfen\nGröße M\"\r\n"
-            . "Wärmebild 1;Atemschutzmaske;Lager;einsatzbereit;;;;;;\r\n",
+            "\xEF\xBB\xBFKennung;Scan-Code;Gerätetyp;Standort;Status;Nächste Prüfung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n"
+            . "MA-01;0104006381333931\x1D10AB 7;Atemschutzmaske;HLF 20 / G1;in Wartung;01.03.2027;\"S;1\";Dräger;\"FPS \"\"7000\"\"\";01.05.2024;\"Ventil prüfen\nGröße M\"\r\n"
+            . "Wärmebild 1;;Atemschutzmaske;Lager;einsatzbereit;;;;;;\r\n",
             $body,
         );
         self::assertSame([
-            ['MA-01', 'Atemschutzmaske', 'HLF 20 / G1', 'in Wartung', '01.03.2027', 'S;1', 'Dräger', 'FPS "7000"', '01.05.2024', "Ventil prüfen\nGröße M"],
-            ['Wärmebild 1', 'Atemschutzmaske', 'Lager', 'einsatzbereit', '', '', '', '', '', ''],
+            ['MA-01', "0104006381333931\x1D10AB 7", 'Atemschutzmaske', 'HLF 20 / G1', 'in Wartung', '01.03.2027', 'S;1', 'Dräger', 'FPS "7000"', '01.05.2024', "Ventil prüfen\nGröße M"],
+            ['Wärmebild 1', '', 'Atemschutzmaske', 'Lager', 'einsatzbereit', '', '', '', '', '', ''],
         ], $this->rows('devices/export'));
     }
 
@@ -82,6 +83,7 @@ final class DeviceExportTest extends ExportApiTestCase
         $this->createDevice($this->tenantId, $this->typeId, $this->g1, ['identifier' => '-12']);
         $this->createDevice($this->tenantId, $this->typeId, $this->g1, [
             'identifier' => 'MA-01',
+            'scan_code' => '=0104',
             'serial_number' => '+49 7462',
             'manufacturer' => '=HYPERLINK("http://example.org")',
             'model' => '@SUMME(A1)',
@@ -92,12 +94,13 @@ final class DeviceExportTest extends ExportApiTestCase
 
         self::assertStringContainsString("\r\n'-12;", $body);
         self::assertStringContainsString(
-            "\r\nMA-01;Atemschutzmaske;HLF 20 / G1;einsatzbereit;;'+49 7462;\"'=HYPERLINK(\"\"http://example.org\"\")\";'@SUMME(A1);;''=1\r\n",
+            "\r\nMA-01;'=0104;Atemschutzmaske;HLF 20 / G1;einsatzbereit;;'+49 7462;\"'=HYPERLINK(\"\"http://example.org\"\")\";'@SUMME(A1);;''=1\r\n",
             $body,
         );
         $rows = array_slice(self::parse($body), 1);
         self::assertSame(['-12', 'MA-01'], array_map(CsvFormat::removeFormulaGuard(...), self::column($rows, 0)));
-        self::assertSame("'=1", CsvFormat::removeFormulaGuard($rows[1][9]));
+        self::assertSame('=0104', CsvFormat::removeFormulaGuard($rows[1][1]));
+        self::assertSame("'=1", CsvFormat::removeFormulaGuard($rows[1][10]));
     }
 
     public function testNaturalSortAndRetiredOnlyOnRequest(): void
@@ -110,7 +113,7 @@ final class DeviceExportTest extends ExportApiTestCase
         self::assertSame(['MA-1', 'MA-2', 'ma-3', 'MA-10'], self::column($this->rows('devices/export'), 0));
         self::assertSame(['MA-1', 'MA-2', 'ma-3', 'MA-4', 'MA-10'], self::column($this->rows('devices/export?include_retired=1'), 0));
         self::assertSame([['MA-4', 'ausgesondert']], array_map(
-            static fn (array $row): array => [$row[0], $row[3]],
+            static fn (array $row): array => [$row[0], $row[4]],
             $this->rows('devices/export?status=retired'),
         ));
     }

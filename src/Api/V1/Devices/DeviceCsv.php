@@ -23,8 +23,8 @@ use FirefightingEquipment\Time\GermanFormat;
 final class DeviceCsv
 {
     public const array DEVICE_HEADER = [
-        'Kennung', 'Gerätetyp', 'Standort', 'Status', 'Nächste Prüfung', 'Seriennummer', 'Hersteller',
-        'Modell', 'Beschaffungsdatum', 'Notiz',
+        'Kennung', 'Scan-Code', 'Gerätetyp', 'Standort', 'Status', 'Nächste Prüfung', 'Seriennummer',
+        'Hersteller', 'Modell', 'Beschaffungsdatum', 'Notiz',
     ];
 
     public const array EVENT_HEADER = [
@@ -40,6 +40,7 @@ final class DeviceCsv
     {
         return [
             $device->identifier->value,
+            $device->scanCode?->value,
             $device->deviceTypeName,
             $device->locationPath(),
             $device->status->label(),

@@ -64,4 +64,26 @@ final class ImportWarningsTest extends TestCase
     {
         self::assertFalse(ImportWarnings::looksLikeDate($identifier));
     }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function scientific(): iterable
+    {
+        yield 'Excel deutsch' => ['4,00638E+12', true];
+        yield 'Excel englisch' => ['4.00638E+12', true];
+        yield 'klein ohne Vorzeichen' => ['4.00638e12', true];
+        yield 'ganze Mantisse' => ['1E+15', true];
+        yield 'negativer Exponent' => ['1,5E-3', true];
+        yield 'GTIN' => ['4006381333931', false];
+        yield 'Buchstaben' => ['ABC1E+12', false];
+        yield 'nur E' => ['E+12', false];
+        yield 'Text' => ['4,00638E+12 Stück', false];
+    }
+
+    #[DataProvider('scientific')]
+    public function testLooksScientific(string $value, bool $expected): void
+    {
+        self::assertSame($expected, ImportWarnings::looksScientific($value));
+    }
 }

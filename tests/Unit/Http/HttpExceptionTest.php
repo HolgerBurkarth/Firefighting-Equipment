@@ -60,6 +60,14 @@ final class HttpExceptionTest extends TestCase
         self::assertSame('{"error":"identifier_taken","message":"Die Kennung „MA-01“ ist bereits vergeben."}', $response->body());
     }
 
+    public function testScanCodeTakenIsConflict(): void
+    {
+        $response = HttpException::scanCodeTaken('Der Scan-Code „4006381333931“ ist bereits vergeben.')->toResponse();
+
+        self::assertSame(409, $response->statusCode());
+        self::assertSame('{"error":"scan_code_taken","message":"Der Scan-Code „4006381333931“ ist bereits vergeben."}', $response->body());
+    }
+
     public function testVersionConflictCarriesCurrentState(): void
     {
         $response = HttpException::versionConflict('Inzwischen geändert.', ['device' => ['id' => 7, 'version' => 3]])->toResponse();

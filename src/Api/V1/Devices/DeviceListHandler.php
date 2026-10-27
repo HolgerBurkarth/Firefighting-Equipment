@@ -11,6 +11,7 @@ use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\DeviceSort;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\DeviceText;
+use FirefightingEquipment\Device\ScanCode;
 use FirefightingEquipment\Device\SortDirection;
 use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\JsonResponse;
@@ -23,8 +24,9 @@ use FirefightingEquipment\Http\RequestHandler;
  *
  * Parameter (alle optional): device_type_id, location_id, include_sublocations=1 (nur mit
  * location_id), status=ready,defective (kommagetrennt; retired schließt ausgesonderte ein), q
- * (Teil von Kennung, Seriennummer, Hersteller oder Modell), include_retired=1 (ohne status: alle
- * Status), sort=identifier|next_inspection_due, limit (1–200, Standard 50), offset (Standard 0).
+ * (Teil von Kennung, Scan-Code, Seriennummer, Hersteller oder Modell), scan_code (genau dieser
+ * Scan-Code, Regeln wie ScanCode), include_retired=1 (ohne status: alle Status),
+ * sort=identifier|next_inspection_due, limit (1–200, Standard 50), offset (Standard 0).
  * Unbekannte oder fremde IDs ergeben eine leere Liste; ungültige Werte 400.
  */
 final readonly class DeviceListHandler implements RequestHandler
@@ -52,8 +54,8 @@ final readonly class DeviceListHandler implements RequestHandler
     }
 
     /**
-     * Filter aus den Parametern device_type_id, location_id, include_sublocations, status, q und
-     * include_retired (auch für den CSV-Export, DeviceExportHandler).
+     * Filter aus den Parametern device_type_id, location_id, include_sublocations, status, q,
+     * include_retired und scan_code (auch für den CSV-Export, DeviceExportHandler).
      *
      * @throws HttpException 400 invalid_request
      */
@@ -68,6 +70,7 @@ final readonly class DeviceListHandler implements RequestHandler
                 self::statuses($query['status'] ?? null),
                 DeviceText::search($query['q'] ?? null),
                 $context->queryFlag('include_retired'),
+                self::scanCode($query['scan_code'] ?? null),
             );
         } catch (DeviceException $e) {
             throw DeviceErrors::http($e);
@@ -94,6 +97,19 @@ final readonly class DeviceListHandler implements RequestHandler
                 'Der Parameter "dir" muss "asc" oder "desc" sein.',
             ),
         ];
+    }
+
+    /**
+     * @throws HttpException   400 invalid_request (leer)
+     * @throws DeviceException ungültiger Scan-Code
+     */
+    private static function scanCode(?string $value): ?ScanCode
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return ScanCode::fromString($value) ?? throw HttpException::invalidRequest('Der Parameter "scan_code" darf nicht leer sein.');
     }
 
     /**

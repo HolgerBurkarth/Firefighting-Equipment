@@ -14,6 +14,7 @@ use FirefightingEquipment\Device\DeviceStateChange;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\DeviceText;
 use FirefightingEquipment\Device\NewDevice;
+use FirefightingEquipment\Device\ScanCode;
 use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\RequestContext;
 
@@ -41,8 +42,8 @@ final class DeviceFields
     public static function newDevice(RequestContext $context): NewDevice
     {
         self::rejectUnknown($context, [
-            'identifier', 'device_type_id', 'location_id', 'status', 'serial_number', 'manufacturer', 'model',
-            'procured_on', 'next_inspection_due', 'note', 'comment',
+            'identifier', 'scan_code', 'device_type_id', 'location_id', 'status', 'serial_number', 'manufacturer',
+            'model', 'procured_on', 'next_inspection_due', 'note', 'comment',
         ]);
 
         return new NewDevice(
@@ -56,6 +57,7 @@ final class DeviceFields
             self::date($context, DeviceField::ProcuredOn->value, DeviceField::ProcuredOn->subject()),
             self::date($context, 'next_inspection_due', self::DUE_SUBJECT),
             DeviceText::field($context->optionalStringField('note'), DeviceField::Note),
+            ScanCode::fromString($context->optionalStringField('scan_code')),
         );
     }
 
@@ -77,6 +79,7 @@ final class DeviceFields
             }
             $values[$field->value] = match ($field) {
                 DeviceField::Identifier => DeviceIdentifier::fromString($context->stringField($field->bodyKey())),
+                DeviceField::ScanCode => ScanCode::fromString($context->optionalStringField($field->bodyKey())),
                 DeviceField::DeviceType => $context->intField($field->bodyKey(), 1, self::MAX_ID),
                 DeviceField::ProcuredOn => self::date($context, $field->bodyKey(), $field->subject()),
                 default => DeviceText::field($context->optionalStringField($field->bodyKey()), $field),
@@ -133,20 +136,22 @@ final class DeviceFields
 
     /**
      * POST devices/{id}/reinstate: Pflicht status (nicht ausgesondert), optional location_id,
-     * identifier (nicht leerbar) und device_type_id.
+     * identifier (nicht leerbar), scan_code (null oder leer = entfernen) und device_type_id.
      *
      * @throws HttpException   400 invalid_request
      * @throws DeviceException ungültige Kennung
      */
     public static function reinstatement(RequestContext $context): DeviceReinstatement
     {
-        self::rejectUnknown($context, ['version', 'status', 'location_id', 'identifier', 'device_type_id', 'comment']);
+        self::rejectUnknown($context, ['version', 'status', 'location_id', 'identifier', 'scan_code', 'device_type_id', 'comment']);
 
         return new DeviceReinstatement(
             self::serviceStatus($context, true) ?? throw new \LogicException('Status fehlt.'),
             $context->optionalIntField('location_id', 1, self::MAX_ID),
             $context->hasField('identifier') ? DeviceIdentifier::fromString($context->stringField('identifier')) : null,
             $context->optionalIntField('device_type_id', 1, self::MAX_ID),
+            $context->hasField('scan_code'),
+            ScanCode::fromString($context->optionalStringField('scan_code')),
         );
     }
 

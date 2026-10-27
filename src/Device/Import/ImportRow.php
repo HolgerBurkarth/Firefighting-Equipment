@@ -10,6 +10,7 @@ use FirefightingEquipment\Device\DeviceException;
 use FirefightingEquipment\Device\DeviceIdentifier;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\DeviceText;
+use FirefightingEquipment\Device\ScanCode;
 
 /**
  * Eine Zeile der Import-Datei mit geprüften Werten (noch ohne Datenbank). Fehlt eine Spalte, bleibt
@@ -21,14 +22,14 @@ final readonly class ImportRow
 {
     /** Spalten mit optionalem Wert (null = leeren) */
     private const array OPTIONAL = [
-        ImportColumn::NextInspectionDue, ImportColumn::SerialNumber, ImportColumn::Manufacturer,
+        ImportColumn::ScanCode, ImportColumn::NextInspectionDue, ImportColumn::SerialNumber, ImportColumn::Manufacturer,
         ImportColumn::Model, ImportColumn::ProcuredOn, ImportColumn::Note,
     ];
 
     /**
-     * @param array<string, string|DeviceDate|null> $values Spalte (ImportColumn-Wert) => Wert der
-     *                                                      vorhandenen optionalen Spalten
-     * @param list<string>                          $errors Meldungen zu ungültigen Werten
+     * @param array<string, string|DeviceDate|ScanCode|null> $values Spalte (ImportColumn-Wert) => Wert
+     *                                                               der vorhandenen optionalen Spalten
+     * @param list<string>                                   $errors Meldungen zu ungültigen Werten
      */
     private function __construct(
         public int $line,
@@ -137,6 +138,13 @@ final readonly class ImportRow
         return $value instanceof DeviceDate ? $value : null;
     }
 
+    public function scanCode(): ?ScanCode
+    {
+        $value = $this->values[ImportColumn::ScanCode->value] ?? null;
+
+        return $value instanceof ScanCode ? $value : null;
+    }
+
     private static function status(string $text): ?DeviceStatus
     {
         $text = mb_strtolower($text);
@@ -152,9 +160,10 @@ final readonly class ImportRow
     /**
      * @throws DeviceException
      */
-    private static function optional(ImportColumn $column, string $value): string|DeviceDate|null
+    private static function optional(ImportColumn $column, string $value): string|DeviceDate|ScanCode|null
     {
         return match ($column) {
+            ImportColumn::ScanCode => ScanCode::fromString($value),
             ImportColumn::NextInspectionDue => trim($value) === '' ? null : ImportDate::parse(trim($value), 'Das Datum der nächsten Prüfung'),
             ImportColumn::ProcuredOn => trim($value) === '' ? null : ImportDate::parse(trim($value), 'Das Beschaffungsdatum'),
             default => DeviceText::field($value, $column->deviceField() ?? throw new \LogicException('Kein Textfeld.')),

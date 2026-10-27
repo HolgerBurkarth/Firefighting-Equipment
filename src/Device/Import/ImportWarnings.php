@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Device\Import;
 
 /**
- * Erkennt Kennungen, die Excel beim Öffnen einer CSV-Datei vermutlich verändert hat: führende
- * Nullen entfernt („007“ → „7“) oder in ein Datum umgewandelt („1-3“ → „01.03.2026“, „01. Mrz“).
+ * Erkennt Kennungen und Scan-Codes, die Excel beim Öffnen einer CSV-Datei vermutlich verändert hat:
+ * führende Nullen entfernt („007“ → „7“), in ein Datum umgewandelt („1-3“ → „01.03.2026“, „01. Mrz“)
+ * oder als Zahl in wissenschaftlicher Schreibweise gespeichert („4006381333931“ → „4,00638E+12“).
  * Nur Hinweise in der Vorschau, sie blockieren den Import nicht.
  */
 final class ImportWarnings
@@ -35,6 +36,15 @@ final class ImportWarnings
         $trimmed = ltrim($identifier, '0');
 
         return $trimmed === '' ? '0' : $trimmed;
+    }
+
+    /**
+     * Zahl in wissenschaftlicher Schreibweise, wie Excel lange Ziffernfolgen speichert
+     * („4,00638E+12“, „4.00638e12“, „1E+15“).
+     */
+    public static function looksScientific(string $value): bool
+    {
+        return preg_match('/^[0-9]+(?:[.,][0-9]+)?E[+-]?[0-9]+\z/i', $value) === 1;
     }
 
     public static function looksLikeDate(string $identifier): bool

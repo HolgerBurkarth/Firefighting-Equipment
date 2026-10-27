@@ -84,11 +84,11 @@ final class DeviceEventSchemaTest extends DeviceSchemaTestCase
 
     public function testAllFieldsAreAccepted(): void
     {
-        foreach (['identifier', 'device_type', 'serial_number', 'manufacturer', 'model', 'procured_on', 'note'] as $field) {
+        foreach (['identifier', 'scan_code', 'device_type', 'serial_number', 'manufacturer', 'model', 'procured_on', 'note'] as $field) {
             $this->event(['event_type' => 'field_changed', 'field' => $field, 'old_value' => 'alt', 'new_value' => 'neu']);
         }
 
-        self::assertSame(7, $this->countRows('fe_device_events'));
+        self::assertSame(8, $this->countRows('fe_device_events'));
     }
 
     /**

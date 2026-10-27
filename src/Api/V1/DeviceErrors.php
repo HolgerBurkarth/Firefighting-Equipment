@@ -12,6 +12,7 @@ use FirefightingEquipment\Device\DeviceTypeNotFoundException;
 use FirefightingEquipment\Device\DeviceVersionConflictException;
 use FirefightingEquipment\Device\DuplicateDeviceIdentifierException;
 use FirefightingEquipment\Device\DuplicateDeviceNameException;
+use FirefightingEquipment\Device\DuplicateDeviceScanCodeException;
 use FirefightingEquipment\Device\InvalidDeviceValueException;
 use FirefightingEquipment\Device\LocationNotFoundException;
 use FirefightingEquipment\Http\HttpException;
@@ -19,7 +20,7 @@ use FirefightingEquipment\Http\HttpException;
 /**
  * Fachliche Fehler zu Gerätetypen, Standorten und Geräten als HTTP-Fehler: ungültiger Wert 400,
  * fremde oder unbekannte ID 404 not_found, Name vergeben 409 name_taken, Kennung vergeben 409
- * identifier_taken, veraltete Version 409 version_conflict (details {"device": aktueller Stand}),
+ * identifier_taken, Scan-Code vergeben 409 scan_code_taken, veraltete Version 409 version_conflict (details {"device": aktueller Stand}),
  * Regelverstoß 409 rule_violation (mit "details", falls vorhanden).
  */
 final class DeviceErrors
@@ -36,6 +37,7 @@ final class DeviceErrors
             $e instanceof DeviceNotFoundException => HttpException::notFound(),
             $e instanceof DuplicateDeviceNameException => HttpException::nameTaken($e->getMessage()),
             $e instanceof DuplicateDeviceIdentifierException => HttpException::identifierTaken($e->getMessage()),
+            $e instanceof DuplicateDeviceScanCodeException => HttpException::scanCodeTaken($e->getMessage()),
             $e instanceof DeviceVersionConflictException => HttpException::versionConflict(
                 $e->getMessage(),
                 ['device' => DeviceJson::device($e->current)],

@@ -121,6 +121,7 @@ nicht leer ist: `{"error":"rule_violation","message":"…","details":{"devices":
 | 409  | `email_taken`              | Super-Admin: Adresse hat in der Stadt schon ein Konto      |
 | 409  | `name_taken`               | Name eines Gerätetyps bzw. Standorts schon vergeben        |
 | 409  | `identifier_taken`         | Kennung eines Geräts schon vergeben (ohne Groß-/Kleinschreibung) |
+| 409  | `scan_code_taken`          | Scan-Code eines Geräts schon vergeben (exakter Vergleich)  |
 | 409  | `version_conflict`         | Gerät inzwischen geändert; aktueller Stand in `details.device` |
 | 409  | `import_outdated`          | CSV-Import: seit der Vorschau geändert oder Datei fehlerhaft; Vorschau neu erstellen |
 | 415  | `unsupported_media_type`   | ändernde Anfrage ohne `Content-Type: application/json`     |
@@ -165,7 +166,7 @@ ihrer Stadt, Super-Admins für alle Städte. Wer den Vorgang auslöst, bekommt k
 (Anfrage) gibt es eine Mail je Empfänger; ein CSV-Import ergibt eine Sammelmail mit Zusammenfassung
 und höchstens 50 Zeilen Einzelheiten. Betreff z. B. "Log Feuerwehr Immendingen: M1 umgebucht, Status
 defekt"; der Text nennt Wer, Wann (deutsche Zeit), Gerät(e), Von/Nach, Kommentar und den Link zur
-Anwendung. Gesendet wird erst nach dem Speichern; ein Versandfehler ändert am Vorgang nichts (nur
+Anwendung (Trennzeichen eines Scan-Codes als [GS], [RS], [EOT]). Gesendet wird erst nach dem Speichern; ein Versandfehler ändert am Vorgang nichts (nur
 `mail_failed (device_log, Konto #ID)` im Server-Log). Begrenzung: höchstens 25 Empfänger je Vorgang
 (zuerst die Admins der Stadt; Überschreitung als `device_log_recipients_capped` im Log) und 10 s
 Zeitbudget je Anfrage für den Versand. Mehrere Mails gehen über eine SMTP-Verbindung (eine
@@ -452,7 +453,7 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
 | GET     | `api/v1/devices/export`               | angemeldet | CSV-Download (siehe "CSV-Export")           |
 | GET     | `api/v1/device-events/export`         | angemeldet | CSV-Download (siehe "CSV-Export")           |
 
-- Liste: je Gerät `id`, `identifier`, `device_type` (`id`, `name`), `location` (`id`, `name`,
+- Liste: je Gerät `id`, `identifier`, `scan_code`, `device_type` (`id`, `name`), `location` (`id`, `name`,
   `path` wie „HLF 20 / G1“), `status` mit `status_label` (einsatzbereit, in Wartung, defekt,
   ausgesondert), `next_inspection_due`, `version`. Die Einzelansicht zeigt zusätzlich
   `serial_number`, `manufacturer`, `model`, `procured_on`, `note`, `created_at`, `updated_at`.
@@ -461,8 +462,11 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
     Geräte der Unterstandorte ein. Unbekannte oder fremde IDs ergeben eine leere Liste.
   - `status=ready,defective` (kommagetrennt). Ausgesonderte Geräte (`retired`) erscheinen nur, wenn
     `retired` angegeben ist oder (ohne `status`) mit `include_retired=1`.
-  - `q`: Teil von Kennung, Seriennummer, Hersteller oder Modell, ohne Groß-/Kleinschreibung
-    (höchstens 100 Zeichen; `%` und `_` sind keine Platzhalter).
+  - `q`: Teil von Kennung, Scan-Code, Seriennummer, Hersteller oder Modell, ohne
+    Groß-/Kleinschreibung (höchstens 100 Zeichen; `%` und `_` sind keine Platzhalter).
+  - `scan_code`: genau dieser Scan-Code (exakt, mit Groß-/Kleinschreibung; Leerraum am Rand wird wie
+    beim Speichern entfernt, ein mitgescanntes CR/LF stört also nicht). Mit allen anderen Parametern
+    kombinierbar; leer oder ungültig: 400. Im URL kodiert, z. B. GS als `%1D`, `+` als `%2B`.
   - `sort`: `identifier` (Standard, Kennung natürlich: „M2“ vor „M10“), `device_type` (Name des
     Gerätetyps), `location` (angezeigter Pfad „HLF 20 / G1“), `status` (fachlich: einsatzbereit, in
     Wartung, defekt, ausgesondert) oder `next_inspection_due` (Geräte ohne Datum immer am Ende,
@@ -474,15 +478,24 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
   Rand wird entfernt, mehrere Leerzeichen werden zu einem. Eindeutig je Stadt unter nicht
   ausgesonderten Geräten, ohne Groß-/Kleinschreibung („MA-01“ = „ma-01“), aber „ß“ ≠ „ss“ und
   „é“ ≠ „e“. Nach dem Aussondern ist die Kennung wieder frei.
-- Datumsfelder (`procured_on`, `next_inspection_due`) im Format `JJJJ-MM-TT` zwischen 1950-01-01
+- Scan-Code (`scan_code`, optional): Inhalt eines Barcodes, QR-Codes oder einer GS1-DataMatrix,
+  höchstens 200 Zeichen, gespeichert wie gescannt und exakt verglichen („abc“ ≠ „ABC“, „ß“ ≠ „ss“).
+  - Leerzeichen, Tab, CR und LF am Rand werden entfernt (Handscanner hängen oft CR/LF oder Tab an);
+    danach leer bzw. `null` = kein Scan-Code.
+  - Erlaubt sind die Trennzeichen GS (0x1D, GS1), RS (0x1E) und EOT (0x04) aus ISO/IEC 15434, in
+    JSON als `\u001d` usw. Andere Steuerzeichen (auch Tab oder Zeilenumbruch mitten im Code, meist
+    zwei zusammengefügte Scans) und unsichtbare Formatzeichen (z. B. Zero-Width-Space) werden
+    abgelehnt. In Meldungen und Mails erscheinen die Trennzeichen als `[GS]`, `[RS]`, `[EOT]`.
+  - Eindeutig je Stadt unter nicht ausgesonderten Geräten; nach dem Aussondern frei (bleibt aber am
+    ausgesonderten Gerät gespeichert).- Datumsfelder (`procured_on`, `next_inspection_due`) im Format `JJJJ-MM-TT` zwischen 1950-01-01
   und 2099-12-31. Leere Texte werden zu `null`. Nur die Notiz darf Zeilenumbrüche enthalten.
 - Anlegen: Pflicht `identifier`, `device_type_id` (aktiver Typ), `location_id` (aktiver Standort);
-  optional `status` (`ready` Standard, `maintenance`, `defective`), `serial_number`, `manufacturer`,
+  optional `scan_code`, `status` (`ready` Standard, `maintenance`, `defective`), `serial_number`, `manufacturer`,
   `model` (je 100 Zeichen), `procured_on`, `next_inspection_due`, `note` (1000 Zeichen) und
   `comment` (500 Zeichen, einzeilig) für die Historie.
 - Ändern mit erwarteter `version` (aus der letzten Antwort):
-  - `…/fields`: nur die mitgesendeten Stammdaten (`identifier`, `device_type_id`, `serial_number`,
-    `manufacturer`, `model`, `procured_on`, `note`; `null` leert ein optionales Feld) und optional
+  - `…/fields`: nur die mitgesendeten Stammdaten (`identifier`, `scan_code`, `device_type_id`,
+    `serial_number`, `manufacturer`, `model`, `procured_on`, `note`; `null` leert ein optionales Feld) und optional
     `comment`. Je geändertem Feld ein Eintrag in der Historie mit demselben Kommentar.
   - `…/inspection-due`: `next_inspection_due` (Datum oder `null` zum Entfernen), optional `comment`.
   - `…/state` (auch `user`): `location_id` (neuer Standort) und/oder `status` (`ready`,
@@ -492,6 +505,7 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
     erscheint nicht mehr in normalen Listen, und seine Kennung ist frei.
   - `…/reinstate` (Admin): `status` (Pflicht, nicht `retired`), optional `location_id` (sonst der
     bisherige Standort), `identifier` (neue Kennung, falls die alte inzwischen vergeben ist),
+    `scan_code` (neuer Scan-Code oder `null` zum Entfernen, falls der alte inzwischen vergeben ist),
     `device_type_id` (falls der bisherige Typ deaktiviert ist) und `comment`. Standort und Typ
     müssen aktiv sein.
   - Jede Änderung erhöht `version` um 1. Ändert sich nichts (gleiche Werte), bleibt alles wie es
@@ -516,6 +530,7 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
 | `…/state` ohne `location_id` und `status`; `status` = `retired`         | 400 `invalid_request`  |
 | Parameter der Liste ungültig (z. B. `limit=500`, `status=kaputt`)       | 400 `invalid_request`  |
 | Kennung schon vergeben (auch beim Wiederaufnehmen)                      | 409 `identifier_taken` |
+| Scan-Code schon vergeben (auch beim Wiederaufnehmen)                    | 409 `scan_code_taken`  |
 | Version veraltet                                                        | 409 `version_conflict` |
 | Standort gesperrt, Gerätetyp deaktiviert, Gerät ausgesondert            | 409 `rule_violation`   |
 | Aussondern eines ausgesonderten, Wiederaufnahme eines nicht ausgesonderten Geräts | 409 `rule_violation` |
@@ -526,6 +541,7 @@ Lokal ausprobieren (Admin angemeldet wie unter "Lokal starten"):
 curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/devices
 curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/devices?location_id=1&include_sublocations=1&status=ready,maintenance&q=ma&sort=next_inspection_due&dir=desc&limit=20&offset=0"
 curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/devices?include_retired=1"
+curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/devices?scan_code=0104006381333931%1D10AB12"
 # device.json:   {"identifier":"MA-01","device_type_id":1,"location_id":2,"manufacturer":"Dräger","model":"FPS 7000","next_inspection_due":"2027-03-01","comment":"Neu beschafft"}
 curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@device.json" http://localhost:8000/firefighting/immendingen/api/v1/devices
 curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/devices/1
@@ -544,6 +560,8 @@ curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@reti
 # reinstate.json: {"version":6,"status":"ready","location_id":2,"comment":"Doch repariert"}
 #   Kennung inzwischen vergeben → 409 identifier_taken; dann mit neuer Kennung:
 #   {"version":6,"status":"ready","location_id":2,"identifier":"MA-01a"}
+#   Scan-Code inzwischen vergeben → 409 scan_code_taken; dann neuer Scan-Code oder ohne:
+#   {"version":6,"status":"ready","location_id":2,"scan_code":null}
 curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "@reinstate.json" http://localhost:8000/firefighting/immendingen/api/v1/devices/1/reinstate
 curl.exe -b cookies.txt "http://localhost:8000/firefighting/immendingen/api/v1/devices/1/events?limit=20&offset=0"
 ```
@@ -621,10 +639,11 @@ Format (für Excel unter Windows gedacht, Doppelklick öffnet die Datei mit korr
 - Bricht der Export mittendrin ab (z. B. Datenbankfehler), endet die Datei mit der Zeile
   `Export abgebrochen – Datei unvollständig`; der Fehler steht im Server-Log.
 
-**Geräteliste** (`devices/export`): Spalten Kennung, Gerätetyp, Standort (Pfad wie „HLF 20 / G1“),
-Status, Nächste Prüfung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz. Filter wie in der
-Geräteliste (`device_type_id`, `location_id`, `include_sublocations=1`, `status`, `q`,
-`include_retired=1`), Sortierung ebenso (`sort`, `dir`; Standard natürlich nach Kennung), ohne
+**Geräteliste** (`devices/export`): Spalten Kennung, Scan-Code, Gerätetyp, Standort (Pfad wie
+„HLF 20 / G1“), Status, Nächste Prüfung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz.
+Der Scan-Code steht unverändert in der Datei (Trennzeichen wie GS als Steuerzeichen). Filter wie in
+der Geräteliste (`device_type_id`, `location_id`, `include_sublocations=1`, `status`, `q`,
+`scan_code`, `include_retired=1`), Sortierung ebenso (`sort`, `dir`; Standard natürlich nach Kennung), ohne
 Seitenbegrenzung (`limit` und `offset` werden ignoriert). So kann das Frontend die Parameter der
 angezeigten Liste unverändert weitergeben. Die Datei kann wieder importiert werden (siehe "CSV-Import").
 
@@ -674,8 +693,8 @@ und erlaubter `Origin`.
 
 **Datei**
 
-- Spalten wie im Export (Kennung, Gerätetyp, Standort, Status, Nächste Prüfung, Seriennummer,
-  Hersteller, Modell, Beschaffungsdatum, Notiz). Zugeordnet wird über die Überschrift, Reihenfolge
+- Spalten wie im Export (Kennung, Scan-Code, Gerätetyp, Standort, Status, Nächste Prüfung,
+  Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz). Zugeordnet wird über die Überschrift, Reihenfolge
   und Groß-/Kleinschreibung sind egal. Unbekannte Spalten (z. B. Tippfehler „Seriennumer“) sind ein
   Fehler. Nur die Spalte Kennung ist Pflicht.
 - Die Kennung ordnet die Zeile einem nicht ausgesonderten Gerät zu (ohne Groß-/Kleinschreibung,
@@ -691,6 +710,10 @@ und erlaubter `Origin`.
 - Status: einsatzbereit, in Wartung, defekt. Zeilen mit „ausgesondert“ werden übersprungen
   (Aussondern und Wiederaufnehmen nur einzeln). Ein Export mit ausgesonderten Geräten lässt sich
   daher ohne Fehler einlesen.
+- Scan-Code: Regeln wie bei der Bearbeitung (siehe "Geräte"), exakt verglichen. Derselbe Scan-Code
+  zweimal in der Datei ist ein Fehler, ebenso ein Scan-Code, der einem anderen nicht ausgesonderten
+  Gerät gehört, auch wenn jenes ihn in derselben Datei abgibt: Scan-Codes lassen sich per Import
+  nicht tauschen oder übertragen (dafür zuerst beim alten Gerät entfernen, dann neu importieren).
 - Datum als `TT.MM.JJJJ`, `T.M.JJJJ` oder `JJJJ-MM-TT`. Ein führendes `'` (Formelschutz des Exports)
   wird immer genau einmal entfernt.
 - Kodierung UTF-8 (mit oder ohne BOM) oder Windows-1252 (Excel „CSV (Trennzeichen-getrennt)“).
@@ -724,9 +747,12 @@ und erlaubter `Origin`.
 ```
 
 `result` ist `new`, `changed`, `unchanged`, `skipped` oder `error`; `line` ist die Zeilennummer wie in
-Excel (Kopfzeile = 1). Warnungen blockieren nicht. Sie erscheinen, wenn Excel eine Kennung vermutlich
-verändert hat: eine neue Kennung aus Ziffern, die ohne führende Nullen einem vorhandenen Gerät
-entspricht, oder eine Kennung, die wie ein Datum aussieht.
+Excel (Kopfzeile = 1). Warnungen blockieren nicht. Sie erscheinen, wenn Excel eine Kennung oder einen
+Scan-Code vermutlich verändert hat: eine neue Kennung aus Ziffern, die ohne führende Nullen einem
+vorhandenen Gerät entspricht; eine Kennung, die wie ein Datum aussieht; ein neuer oder geänderter
+Scan-Code in wissenschaftlicher Schreibweise („4,00638E+12“) oder aus Ziffern, dem gegenüber einem
+vorhandenen Scan-Code (desselben oder eines anderen Geräts) führende Nullen fehlen
+(„4006381333931“ statt „04006381333931“).
 
 **Übernehmen**: Nur mit dem `token` der Vorschau und nur, wenn die erneute Prüfung fehlerfrei ist und
 seit der Vorschau kein betroffenes Gerät (Version), keine Zuordnung und nicht die Datei geändert
@@ -738,18 +764,22 @@ je Feld, Prüfdatum, Umbuchung und Status in einem Eintrag); der Kommentar steht
 **CSV in Excel sicher öffnen und speichern**
 
 Ein Doppelklick auf die CSV-Datei öffnet sie zwar, Excel wandelt dabei aber Werte um: Aus „007“ wird
-„7“, aus „1-3“ ein Datum. Zum Bearbeiten daher so öffnen:
+„7“, aus „1-3“ ein Datum, aus dem Scan-Code „04006381333931“ die Zahl „4,00638E+12“. Mehr als 15
+Ziffern rundet Excel sogar auf Nullen („123456789012345678“ → „123456789012345000“); das kann der
+Import nicht erkennen. Zum Bearbeiten daher so öffnen:
 
 1. In einer leeren Arbeitsmappe **Daten → Aus Text/CSV** wählen und die Datei auswählen.
 2. Dateiursprung „65001: Unicode (UTF-8)“ und Trennzeichen „Semikolon“ prüfen, dann **Daten
    transformieren** wählen.
-3. Im Power-Query-Editor die Spalte **Kennung** markieren, **Datentyp → Text** wählen und „Aktuelle
-   ersetzen“ bestätigen. Am besten ebenso für Seriennummer und Modell. Dann **Schließen & laden**.
+3. Im Power-Query-Editor die Spalten **Kennung** und **Scan-Code** markieren, **Datentyp → Text**
+   wählen und „Aktuelle ersetzen“ bestätigen. Am besten ebenso für Seriennummer und Modell. Dann
+   **Schließen & laden**.
 4. Nach dem Bearbeiten **Datei → Speichern unter → „CSV UTF-8 (durch Trennzeichen getrennt)“**
    wählen. Auch „CSV (Trennzeichen-getrennt)“ (Windows-1252) wird erkannt; Zeichen wie „ẞ“ gehen dort
    aber verloren.
 
-In der Vorschau auf Warnungen achten: Sie zeigen, wenn Excel eine Kennung trotzdem umgewandelt hat.
+In der Vorschau auf Warnungen achten: Sie zeigen, wenn Excel eine Kennung oder einen Scan-Code
+trotzdem umgewandelt hat.
 
 **Laufzeit und Server-Einstellungen**
 
