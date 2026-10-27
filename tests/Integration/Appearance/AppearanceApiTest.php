@@ -286,7 +286,7 @@ final class AppearanceApiTest extends AuthTestCase
             'scope' => self::AREA,
             'display' => 'standalone',
             'theme_color' => '#b71c1c',
-            'background_color' => '#ffffff',
+            'background_color' => '#f3f4f6',
             'icons' => [
                 ['src' => self::AREA . 'api/v1/app-icon/192?v=' . $icon, 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
                 ['src' => self::AREA . 'api/v1/app-icon/512?v=' . $icon, 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
@@ -346,9 +346,24 @@ final class AppearanceApiTest extends AuthTestCase
 
     public function testRoutesDoNotExistUnderService(): void
     {
-        foreach (['/firefighting/service/manifest.webmanifest', self::url(null, 'tenant/logo/512'), self::url(null, 'app-icon/512')] as $url) {
+        foreach (['/firefighting/service/manifest.webmanifest', self::url(null, 'tenant/logo/512'), self::url(null, 'tenant'), self::url(null, 'tenant/appearance')] as $url) {
             self::assertError(404, 'not_found', $this->send('GET', $url));
         }
+    }
+
+    public function testDefaultAppIconAlsoUnderService(): void
+    {
+        // Symbol der App-Seite des Super-Admins (index.html verweist relativ auf api/v1/app-icon/…).
+        $version = DefaultAppIcon::version();
+
+        $response = $this->image('GET', self::url(null, 'app-icon/192?v=' . $version));
+
+        self::assertSame(200, $response->statusCode());
+        self::assertSame(DefaultAppIcon::png(LogoSize::Medium), $response->body());
+        self::assertSame('public, max-age=31536000, immutable', $response->headers()['Cache-Control']);
+        self::assertArrayNotHasKey('Set-Cookie', $response->headers());
+        self::assertSame('no-cache', $this->image('GET', self::url(null, 'app-icon/180'))->headers()['Cache-Control']);
+        self::assertError(404, 'not_found', $this->send('GET', self::url(null, 'app-icon/64')));
     }
 
     public function testLargerBodyLimitOnlyForLogoUpload(): void

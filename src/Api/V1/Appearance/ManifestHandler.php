@@ -16,17 +16,20 @@ use FirefightingEquipment\Tenant\TenantAppearanceRepository;
  * der Stadt mit Akzentfarbe als theme_color und dem Logo (sonst Standard-Symbol) in 192 und 512 px.
  * CachePolicy::Revalidate mit ETag über den Inhalt.
  *
- * Abhängig von der noch offenen Frontend-Technik (bei deren Festlegung prüfen): start_url (Startseite
- * der Stadt), BACKGROUND_COLOR (Ladebildschirm) und das Standard-Symbol (vom Backend ausgeliefert,
- * siehe DefaultAppIcon), nicht aber scope und id.
+ * start_url ist die Startseite der Stadt im Frontend (= scope); den Link auf das Manifest setzt das
+ * Frontend nur unter Städten (src/runtime/appearance.ts). Das Standard-Symbol liefert das Backend
+ * (DefaultAppIcon), nicht das Frontend.
  */
 final readonly class ManifestHandler implements RequestHandler
 {
     public const string NAME_FORMAT = '%s – Geräteverwaltung';
     public const string SHORT_NAME = 'FF-Geräte';
 
-    /** Frontend-abhängig: Hintergrund des Ladebildschirms */
-    public const string BACKGROUND_COLOR = '#ffffff';
+    /**
+     * Hintergrund des Ladebildschirms beim Start der installierten App: --bg (hell) aus
+     * frontend/src/styles/tokens.css (per Test gleich). Das Manifest kennt nur einen Wert, daher hell.
+     */
+    public const string BACKGROUND_COLOR = '#f3f4f6';
 
     /** Größen im Manifest (180 ist nur das apple-touch-icon) */
     private const array ICON_SIZES = [LogoSize::Medium, LogoSize::Large];

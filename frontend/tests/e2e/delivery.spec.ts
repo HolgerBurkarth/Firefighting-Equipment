@@ -49,3 +49,15 @@ test.describe('Auslieferung durch PHP', () => {
         expect(api.headers()['content-type']).toBe('application/json; charset=utf-8');
     });
 });
+
+test.describe('Symbole und Manifest durch PHP', () => {
+    test('Standard-Symbol auch unter service, Manifest nur unter Städten', async ({ request }) => {
+        const icon = await request.get('/firefighting/service/api/v1/app-icon/192');
+        expect(icon.status()).toBe(200);
+        expect(icon.headers()['content-type']).toBe('image/png');
+
+        const manifest = await request.get('/firefighting/service/manifest.webmanifest');
+        expect(manifest.status()).toBe(404);
+        expect(await manifest.json()).toMatchObject({ error: 'not_found' });
+    });
+});

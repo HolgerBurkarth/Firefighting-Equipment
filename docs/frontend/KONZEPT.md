@@ -30,9 +30,11 @@ Das Mockup liegt in `docs/frontend/mockup/` (siehe dortige `LIESMICH.md`).
 - Seiten für Mail-Links (Namen stehen fest in `src/Http/AppUrls.php`):
   `passwort-zuruecksetzen`, `email-bestaetigen`, `einladung-annehmen`. Das Token steht hinter `#`
   und wird per POST an die API geschickt. Jede dieser Seiten mit Hinweis auf den Spam-Ordner.
-- Manifest, Service Worker und App-Symbol gelten je Stadt (Logo der Stadt); die offenen Punkte
-  unter "Noch offen" in `CLAUDE.md` (`start_url`, `background_color`, Standard-Symbol,
-  `apple-touch-icon`) werden mit dem Grundgerüst geklärt.
+- Manifest, Service Worker und App-Symbol gelten je Stadt (Logo der Stadt). Mit dem Grundgerüst
+  geklärt (Einzelheiten in `CLAUDE.md`, "Erscheinungsbild (API)"): `start_url` = Startseite der
+  Stadt, `background_color` = heller Hintergrund `#f3f4f6`, Standard-Symbol vom Backend,
+  `apple-touch-icon` zuerst Standard-Symbol, nach dem Laden der Stadt deren Logo; unter `service`
+  kein Manifest.
 
 ## Rollen und Rechte
 

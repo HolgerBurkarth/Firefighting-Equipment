@@ -45,15 +45,20 @@ async function fulfillApi(
     tenant: TenantResponse,
     problems: string[],
 ): Promise<string> {
-    const path = new URL(route.request().url()).pathname.replace(
-        /^\/firefighting\/[a-z0-9-]+\//,
-        '',
+    // Wie die Routen in PHP (Routes::service/tenant): Unter service gibt es nur das Standard-Symbol,
+    // nicht Stadt, Logo oder Manifest.
+    const match = /^\/firefighting\/([a-z0-9-]+)\/(.*)$/.exec(
+        new URL(route.request().url()).pathname,
     );
-    if (path === 'api/v1/tenant') {
+    const isService = match?.[1] === 'service';
+    const path = match?.[2] ?? '';
+    if (path === 'api/v1/tenant' && !isService) {
         await route.fulfill({ status: tenant.status, json: tenant.body });
-    } else if (/^api\/v1\/(app-icon|tenant\/logo)\/(512|192|180)$/.test(path)) {
+    } else if (/^api\/v1\/app-icon\/(512|192|180)$/.test(path)) {
         await route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
-    } else if (path === 'manifest.webmanifest') {
+    } else if (/^api\/v1\/tenant\/logo\/(512|192|180)$/.test(path) && !isService) {
+        await route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
+    } else if (path === 'manifest.webmanifest' && !isService) {
         await route.fulfill({
             status: 200,
             contentType: 'application/manifest+json; charset=utf-8',
