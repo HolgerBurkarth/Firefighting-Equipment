@@ -1423,7 +1423,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 
 ## Lokale Entwicklungsumgebung
 - Windows 10, PowerShell, PHP 8.5 CLI, Composer, Git, MariaDB 10.11 (Port 3306).
-- Node.js ist noch nicht installiert.
+- Node.js 24 LTS (v24.22.1) mit npm 11 (11.19.1); nur lokal und in GitHub Actions, auf STRATO gibt es
+  kein Node.js.
 
 ## Noch offen
 - Frontend-Technik (Kandidat: Vue 3 mit Vite) – wird festgelegt, wenn die REST-API steht. Danach

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Admin Dashboard</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav:hover{background:#D6DFEA;color:#0F1F33;box-shadow:inset 4px 0 0 #1D3557}
+.nav.active{background:#E3E9F2;color:#1B2430;font-weight:600}
+.count{margin-left:auto;background:#9B1C1C;color:#fff;border-radius:999px;font-size:13px;font-weight:700;padding:1px 8px}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:14px;font-weight:600;white-space:nowrap}
+.b-ready{background:#E3F2E7;color:#1B6330}
+.b-maint{background:#FFF1DB;color:#7A4A00}
+.b-def{background:#FCE4E2;color:#9B1C1C}
+.tile{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #E1E5EA;border-radius:12px;padding:20px;text-decoration:none;color:#1B2430;border-top-width:6px}
+.tile{transition:box-shadow .12s,transform .12s}
+.tile:hover{box-shadow:0 8px 20px rgba(20,30,50,.20);border-color:#8796A8;transform:translateY(-2px);color:#1B2430}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 4px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: {{accent}}">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"></path></svg>
+      </div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">Feuerwehr Immendingen</span>
+        <span style="font-size: 14px; color: #5B6675">Geräteverwaltung</span>
+      </div>
+    </div>
+    <a class="nav active" href="Main.dc.html">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+      Dashboard
+    </a>
+    <a class="nav" href="Geraete.dc.html">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"></path><path d="M3 8v8l9 5 9-5V8"></path></svg>
+      Geräte
+    </a>
+    <a class="nav" href="#">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"></path><circle cx="12" cy="9" r="2.5"></circle></svg>
+      Standorte
+    </a>
+    <a class="nav" href="#">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 12l-8 8-9-9V3h8z"></path><circle cx="7.5" cy="7.5" r="1.5"></circle></svg>
+      Gerätetypen
+    </a>
+    <a class="nav" href="#">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7"></path><path d="M18 14.8c2 .7 3.2 2.5 3.6 5.2"></path></svg>
+      Benutzer
+      <span class="count" aria-label="2 warten auf Freischaltung">2</span>
+    </a>
+    <a class="nav" href="#">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><circle cx="4" cy="6" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="18" r="1"></circle></svg>
+      Protokoll
+      <span class="count" aria-label="1 offener Hinweis">1</span>
+    </a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+    <div style="border-top: 1px solid #E1E5EA; padding-top: 8px; display: flex; flex-direction: column; gap: 4px">
+      <a class="nav" href="Einstellungen.dc.html">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3"></path><path d="M12 19v3"></path><path d="M2 12h3"></path><path d="M19 12h3"></path><path d="M4.9 4.9l2.1 2.1"></path><path d="M17 17l2.1 2.1"></path><path d="M4.9 19.1L7 17"></path><path d="M17 7l2.1-2.1"></path></svg>
+        Einstellungen
+      </a>
+      <a class="nav" href="#">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>
+        Thomas Keller
+      </a>
+      <a class="nav" href="#">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 4h4v16h-4"></path><path d="M10 8l-4 4 4 4"></path><path d="M6 12h10"></path></svg>
+        Abmelden
+      </a>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px">
+    <sc-if value="{{offline}}" hint-placeholder-val="{{ false }}">
+      <div role="status" style="display: flex; align-items: center; gap: 12px; background: #FFF1DB; border: 1px solid #E8B25C; color: #5C3800; border-radius: 10px; padding: 12px 16px; font-size: 16px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0"></path><path d="M5 12a10 10 0 0 1 14 0"></path><path d="M8.5 15.5a5 5 0 0 1 7 0"></path><path d="M3 3l18 18"></path></svg>
+        <span><strong>Keine Verbindung zum Server.</strong> Neuer Versuch läuft automatisch. Ihre Eingaben bleiben erhalten.</span>
+      </div>
+    </sc-if>
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+      <h1 style="margin: 0; font-size: 30px; font-weight: 700">Dashboard</h1>
+      <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: #3A4655">
+        <span style="width: 10px; height: 10px; border-radius: 50%; background: #1B6330"></span>
+        Verbunden · zuletzt aktualisiert 08:24
+      </span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px">
+      <a class="tile" href="Geraete.dc.html" style="border-top-color: #1B6330">
+        <span style="font-size: 15px; color: #5B6675; font-weight: 600">Einsatzbereitschaft</span>
+        <span style="font-size: 36px; font-weight: 700; line-height: 1.1">42 von 45</span>
+        <span style="font-size: 15px">Geräte einsatzbereit</span>
+        <div style="height: 8px; background: #E3E7EC; border-radius: 4px; overflow: hidden; margin-top: 6px">
+          <div style="width: 93%; height: 8px; background: #1B6330"></div>
+        </div>
+      </a>
+      <a class="tile" href="Geraete.dc.html" style="border-top-color: #9B1C1C">
+        <span style="font-size: 15px; color: #5B6675; font-weight: 600">Nicht einsatzbereit</span>
+        <span style="font-size: 36px; font-weight: 700; line-height: 1.1; color: #9B1C1C">3</span>
+        <span style="font-size: 15px">2 defekt · 1 in Wartung</span>
+      </a>
+      <a class="tile" href="Geraete.dc.html" style="border-top-color: #B86E00">
+        <span style="font-size: 15px; color: #5B6675; font-weight: 600">Prüffristen</span>
+        <span style="font-size: 36px; font-weight: 700; line-height: 1.1; color: #7A4A00">2 überfällig</span>
+        <span style="font-size: 15px">4 in den nächsten 30 Tagen</span>
+      </a>
+      <a class="tile" href="#" style="border-top-color: {{accent}}">
+        <span style="font-size: 15px; color: #5B6675; font-weight: 600">Offene Hinweise</span>
+        <span style="font-size: 36px; font-weight: 700; line-height: 1.1">3</span>
+        <span style="font-size: 15px">1 Konflikt · 2 Freischaltungen</span>
+      </a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px">
+      <section style="background: #FFFFFF; border: 1px solid #E1E5EA; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 4px">
+        <h2 style="margin: 0 0 8px 0; font-size: 19px">Nicht einsatzbereit</h2>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #EEF0F3">
+          <span style="font-weight: 700; min-width: 64px">PA 4</span>
+          <span style="flex-grow: 1; color: #3A4655">Atemschutzgerät · Atemschutzwerkstatt</span>
+          <span class="badge b-def">✕ defekt</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #EEF0F3">
+          <span style="font-weight: 700; min-width: 64px">HRT 5</span>
+          <span style="flex-grow: 1; color: #3A4655">Funkgerät · MTW / Fahrerhaus</span>
+          <span class="badge b-def">✕ defekt</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0">
+          <span style="font-weight: 700; min-width: 64px">M10</span>
+          <span style="flex-grow: 1; color: #3A4655">Atemschutzmaske · Lager Gerätehaus</span>
+          <span class="badge b-maint">◐ in Wartung</span>
+        </div>
+      </section>
+      <section style="background: #FFFFFF; border: 1px solid #E1E5EA; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 4px">
+        <h2 style="margin: 0 0 8px 0; font-size: 19px">Letzte Aktivitäten</h2>
+        <div style="display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #EEF0F3">
+          <span style="color: #5B6675; min-width: 48px">08:12</span>
+          <span><strong>M1</strong> nach HLF 20 / G1 gebucht · J. Müller</span>
+        </div>
+        <div style="display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #EEF0F3">
+          <span style="color: #5B6675; min-width: 48px">07:40</span>
+          <span><strong>HRT 5</strong> als defekt gemeldet · S. Schmidt</span>
+        </div>
+        <div style="display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #EEF0F3">
+          <span style="color: #5B6675; min-width: 48px">Gestern</span>
+          <span><strong>M10</strong> in Wartung gegeben · T. Keller</span>
+        </div>
+        <div style="display: flex; gap: 12px; padding: 10px 0">
+          <span style="color: #5B6675; min-width: 48px">Gestern</span>
+          <span style="color: #7A4A00"><strong>Konflikt bei PA 3:</strong> Offline-Buchung von J. Müller überschrieben</span>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#1D3557","options":["#1D3557","#7A1F1F","#2E5E3E","#4B3B7A"],"section":"Stadt"},"offline":{"editor":"boolean","default":false,"section":"Zustand"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      accent: this.props.accent ?? '#1D3557',
+      offline: this.props.offline ?? false
+    };
+  }
+}
+</script>
+</body>
+</html>

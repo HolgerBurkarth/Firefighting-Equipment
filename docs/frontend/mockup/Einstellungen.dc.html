@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Einstellungen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav:hover{background:var(--navHover);color:var(--text);box-shadow:inset 4px 0 0 var(--line)}
+.nav.active{background:var(--navActive);color:var(--text);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.mode{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:10px;cursor:pointer;min-height:56px;box-sizing:border-box}
+.mode:hover{background:var(--navHover)}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid var(--inputBorder);background:var(--surface);color:var(--text);font:inherit;font-weight:600;font-size:15px;cursor:pointer}
+.btn:hover{background:var(--navHover);border-color:var(--line)}
+.sw{width:44px;height:44px;border-radius:50%;cursor:pointer}
+</style>
+</helmet>
+<div style="--bg: {{t.bg}}; --surface: {{t.surface}}; --border: {{t.border}}; --text: {{t.text}}; --muted: {{t.muted}}; --navHover: {{t.navHover}}; --navActive: {{t.navActive}}; --inputBorder: {{t.inputBorder}}; --line: {{t.line}}; display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch; background: {{t.bg}}; color: {{t.text}}">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: {{t.surface}}; border-right: 1px solid {{t.border}}; display: flex; flex-direction: column; gap: 4px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: {{accent}}">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"></path></svg>
+      </div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">Feuerwehr Immendingen</span>
+        <span style="font-size: 14px; color: {{t.muted}}">Geräteverwaltung</span>
+      </div>
+    </div>
+    <a class="nav" href="Main.dc.html">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+      Dashboard
+    </a>
+    <a class="nav" href="Geraete.dc.html">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z"></path><path d="M3 8v8l9 5 9-5V8"></path></svg>
+      Geräte
+    </a>
+    <a class="nav" href="#">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"></path><circle cx="12" cy="9" r="2.5"></circle></svg>
+      Standorte
+    </a>
+    <a class="nav" href="#">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 12l-8 8-9-9V3h8z"></path><circle cx="7.5" cy="7.5" r="1.5"></circle></svg>
+      Gerätetypen
+    </a>
+    <a class="nav" href="#">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7"></path><path d="M18 14.8c2 .7 3.2 2.5 3.6 5.2"></path></svg>
+      Benutzer
+    </a>
+    <a class="nav" href="#">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><circle cx="4" cy="6" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="18" r="1"></circle></svg>
+      Protokoll
+    </a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+    <div style="border-top: 1px solid {{t.border}}; padding-top: 8px; display: flex; flex-direction: column; gap: 4px">
+      <a class="nav active" href="Einstellungen.dc.html">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3"></path><path d="M12 19v3"></path><path d="M2 12h3"></path><path d="M19 12h3"></path><path d="M4.9 4.9l2.1 2.1"></path><path d="M17 17l2.1 2.1"></path><path d="M4.9 19.1L7 17"></path><path d="M17 7l2.1-2.1"></path></svg>
+        Einstellungen
+      </a>
+      <a class="nav" href="#">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>
+        Thomas Keller
+      </a>
+      <a class="nav" href="#">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 4h4v16h-4"></path><path d="M10 8l-4 4 4 4"></path><path d="M6 12h10"></path></svg>
+        Abmelden
+      </a>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; max-width: 980px">
+    <h1 style="margin: 0; font-size: 30px; font-weight: 700">Einstellungen</h1>
+
+    <section class="card" aria-labelledby="s-mode">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h2 id="s-mode" style="margin: 0; font-size: 19px">Anzeigemodus</h2>
+        <span style="font-size: 15px; color: {{t.muted}}">Wird auf diesem Gerät gespeichert. {{modeHint}}</span>
+      </div>
+      <div role="radiogroup" aria-labelledby="s-mode" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px">
+        <sc-for list="{{modes}}" as="m" hint-placeholder-count="3">
+          <label class="mode" style="border: {{m.border}}; background: {{m.bg}}">
+            <input type="radio" name="anzeigemodus" checked="{{m.checked}}" onChange="{{m.pick}}" style="width: 20px; height: 20px; margin: 0; accent-color: {{t.line}}">
+            <span style="display: flex; flex-direction: column">
+              <span style="font-weight: 700; font-size: 16px">{{m.label}}</span>
+              <span style="font-size: 14px; color: {{t.muted}}">{{m.desc}}</span>
+            </span>
+          </label>
+        </sc-for>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="s-city">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h2 id="s-city" style="margin: 0; font-size: 19px">Erscheinungsbild der Feuerwehr</h2>
+        <span style="font-size: 15px; color: {{t.muted}}">Nur für Admins. Gilt für alle Benutzer dieser Stadt. Die Statusfarben (bereit, Wartung, defekt) bleiben immer gleich.</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+        <div style="display: flex; flex-direction: column; gap: 10px; flex: 1 1 280px">
+          <span style="font-weight: 600; font-size: 15px">Akzentfarbe</span>
+          <div role="radiogroup" aria-label="Akzentfarbe" style="display: flex; gap: 10px; flex-wrap: wrap">
+            <sc-for list="{{swatches}}" as="s" hint-placeholder-count="6">
+              <button class="sw" type="button" role="radio" aria-checked="{{s.checked}}" aria-label="{{s.label}}" onClick="{{s.pick}}" style="background: {{s.color}}; border: {{s.border}}; box-shadow: {{s.ring}}"></button>
+            </sc-for>
+          </div>
+          <span role="status" style="font-size: 14px; font-weight: 600; color: {{contrastColor}}">{{contrastText}}</span>
+          <span style="font-weight: 600; font-size: 15px; margin-top: 8px">Logo</span>
+          <div style="display: flex; align-items: center; gap: 12px">
+            <div style="width: 56px; height: 56px; border-radius: 12px; border: 2px dashed {{t.inputBorder}}; display: flex; align-items: center; justify-content: center; color: {{t.muted}}">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"></path></svg>
+            </div>
+            <button class="btn" type="button">Logo hochladen</button>
+          </div>
+          <span style="font-size: 14px; color: {{t.muted}}">PNG oder SVG, quadratisch. Wird auch als App-Symbol verwendet.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; flex: 1 1 260px">
+          <span style="font-weight: 600; font-size: 15px">Vorschau</span>
+          <div style="border: 1px solid {{t.border}}; border-radius: 12px; overflow: hidden">
+            <div style="background: {{accent}}; color: #FFFFFF; padding: 14px 16px; display: flex; align-items: center; gap: 10px">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"></path></svg>
+              <span style="font-weight: 700; font-size: 17px">FF Immendingen</span>
+            </div>
+            <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; background: {{t.bg}}">
+              <span style="display: flex; align-items: center; justify-content: space-between; font-size: 15px">
+                <strong>M1 · Atemschutzmaske</strong>
+                <span style="background: #E3F2E7; color: #1B6330; border-radius: 999px; padding: 2px 9px; font-size: 13px; font-weight: 600">✓ bereit</span>
+              </span>
+              <span style="align-self: flex-start; background: {{accent}}; color: #FFFFFF; border-radius: 8px; padding: 8px 14px; font-weight: 700; font-size: 14px">Speichern</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px">
+      <section class="card" aria-labelledby="s-mail">
+        <h2 id="s-mail" style="margin: 0; font-size: 19px">Benachrichtigung</h2>
+        <label style="display: flex; align-items: flex-start; gap: 12px; font-size: 16px; cursor: pointer">
+          <input type="checkbox" style="width: 20px; height: 20px; margin: 2px 0 0 0; accent-color: {{t.line}}">
+          <span>Mail bei jeder Änderung an Geräten<br><span style="font-size: 14px; color: {{t.muted}}">Eigene Änderungen sind ausgenommen.</span></span>
+        </label>
+      </section>
+      <section class="card" aria-labelledby="s-konto">
+        <h2 id="s-konto" style="margin: 0; font-size: 19px">Konto</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px">
+          <button class="btn" type="button">Passwort ändern</button>
+          <button class="btn" type="button">Angemeldete Geräte</button>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { mode: 'system', sysDark: false, accent: '#1D3557' };
+  }
+  componentDidMount() {
+    try {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      this.setState({ sysDark: mq.matches });
+    } catch (e) {}
+  }
+  lum(hex) {
+    const c = [1, 3, 5].map((i) => {
+      const v = parseInt(hex.substr(i, 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+  renderVals() {
+    const light = { bg: '#F3F4F6', surface: '#FFFFFF', border: '#E1E5EA', text: '#1B2430', muted: '#5B6675', navHover: '#D6DFEA', navActive: '#E3E9F2', inputBorder: '#C9D1DA', line: '#1D3557', selBg: '#EEF2F8' };
+    const dark = { bg: '#12161C', surface: '#1B222B', border: '#2C3644', text: '#E7ECF2', muted: '#A9B4C1', navHover: '#2E3D51', navActive: '#253141', inputBorder: '#45526A', line: '#8FB3E8', selBg: '#22344B' };
+    const mode = this.state.mode;
+    const isDark = mode === 'dark' || (mode === 'system' && this.state.sysDark);
+    const t = isDark ? dark : light;
+    const defs = [
+      { key: 'system', label: 'System', desc: 'Wie am Gerät eingestellt (Standard)' },
+      { key: 'light', label: 'Hell', desc: 'Immer helle Darstellung' },
+      { key: 'dark', label: 'Dunkel', desc: 'Schont die Augen bei Nacht' }
+    ];
+    const modes = defs.map((d) => {
+      const on = d.key === mode;
+      return {
+        label: d.label, desc: d.desc, checked: on,
+        border: on ? '2px solid ' + t.line : '1px solid ' + t.inputBorder,
+        bg: on ? t.selBg : t.surface,
+        pick: () => this.setState({ mode: d.key })
+      };
+    });
+    const colors = [
+      { c: '#1D3557', n: 'Dunkelblau' },
+      { c: '#9F1D20', n: 'Feuerwehrrot' },
+      { c: '#2E5E3E', n: 'Grün' },
+      { c: '#4B3B7A', n: 'Violett' },
+      { c: '#2B3440', n: 'Anthrazit' },
+      { c: '#E8B44C', n: 'Gelb' }
+    ];
+    const accent = this.state.accent;
+    const swatches = colors.map((x) => {
+      const on = x.c === accent;
+      return {
+        color: x.c, label: x.n, checked: on ? 'true' : 'false',
+        border: on ? '3px solid ' + t.surface : '1px solid ' + t.border,
+        ring: on ? '0 0 0 3px ' + t.line : 'none',
+        pick: () => this.setState({ accent: x.c })
+      };
+    });
+    const ratio = 1.05 / (this.lum(accent) + 0.05);
+    const ok = ratio >= 4.5;
+    return {
+      t: t,
+      modes: modes,
+      modeHint: mode === 'system' ? (isDark ? 'Ihr Gerät ist gerade dunkel eingestellt.' : 'Ihr Gerät ist gerade hell eingestellt.') : '',
+      swatches: swatches,
+      accent: accent,
+      contrastText: ok ? '✓ Schrift auf dieser Farbe gut lesbar' : '✕ Zu hell: weiße Schrift wäre schlecht lesbar. Bitte dunklere Farbe wählen.',
+      contrastColor: ok ? (isDark ? '#7BC892' : '#1B6330') : (isDark ? '#F2938E' : '#9B1C1C')
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+/*
+ * Design-Variablen nach dem Mockup (docs/frontend/mockup/LIESMICH.md).
+ * Farben nur hier festlegen; Komponenten verwenden ausschließlich var(--…).
+ *
+ * Anzeigemodus: ohne data-theme gilt prefers-color-scheme (System), data-theme="light" bzw.
+ * "dark" erzwingt den Modus. Die beiden Dunkel-Blöcke unten müssen gleich sein (per Test).
+ */
+
+:root {
+    color-scheme: light;
+
+    /* Schrift */
+    --font-sans: 'Source Sans 3', system-ui, sans-serif;
+    --font-weight-normal: 400;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-size-xs: 13px;
+    --font-size-sm: 14px;
+    --font-size-md: 15px;
+    --font-size-base: 16px;
+    --font-size-lg: 17px;
+    --font-size-xl: 19px;
+    --font-size-h1: 30px;
+    --font-size-kpi: 36px;
+
+    /* Stadtfarbe: --accent setzt die App zur Laufzeit (src/runtime/accent.ts). Weiße Schrift
+     darauf hat mindestens 4,5:1 (prüft das Backend). */
+    --accent-default: #b71c1c;
+    --accent: var(--accent-default);
+    --on-accent: #ffffff;
+    --on-accent-soft: rgb(255 255 255 / 16%);
+
+    /* Flächen und Text (hell) */
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --surface-hover: #f7f9fb;
+    --border: #e1e5ea;
+    --border-subtle: #eef0f3;
+    --border-strong: #8796a8;
+    --input-border: #c9d1da;
+    --text: #1b2430;
+    --text-secondary: #3a4655;
+    --muted: #5b6675;
+    --nav-hover: #d6dfea;
+    --nav-active: #e3e9f2;
+    --selected-bg: #eef2f8;
+    /* Markierungen (Randbalken, Fokus, Auswahl) in der Stadtfarbe */
+    --line: var(--accent);
+    --offline-bg: #3a4655;
+    --offline-text: #ffffff;
+
+    /* Statusfarben: fest, unabhängig von der Stadt, immer mit Symbol und Wort */
+    --status-ready-fg: #1b6330;
+    --status-ready-bg: #e3f2e7;
+    --status-maintenance-fg: #7a4a00;
+    --status-maintenance-bg: #fff1db;
+    --status-defective-fg: #9b1c1c;
+    --status-defective-bg: #fce4e2;
+    --status-retired-fg: #5b6675;
+    --status-retired-bg: #eef0f3;
+
+    /* Meldungen und Formularprüfung */
+    --success: #1b6330;
+    --danger: #9b1c1c;
+
+    /* Formen */
+    --radius-sm: 8px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --radius-pill: 999px;
+    --shadow-raised: 0 8px 20px rgb(20 30 50 / 20%);
+    --shadow-group: 0 4px 14px rgb(20 30 50 / 14%);
+
+    /* Bedienelemente: mindestens 44 px (Konzept), große Tasten 56 px */
+    --touch-min: 44px;
+    --touch-large: 56px;
+    --focus-ring: 3px solid var(--line);
+}
+
+/* Dunkel, erzwungen */
+:root[data-theme='dark'] {
+    color-scheme: dark;
+    --bg: #12161c;
+    --surface: #1b222b;
+    --surface-hover: #212a35;
+    --border: #2c3644;
+    --border-subtle: #252e3a;
+    --border-strong: #5f6e82;
+    --input-border: #45526a;
+    --text: #e7ecf2;
+    --text-secondary: #c9d2dc;
+    --muted: #a9b4c1;
+    --nav-hover: #2e3d51;
+    --nav-active: #253141;
+    --selected-bg: #22344b;
+    --line: color-mix(in srgb, var(--accent) 45%, #ffffff);
+    --offline-bg: #2c3644;
+    --offline-text: #e7ecf2;
+    --status-ready-fg: #7bc892;
+    --status-ready-bg: #1d3a27;
+    --status-maintenance-fg: #f0c36d;
+    --status-maintenance-bg: #3d2e12;
+    --status-defective-fg: #f2938e;
+    --status-defective-bg: #43201f;
+    --status-retired-fg: #a9b4c1;
+    --status-retired-bg: #2c3644;
+    --success: #7bc892;
+    --danger: #f2938e;
+    --shadow-raised: 0 8px 20px rgb(0 0 0 / 45%);
+    --shadow-group: 0 4px 14px rgb(0 0 0 / 40%);
+}
+
+/* Dunkel, wie am Gerät eingestellt (System) */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        color-scheme: dark;
+        --bg: #12161c;
+        --surface: #1b222b;
+        --surface-hover: #212a35;
+        --border: #2c3644;
+        --border-subtle: #252e3a;
+        --border-strong: #5f6e82;
+        --input-border: #45526a;
+        --text: #e7ecf2;
+        --text-secondary: #c9d2dc;
+        --muted: #a9b4c1;
+        --nav-hover: #2e3d51;
+        --nav-active: #253141;
+        --selected-bg: #22344b;
+        --line: color-mix(in srgb, var(--accent) 45%, #ffffff);
+        --offline-bg: #2c3644;
+        --offline-text: #e7ecf2;
+        --status-ready-fg: #7bc892;
+        --status-ready-bg: #1d3a27;
+        --status-maintenance-fg: #f0c36d;
+        --status-maintenance-bg: #3d2e12;
+        --status-defective-fg: #f2938e;
+        --status-defective-bg: #43201f;
+        --status-retired-fg: #a9b4c1;
+        --status-retired-bg: #2c3644;
+        --success: #7bc892;
+        --danger: #f2938e;
+        --shadow-raised: 0 8px 20px rgb(0 0 0 / 45%);
+        --shadow-group: 0 4px 14px rgb(0 0 0 / 40%);
+    }
+}

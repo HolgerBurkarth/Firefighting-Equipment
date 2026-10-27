@@ -1,0 +1,109 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "AdminHandy.dc.html": {
+      "h": 844,
+      "title": "Admin – Geräteliste (Handy)",
+      "w": 390,
+      "x": 0,
+      "y": 2264
+    },
+    "Einstellungen.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Einstellungen (PC, Anzeigemodus und Stadtfarbe klickbar)",
+      "w": 1440,
+      "x": 3100,
+      "y": 0
+    },
+    "Geraete.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Admin – Geräteliste (PC, Filter und Sortierung klickbar)",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "Main.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Admin – Dashboard (PC)",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "SuperAdmin.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Super-Admin – Dashboard und neue Stadt",
+      "w": 1440,
+      "x": 1731,
+      "y": 1111
+    },
+    "UserStart.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "User – Start (Handy)",
+      "w": 390,
+      "x": 0,
+      "y": 1300
+    },
+    "UserUmbuchen.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "User – Umbuchen (Handy, klickbar)",
+      "w": 390,
+      "x": 470,
+      "y": 1300
+    },
+    "UserStandortwahl.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "User – Standortauswahl (Handy, Suche und Baum klickbar)",
+      "w": 390,
+      "x": 940,
+      "y": 1300
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-27T07:30:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "rowAdmin": {
+      "kind": "title1",
+      "maxW": 6000,
+      "text": "Admin-Konsole am PC",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "rowHandy": {
+      "kind": "title1",
+      "maxW": 1330,
+      "text": "Handy",
+      "w": 240,
+      "x": 0,
+      "y": 1000
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Geraete.dc.html",
+    "SuperAdmin.dc.html",
+    "UserStart.dc.html",
+    "UserUmbuchen.dc.html",
+    "UserStandortwahl.dc.html",
+    "AdminHandy.dc.html",
+    "Einstellungen.dc.html"
+  ],
+  "pages": [],
+  "title": "Mockup Feuerwehr-Geräteverwaltung"
+}
