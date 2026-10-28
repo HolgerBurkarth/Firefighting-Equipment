@@ -18,7 +18,7 @@ use FirefightingEquipment\Tenant\TenantSlug;
  * so funktioniert die Seite auch offline aus dem Service Worker.
  *
  * - assets/<datei>: Datei mit Hash im Namen, CachePolicy::Immutable; fehlt sie: 404.
- * - <datei> mit Dateiendung (sw.js, workbox-….js): CachePolicy::Revalidate; fehlt sie: 404
+ * - <datei> mit Dateiendung (sw.js, workbox-….js, build.json): CachePolicy::Revalidate; fehlt sie: 404
  *   (nie die App-Seite, sonst würde HTML als Skript geladen).
  * - alles andere (z. B. "", "geraete/12", "passwort-zuruecksetzen"): index.html mit Basispfad,
  *   CachePolicy::Revalidate und den Sicherheits-Headern.

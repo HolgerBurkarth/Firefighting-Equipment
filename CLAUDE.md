@@ -161,11 +161,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   personenbezogene Daten, ohne Sitzung und nie `Set-Cookie`). `CacheableResponse` erlaubt nur die
   Content-Types `image/png`, `application/manifest+json; charset=utf-8` und für das Frontend
   `text/html; charset=utf-8`, `text/javascript; charset=utf-8`, `text/css; charset=utf-8`,
-  `font/woff2`, `font/woff` (Konstanten in `CacheableResponse`), und nur die beiden Richtlinien aus
+  `font/woff2`, `font/woff` und `application/json; charset=utf-8` (NUR für `build.json` des
+  Frontends; API-Antworten nie über `CacheableResponse`) (Konstanten in `CacheableResponse`), und nur die beiden Richtlinien aus
   `CachePolicy`: `Immutable` (`public, max-age=31536000, immutable`: Logo/Symbol nur, wenn `?v=`
   gleich der aktuellen Versionskennung ist; Frontend nur `assets/…` mit Hash im Namen) und
   `Revalidate` (`no-cache`: Logo/Symbol ohne oder mit veralteter Kennung, Manifest, App-Seite,
-  `sw.js`/`workbox-….js`). Immer mit starkem `ETag` und `nosniff`; `If-None-Match` (auch `W/`,
+  `sw.js`/`workbox-….js`, `build.json`). Immer mit starkem `ETag` und `nosniff`; `If-None-Match` (auch `W/`,
   Liste, `*`) → 304 ohne Body. Zusätzliche Header nur aus der festen Liste
   `Content-Security-Policy`, `Referrer-Policy`, `X-Frame-Options` (ohne Steuerzeichen, sonst
   `InvalidArgumentException`), bisher nur auf der App-Seite. Fehler dieser Routen bleiben JSON mit
@@ -207,15 +208,18 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Datenbank, keine Sitzung, kein Cookie: Ob die Stadt existiert, fragt die App über `api/v1/tenant`;
   ein ungültiges Kürzel (`TenantSlug`, ohne Datenbank) → 404.
 - Pfade (relativ zum Bereich): `assets/<datei>` → Datei aus `frontend/dist/assets/`, `Immutable`.
-  Andere Pfade mit Dateiendung (z. B. `sw.js`, `workbox-….js`) → Datei direkt in `frontend/dist/`,
-  `Revalidate`. Fehlt die Datei oder ist sie nicht erlaubt → 404 `not_found` (JSON), NIE die App-Seite
+  Andere Pfade mit Dateiendung (z. B. `sw.js`, `workbox-….js`, `build.json`) → Datei direkt in
+  `frontend/dist/`, `Revalidate`. Fehlt die Datei oder ist sie nicht erlaubt → 404 `not_found` (JSON), NIE die App-Seite
   (sonst würde HTML als Skript geladen). Alles andere (`""`, `index.html`, `geraete/12`,
   `passwort-zuruecksetzen` …) → `index.html` mit Basispfad, `Revalidate`.
 - Erlaubte Dateien (`FrontendAssets`): nur Endungen aus `FrontendAssets::CONTENT_TYPES` (`js`, `css`,
   `woff2`, `woff`), Name `[A-Za-z0-9][A-Za-z0-9_.-]*` (höchstens 128 Zeichen), keine Unterordner
   außer `assets/`, kein `..`, keine versteckten Dateien, zusätzlich per `realpath` innerhalb von
   `frontend/dist`. Neue Endungen nur, wenn der Build sie wirklich enthält (Content-Type in
-  `CacheableResponse` ergänzen).
+  `CacheableResponse` ergänzen). Einzige Ausnahme ohne Endung in der Liste: genau
+  `FrontendAssets::BUILD_INFO_FILE` (`build.json`, nur direkt in `frontend/dist`, nicht in `assets/`,
+  `application/json; charset=utf-8`; per Test gleich mit `BUILD_INFO_FILE` in
+  `frontend/build/buildInfo.ts`); andere `.json` bleiben 404.
 - Basispfad: `index.html` des Builds enthält genau einmal `<base href="/__FF_BASE__/" />`
   (`FrontendAssets::BASE_PLACEHOLDER` = `BASE_PLACEHOLDER` in `frontend/build/appBase.ts`, per Test
   gleich). PHP ersetzt ihn durch `AppPath::PREFIX/<bereich>/` (HTML-maskiert). Ein Build für alle
@@ -314,7 +318,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Eingaben oder während der Sperre; mit ungespeicherten Eingaben erst nach der Rückfrage „Ihre
   Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?“, Standard „Abbrechen“). Gegen Schleifen: nach einem automatischen Neuladen 10 Minuten
   keines mehr (`RELOAD_COOLDOWN_MS`, sessionStorage je Tab). Die erste Übernahme nach der Installation
-  ist kein Update; die eines anderen Tabs schon. Fehlende Teile nach einem Deploy
+  ist kein Update; die eines anderen Tabs schon. Zusätzlich vergleicht jede Prüfung (und jede
+  Übernahme einer Seite ohne Kontrolle, jede neu installierte Version) die Kennung in `build.json`
+  (vom Plugin `frontend/build/buildInfo.ts` in den Build gelegt, `fetch` mit `cache: 'no-store'`) mit
+  `BUILD_ID`: verschieden = Update, unabhängig vom Zustand des Service Workers (sonst bliebe z. B. eine
+  per Strg+F5 geladene Seite, die der neue Service Worker übernimmt, dauerhaft alt). Beim
+  Aktualisieren wartet die App erst auf eine noch laufende Installation, dann `SKIP_WAITING`, dann
+  Neuladen. Ohne Service Worker gilt nur die Kennung. Fehlende Teile nach einem Deploy
   (`isChunkLoadError`) → Zielseite einmal neu laden. Was ein Neuladen überstehen muss (z. B. der
   Hinweis der Anmeldeseite in `session.ts`), steht in sessionStorage.
 - Regel für ALLE Formulare: ungespeicherte Eingaben über `useUnsavedInput(() => …)`
@@ -351,7 +361,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   liefert je Bereich `frontend/dist` oder, mit Schaltdatei `test-builds/state/<bereich>`, die neue;
   jeder Test hat einen eigenen Bereich. Er beantwortet die öffentlichen Aufrufe der Anmeldeseite
   selbst, weil WebKit Anfragen einer vom Service Worker kontrollierten Seite nicht an `page.route()`
-  gibt.
+  gibt. Abgedeckte Fälle: ohne/mit Eingabe, Rückfrage, erster Besuch mit Deploy vor der
+  Installation (Registrierung per Init-Skript zurückgehalten), Seite per Strg+F5 geladen und vom
+  neuen Service Worker übernommen (nur Chromium: `Page.reload` mit `ignoreCache` über CDP), zwei Tabs
+  (einer aktualisiert, der andere folgt; einer geschlossen).
 - Formatierung: Prettier (4 Leerzeichen laut `.editorconfig`, JSON 2), ESLint mit typgeprüften
   strikten Regeln, `no-console`, nur `<script setup lang="ts">`, kein `v-html`.
 

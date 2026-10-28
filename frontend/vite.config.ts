@@ -2,29 +2,21 @@ import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { appBase } from './build/appBase.ts';
+import { buildId, buildInfo } from './build/buildInfo.ts';
 
 /** PHP-Entwicklungsserver: php -S localhost:8000 public/index.php (im Hauptordner). */
 const PHP_DEV_SERVER = 'http://localhost:8000';
 
-/**
- * Kennung des Builds (src/runtime/build.ts): FF_BUILD_ID (z. B. zweiter Build der Browser-Tests),
- * sonst der Commit in GitHub Actions, sonst "dev". Gleicher Stand ergibt denselben Build.
- */
-function buildId(): string {
-    const id = process.env['FF_BUILD_ID'] ?? process.env['GITHUB_SHA']?.slice(0, 12) ?? 'dev';
-    if (!/^[A-Za-z0-9._-]{1,40}$/.test(id)) {
-        throw new Error('FF_BUILD_ID: nur A-Z, a-z, 0-9, Punkt, Unterstrich, Bindestrich (1-40)');
-    }
-    return id;
-}
+const BUILD_ID = buildId();
 
 export default defineConfig({
     // Relative Adressen; den Basispfad je Stadt setzt <base href> (vom Server eingesetzt).
     base: './',
-    define: { __APP_BUILD_ID__: JSON.stringify(buildId()) },
+    define: { __APP_BUILD_ID__: JSON.stringify(BUILD_ID) },
     plugins: [
         vue(),
         appBase(),
+        buildInfo(BUILD_ID),
         VitePWA({
             // Das Manifest liefert PHP je Stadt (manifest.webmanifest); die Registrierung steht in
             // src/runtime/serviceWorker.ts (eigene Datei, kein Inline-Skript wegen der CSP).

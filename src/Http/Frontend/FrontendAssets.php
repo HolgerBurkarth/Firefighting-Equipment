@@ -24,6 +24,13 @@ final readonly class FrontendAssets
         'woff' => CacheableResponse::WOFF,
     ];
 
+    /**
+     * Kennung der ausgelieferten Version ({"build": "…"}), nur direkt im Build-Ordner; wie
+     * BUILD_INFO_FILE in frontend/build/buildInfo.ts (per Test). Die App vergleicht sie mit der
+     * eigenen (frontend/src/runtime/appUpdate.ts). Bewusst nur diese eine Datei, keine Endung .json.
+     */
+    public const string BUILD_INFO_FILE = 'build.json';
+
     private const string FILE_NAME_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/';
 
     public function __construct(private string $directory)
@@ -61,7 +68,7 @@ final readonly class FrontendAssets
     }
 
     /**
-     * Datei im Build-Ordner ("sw.js") oder in assets/ ("assets/index-abc.js").
+     * Datei im Build-Ordner ("sw.js", "build.json") oder in assets/ ("assets/index-abc.js").
      *
      * @return FrontendFile|null null, wenn der Name nicht erlaubt ist oder die Datei fehlt
      */
@@ -71,7 +78,9 @@ final readonly class FrontendAssets
         if (preg_match(self::FILE_NAME_PATTERN, $name) !== 1 || str_contains($name, '..')) {
             return null;
         }
-        $contentType = self::CONTENT_TYPES[strtolower(pathinfo($name, PATHINFO_EXTENSION))] ?? null;
+        $contentType = $relativePath === self::BUILD_INFO_FILE
+            ? CacheableResponse::JSON
+            : self::CONTENT_TYPES[strtolower(pathinfo($name, PATHINFO_EXTENSION))] ?? null;
         if ($contentType === null) {
             return null;
         }

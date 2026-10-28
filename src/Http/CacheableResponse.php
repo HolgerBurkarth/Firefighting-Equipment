@@ -20,8 +20,10 @@ final readonly class CacheableResponse implements Response
     public const string CSS = 'text/css; charset=utf-8';
     public const string WOFF2 = 'font/woff2';
     public const string WOFF = 'font/woff';
+    /** Nur build.json des Frontends (FrontendAssets::BUILD_INFO_FILE). */
+    public const string JSON = 'application/json; charset=utf-8';
 
-    private const array CONTENT_TYPES = [self::PNG, self::MANIFEST, self::HTML, self::JAVASCRIPT, self::CSS, self::WOFF2, self::WOFF];
+    private const array CONTENT_TYPES = [self::PNG, self::MANIFEST, self::HTML, self::JAVASCRIPT, self::CSS, self::WOFF2, self::WOFF, self::JSON];
 
     /** Zusätzliche Header, nur für die App-Seite (FrontendHandler). */
     private const array SECURITY_HEADERS = ['Content-Security-Policy', 'Referrer-Policy', 'X-Frame-Options'];

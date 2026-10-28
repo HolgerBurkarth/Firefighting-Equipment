@@ -18,13 +18,14 @@ export default function globalSetup(): void {
     const state = join(frontend, 'test-builds', 'state');
     rmSync(state, { recursive: true, force: true });
     mkdirSync(state, { recursive: true });
+    // Vite direkt mit Node starten (ohne Shell, auch unter Windows).
+    const vite = join(frontend, 'node_modules', 'vite', 'bin', 'vite.js');
     const result = spawnSync(
-        'npx',
-        ['vite', 'build', '--outDir', 'test-builds/next', '--emptyOutDir'],
+        process.execPath,
+        [vite, 'build', '--outDir', 'test-builds/next', '--emptyOutDir'],
         {
             cwd: frontend,
             env: { ...process.env, FF_BUILD_ID: NEXT_BUILD_ID },
-            shell: process.platform === 'win32',
             stdio: ['ignore', 'ignore', 'inherit'],
         },
     );
