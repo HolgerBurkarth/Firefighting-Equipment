@@ -1,0 +1,1 @@
+import{E as e,F as t,M as n,P as r,U as i,i as a,k as o}from"./index-rkkRK1Ir.js";import{t as s}from"./AccountPanel-BHf2GTxM.js";var c=a(t({__name:`DashboardPage`,setup(t){return(t,a)=>(i(),n(e,null,[a[0]||=o(`h1`,null,`Dashboard`,-1),a[1]||=o(`p`,{class:`placeholder`},`Hier entsteht das Dashboard.`,-1),r(s)],64))}}),[[`__scopeId`,`data-v-f66d6328`]]);export{c as default};

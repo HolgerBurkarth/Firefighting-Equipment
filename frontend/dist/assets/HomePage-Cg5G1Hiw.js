@@ -1,0 +1,1 @@
+import{M as e,U as t,i as n}from"./index-rkkRK1Ir.js";var r={},i={class:`loading`,role:`status`};function a(n,r){return t(),e(`p`,i,`Wird geladen …`)}var o=n(r,[[`render`,a],[`__scopeId`,`data-v-70a9a5bb`]]);export{o as default};

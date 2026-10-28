@@ -128,3 +128,30 @@ export function resendVerification(
         ...(fetchFn && { fetchFn }),
     });
 }
+
+/** POST auth/password-reset/request: immer 202 mit derselben Meldung (Stadt und service). */
+export function requestPasswordReset(
+    email: string,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<{ readonly message: string }>> {
+    return apiRequest('auth/password-reset/request', parseMessage, {
+        method: 'POST',
+        body: { email },
+        public: true,
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** POST auth/password-reset/confirm mit dem Token aus dem Mail-Link (nie in der Adresse). */
+export function confirmPasswordReset(
+    token: string,
+    newPassword: string,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<{ readonly message: string }>> {
+    return apiRequest('auth/password-reset/confirm', parseMessage, {
+        method: 'POST',
+        body: { token, new_password: newPassword },
+        public: true,
+        ...(fetchFn && { fetchFn }),
+    });
+}
