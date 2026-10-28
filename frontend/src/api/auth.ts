@@ -155,3 +155,34 @@ export function confirmPasswordReset(
         ...(fetchFn && { fetchFn }),
     });
 }
+
+/** POST auth/register (nur unter Städten): 202 mit derselben Meldung, ob neu oder schon vorhanden. */
+export function register(
+    input: {
+        readonly code: string;
+        readonly email: string;
+        readonly password: string;
+        readonly name: string;
+    },
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<{ readonly message: string }>> {
+    return apiRequest('auth/register', parseMessage, {
+        method: 'POST',
+        body: input,
+        public: true,
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** POST auth/email/verify mit dem Token aus dem Mail-Link (nie in der Adresse). */
+export function verifyEmail(
+    token: string,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<{ readonly message: string }>> {
+    return apiRequest('auth/email/verify', parseMessage, {
+        method: 'POST',
+        body: { token },
+        public: true,
+        ...(fetchFn && { fetchFn }),
+    });
+}

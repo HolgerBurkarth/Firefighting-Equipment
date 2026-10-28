@@ -1183,7 +1183,9 @@ Fürs Ansehen mit echter API: `npm run build`, dann im Hauptordner
 `http.allowed_origins` eintragen.
 
 Anmeldung: `/firefighting/<bereich>/` leitet ohne Sitzung zur Anmeldung, sonst zur Startseite der
-Rolle (User `suchen`, Admin und Super-Admin `dashboard`; beide vorerst Platzhalter). Abläufe und
+Rolle (User `suchen`, Admin und Super-Admin `dashboard`; beide vorerst Platzhalter). Registrieren
+unter `/firefighting/<stadt>/registrieren` (mit Code aus dem QR-Link `#code=…` oder von Hand),
+Bestätigungslink der Mail auf `email-bestaetigen` (Bestätigung per Knopf, dort auch neuer Link). Abläufe und
 Entscheidungen in `docs/frontend/KONZEPT.md`, "Anmeldung und Registrierung".
 
 Die Browser-Tests (Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build, den

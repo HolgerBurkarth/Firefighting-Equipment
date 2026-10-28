@@ -61,6 +61,20 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
     ];
     if (!base.isService) {
         routes.push({
+            // Link im QR-Code des Einladungscodes: registrieren#code=XXXX-XXXX-XXXX.
+            path: '/registrieren',
+            name: 'register',
+            component: () => import('../pages/RegisterPage.vue'),
+            meta: { public: true },
+        });
+        routes.push({
+            // Name wie AppUrls::VERIFY_EMAIL_PAGE (Link in der Mail).
+            path: '/email-bestaetigen',
+            name: 'email-verify',
+            component: () => import('../pages/EmailVerifyPage.vue'),
+            meta: { public: true },
+        });
+        routes.push({
             path: '/suchen',
             name: 'search',
             component: () => import('../pages/SearchPage.vue'),

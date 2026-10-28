@@ -14,6 +14,8 @@ const model = defineModel<string>({ required: true });
 const props = defineProps<{
     id: string;
     context: PasswordContext;
+    /** Beschriftung (Standard „Neues Passwort“; bei der Registrierung „Passwort“). */
+    label?: string;
     /** Meldung des Servers (422 weak_password, z. B. Sperrliste); der Aufrufer leert sie beim Tippen. */
     serverError?: string | null;
     /** Nach einem Absendeversuch werden offene Regeln rot statt neutral angezeigt. */
@@ -78,7 +80,7 @@ const describedby = computed(
 <!-- Neues Passwort: ein Feld mit Auge-Knopf, darunter die Regeln mit Live-Prüfung. -->
 <template>
     <div class="field">
-        <Label :for="id" class="field-label">Neues Passwort</Label>
+        <Label :for="id" class="field-label">{{ label ?? 'Neues Passwort' }}</Label>
         <PasswordField
             :id="id"
             ref="field"

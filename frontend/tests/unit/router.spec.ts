@@ -83,6 +83,20 @@ describe('Wächter', () => {
         expect((await routerAt('/suchen', SERVICE)).currentRoute.value.name).toBe('not-found');
     });
 
+    it('registrieren und email-bestaetigen gibt es nur unter Städten, öffentlich', async () => {
+        const fetchSpy = vi.fn();
+        vi.stubGlobal('fetch', fetchSpy);
+        expect((await routerAt('/registrieren')).currentRoute.value.name).toBe('register');
+        expect((await routerAt('/email-bestaetigen')).currentRoute.value.name).toBe('email-verify');
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect((await routerAt('/registrieren', SERVICE)).currentRoute.value.name).toBe(
+            'not-found',
+        );
+        expect((await routerAt('/email-bestaetigen', SERVICE)).currentRoute.value.name).toBe(
+            'not-found',
+        );
+    });
+
     it('öffentliche Seiten fragen auth/me nicht', async () => {
         const fetchSpy = vi.fn();
         vi.stubGlobal('fetch', fetchSpy);

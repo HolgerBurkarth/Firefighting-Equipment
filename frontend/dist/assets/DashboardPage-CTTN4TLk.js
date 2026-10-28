@@ -1,1 +1,0 @@
-import{A as e,F as t,I as n,N as r,O as i,V as a,s as o}from"./index-D8RLuWfk.js";import{t as s}from"./AccountPanel-hx_LOvno.js";var c=o(n({__name:`DashboardPage`,setup(n){return(n,o)=>(a(),r(i,null,[o[0]||=e(`h1`,null,`Dashboard`,-1),o[1]||=e(`p`,{class:`placeholder`},`Hier entsteht das Dashboard.`,-1),t(s)],64))}}),[[`__scopeId`,`data-v-f66d6328`]]);export{c as default};

@@ -1,0 +1,1 @@
+function e(e,t){let n=new URLSearchParams(e.replace(/^#/,``)).get(t);return n===null||n===``?null:n}function t(t,n,r){let i=e(n.hash,r);return n.hash!==``&&t.replace({path:n.path,query:n.query,hash:``}),i}export{t};

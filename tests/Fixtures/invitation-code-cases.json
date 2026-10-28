@@ -1,0 +1,180 @@
+{
+    "description": "Einladungscodes: Eingabe und Ergebnis von InvitationCodeValue::fromInput (server: normalisiert oder null). Geprüft von InvitationCodeCasesTest (PHPUnit) und invitationCode.spec.ts (Vitest); das Frontend darf nie strenger sein.",
+    "cases": [
+        {
+            "description": "Anzeigeform",
+            "input": "ABCD-EFGH-JKMN",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "ohne Bindestriche",
+            "input": "ABCDEFGHJKMN",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "kleingeschrieben",
+            "input": "abcd-efgh-jkmn",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "gemischt mit Leerzeichen",
+            "input": " abCD efgh  JKMN ",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "Tab und Zeilenumbruch",
+            "input": "ABCD\tEFGH\nJKMN",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "mehrere Bindestriche",
+            "input": "ABCD--EFGH---JKMN-",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "geschütztes Leerzeichen (U+00A0)",
+            "input": "ABCD EFGH JKMN",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "Ziffern",
+            "input": "2345-6789-ABCD",
+            "server": "23456789ABCD"
+        },
+        {
+            "description": "zu kurz (11)",
+            "input": "ABCD-EFGH-JKM",
+            "server": null
+        },
+        {
+            "description": "zu lang (13)",
+            "input": "ABCD-EFGH-JKMNP",
+            "server": null
+        },
+        {
+            "description": "leer",
+            "input": "",
+            "server": null
+        },
+        {
+            "description": "nur Leerraum",
+            "input": "   ",
+            "server": null
+        },
+        {
+            "description": "O statt 0 (nicht im Alphabet)",
+            "input": "OBCD-EFGH-JKMN",
+            "server": null
+        },
+        {
+            "description": "Ziffer 0",
+            "input": "0BCD-EFGH-JKMN",
+            "server": null
+        },
+        {
+            "description": "I",
+            "input": "IBCD-EFGH-JKMN",
+            "server": null
+        },
+        {
+            "description": "Ziffer 1",
+            "input": "1BCD-EFGH-JKMN",
+            "server": null
+        },
+        {
+            "description": "L",
+            "input": "LBCD-EFGH-JKMN",
+            "server": null
+        },
+        {
+            "description": "l klein",
+            "input": "lbcd-efgh-jkmn",
+            "server": null
+        },
+        {
+            "description": "Gedankenstrich statt Bindestrich",
+            "input": "ABCD–EFGH–JKMN",
+            "server": null
+        },
+        {
+            "description": "Umlaut",
+            "input": "ÄBCD-EFGH-JKMN",
+            "server": null
+        },
+        {
+            "description": "ß",
+            "input": "ßBCD-EFGH-JKMN",
+            "server": null
+        },
+        {
+            "description": "Unterstrich",
+            "input": "ABCD_EFGH_JKMN",
+            "server": null
+        },
+        {
+            "description": "Punkt",
+            "input": "ABCD.EFGH.JKMN",
+            "server": null
+        },
+        {
+            "description": "genau 64 Bytes",
+            "input": "ABCD-EFGH-JKMN                                                  ",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "65 Bytes",
+            "input": "ABCD-EFGH-JKMN                                                   ",
+            "server": null
+        },
+        {
+            "description": "64 Bytes mit Mehrbyte-Leerraum",
+            "input": "ABCDEFGHJKMN                          ",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "66 Bytes mit Mehrbyte-Leerraum",
+            "input": "ABCDEFGHJKMN                           ",
+            "server": null
+        },
+        {
+            "description": "Code doppelt",
+            "input": "ABCD-EFGH-JKMN-ABCD-EFGH-JKMN",
+            "server": null
+        },
+        {
+            "description": "Zeichen ohne Breite (U+200B)",
+            "input": "ABCD​EFGH-JKMN",
+            "server": null
+        },
+        {
+            "description": "BOM (U+FEFF)",
+            "input": "﻿ABCD-EFGH-JKMN",
+            "server": null
+        },
+        {
+            "description": "ideografisches Leerzeichen (U+3000)",
+            "input": "ABCD　EFGH JKMN",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "Zeilentrenner (U+2028)",
+            "input": "ABCD\u2028EFGH JKMN",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "NEL (U+0085)",
+            "input": "ABCDEFGH JKMN",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "schmales geschütztes Leerzeichen (U+202F)",
+            "input": "ABCD EFGH JKMN",
+            "server": "ABCDEFGHJKMN"
+        },
+        {
+            "description": "vertikaler Tab und Seitenvorschub",
+            "input": "ABCD\u000bEFGH\fJKMN",
+            "server": "ABCDEFGHJKMN"
+        }
+    ]
+}

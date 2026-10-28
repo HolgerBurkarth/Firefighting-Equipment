@@ -282,6 +282,15 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Tokens und Einladungscodes aus Links (`#token=…`, `#code=…`) nur über `takeFragmentParam`
   (`src/runtime/fragment.ts`): aus dem Fragment lesen, per POST senden, das Fragment sofort aus der
   Adresszeile entfernen (per Browser-Test: keine angefragte Adresse enthält das Token).
+- Einladungscodes (`src/auth/invitationCode.ts`, Seite `registrieren`): Normalisierung genau wie
+  `InvitationCodeValue::fromInput` (höchstens 64 Bytes, Leerraum wie PCRE `\s` mit `/u` – Kategorie
+  Z, Tab, LF, VT, FF, CR, NEL, NICHT U+FEFF – und Bindestriche weg, nur ASCII groß); gesendet wird
+  `XXXX-XXXX-XXXX`. Gemeinsame Testfälle `tests/Fixtures/invitation-code-cases.json` (`server` =
+  Ergebnis des Backends), geprüft von `InvitationCodeCasesTest` (PHPUnit) und `invitationCode.spec.ts`
+  (Vitest, gleicht auch `ALPHABET`, `LENGTH`, `MAX_INPUT_LENGTH` ab); Änderungen an
+  `InvitationCodeValue` daher immer mit dem Frontend und neuen Fällen. Seiten der Mail-Links
+  (`AppUrls::*_PAGE`) muss es im Router geben (`appUrlsPages.spec.ts`). `email-bestaetigen` sendet
+  das Token erst per Knopf (Virenscanner öffnen Links vorab).
 - Neue Passwörter (`NewPasswordField`, Live-Prüfung `src/auth/passwordRules.ts`): Regeln wie
   `PasswordPolicy` OHNE Sperrliste (nur der Server, 422 `weak_password` am Feld). Absenden erst nach
   bestandener Prüfung, daher nie strenger als der Server: gemeinsame Testfälle

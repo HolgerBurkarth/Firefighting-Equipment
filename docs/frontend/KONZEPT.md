@@ -77,6 +77,20 @@ Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen")
    Anmeldeseite hat das Auge-Symbol.
 4. **Tokens aus Mail-Links** (`#token=…`) wie der Einladungscode: aus dem Fragment lesen, per POST
    senden, danach aus der Adresszeile entfernen.
+5. **Registrieren:** Felder Einladungscode, Name, E-Mail-Adresse, Passwort (Live-Prüfung mit Name,
+   E-Mail und Stadt). Der Code darf in jeder Schreibweise eingegeben werden (klein, mit Leerzeichen,
+   ohne Bindestriche) und erscheint danach als `XXXX-XXXX-XXXX`. Die App prüft vor dem Absenden nur
+   den Aufbau (12 Zeichen aus dem Alphabet ohne 0/O/1/I/L), genau wie der Server (gemeinsame
+   Testfälle `tests/Fixtures/invitation-code-cases.json`); ob der Code gilt, sagt nur der Server
+   (Meldung am Feld). Danach: Meldung des Servers, „Link 24 Stunden gültig“, Hinweis auf Spam-Ordner
+   und Kontakte, Link „Bestätigungsmail erneut senden“.
+6. **E-Mail bestätigen per Knopf:** Die Seite sendet das Token erst nach „E-Mail-Adresse
+   bestätigen“, nicht schon beim Öffnen; Virenscanner mancher Mailprogramme öffnen Links vorab und
+   würden die Adresse sonst ohne den Menschen bestätigen. Link abgelaufen oder benutzt, oder Seite
+   ohne Link geöffnet: Formular „Neuen Bestätigungslink anfordern“ (E-Mail-Adresse). Danach geht es
+   zur Anmeldung; bis zur Freischaltung meldet sie „wartet auf Freischaltung“.
+7. **Ungespeicherte Eingaben:** Ein Code oder Token aus einem Link zählt wie eine Eingabe, solange
+   er nicht verwendet ist (nach einem Neuladen stünde er nicht mehr in der Adresse).
 
 ### Weitere Regeln
 - Nur eine echte Antwort des Servers entscheidet, ob jemand angemeldet ist (401 = nicht
