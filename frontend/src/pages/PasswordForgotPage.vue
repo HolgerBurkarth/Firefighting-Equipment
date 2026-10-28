@@ -6,6 +6,7 @@ import { requestPasswordReset } from '../api/auth';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import MailHint from '../components/MailHint.vue';
 import { currentAppBase } from '../runtime/appBase';
+import { useUnsavedInput } from '../runtime/unsavedInput';
 
 const base = currentAppBase();
 const email = ref('');
@@ -13,6 +14,7 @@ const emailError = ref<string | null>(null);
 const busy = ref(false);
 const error = ref<ApiError | null>(null);
 const sentMessage = ref<string | null>(null);
+useUnsavedInput(() => email.value.trim() !== '' && sentMessage.value === null);
 const emailInput = useTemplateRef<HTMLInputElement>('emailInput');
 
 async function onSubmit(): Promise<void> {

@@ -10,6 +10,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Bestehende Funktionen dürfen nicht kaputtgehen: Jede Änderung bekommt Tests,
   vor jedem Commit müssen alle Tests grün sein.
 - Agenten committen und pushen nie; das macht der Nutzer.
+- Während Prüfläufe laufen (z. B. mehrere Testläufe im Hintergrund), keine Testdateien und keinen
+  getesteten Code ändern oder anlegen: Die Läufe lesen sie neu ein, das Ergebnis wäre verfälscht.
+  Erst nach dem Ende weiterarbeiten.
 - Das Repository ist öffentlich: niemals Passwörter, Zugangsdaten oder
   `config/config.local.php` committen.
 - Code und Bezeichner auf Englisch, Dokumentation und Oberflächentexte auf Deutsch.
@@ -168,6 +171,25 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `InvalidArgumentException`), bisher nur auf der App-Seite. Fehler dieser Routen bleiben JSON mit
   `no-store`. Keine weiteren Ausnahmen ohne Rückfrage; neue nur über
   `CacheableResponse`/`CachePolicy` und hier dokumentiert.
+- Versionierung der API für das Frontend (beschlossener Plan, gilt für alle Arbeiten an API und
+  Frontend): Die App sendet bei JEDEM API-Aufruf `X-Client-Api: <n>` (umgesetzt: `apiRequest` in
+  `frontend/src/api/client.ts`, `ClientApi::HEADER`/`CURRENT` in `src/Http/ClientApi.php`; die Zahl
+  steht in `resources/client-api.json`, abgeglichen von `ClientApiTest` und `clientApi.spec.ts`;
+  derzeit 1). Ein gewöhnlicher Header einer Anfrage an dieselbe Adresse: kein CORS-Preflight,
+  `RequestGuard` prüft nur `Content-Type`, `Origin` und Body (per Test). Das Backend wertet ihn
+  NOCH NICHT aus. Geplant, jeweils erst nach Rückfrage umzusetzen:
+  - Grundregel: Die API nur erweitern (neue Felder optional, alte noch mindestens einen Deploy
+    lang behalten). `n` steigt nur bei einer inkompatiblen Änderung, dann in Datei, `ClientApi` und
+    Frontend gemeinsam.
+  - Backend: `MIN_CLIENT_API`; liegt `X-Client-Api` darunter, antwortet `Application` vor dem
+    Handler mit 409 `client_outdated` (neuer Fehlercode, `details {min_client_api}`). Ohne Header
+    (curl, ältere Apps) gilt die Anfrage als aktuell, bis das ausdrücklich geändert wird.
+  - Jede Antwort trägt `X-Api-Version: <m>`; kennt die App eine kleinere Zahl, prüft sie sofort auf
+    ein Update.
+  - Frontend bei `client_outdated`: sofort auf eine neue Version prüfen und nach den Regeln der
+    Updates aktualisieren (angefangene Eingaben bleiben, Hinweis „Diese Version ist veraltet –
+    bitte aktualisieren“). Offline-Buchungen bleiben in der Warteschlange und gehen nach dem Update
+    raus; die Warteschlange bekommt dafür eine eigene Formatversion.
 - Antworten implementieren `Http\Response` (`statusCode()`, `headers()`, `send()`): `JsonResponse`
   (Regelfall), `CsvResponse` oder `CacheableResponse`. `Application` erzeugt nur JSON vorab
   (Kodierfehler → 500); ein CSV-Download wird erst beim Senden geschrieben.
@@ -221,7 +243,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `client.ts`), `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
-  `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
+  `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung,
+  `appUpdate.ts` Updates, `unsavedInput.ts` ungespeicherte Eingaben, `build.ts` Build-Kennung), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
   `tests/unit/` (Vitest), `tests/e2e/` (Playwright). Build nach `frontend/dist/` (in `.gitignore`).
 - Design-Variablen nur in `src/styles/tokens.css` (Farben hell/dunkel aus dem Mockup, Statusfarben,
@@ -252,7 +275,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `PasswordField` (Auge-Knopf mit fester Beschriftung „Passwort anzeigen“ und `aria-pressed`,
   mindestens 48 px), `ErrorNotice`, `MailHint` (Spam-Ordner, Absender zu den Kontakten),
   `BrandCard` (Logo 512 px oder Standard-Symbol, Name; unter `service` „Super-Admin“),
-  `AccountPanel`. Anmeldeseite: Formular ausgeblendet bei `tenant_not_found`/`tenant_inactive`,
+  `AccountPanel`, `ConfirmDialog` (Rückfrage über Reka UI `AlertDialog`, Fokus auf „Abbrechen“;
+  nie `window.confirm`). Anmeldeseite: Formular ausgeblendet bei `tenant_not_found`/`tenant_inactive`,
   Passwort wird unverändert gesendet und nur bei `invalid_credentials` geleert, bei 429 Knopf mit
   Countdown bis `Retry-After`, bei `email_not_verified` „Bestätigungsmail erneut senden“.
 - Tokens und Einladungscodes aus Links (`#token=…`, `#code=…`) nur über `takeFragmentParam`
@@ -271,6 +295,25 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Service Worker `sw.js` (Workbox, `generateSW`), registriert aus dem Bundle (kein Inline-Skript),
   Scope `/firefighting/<bereich>/`, Rückfall auf `index.html` außer `api/` und
   `manifest.webmanifest`. Das Manifest liefert PHP (`manifest: false` im Plugin).
+- Updates (KONZEPT.md "Updates der App", `src/runtime/appUpdate.ts`): `skipWaiting: false`, die neue
+  Version wartet, bis `AppUpdater` sie per `SKIP_WAITING` aktiviert und die Seite neu lädt (nie
+  `skipWaiting: true`: die laufende App bräuchte sonst gelöschte Teile). Prüfen
+  (`registration.update()`) beim Start, bei `visibilitychange` (sichtbar) und stündlich, offline
+  nie, Fehler still. Aktualisiert wird beim nächsten Seitenwechsel auf einen anderen Pfad
+  (`installUpdateGuard`; nicht beim Start, nicht bei gleichem Pfad wie beim Entfernen von
+  `#token=…`) oder per Knopf „Jetzt aktualisieren“ im Hinweis von `App.vue` (nur mit ungespeicherten
+  Eingaben oder während der Sperre; mit ungespeicherten Eingaben erst nach der Rückfrage „Ihre
+  Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?“, Standard „Abbrechen“). Gegen Schleifen: nach einem automatischen Neuladen 10 Minuten
+  keines mehr (`RELOAD_COOLDOWN_MS`, sessionStorage je Tab). Die erste Übernahme nach der Installation
+  ist kein Update; die eines anderen Tabs schon. Fehlende Teile nach einem Deploy
+  (`isChunkLoadError`) → Zielseite einmal neu laden. Was ein Neuladen überstehen muss (z. B. der
+  Hinweis der Anmeldeseite in `session.ts`), steht in sessionStorage.
+- Regel für ALLE Formulare: ungespeicherte Eingaben über `useUnsavedInput(() => …)`
+  (`src/runtime/unsavedInput.ts`) melden: true, solange etwas eingegeben und nicht gespeichert ist;
+  nach dem Speichern oder Leeren false. Nur so lädt die App nie mitten in einer Eingabe neu.
+- Build-Kennung `__APP_BUILD_ID__` (`vite.config.ts`: `FF_BUILD_ID`, sonst `GITHUB_SHA` gekürzt,
+  sonst `dev`; nur `A-Za-z0-9._-`, 1–40) an `<html data-build>`; derselbe Stand ergibt denselben
+  Build.
 - Befehle (in `frontend/`): `npm ci`, einmalig `npx playwright install chromium firefox webkit`;
   `npm test` (ESLint + Prettier, Vitest, `vue-tsc` + Build, Playwright) muss vor jedem Commit grün
   sein. Einzeln: `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test:unit`,
@@ -292,8 +335,14 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Seiten (z. B. `anmelden`) brauchen kein `auth/me`. Jeder Konsolenfehler, Skriptfehler,
   jede CSP-Verletzung und jede nicht simulierte API-Anfrage lässt den Test scheitern (erwartete
   Browsermeldung nur per Option `allowedConsoleError`, nie für CSP). Service Worker sind gesperrt
-  außer in `serviceWorker.spec.ts`; der Offline-Test läuft nur in Chromium (`setOffline` umgeht in
-  Firefox/WebKit den Service Worker).
+  außer in `serviceWorker.spec.ts` und `appUpdate.spec.ts`; der Offline-Test läuft nur in Chromium (`setOffline` umgeht in
+  Firefox/WebKit den Service Worker). Update-Tests (`appUpdate.spec.ts`) mit zwei echten Builds: `globalSetup.ts` baut
+  die neue Version (`FF_BUILD_ID=e2e-next`) nach `frontend/test-builds/` (in `.gitignore`), ein
+  zweiter Server `php -S localhost:4174 frontend/tests/e2e/support/update-server.php` (nur für Tests)
+  liefert je Bereich `frontend/dist` oder, mit Schaltdatei `test-builds/state/<bereich>`, die neue;
+  jeder Test hat einen eigenen Bereich. Er beantwortet die öffentlichen Aufrufe der Anmeldeseite
+  selbst, weil WebKit Anfragen einer vom Service Worker kontrollierten Seite nicht an `page.route()`
+  gibt.
 - Formatierung: Prettier (4 Leerzeichen laut `.editorconfig`, JSON 2), ESLint mit typgeprüften
   strikten Regeln, `no-console`, nur `<script setup lang="ts">`, kein `v-html`.
 

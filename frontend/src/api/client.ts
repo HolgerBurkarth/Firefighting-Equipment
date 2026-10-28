@@ -1,5 +1,13 @@
 import { apiUrl } from '../runtime/appBase';
 
+/**
+ * Vertragsnummer der API, bei jedem Aufruf als X-Client-Api gesendet. Gleich mit
+ * resources/client-api.json und ClientApi::CURRENT im Backend (per Test); nur bei inkompatiblen
+ * Änderungen erhöhen (CLAUDE.md, "Versionierung der API für das Frontend").
+ */
+export const CLIENT_API_HEADER = 'X-Client-Api';
+export const CLIENT_API_VERSION = 1;
+
 /** Fehler einer API-Anfrage; `code` ist der Code der API oder "network" bzw. "invalid_response". */
 export interface ApiError {
     readonly code: string;
@@ -82,10 +90,14 @@ export async function apiRequest<T>(
     const init: RequestInit = {
         method,
         credentials: 'same-origin',
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', [CLIENT_API_HEADER]: String(CLIENT_API_VERSION) },
     };
     if (method !== 'GET') {
-        init.headers = { Accept: 'application/json', 'Content-Type': 'application/json' };
+        init.headers = {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            [CLIENT_API_HEADER]: String(CLIENT_API_VERSION),
+        };
         init.body = JSON.stringify(options.body ?? {});
     }
 

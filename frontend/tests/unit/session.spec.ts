@@ -157,3 +157,23 @@ describe('logout', () => {
         expect(session.value?.user.id).toBe(7);
     });
 });
+
+describe('Hinweis für die Anmeldeseite', () => {
+    it('steht in sessionStorage und übersteht so ein Neuladen (Update beim Seitenwechsel)', () => {
+        setLoginNotice('password_reset');
+        expect(window.sessionStorage.getItem('ff-login-notice')).toBe('password_reset');
+        expect(takeLoginNotice()).toBe('password_reset');
+        expect(window.sessionStorage.getItem('ff-login-notice')).toBeNull();
+    });
+
+    it('nach dem Neuladen nur aus sessionStorage gelesen', () => {
+        window.sessionStorage.setItem('ff-login-notice', 'session_expired');
+        expect(takeLoginNotice()).toBe('session_expired');
+        expect(takeLoginNotice()).toBeNull();
+    });
+
+    it('unbekannte gespeicherte Werte werden ignoriert', () => {
+        window.sessionStorage.setItem('ff-login-notice', '<b>x</b>');
+        expect(takeLoginNotice()).toBeNull();
+    });
+});

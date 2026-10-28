@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
     plugins: [vue()],
+    define: { __APP_BUILD_ID__: JSON.stringify('test') },
     test: {
         environment: 'happy-dom',
         // Basis-Adresse wie unter einer Stadt (apiUrl liest document.baseURI).

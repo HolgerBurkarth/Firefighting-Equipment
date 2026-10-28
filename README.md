@@ -1193,6 +1193,18 @@ gleichzeitig, sonst weist der eine PHP-Prozess Verbindungen ab, z. B. `NS_ERROR_
 Datenbank ist nicht nötig. Jeder Konsolenfehler und jede Verletzung der Content-Security-Policy
 lässt einen Test scheitern.
 
+Updates nach einem Deploy (KONZEPT.md, "Updates der App"): Die App lädt eine neue Version selbst,
+beim nächsten Seitenwechsel bzw. nach dem Speichern eines angefangenen Formulars; Strg+F5 ist nicht
+nötig. Die Kennung des geladenen Builds steht an `<html data-build="…">` (in GitHub Actions der
+Commit, lokal `dev`, sonst `FF_BUILD_ID`). Für die Browser-Tests der Updates baut Playwright vorab
+eine zweite Version nach `frontend/test-builds/next` (rund 7 s) und startet einen zweiten Server
+(`php -S localhost:4174 frontend/tests/e2e/support/update-server.php`), der je Test-Bereich die
+alte (`frontend/dist`) oder die neue Version ausliefert.
+
+Jeder API-Aufruf der App trägt `X-Client-Api: 1` (Vertragsnummer der API, `resources/client-api.json`);
+das Backend wertet den Header noch nicht aus (Plan in `CLAUDE.md`, "Versionierung der API für das
+Frontend").
+
 ## GitHub Actions und Branch deploy
 
 Bei jedem Push auf `main` und bei Pull Requests testet der Workflow "CI" PHP (mit MariaDB 10.11)

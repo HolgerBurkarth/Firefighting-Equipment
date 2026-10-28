@@ -148,6 +148,12 @@ async function fulfillApi(
     const path = match?.[2] ?? '';
     const method = route.request().method();
     const mock = api[`${method} ${path}`];
+    // Jeder Aufruf der App (über apiRequest) trägt die Vertragsnummer; Bilder und das Manifest
+    // lädt der Browser selbst, ohne den Header.
+    const byApp = path.startsWith('api/') && !/^api\/v1\/(app-icon|tenant\/logo)\//.test(path);
+    if (byApp && route.request().headers()['x-client-api'] !== '1') {
+        problems.push(`Ohne X-Client-Api: 1: ${method} ${path}`);
+    }
     if (mock !== undefined) {
         const request = { area, method, path, url, body: requestBody(route) };
         apiRequests.push(request);

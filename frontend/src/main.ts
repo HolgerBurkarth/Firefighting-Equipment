@@ -9,6 +9,13 @@ import App from './App.vue';
 import { createAppRouter } from './router';
 import { currentAppBase } from './runtime/appBase';
 import { linkManifest } from './runtime/appearance';
+import {
+    AppUpdater,
+    browserUpdateEnvironment,
+    installUpdateGuard,
+    startUpdateChecks,
+} from './runtime/appUpdate';
+import { BUILD_ID } from './runtime/build';
 import { registerServiceWorker } from './runtime/serviceWorker';
 import { applyThemeMode, browserStorage, loadThemeMode } from './runtime/theme';
 
@@ -21,8 +28,20 @@ if (!base.isService) {
     linkManifest(document);
 }
 
-createApp(App, { base }).use(createAppRouter(base)).mount('#app');
+// Kennung des Builds (Support, Browser-Tests der Updates).
+document.documentElement.dataset['build'] = BUILD_ID;
+
+const updater = new AppUpdater(browserUpdateEnvironment());
+const router = createAppRouter(base);
+installUpdateGuard(router, updater);
+
+createApp(App, { base, updater }).use(router).mount('#app');
 
 if (import.meta.env.PROD) {
-    void registerServiceWorker(base);
+    void registerServiceWorker(base).then((registration) => {
+        if (registration !== null) {
+            updater.attach(registration);
+        }
+        startUpdateChecks(router, updater);
+    });
 }

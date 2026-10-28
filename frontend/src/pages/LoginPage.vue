@@ -13,6 +13,7 @@ import MailHint from '../components/MailHint.vue';
 import PasswordField from '../components/PasswordField.vue';
 import { currentAppBase } from '../runtime/appBase';
 import { isTenantUnavailable, tenantState } from '../runtime/tenantState';
+import { useUnsavedInput } from '../runtime/unsavedInput';
 
 const NOTICES: Readonly<Record<LoginNotice, string>> = {
     logged_out: 'Sie wurden abgemeldet.',
@@ -27,6 +28,8 @@ const notice = takeLoginNotice();
 
 const email = ref('');
 const password = ref('');
+// Angefangene Anmeldung: kein automatisches Update mitten in der Eingabe.
+useUnsavedInput(() => email.value !== '' || password.value !== '');
 const emailError = ref<string | null>(null);
 const passwordError = ref<string | null>(null);
 const busy = ref(false);
