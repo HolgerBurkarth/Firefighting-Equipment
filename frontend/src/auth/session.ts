@@ -9,7 +9,10 @@ export type LoginNotice = 'logged_out' | 'session_expired' | 'password_reset';
 export const RETRY_DELAYS_MS: readonly number[] = [2000, 4000, 8000, 15000];
 
 const current = shallowRef<AuthState | null>(null);
-const notice = shallowRef<LoginNotice | null>(null);
+/** Ersatz, wenn sessionStorage fehlt oder gesperrt ist. */
+let noticeFallback: LoginNotice | null = null;
+const NOTICE_STORAGE_KEY = 'ff-login-notice';
+const LOGIN_NOTICES: readonly LoginNotice[] = ['logged_out', 'session_expired', 'password_reset'];
 const checkError = shallowRef<ApiError | null>(null);
 /** true, sobald bekannt ist, ob eine Sitzung besteht (nach auth/me oder Anmelden/Abmelden). */
 let known = false;
@@ -105,14 +108,33 @@ export function ensureSession(options: EnsureSessionOptions = {}): Promise<AuthS
     return pending;
 }
 
+/**
+ * Hinweis für die Anmeldeseite. Er steht in sessionStorage, damit er ein Neuladen übersteht (beim
+ * Seitenwechsel lädt die App eine neue Version, siehe runtime/appUpdate.ts).
+ */
 export function setLoginNotice(value: LoginNotice | null): void {
-    notice.value = value;
+    noticeFallback = value;
+    try {
+        if (value === null) {
+            window.sessionStorage.removeItem(NOTICE_STORAGE_KEY);
+        } else {
+            window.sessionStorage.setItem(NOTICE_STORAGE_KEY, value);
+        }
+    } catch {
+        // Ohne Speicher gilt der Hinweis nur bis zum nächsten Neuladen.
+    }
 }
 
 /** Hinweis einmal abholen (die Anmeldeseite zeigt ihn, danach ist er weg). */
 export function takeLoginNotice(): LoginNotice | null {
-    const value = notice.value;
-    notice.value = null;
+    let value = noticeFallback;
+    try {
+        const stored = window.sessionStorage.getItem(NOTICE_STORAGE_KEY);
+        value = LOGIN_NOTICES.find((notice) => notice === stored) ?? null;
+    } catch {
+        // Ersatzwert verwenden.
+    }
+    setLoginNotice(null);
     return value;
 }
 
@@ -126,6 +148,6 @@ export async function logout(fetchFn?: typeof fetch): Promise<ApiError | null> {
         return result.error;
     }
     setSession(null);
-    notice.value = 'logged_out';
+    setLoginNotice('logged_out');
     return null;
 }

@@ -10,6 +10,7 @@ import NewPasswordField from '../components/NewPasswordField.vue';
 import { currentAppBase } from '../runtime/appBase';
 import { takeFragmentParam } from '../runtime/fragment';
 import { tenantState } from '../runtime/tenantState';
+import { useUnsavedInput } from '../runtime/unsavedInput';
 
 const base = currentAppBase();
 const route = useRoute();
@@ -24,6 +25,7 @@ const error = ref<ApiError | null>(null);
 const serverError = ref<string | null>(null);
 /** Link abgelaufen oder benutzt: Formular ausblenden, Weg zu einem neuen Link zeigen. */
 const tokenInvalid = ref(false);
+useUnsavedInput(() => password.value !== '' && !tokenInvalid.value);
 const field = useTemplateRef<InstanceType<typeof NewPasswordField>>('field');
 
 // Die Seite kennt nur die Stadt (E-Mail und Name prüft der Server zusätzlich).

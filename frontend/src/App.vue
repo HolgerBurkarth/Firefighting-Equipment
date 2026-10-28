@@ -1,11 +1,30 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { errorMessage } from './auth/errorMessages';
 import { sessionCheckError } from './auth/session';
+import ConfirmDialog from './components/ConfirmDialog.vue';
 import type { AppBase } from './runtime/appBase';
+import { updateNotice, type AppUpdater } from './runtime/appUpdate';
 import { loadTenant, tenantState } from './runtime/tenantState';
 
-const props = defineProps<{ base: AppBase }>();
+const props = defineProps<{ base: AppBase; updater: AppUpdater }>();
+
+const notice = computed(() => updateNotice(props.updater));
+
+const confirmOpen = ref(false);
+
+/** Mit ungespeicherten Eingaben erst nachfragen (sie gingen beim Neuladen verloren). */
+function updateNow(): void {
+    if (notice.value === 'unsaved') {
+        confirmOpen.value = true;
+        return;
+    }
+    applyUpdate();
+}
+
+function applyUpdate(): void {
+    void props.updater.apply(window.location.href);
+}
 
 onMounted(() => {
     void loadTenant(props.base);
@@ -51,6 +70,27 @@ onMounted(() => {
         Keine Verbindung zum Server, neuer Versuch läuft automatisch.
         <small>({{ sessionCheckError.code }})</small>
     </p>
+
+    <!-- Neue Version, aber gerade nicht automatisch: Formular angefangen oder kurz zuvor neu geladen. -->
+    <div v-if="notice !== null" class="app-update" role="status" data-testid="update-notice">
+        <span>
+            {{
+                notice === 'unsaved'
+                    ? 'Neue Version verfügbar – nach dem Speichern wird aktualisiert.'
+                    : 'Neue Version verfügbar.'
+            }}
+        </span>
+        <button class="btn app-update-button" type="button" @click="updateNow">
+            Jetzt aktualisieren
+        </button>
+    </div>
+    <ConfirmDialog
+        v-model:open="confirmOpen"
+        title="Jetzt aktualisieren?"
+        description="Ihre Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?"
+        confirm-label="Aktualisieren"
+        @confirm="applyUpdate"
+    />
 
     <main class="app-main">
         <RouterView />
@@ -103,6 +143,22 @@ onMounted(() => {
 .app-offline {
     background: var(--offline-bg);
     color: var(--offline-text);
+}
+
+.app-update {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-weight: var(--font-weight-semibold);
+}
+
+.app-update-button {
+    flex: none;
 }
 
 .app-error small {

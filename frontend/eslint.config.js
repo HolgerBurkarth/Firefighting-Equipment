@@ -13,6 +13,7 @@ export default defineConfigWithVueTs(
         'playwright-report/**',
         'test-results/**',
         'blob-report/**',
+        'test-builds/**',
         'eslint.config.js',
     ]),
     pluginVue.configs['flat/recommended'],

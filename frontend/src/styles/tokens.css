@@ -70,6 +70,7 @@
     --radius-pill: 999px;
     --shadow-raised: 0 8px 20px rgb(20 30 50 / 20%);
     --shadow-group: 0 4px 14px rgb(20 30 50 / 14%);
+    --overlay: rgb(15 23 42 / 45%);
 
     /* Bedienelemente: mindestens 44 px (Konzept), große Tasten 56 px */
     --touch-min: 44px;
@@ -108,6 +109,7 @@
     --danger: #f2938e;
     --shadow-raised: 0 8px 20px rgb(0 0 0 / 45%);
     --shadow-group: 0 4px 14px rgb(0 0 0 / 40%);
+    --overlay: rgb(0 0 0 / 60%);
 }
 
 /* Dunkel, wie am Gerät eingestellt (System) */
@@ -142,5 +144,6 @@
         --danger: #f2938e;
         --shadow-raised: 0 8px 20px rgb(0 0 0 / 45%);
         --shadow-group: 0 4px 14px rgb(0 0 0 / 40%);
+        --overlay: rgb(0 0 0 / 60%);
     }
 }

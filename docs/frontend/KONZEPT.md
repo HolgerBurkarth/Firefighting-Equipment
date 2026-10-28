@@ -135,6 +135,36 @@ Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen")
 - Eingaben gehen nie verloren.
 - Fehlercodes höchstens klein für den Support. Bei 401 meldet die App ab.
 
+## Updates der App
+Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
+- Eine neue Version (neuer Build nach einem Deploy) übernimmt nicht von selbst: Ihr Service Worker
+  wartet, bis die App ihn aktiviert. Bis dahin läuft die geladene Version vollständig weiter (auch
+  ihre nachgeladenen Teile kommen aus dem Cache), danach lädt die App die Seite neu.
+- Geprüft wird beim Start, wenn die App wieder in den Vordergrund kommt (z. B. Handy entsperrt,
+  Tab gewechselt) und etwa stündlich. Offline wird nicht geprüft; eine gescheiterte Prüfung zeigt
+  keinen Fehler.
+- Ist eine neue Version da und kein Formular angefangen, aktualisiert die App beim nächsten
+  Seitenwechsel unbemerkt: Statt in der alten Version weiterzublättern, lädt sie die Zielseite neu.
+  Nicht beim Start und nicht, wenn nur die Adresszeile bereinigt wird (z. B. `#token=…` entfernt).
+- Ist ein Formular angefangen (z. B. Umbuchung, Registrierung), erscheint oben der Hinweis „Neue
+  Version verfügbar – nach dem Speichern wird aktualisiert“ mit dem Knopf „Jetzt aktualisieren“.
+  Aktualisiert wird beim nächsten Seitenwechsel (nach dem Speichern führt die App in der Regel auf
+  eine andere Seite) oder per Knopf. Die Eingaben bleiben bis dahin unverändert stehen. Der Knopf
+  fragt vorher nach: „Ihre Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?“ mit
+  „Abbrechen“ (Standard) und „Aktualisieren“.
+- Jedes Formular meldet „ungespeicherte Eingaben“ an einer zentralen Stelle: etwas eingegeben und
+  noch nicht gespeichert. Nach dem Speichern oder Leeren gilt es nicht mehr als angefangen.
+- Keine Schleife: Nach einem automatischen Neuladen lädt die App 10 Minuten lang nicht erneut von
+  selbst neu (je Tab). Meldet die neue Version sofort wieder eine neue, erscheint stattdessen der
+  Hinweis „Neue Version verfügbar“ mit dem Knopf.
+- Hat ein anderer Tab die neue Version schon aktiviert, aktualisiert sich dieser Tab ebenso beim
+  nächsten Seitenwechsel. Fehlen nach einem Deploy Teile der alten Version (Browser ohne Service
+  Worker), lädt die App die Zielseite einmal neu.
+- Hinweise für die Anmeldeseite (z. B. „Passwort geändert“) überstehen das Neuladen.
+- Veraltete App gegen geänderte API: Die App nennt bei jedem Aufruf ihre Vertragsnummer
+  (`X-Client-Api`). Später kann der Server eine zu alte App ablehnen („Diese Version ist veraltet –
+  bitte aktualisieren“); Plan und Regeln in CLAUDE.md, "Versionierung der API für das Frontend".
+
 ## Hinweise für Admins (Menüpunkt „Protokoll“)
 - Überschriebene, verspätete und nach Rückfrage gesendete Offline-Buchungen erscheinen als offene
   Hinweise, gezählt auf dem Dashboard.

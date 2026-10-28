@@ -1,0 +1,5 @@
+{
+  "description": "Vertragsnummer der API für das Frontend (Header X-Client-Api). Steigt nur bei inkompatiblen Änderungen (CLAUDE.md, \"Versionierung der API für das Frontend\"). Geprüft von ClientApiTest (PHPUnit) und client.spec.ts (Vitest).",
+  "header": "X-Client-Api",
+  "client_api": 1
+}

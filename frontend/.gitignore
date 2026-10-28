@@ -4,4 +4,5 @@ dev-dist/
 playwright-report/
 test-results/
 blob-report/
+test-builds/
 *.tsbuildinfo

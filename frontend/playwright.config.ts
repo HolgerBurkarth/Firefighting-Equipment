@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 const isCi = process.env['CI'] !== undefined;
 const PORT = 4173;
+/** Zweiter Server für die Update-Tests: liefert je Bereich die alte oder die neue Version. */
+const UPDATE_PORT = 4174;
 
 /**
  * `php -S` beantwortet Anfragen nacheinander in einem Prozess. Laden zu viele Browser gleichzeitig
@@ -22,6 +24,8 @@ const WINDOWS_TEST_WORKERS = 4;
  */
 export default defineConfig({
     testDir: 'tests/e2e',
+    // Baut die zweite Version für appUpdate.spec.ts (test-builds/next).
+    globalSetup: './tests/e2e/globalSetup.ts',
     fullyParallel: true,
     forbidOnly: isCi,
     // Keine Wiederholungen: Sie würden zeitweise auftretende Fehler verdecken.
@@ -44,12 +48,22 @@ export default defineConfig({
         { name: 'handy-webkit', use: { ...devices['iPhone 13'] } },
         { name: 'handy-chromium', use: { ...devices['Pixel 7'] } },
     ],
-    webServer: {
-        command: `php -q -S localhost:${PORT} public/index.php`,
-        cwd: '..',
-        ...(!isWindows && { env: { PHP_CLI_SERVER_WORKERS: String(PHP_SERVER_WORKERS) } }),
-        url: `http://localhost:${PORT}/firefighting/test/`,
-        reuseExistingServer: !isCi,
-        timeout: 60_000,
-    },
+    webServer: [
+        {
+            command: `php -q -S localhost:${PORT} public/index.php`,
+            cwd: '..',
+            ...(!isWindows && { env: { PHP_CLI_SERVER_WORKERS: String(PHP_SERVER_WORKERS) } }),
+            url: `http://localhost:${PORT}/firefighting/test/`,
+            reuseExistingServer: !isCi,
+            timeout: 60_000,
+        },
+        {
+            command: `php -q -S localhost:${UPDATE_PORT} frontend/tests/e2e/support/update-server.php`,
+            cwd: '..',
+            ...(!isWindows && { env: { PHP_CLI_SERVER_WORKERS: String(PHP_SERVER_WORKERS) } }),
+            url: `http://localhost:${UPDATE_PORT}/firefighting/test/`,
+            reuseExistingServer: !isCi,
+            timeout: 60_000,
+        },
+    ],
 });

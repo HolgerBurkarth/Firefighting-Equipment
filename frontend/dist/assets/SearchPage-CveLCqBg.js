@@ -1,0 +1,1 @@
+import{A as e,F as t,I as n,N as r,O as i,V as a,s as o}from"./index-D8RLuWfk.js";import{t as s}from"./AccountPanel-hx_LOvno.js";var c=o(n({__name:`SearchPage`,setup(n){return(n,o)=>(a(),r(i,null,[o[0]||=e(`h1`,null,`Suchen`,-1),o[1]||=e(`p`,{class:`placeholder`},`Hier entsteht die Suche nach Geräten.`,-1),t(s)],64))}}),[[`__scopeId`,`data-v-3954207a`]]);export{c as default};

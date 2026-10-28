@@ -28,6 +28,14 @@ describe('apiRequest', () => {
         expect(requests[1]?.body).toEqual({ a: 1 });
     });
 
+    it('sendet bei jedem Aufruf die Vertragsnummer X-Client-Api', async () => {
+        const { fetch, requests } = respond(200, { ok: true });
+        await apiRequest('auth/me', parseOk, { fetchFn: fetch });
+        await apiRequest('auth/logout', parseOk, { method: 'POST', fetchFn: fetch });
+        await apiRequest('x', parseOk, { method: 'DELETE', fetchFn: fetch });
+        expect(requests.map((request) => request.headers['X-Client-Api'])).toEqual(['1', '1', '1']);
+    });
+
     it('liest das Fehlerformat mit details', async () => {
         const { fetch } = respond(409, {
             error: 'rule_violation',
