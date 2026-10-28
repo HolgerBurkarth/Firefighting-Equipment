@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import {
-    ACTIVATION_TIMEOUT_MS,
+    TAKEOVER_TIMEOUT_MS,
     AppUpdater,
     fetchServedBuildId,
     installUpdateGuard,
@@ -9,6 +9,9 @@ import {
     RELOAD_COOLDOWN_MS,
     RELOAD_STORAGE_KEY,
     SKIP_WAITING_MESSAGE,
+    START_CHECK_TIMEOUT_MS,
+    START_RETRY_DELAYS_MS,
+    UPDATE_RETRY_DELAYS_MS,
     updateNotice,
     type UpdateEnvironment,
     type UpdateWorker,
@@ -62,6 +65,12 @@ class FakeRegistration extends FakeTarget {
     installing: FakeWorker | null = null;
     updates = 0;
     failUpdate = false;
+    unregistered = false;
+
+    unregister(): Promise<boolean> {
+        this.unregistered = true;
+        return Promise.resolve(true);
+    }
 
     update(): Promise<unknown> {
         this.updates += 1;
@@ -94,6 +103,8 @@ interface Setup {
     readonly storage: MemoryStorage;
     readonly navigated: string[];
     readonly timers: { callback: () => void; ms: number }[];
+    /** So viele Zeitgeber hat runTimers schon ausgelöst. */
+    firedTimers: number;
     online: boolean;
     now: number;
     /** Kennung, die der Server liefert (build.json); null = nicht lesbar. */
@@ -123,7 +134,7 @@ function bareEnv(
 
 /** Offene Promises (Prüfung der Build-Kennung) abarbeiten. */
 async function flush(): Promise<void> {
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 20; i += 1) {
         await Promise.resolve();
     }
 }
@@ -139,6 +150,7 @@ function setup(options: { controller?: unknown; storage?: MemoryStorage | null }
         storage,
         navigated: [],
         timers: [],
+        firedTimers: 0,
         online: true,
         now: 1_000_000,
         served: RUNNING_BUILD,
@@ -160,6 +172,42 @@ function setup(options: { controller?: unknown; storage?: MemoryStorage | null }
     const updater = new AppUpdater(env);
     updater.attach(state.registration);
     return Object.assign(state, { updater });
+}
+
+/**
+ * Zeitgeber der Reihe nach auslösen (auch neu hinzukommende), bis keiner mehr kommt. Liefert die
+ * Wartezeiten der ausgelösten Zeitgeber.
+ */
+async function runTimers(s: Setup): Promise<number[]> {
+    const fired: number[] = [];
+    await flush();
+    while (s.firedTimers < s.timers.length) {
+        const timer = s.timers[s.firedTimers];
+        s.firedTimers += 1;
+        timer?.callback();
+        if (timer !== undefined) {
+            fired.push(timer.ms);
+        }
+        await flush();
+    }
+    return fired;
+}
+
+/**
+ * Der Browser findet die neue Version erst beim `n`-ten update() (die früheren zusammengelegt); sie
+ * wartet dann installiert.
+ */
+function findsNewVersionOnUpdate(s: Setup, n: number): FakeWorker {
+    const worker = new FakeWorker('installed');
+    s.registration.update = () => {
+        s.registration.updates += 1;
+        if (s.registration.updates === n) {
+            s.registration.waiting = worker;
+            s.registration.emit('updatefound');
+        }
+        return Promise.resolve();
+    };
+    return worker;
 }
 
 /** Neue Version installieren: updatefound → installing → installed (wartet). */
@@ -205,6 +253,23 @@ describe('AppUpdater: neue Version erkennen', () => {
         expect(s.updater.ready.value).toBe(false);
     });
 
+    it('nach der ersten Übernahme ein Deploy: erst den neuen Service Worker holen, dann neu laden', async () => {
+        // Die übernehmende Version ist die eigene; ihr Service Worker lieferte die alte Seite.
+        const s = setup({ controller: null });
+        s.container.controller = { scriptURL: 'sw.js' };
+        s.container.emit('controllerchange');
+        await flush();
+        s.served = NEW_BUILD;
+        const worker = findsNewVersionOnUpdate(s, 2);
+        activatesOnMessage(s, worker);
+        await s.updater.check();
+        const done = s.updater.applyNow('https://x/a');
+        await runTimers(s);
+        expect(await done).toBe(true);
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual(['https://x/a']);
+    });
+
     it('Seite ohne Kontrolle (Strg+F5) von neuer Version übernommen → bereit (Build-Kennung)', async () => {
         const s = setup({ controller: null });
         s.served = NEW_BUILD;
@@ -212,6 +277,26 @@ describe('AppUpdater: neue Version erkennen', () => {
         s.container.emit('controllerchange');
         await flush();
         expect(s.updater.ready.value).toBe(true);
+        // Die neue Version kontrolliert die Seite vermutlich schon: ein update() kennt nichts
+        // Neueres, also ohne weitere Suche neu laden.
+        expect(await s.updater.applyNow('https://x/a')).toBe(true);
+        expect(s.registration.updates).toBe(1);
+        expect(s.timers).toEqual([]);
+        expect(s.navigated).toEqual(['https://x/a']);
+    });
+
+    it('erste Übernahme, Antwort von build.json erst nach dem Deploy: neue Version trotzdem holen', async () => {
+        // Die übernehmende Version ist die eigene; die Kennung kam aber schon vom neuen Build.
+        const s = setup({ controller: null });
+        s.served = NEW_BUILD;
+        s.container.controller = { scriptURL: 'sw.js' };
+        s.container.emit('controllerchange');
+        await flush();
+        const worker = findsNewVersionOnUpdate(s, 1);
+        activatesOnMessage(s, worker);
+        expect(await s.updater.applyNow('https://x/a')).toBe(true);
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual(['https://x/a']);
     });
 
     it('Seite ohne Kontrolle: neue Version installiert → Build-Kennung entscheidet', async () => {
@@ -222,10 +307,15 @@ describe('AppUpdater: neue Version erkennen', () => {
         expect(s.updater.ready.value).toBe(true);
     });
 
-    it('installierte neue Version wartet → bereit', () => {
+    it('installierte neue Version wartet → bereit, ohne Abfrage über den alten Service Worker', async () => {
         const s = setup();
+        s.served = NEW_BUILD;
         installNewVersion(s);
+        await flush();
         expect(s.updater.ready.value).toBe(true);
+        // Eine Anfrage jetzt liefe über den alten Service Worker und könnte die Aktivierung der
+        // neuen Version durch einen anderen Tab anhalten.
+        expect(s.buildFetches).toBe(0);
     });
 
     it('wartet schon beim Start (z. B. aus einer früheren Sitzung) → bereit', () => {
@@ -311,9 +401,9 @@ describe('AppUpdater: prüfen', () => {
 });
 
 describe('AppUpdater: aktualisieren', () => {
-    it('ohne neue Version: Seitenwechsel wie immer', () => {
+    it('ohne neue Version: Seitenwechsel wie immer', async () => {
         const s = setup();
-        expect(s.updater.applyOnNavigation('https://x/firefighting/test/suchen')).toBe(false);
+        expect(await s.updater.applyNow('https://x/firefighting/test/suchen')).toBe(false);
         expect(s.navigated).toEqual([]);
     });
 
@@ -321,8 +411,7 @@ describe('AppUpdater: aktualisieren', () => {
         const s = setup();
         const worker = installNewVersion(s);
         activatesOnMessage(s, worker);
-        expect(s.updater.applyOnNavigation('https://x/firefighting/test/suchen')).toBe(true);
-        await flush();
+        expect(await s.updater.applyNow('https://x/firefighting/test/suchen')).toBe(true);
         expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
         expect(s.navigated).toEqual(['https://x/firefighting/test/suchen']);
         expect(s.storage.getItem(RELOAD_STORAGE_KEY)).toBe(String(s.now));
@@ -343,7 +432,7 @@ describe('AppUpdater: aktualisieren', () => {
         s.registration.installing = null;
         s.registration.waiting = worker;
         worker.setState('installed');
-        await done;
+        expect(await done).toBe(true);
         expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
         expect(s.navigated).toEqual(['https://x/a']);
     });
@@ -352,9 +441,20 @@ describe('AppUpdater: aktualisieren', () => {
         const s = setup();
         s.served = NEW_BUILD;
         s.container.emit('controllerchange');
-        await s.updater.apply('https://x/a');
+        expect(await s.updater.apply('https://x/a')).toBe(true);
         expect(s.navigated).toEqual(['https://x/a']);
         expect(s.timers).toEqual([]);
+    });
+
+    it('ohne Service Worker in Kontrolle (z. B. kein Service Worker): neu laden vom Server', async () => {
+        const s = setup({ controller: null });
+        s.served = NEW_BUILD;
+        await s.updater.check();
+        s.registration.failUpdate = true;
+        const done = s.updater.apply('https://x/a');
+        expect(await runTimers(s)).toEqual(UPDATE_RETRY_DELAYS_MS);
+        expect(await done).toBe(true);
+        expect(s.navigated).toEqual(['https://x/a']);
     });
 
     it('update() fertig, bevor die neue Version gemeldet wird: auf updatefound warten', async () => {
@@ -373,71 +473,86 @@ describe('AppUpdater: aktualisieren', () => {
         s.registration.installing = null;
         s.registration.waiting = worker;
         worker.setState('installed');
-        await done;
+        expect(await done).toBe(true);
         expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
         expect(s.navigated).toEqual(['https://x/a']);
     });
 
-    it('keine neue Version gemeldet: nach der Frist trotzdem neu laden', async () => {
+    it('keine neue Version gemeldet: NICHT neu laden (der alte Service Worker lieferte die alte Seite)', async () => {
         const s = setup();
         s.served = NEW_BUILD;
         await s.updater.check();
         const done = s.updater.apply('https://x/a');
-        await flush();
-        expect(s.timers.map((t) => t.ms)).toEqual([ACTIVATION_TIMEOUT_MS]);
-        s.timers[0]?.callback();
-        await done;
-        expect(s.navigated).toEqual(['https://x/a']);
+        // Prüfung und Seitenwechsel teilen sich EINE Suche: je Pause ein weiteres update().
+        expect(await runTimers(s)).toEqual(UPDATE_RETRY_DELAYS_MS);
+        expect(s.registration.updates).toBe(2 + UPDATE_RETRY_DELAYS_MS.length);
+        expect(await done).toBe(false);
+        expect(s.registration.unregistered).toBe(false);
+        expect(s.navigated).toEqual([]);
+        expect(s.storage.getItem(RELOAD_STORAGE_KEY)).toBeNull();
+        expect(s.updater.ready.value).toBe(true);
+        expect(s.updater.switching.value).toBe(false);
     });
 
-    it('übernimmt der Worker schon selbst (activating), wird sofort geladen', async () => {
+    it('Aktivierung bleibt stehen (kein controllerchange): Service Worker abmelden, dann neu laden', async () => {
         const s = setup();
         const worker = installNewVersion(s);
-        worker.onMessage = () => {
-            worker.setState('activating');
-        };
-        await s.updater.apply('https://x/a');
-        expect(s.navigated).toEqual(['https://x/a']);
-    });
-
-    it('übernimmt der Worker nicht, wird nach der Frist trotzdem geladen', async () => {
-        const s = setup();
-        installNewVersion(s);
+        // Der Worker übernimmt die Seite nicht (Chrome hält die Aktivierung an, wenn der alte
+        // Service Worker genau beim Wechsel eine Anfrage bekommt).
         const done = s.updater.apply('https://x/a');
         await flush();
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
         expect(s.navigated).toEqual([]);
-        expect(s.timers.map((t) => t.ms)).toEqual([ACTIVATION_TIMEOUT_MS]);
-        s.timers[0]?.callback();
-        await done;
+        expect(s.timers.at(-1)?.ms).toBe(TAKEOVER_TIMEOUT_MS);
+        s.timers.at(-1)?.callback();
+        expect(await done).toBe(true);
+        expect(s.registration.unregistered).toBe(true);
         expect(s.navigated).toEqual(['https://x/a']);
+        expect(s.storage.getItem(RELOAD_STORAGE_KEY)).toBe(String(s.now));
+    });
+
+    it('Aktivierung bleibt stehen und Abmelden scheitert: nicht neu laden, Sperre unberührt', async () => {
+        const s = setup();
+        installNewVersion(s);
+        s.registration.unregister = () => Promise.reject(new Error('SecurityError'));
+        const done = s.updater.apply('https://x/a');
+        await flush();
+        s.timers.at(-1)?.callback();
+        expect(await done).toBe(false);
+        expect(s.navigated).toEqual([]);
+        expect(s.storage.getItem(RELOAD_STORAGE_KEY)).toBeNull();
+        expect(s.updater.ready.value).toBe(true);
+        expect(s.updater.switching.value).toBe(false);
     });
 
     it('während des Ladens werden weitere Seitenwechsel abgebrochen, nur einmal geladen', async () => {
         const s = setup();
-        installNewVersion(s);
-        expect(s.updater.applyOnNavigation('https://x/a')).toBe(true);
-        expect(s.updater.applyOnNavigation('https://x/b')).toBe(true);
+        const worker = installNewVersion(s);
+        const first = s.updater.applyNow('https://x/a');
+        expect(await s.updater.applyNow('https://x/b')).toBe(true);
         await flush();
-        s.timers[0]?.callback();
-        await flush();
+        activatesOnMessage(s, worker);
+        worker.onMessage?.();
+        expect(await first).toBe(true);
         expect(s.navigated).toEqual(['https://x/a']);
     });
 
-    it('nach einem Neuladen keine Schleife: Sperre, Hinweis mit Knopf statt erneutem Neuladen', () => {
+    it('nach einem Neuladen keine Schleife: Sperre, Hinweis mit Knopf statt erneutem Neuladen', async () => {
         const s = setup();
         s.storage.setItem(RELOAD_STORAGE_KEY, String(s.now - RELOAD_COOLDOWN_MS + 1));
         installNewVersion(s);
-        expect(s.updater.applyOnNavigation('https://x/a')).toBe(false);
+        expect(await s.updater.applyNow('https://x/a')).toBe(false);
         expect(s.navigated).toEqual([]);
         expect(s.updater.autoBlocked.value).toBe(true);
         expect(updateNotice(s.updater)).toBe('blocked');
     });
 
-    it('nach Ablauf der Sperre wieder automatisch', () => {
+    it('nach Ablauf der Sperre wieder automatisch', async () => {
         const s = setup();
         s.storage.setItem(RELOAD_STORAGE_KEY, String(s.now - RELOAD_COOLDOWN_MS));
-        installNewVersion(s);
-        expect(s.updater.applyOnNavigation('https://x/a')).toBe(true);
+        const worker = installNewVersion(s);
+        activatesOnMessage(s, worker);
+        expect(await s.updater.applyNow('https://x/a')).toBe(true);
     });
 
     it('Knopf „Jetzt aktualisieren“ lädt auch während der Sperre', async () => {
@@ -445,11 +560,11 @@ describe('AppUpdater: aktualisieren', () => {
         s.storage.setItem(RELOAD_STORAGE_KEY, String(s.now));
         const worker = installNewVersion(s);
         activatesOnMessage(s, worker);
-        await s.updater.apply('https://x/a');
+        expect(await s.updater.apply('https://x/a')).toBe(true);
         expect(s.navigated).toEqual(['https://x/a']);
     });
 
-    it('ohne sessionStorage (gesperrt) weiter ohne Sperre', () => {
+    it('ohne sessionStorage (gesperrt) weiter ohne Sperre', async () => {
         const throwing = new MemoryStorage();
         throwing.getItem = () => {
             throw new Error('SecurityError');
@@ -458,8 +573,164 @@ describe('AppUpdater: aktualisieren', () => {
             throw new Error('SecurityError');
         };
         const s = setup({ storage: throwing });
-        installNewVersion(s);
-        expect(s.updater.applyOnNavigation('https://x/a')).toBe(true);
+        const worker = installNewVersion(s);
+        activatesOnMessage(s, worker);
+        expect(await s.updater.applyNow('https://x/a')).toBe(true);
+    });
+});
+
+describe('AppUpdater: update() mit laufender Prüfung zusammengelegt', () => {
+    it('Server kennt neue Version, Browser noch nicht: erneut fragen, bis er sie findet', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        findsNewVersionOnUpdate(s, 3);
+        await s.updater.check();
+        expect(await runTimers(s)).toEqual([500, 1000]);
+        expect(s.registration.updates).toBe(3);
+        expect(s.registration.waiting).not.toBeNull();
+    });
+
+    it('nach den Pausen (0,5 s, 1 s, 2 s, 4 s) Schluss bis zum nächsten Anlass', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        await s.updater.check();
+        expect(await runTimers(s)).toEqual(UPDATE_RETRY_DELAYS_MS);
+        expect(s.registration.updates).toBe(1 + UPDATE_RETRY_DELAYS_MS.length);
+        expect(s.updater.ready.value).toBe(true);
+
+        // Nächster Anlass (z. B. sichtbar): wieder dieselbe Folge, keine Endlosschleife.
+        await s.updater.check();
+        expect(await runTimers(s)).toEqual(UPDATE_RETRY_DELAYS_MS);
+    });
+
+    it('meldet der Browser die neue Version während einer Pause, endet die Suche', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        await s.updater.check();
+        s.registration.installing = new FakeWorker('installing');
+        s.registration.emit('updatefound');
+        await flush();
+        expect(s.registration.updates).toBe(1);
+        await runTimers(s);
+        expect(s.registration.updates).toBe(1);
+    });
+
+    it('gleiche Kennung beim Server: kein erneutes Fragen', async () => {
+        const s = setup();
+        await s.updater.check();
+        expect(await runTimers(s)).toEqual([]);
+        expect(s.registration.updates).toBe(1);
+    });
+
+    it('zwei Prüfungen gleichzeitig: nur eine Suche', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        await Promise.all([s.updater.check(), s.updater.check()]);
+        expect(await runTimers(s)).toEqual(UPDATE_RETRY_DELAYS_MS);
+        expect(s.registration.updates).toBe(2 + UPDATE_RETRY_DELAYS_MS.length);
+    });
+
+    it('Seitenwechsel: erst zusammengelegt, beim erneuten Fragen gefunden → neu laden', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        await s.updater.check();
+        await runTimers(s);
+        const worker = findsNewVersionOnUpdate(s, s.registration.updates + 2);
+        activatesOnMessage(s, worker);
+        const done = s.updater.applyNow('https://x/a');
+        // Eine Pause, dann gefunden; danach nur noch die Frist der Übernahme (sofort erfüllt).
+        expect(await runTimers(s)).toEqual([500, TAKEOVER_TIMEOUT_MS]);
+        expect(await done).toBe(true);
+        expect(s.navigated).toEqual(['https://x/a']);
+    });
+});
+
+describe('AppUpdater: Start mit veralteter Version und „Seite nicht gefunden“', () => {
+    const START_URL = 'https://x/firefighting/test/email-bestaetigen#token=abc';
+
+    function settled<T>(promise: Promise<T>): { done: boolean } {
+        const state = { done: false };
+        void promise.then(() => {
+            state.done = true;
+        });
+        return state;
+    }
+
+    it('aktuelle Version: Seite erscheint ohne „Seite wird geladen …“', async () => {
+        const s = setup();
+        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        expect(s.updater.loadingPage.value).toBe(false);
+    });
+
+    it('neue Version erst beim erneuten Fragen gefunden: lädt die Startadresse samt Fragment', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        const worker = findsNewVersionOnUpdate(s, 3);
+        activatesOnMessage(s, worker);
+        const start = s.updater.checkOnStart(START_URL);
+        await flush();
+        expect(s.updater.loadingPage.value).toBe(true);
+        await runTimers(s);
+        expect(await start).toBe(true);
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual([START_URL]);
+    });
+
+    it('neue Version nicht zu laden: bleibt bei „Seite wird geladen …“, nach rund 30 s Knopf', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        const start = s.updater.checkOnStart(START_URL);
+        const state = settled(start);
+        // Fristen der Startprüfung (Registrierung, build.json), dann die Pausen bis rund 30 s.
+        expect(await runTimers(s)).toEqual([
+            START_CHECK_TIMEOUT_MS,
+            START_CHECK_TIMEOUT_MS,
+            ...START_RETRY_DELAYS_MS,
+        ]);
+        expect(START_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0)).toBeGreaterThanOrEqual(
+            30_000,
+        );
+        expect(s.registration.updates).toBe(1 + START_RETRY_DELAYS_MS.length);
+        expect(state.done).toBe(false);
+        expect(s.updater.loadingPage.value).toBe(true);
+        expect(s.updater.reloadNeeded.value).toBe(true);
+        expect(s.updater.switching.value).toBe(false);
+        expect(s.navigated).toEqual([]);
+    });
+
+    it('„Seite nicht gefunden“ mit neuer Version, die nicht lädt: nie „nicht gefunden“, Knopf', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        const state = settled(s.updater.checkBeforeNotFound(START_URL));
+        await runTimers(s);
+        expect(state.done).toBe(false);
+        expect(s.updater.reloadNeeded.value).toBe(true);
+    });
+
+    it('„Seite nicht gefunden“ ohne neue Version: Seite erscheint', async () => {
+        const s = setup();
+        const result = s.updater.checkBeforeNotFound(START_URL);
+        await runTimers(s);
+        expect(await result).toBe(false);
+        expect(s.updater.reloadNeeded.value).toBe(false);
+    });
+
+    it('Schleifensperre: kein Warten, Seite erscheint mit dem Hinweis wie bisher', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        s.storage.setItem(RELOAD_STORAGE_KEY, String(s.now));
+        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        expect(s.updater.loadingPage.value).toBe(false);
+        expect(s.updater.reloadNeeded.value).toBe(false);
+        expect(updateNotice(s.updater)).toBe('blocked');
+    });
+
+    it('Knopf „Neu laden“: Service Worker abmelden, Adresse samt Fragment vom Server laden', async () => {
+        const s = setup();
+        await s.updater.reloadFromServer(START_URL);
+        expect(s.registration.unregistered).toBe(true);
+        expect(s.navigated).toEqual([START_URL]);
+        expect(s.updater.switching.value).toBe(true);
     });
 });
 
@@ -485,7 +756,7 @@ describe('updateNotice', () => {
 });
 
 describe('installUpdateGuard', () => {
-    async function routerWith(updater: { applyOnNavigation: (url: string) => boolean }) {
+    async function routerWith(updater: { applyNow: (url: string) => Promise<boolean> }) {
         const component = { template: '<div />' };
         const router = createRouter({
             history: createMemoryHistory('/firefighting/test/'),
@@ -495,36 +766,46 @@ describe('installUpdateGuard', () => {
                 { path: '/b', component },
             ],
         });
-        installUpdateGuard(router, updater as AppUpdater);
+        installUpdateGuard(router, updater as unknown as AppUpdater);
         await router.push('/a');
         return router;
     }
 
     it('nicht beim Start der App', async () => {
         const urls: string[] = [];
-        await routerWith({ applyOnNavigation: (url) => (urls.push(url), true) });
+        await routerWith({ applyNow: (url) => Promise.resolve((urls.push(url), true)) });
         expect(urls).toEqual([]);
     });
 
-    it('anderer Pfad: neue Version mit der Zieladresse, Navigation abgebrochen', async () => {
+    it('anderer Pfad: neue Version mit der Zieladresse, Seitenwechsel bleibt offen (kein Rücksprung)', async () => {
         const urls: string[] = [];
         let apply = false;
-        const router = await routerWith({ applyOnNavigation: (url) => (urls.push(url), apply) });
+        const router = await routerWith({
+            applyNow: (url) => Promise.resolve((urls.push(url), apply)),
+        });
         apply = true;
-        await router.push('/b?x=1');
+        let settled = false;
+        void router.push('/b?x=1').then(() => {
+            settled = true;
+        });
+        await flush();
         expect(urls.at(-1)).toMatch(/\/firefighting\/test\/b\?x=1$/);
         expect(router.currentRoute.value.path).toBe('/a');
+        // Ein Abbruch setzte bei Zurück/Vor die Historie zurück und überholte das Neuladen.
+        expect(settled).toBe(false);
     });
 
     it('ohne neue Version normal weiter', async () => {
-        const router = await routerWith({ applyOnNavigation: () => false });
+        const router = await routerWith({ applyNow: () => Promise.resolve(false) });
         await router.push('/b');
         expect(router.currentRoute.value.path).toBe('/b');
     });
 
     it('gleicher Pfad (z. B. #token=… entfernen): nie neu laden', async () => {
         const urls: string[] = [];
-        const router = await routerWith({ applyOnNavigation: (url) => (urls.push(url), true) });
+        const router = await routerWith({
+            applyNow: (url) => Promise.resolve((urls.push(url), true)),
+        });
         await router.replace({ path: '/a', hash: '' });
         await router.replace({ path: '/a', query: { weiter: '/x' } });
         expect(urls).toEqual([]);

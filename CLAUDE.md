@@ -17,6 +17,15 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `config/config.local.php` committen.
 - Code und Bezeichner auf Englisch, Dokumentation und Oberflächentexte auf Deutsch.
 - Antworten an den Nutzer immer auf Deutsch.
+- Status von Nachrichten an den Nutzer – jede Nachricht beginnt mit genau einer Kennzeichnung:
+  - "⏳ ZWISCHENSTAND – ich arbeite weiter": Es läuft noch etwas. Dazu: was gerade läuft, wie lange
+    es voraussichtlich dauert und was danach kommt. Der Nutzer muss nichts tun.
+  - "❓ RÜCKFRAGE – ich warte auf Ihre Antwort": Ohne Antwort geht es nicht weiter.
+  - "✅ FERTIG – ich halte an": Die Aufgabe ist abgeschlossen. Dazu: Testergebnisse, was geändert
+    wurde, was der Nutzer committen soll bzw. wie er es prüft.
+  - "⛔ ABGEBROCHEN – Problem": Es geht nicht weiter; Ursache und Vorschlag.
+  Bei lang laufenden Aktionen (Prüfläufe, Komplettläufe) vorher die erwartete Dauer nennen und eine
+  feste Zeitgrenze setzen.
 - Live-Tests (gegen den Server www.prodad.de) nur in der Test-Stadt `/firefighting/test/`, nie in
   echten Städten.
 
@@ -320,27 +329,51 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Updates (KONZEPT.md "Updates der App", `src/runtime/appUpdate.ts`): `skipWaiting: false`, die neue
   Version wartet, bis `AppUpdater` sie per `SKIP_WAITING` aktiviert und die Seite neu lädt (nie
   `skipWaiting: true`: die laufende App bräuchte sonst gelöschte Teile). Prüfen
-  (`registration.update()`) beim Start, bei `visibilitychange` (sichtbar) und stündlich, offline
-  nie, Fehler still. Aktualisiert wird beim nächsten Seitenwechsel auf einen anderen Pfad
+  (`registration.update()` und `build.json` gleichzeitig) beim Start, bei `visibilitychange`
+  (sichtbar) und stündlich, offline nie, Fehler still. Meldet `build.json` eine neue Version, der
+  Browser aber keinen neuen Service Worker, fragt die App nach 0,5/1/2/4 s erneut
+  (`UPDATE_RETRY_DELAYS_MS`, `findNewWorker`: EINE gemeinsame Suche für alle Aufrufer, endet bei
+  `updatefound`), danach erst beim nächsten Anlass. Grund (Prüflauf unter Last): Der Browser legt
+  `update()` mit einer noch laufenden Prüfung zusammen (gleichwertige Jobs im Service-Worker-
+  Standard); begann diese vor dem Deploy, liest sie die alte `sw.js`. Aktualisiert wird beim nächsten Seitenwechsel auf einen anderen Pfad
   (`installUpdateGuard`; nicht bei gleichem Pfad wie beim Entfernen von `#token=…`), beim Start
   (`checkOnStart`, vor der ersten Seite; nur wenn ein Service Worker die Seite liefert, Kennung aus
   `build.json` höchstens `START_CHECK_TIMEOUT_MS` = 2 s abwarten, Registrierung ebenso; neu geladen
   wird die vollständige Startadresse samt Fragment, bei gleicher Adresse per `location.reload()`, da
   `assign` nur zum Fragment springen würde), vor „Seite nicht gefunden“ (`checkBeforeNotFound`, über
-  `UPDATER_KEY` per `inject`) oder per Knopf „Jetzt aktualisieren“ im Hinweis von `App.vue` (nur mit ungespeicherten
+  `UPDATER_KEY` per `inject`; Start und „nicht gefunden“ suchen bis rund 30 s weiter,
+  `START_RETRY_DELAYS_MS` mit zusätzlich 8 und 15 s, und zeigen solange „Seite wird geladen …“
+  (`loadingPage` in `App.vue` bzw. die Seite selbst), nie kurz „nicht gefunden“; gelingt es nicht,
+  bleibt die Seite beim Laden und `App.vue` zeigt „Die neue Version konnte nicht geladen werden.“ mit
+  Knopf „Neu laden“ (`reloadNeeded`, `reloadFromServer`: Service Worker abmelden, Adresse samt
+  `#token`/`#code` neu laden); bei Schleifensperre erscheint die Seite wie bisher) oder per Knopf „Jetzt aktualisieren“ im Hinweis von `App.vue` (nur mit ungespeicherten
   Eingaben oder während der Sperre; mit ungespeicherten Eingaben erst nach der Rückfrage „Ihre
   Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?“, Standard „Abbrechen“). Gegen Schleifen: nach einem automatischen Neuladen 10 Minuten
   keines mehr (`RELOAD_COOLDOWN_MS`, sessionStorage je Tab). Die erste Übernahme nach der Installation
-  ist kein Update; die eines anderen Tabs schon. Zusätzlich vergleicht jede Prüfung (und jede
-  Übernahme einer Seite ohne Kontrolle, jede neu installierte Version) die Kennung in `build.json`
+  ist kein Update und gilt auch beim Aktualisieren nicht als „neue Version übernommen“ (deren Service
+  Worker lieferte beim Neuladen die alte Seite). Meldet `build.json` dabei schon eine andere Kennung
+  (Strg+F5, dann Deploy; `claimedByNewer`), ist die übernehmende Version vermutlich die neue, sicher
+  nicht (die Antwort kann nach einem späteren Deploy kommen): Beim Aktualisieren genügt dann EIN
+  `update()` ohne Suche; findet es keinen neueren Service Worker, wird neu geladen. Die Übernahme
+  durch einen anderen Tab ist ein Update.
+  Zusätzlich vergleicht jede Prüfung (und jede
+  Übernahme einer Seite ohne Kontrolle, jede neu installierte Version einer Seite ohne Kontrolle) die
+  Kennung in `build.json`
   (vom Plugin `frontend/build/buildInfo.ts` in den Build gelegt, `fetch` mit `cache: 'no-store'`) mit
   `BUILD_ID`: verschieden = Update, unabhängig vom Zustand des Service Workers (sonst bliebe z. B. eine
-  per Strg+F5 geladene Seite, die der neue Service Worker übernimmt, dauerhaft alt). Beim
-  Aktualisieren fragt die App den Service Worker (`update()`), wartet, falls noch kein neuer Service
-  Worker diese Seite übernommen hat, auf die neue Version (`updatefound`, `update()` kann vorher
-  fertig sein) und ihre Installation, dann `SKIP_WAITING` (fertig bei `controllerchange` oder
-  Zustand `activating`/`activated`), dann Neuladen; jede Wartezeit höchstens
-  `ACTIVATION_TIMEOUT_MS`. Während des Neuladens keine weiteren Abfragen. Ohne Service Worker gilt
+  per Strg+F5 geladene Seite, die der neue Service Worker übernimmt, dauerhaft alt). Eine neu
+  installierte Version unter einem Service Worker fragt `build.json` NICHT (die Anfrage liefe über den
+  alten Service Worker; aktiviert ein anderer Tab gerade die neue Version, hält Chrome die Aktivierung
+  an). Beim Aktualisieren (`apply`) fragt die App den Service Worker (`update()`, bei Bedarf die Suche
+  wie oben), wartet auf die Installation (`ACTIVATION_TIMEOUT_MS`), sendet `SKIP_WAITING` und lädt NUR
+  nach der Übernahme (`controllerchange`, höchstens `TAKEOVER_TIMEOUT_MS`) neu; bleibt sie aus
+  (Chrome hält die Aktivierung an, wenn der alte Service Worker beim Wechsel eine Anfrage bekommt),
+  meldet sie den Service Worker ab und lädt dann neu (Seite vom Server). Ohne neue Version oder wenn
+  das Abmelden scheitert, kein Neuladen (sonst lieferte der alte Service Worker die alte Seite und die
+  Sperre verhinderte einen zweiten Versuch). Solange: Hinweis „Neue Version wird geladen …“
+  (`switching`). Lädt die App neu, lässt der Wächter den Seitenwechsel offen (Promise ohne Ende) statt
+  ihn abzubrechen: Ein Abbruch setzte bei Zurück/Vor (popstate) die Historie zurück, das überholte das
+  Neuladen. Während des Neuladens keine weiteren Abfragen. Ohne Service Worker gilt
   nur die Kennung. Mail-Links öffnen sich im Test in einem zweiten Tab (wie aus einem
   Mailprogramm): Ein Seitenwechsel mitten in einer Anfrage meldet WebKit als Skriptfehler. Fehlende Teile nach einem Deploy
   (`isChunkLoadError`) → Zielseite einmal neu laden. Was ein Neuladen überstehen muss (z. B. der
@@ -379,10 +412,16 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   liefert je Bereich `frontend/dist` oder, mit Schaltdatei `test-builds/state/<bereich>`, die neue;
   jeder Test hat einen eigenen Bereich. Er beantwortet die öffentlichen Aufrufe der Anmeldeseite
   selbst, weil WebKit Anfragen einer vom Service Worker kontrollierten Seite nicht an `page.route()`
-  gibt. Abgedeckte Fälle: ohne/mit Eingabe, Rückfrage, erster Besuch mit Deploy vor der
+  gibt. Bereiche je Test über `randomUUID` (Prozess-IDs werden unter Windows wiederverwendet).
+  Abgedeckte Fälle: ohne/mit Eingabe, Rückfrage, erster Besuch mit Deploy vor der
   Installation (Registrierung per Init-Skript zurückgehalten), Seite per Strg+F5 geladen und vom
   neuen Service Worker übernommen (nur Chromium: `Page.reload` mit `ignoreCache` über CDP), zwei Tabs
-  (einer aktualisiert, der andere folgt; einer geschlossen).
+  (einer aktualisiert, der andere folgt; einer geschlossen), Mail-Link mit alter Version, „Seite nicht
+  gefunden“, Zurück-Knopf nach erkannter neuer Version. Firefox meldet einen Schrift-Download, den das
+  Neuladen abbricht (Status 2152398850 = `NS_BINDING_ABORTED`), als Konsolenfehler; nur diesen lässt
+  der Mail-Link-Test zu. Sporadische Fehler der Update-Logik nie mit längeren Wartezeiten
+  überdecken: unter Last wiederholen (`--repeat-each`, mehrere Worker, `--output` je Durchgang, damit
+  die Traces bleiben) und die Ursache im Trace suchen.
 - Formatierung: Prettier (4 Leerzeichen laut `.editorconfig`, JSON 2), ESLint mit typgeprüften
   strikten Regeln, `no-console`, nur `<script setup lang="ts">`, kein `v-html`.
 
@@ -1617,7 +1656,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Job `frontend`: PHP (für `php -S` in den Browser-Tests) und Node aus `frontend/.nvmrc`; `npm ci`,
   `npm run lint`, `npm run test:unit`, `npm run build`, Playwright mit Chromium, Firefox, WebKit.
   Der getestete Build wird als Artefakt `frontend-dist` hochgeladen (bei Fehlern zusätzlich der
-  Playwright-Bericht).
+  Playwright-Bericht mit `playwright-report/` und `test-results/`, darin die Traces gescheiterter
+  Tests: `trace: 'retain-on-failure'` in `playwright.config.ts`).
 - Job `deploy`: nur bei Push auf `main` und nur, wenn `php` und `frontend` grün sind; nie parallel
   (`concurrency: deploy-branch`). Lädt das Artefakt und ruft
   `bash scripts/publish-deploy-branch.sh <main-commit> <dist-ordner>` auf.

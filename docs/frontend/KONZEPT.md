@@ -166,6 +166,10 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
 - Geprüft wird beim Start, wenn die App wieder in den Vordergrund kommt (z. B. Handy entsperrt,
   Tab gewechselt) und etwa stündlich. Offline wird nicht geprüft; eine gescheiterte Prüfung zeigt
   keinen Fehler.
+- Meldet der Server eine neue Version, der Browser aber noch keinen neuen Service Worker, fragt die
+  App nach kurzen, wachsenden Pausen erneut (0,5 s, 1 s, 2 s, 4 s), danach erst wieder beim nächsten
+  Anlass; keine Endlosschleife. Grund (Prüflauf unter Last): Der Browser legt eine Prüfung mit einer
+  noch laufenden zusammen; begann diese vor dem Deploy, findet keine von beiden die neue Version.
 - Ist eine neue Version da und kein Formular angefangen, aktualisiert die App beim nächsten
   Seitenwechsel unbemerkt: Statt in der alten Version weiterzublättern, lädt sie die Zielseite neu.
   Nicht, wenn nur die Adresszeile bereinigt wird (z. B. `#token=…` entfernt).
@@ -178,6 +182,15 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   aktuell).
 - „Seite nicht gefunden“ prüft vor der Anzeige immer zuerst auf eine neue Version (vielleicht kennt
   erst sie die Seite) und lädt sie dann sofort, sofern nichts ungespeichert ist.
+- Beim Start mit veralteter Version und vor „Seite nicht gefunden“ fragt die App bis rund 30 Sekunden
+  nach der neuen Version (Pausen weiter 8 s, 15 s) und zeigt solange „Seite wird geladen …“, nie kurz
+  „nicht gefunden“. Gelingt es nicht, erscheint „Die neue Version konnte nicht geladen werden.“ mit
+  dem Knopf „Neu laden“: Die App lädt die Adresse samt `#token=…` bzw. `#code=…` direkt vom Server.
+- Neu geladen wird nur, wenn danach sicher die neue Version kommt (der neue Service Worker hat die
+  Seite übernommen). Hängt die Übernahme (Chrome hält sie an, wenn der alte Service Worker genau
+  dann eine Anfrage bekommt), meldet die App den Service Worker ab und lädt die Seite vom Server.
+  Während des Wechsels steht oben „Neue Version wird geladen …“. Beim Zurück-Knopf landet die neue
+  Version auf der richtigen Seite.
 - Schleifensperre in allen Fällen gleich (10 Minuten je Tab), danach nur der Hinweis mit Knopf.
 - Ist ein Formular angefangen (z. B. Umbuchung, Registrierung), erscheint oben der Hinweis „Neue
   Version verfügbar – nach dem Speichern wird aktualisiert“ mit dem Knopf „Jetzt aktualisieren“.
@@ -206,7 +219,9 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   des Service Workers; Seite per Strg+F5 geladen, neue Version übernimmt sie; zwei Tabs, einer
   aktualisiert und der andere folgt beim nächsten Seitenwechsel; zwei Tabs, einer geschlossen;
   Mail-Link mit alter Version im Service Worker (neue Version lädt sofort, Token bleibt erhalten und
-  wird verarbeitet); „Seite nicht gefunden“ nach einem Deploy.
+  wird verarbeitet); „Seite nicht gefunden“ nach einem Deploy; Zurück-Knopf nach einem Deploy. Die
+  sporadischen Fälle (zusammengelegte Prüfung, hängende Übernahme) prüfen Unit-Tests und ein
+  Prüflauf unter Last (3 × 480 Läufe).
 - Veraltete App gegen geänderte API: Die App nennt bei jedem Aufruf ihre Vertragsnummer
   (`X-Client-Api`). Später kann der Server eine zu alte App ablehnen („Diese Version ist veraltet –
   bitte aktualisieren“); Plan und Regeln in CLAUDE.md, "Versionierung der API für das Frontend".
