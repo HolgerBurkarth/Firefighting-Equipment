@@ -31,7 +31,7 @@ if (!base.isService) {
 // Kennung des Builds (Support, Browser-Tests der Updates).
 document.documentElement.dataset['build'] = BUILD_ID;
 
-const updater = new AppUpdater(browserUpdateEnvironment());
+const updater = new AppUpdater(browserUpdateEnvironment(BUILD_ID));
 const router = createAppRouter(base);
 installUpdateGuard(router, updater);
 

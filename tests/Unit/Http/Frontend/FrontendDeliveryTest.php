@@ -140,6 +140,8 @@ final class FrontendDeliveryTest extends TestCase
         yield 'Schrift' => ['/firefighting/immendingen/assets/font-abc123.woff2', 'font/woff2', 'public, max-age=31536000, immutable'];
         yield 'Service Worker' => ['/firefighting/test/sw.js', 'text/javascript; charset=utf-8', 'no-cache'];
         yield 'Workbox' => ['/firefighting/service/workbox-abc123.js', 'text/javascript; charset=utf-8', 'no-cache'];
+        yield 'Build-Kennung' => ['/firefighting/test/build.json', 'application/json; charset=utf-8', 'no-cache'];
+        yield 'Build-Kennung (service)' => ['/firefighting/service/build.json', 'application/json; charset=utf-8', 'no-cache'];
     }
 
     #[DataProvider('files')]
@@ -180,6 +182,9 @@ final class FrontendDeliveryTest extends TestCase
         yield 'Endung nicht erlaubt (assets)' => ['/firefighting/test/assets/notiz.txt'];
         yield 'Endung nicht erlaubt' => ['/firefighting/test/geheim.txt'];
         yield 'Favicon' => ['/firefighting/test/favicon.ico'];
+        yield 'andere JSON-Datei' => ['/firefighting/test/geheim.json'];
+        yield 'build.json in assets/' => ['/firefighting/test/assets/build.json'];
+        yield 'build.json in Großschreibung' => ['/firefighting/test/BUILD.json'];
         yield 'Unterordner' => ['/firefighting/test/assets/sub/index-abc123.js'];
         yield 'Datei in App-Pfad' => ['/firefighting/test/geraete/index-abc123.js'];
         yield 'Punkte' => ['/firefighting/test/assets/../index.html'];

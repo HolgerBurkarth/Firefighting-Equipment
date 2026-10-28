@@ -1198,7 +1198,8 @@ lässt einen Test scheitern.
 Updates nach einem Deploy (KONZEPT.md, "Updates der App"): Die App lädt eine neue Version selbst,
 beim nächsten Seitenwechsel bzw. nach dem Speichern eines angefangenen Formulars; Strg+F5 ist nicht
 nötig. Die Kennung des geladenen Builds steht an `<html data-build="…">` (in GitHub Actions der
-Commit, lokal `dev`, sonst `FF_BUILD_ID`). Für die Browser-Tests der Updates baut Playwright vorab
+Commit, lokal `dev`, sonst `FF_BUILD_ID`), die des ausgelieferten in `/firefighting/<bereich>/build.json`;
+die App vergleicht beide bei jeder Prüfung. Für die Browser-Tests der Updates baut Playwright vorab
 eine zweite Version nach `frontend/test-builds/next` (rund 7 s) und startet einen zweiten Server
 (`php -S localhost:4174 frontend/tests/e2e/support/update-server.php`), der je Test-Bereich die
 alte (`frontend/dist`) oder die neue Version ausliefert.

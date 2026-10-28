@@ -129,3 +129,157 @@ test.describe('Updates der App', () => {
         await expect(page.getByTestId('update-notice')).toBeHidden();
     });
 });
+
+/** Nur den Server umstellen (Deploy), ohne Prüfung durch die App. */
+function deploy(area: string): void {
+    writeFileSync(join(STATE, area), 'next');
+}
+
+/** Die App prüft wie beim Zurückkehren in den Vordergrund. */
+async function triggerCheck(page: Page): Promise<void> {
+    await page.evaluate(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+    });
+}
+
+/** Wartet, bis kein Worker mehr installiert wird oder wartet und einer die Seite kontrolliert. */
+async function waitForSettledWorker(page: Page): Promise<void> {
+    await expect
+        .poll(() =>
+            page.evaluate(async () => {
+                const registration = await navigator.serviceWorker.getRegistration();
+                return (
+                    navigator.serviceWorker.controller !== null &&
+                    registration?.installing === null &&
+                    registration.waiting === null &&
+                    registration.active?.state === 'activated'
+                );
+            }),
+        )
+        .toBe(true);
+}
+
+/** Seitenwechsel in der App; danach muss die neue Version geladen sein. */
+async function expectNewVersionAfterNavigation(page: Page, area: string): Promise<void> {
+    await page.getByRole('link', { name: 'Passwort vergessen?' }).click();
+    await expect(page).toHaveURL(`${ORIGIN}/firefighting/${area}/passwort-vergessen`);
+    await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+    await expect(page.getByRole('heading', { level: 1, name: 'Passwort vergessen' })).toBeVisible();
+}
+
+test.describe('Updates der App: Seiten ohne Kontrolle des Service Workers, mehrere Tabs', () => {
+    test('erster Besuch, Deploy noch vor der Installation des Service Workers', async ({
+        page,
+    }, testInfo) => {
+        // Die Registrierung wartet, bis der Test sie freigibt (nur ohne Service Worker in Kontrolle):
+        // So installiert der erste Besuch schon den Service Worker der NEUEN Version, die Seite läuft
+        // aber noch mit der alten. Der neue übernimmt sie (clientsClaim) wie eine Erstinstallation.
+        await page.addInitScript(() => {
+            const container = navigator.serviceWorker;
+            if (container.controller !== null) {
+                return;
+            }
+            const register = container.register.bind(container);
+            let release: () => void = () => undefined;
+            const gate = new Promise<void>((resolve) => {
+                release = resolve;
+            });
+            (window as unknown as { ffReleaseSw: () => void }).ffReleaseSw = () => {
+                release();
+            };
+            container.register = (...args: Parameters<typeof register>) =>
+                gate.then(() => register(...args));
+        });
+        const area = newArea(testInfo.project.name);
+        await page.goto(`${ORIGIN}/firefighting/${area}/anmelden`);
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        await expect(page.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+
+        deploy(area);
+        await page.evaluate(() => {
+            (window as unknown as { ffReleaseSw: () => void }).ffReleaseSw();
+        });
+        await waitForSettledWorker(page);
+        await expectNewVersionAfterNavigation(page, area);
+    });
+
+    test('Seite per Strg+F5 geladen, neue Version übernimmt sie (nur Chromium)', async ({
+        page,
+        browserName,
+    }, testInfo) => {
+        // Strg+F5 (Neuladen ohne Cache und ohne Service Worker) gibt es nur über das Chrome DevTools
+        // Protocol; in Firefox und WebKit bildet der Test oben denselben Zustand nach (Seite ohne
+        // Kontrolle, die ein neuer Service Worker übernimmt).
+        test.skip(browserName !== 'chromium', 'Strg+F5 nur in Chromium nachstellbar');
+        const area = newArea(testInfo.project.name);
+        await openOldVersion(page, area);
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send('Page.enable');
+        const loaded = new Promise<void>((resolve) => {
+            cdp.once('Page.loadEventFired', () => {
+                resolve();
+            });
+        });
+        await cdp.send('Page.reload', { ignoreCache: true });
+        await loaded;
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        expect(await page.evaluate(() => navigator.serviceWorker.controller === null)).toBe(true);
+
+        // Deploy: Der neue Service Worker hat keine kontrollierten Seiten, wird sofort aktiv und
+        // übernimmt die Seite, die noch die alte Version zeigt.
+        deploy(area);
+        await triggerCheck(page);
+        await waitForSettledWorker(page);
+        await expect(page.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expectNewVersionAfterNavigation(page, area);
+    });
+
+    test('zwei Tabs: einer aktualisiert, der andere folgt beim nächsten Seitenwechsel', async ({
+        page,
+        context,
+    }, testInfo) => {
+        const area = newArea(testInfo.project.name);
+        await openOldVersion(page, area);
+        const second = await context.newPage();
+        await openOldVersion(second, area);
+
+        deploy(area);
+        await triggerCheck(page);
+        await expect
+            .poll(() =>
+                page.evaluate(async () => {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    return registration?.waiting?.state ?? null;
+                }),
+            )
+            .toBe('installed');
+        await expectNewVersionAfterNavigation(page, area);
+        // Der zweite Tab läuft noch mit der alten Version unter dem neuen Service Worker.
+        await expect(second.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expectNewVersionAfterNavigation(second, area);
+        await second.close();
+    });
+
+    test('zwei Tabs, einer geschlossen: der übrige aktualisiert beim Seitenwechsel', async ({
+        page,
+        context,
+    }, testInfo) => {
+        const area = newArea(testInfo.project.name);
+        await openOldVersion(page, area);
+        const second = await context.newPage();
+        await openOldVersion(second, area);
+
+        deploy(area);
+        await triggerCheck(second);
+        await expect
+            .poll(() =>
+                second.evaluate(async () => {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    return registration?.waiting?.state ?? null;
+                }),
+            )
+            .toBe('installed');
+        await second.close();
+        await expectNewVersionAfterNavigation(page, area);
+    });
+});

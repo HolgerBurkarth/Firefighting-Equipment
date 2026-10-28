@@ -74,7 +74,8 @@ final class CacheableResponseTest extends TestCase
      */
     public static function rejectedArguments(): iterable
     {
-        yield 'JSON' => ['application/json; charset=utf-8', self::ETAG];
+        yield 'JSON ohne charset' => ['application/json', self::ETAG];
+        yield 'Problem-JSON' => ['application/problem+json', self::ETAG];
         yield 'CSV' => ['text/csv; charset=utf-8', self::ETAG];
         yield 'HTML ohne charset' => ['text/html', self::ETAG];
         yield 'Text' => ['text/plain; charset=utf-8', self::ETAG];
@@ -85,7 +86,7 @@ final class CacheableResponseTest extends TestCase
 
     public function testFrontendContentTypes(): void
     {
-        foreach (['text/html; charset=utf-8', 'text/javascript; charset=utf-8', 'text/css; charset=utf-8', 'font/woff2', 'font/woff'] as $type) {
+        foreach (['text/html; charset=utf-8', 'text/javascript; charset=utf-8', 'text/css; charset=utf-8', 'font/woff2', 'font/woff', 'application/json; charset=utf-8'] as $type) {
             $response = new CacheableResponse(new Request('GET', '/x'), $type, 'x', self::ETAG, CachePolicy::Revalidate);
             self::assertSame($type, $response->headers()['Content-Type']);
         }

@@ -7,6 +7,11 @@ import { hasUnsavedInput } from './unsavedInput';
  * wartet (kein skipWaiting im Build), bis die App ihn aktiviert: beim nächsten Seitenwechsel oder
  * per Knopf „Jetzt aktualisieren“, danach lädt sie die Seite neu. Ist ein Formular angefangen
  * (unsavedInput.ts), erscheint stattdessen ein Hinweis; Eingaben gehen nie verloren.
+ *
+ * „Neue Version da“ folgt aus ZWEI Quellen: dem Service Worker (eine neue Version wartet) und dem
+ * Vergleich der Build-Kennung des Servers (build.json) mit der eigenen (BUILD_ID). Der Vergleich
+ * erkennt auch Fälle, in denen der neue Service Worker schon aktiv ist, die Seite aber noch die alte
+ * Version zeigt (z. B. per Strg+F5 geladen und dann übernommen, oder Deploy beim ersten Besuch).
  */
 
 /** Regelmäßige Prüfung, solange die App offen ist. */
@@ -49,10 +54,14 @@ export interface UpdateEnvironment {
     /** Lädt die Adresse vollständig neu (window.location.assign). */
     readonly navigate: (url: string) => void;
     readonly setTimeout: (callback: () => void, ms: number) => unknown;
+    /** Kennung der laufenden Version (BUILD_ID). */
+    readonly buildId: string;
+    /** Kennung der ausgelieferten Version (build.json, ohne Cache); null bei jedem Fehler. */
+    readonly fetchBuildId: () => Promise<string | null>;
 }
 
 export class AppUpdater {
-    /** Eine neue Version ist installiert und wartet (oder hat schon übernommen). */
+    /** Eine neue Version ist da (wartet, hat schon übernommen oder der Server liefert sie aus). */
     readonly ready = shallowRef(false);
     /** Automatisches Neuladen gesperrt, weil kurz zuvor schon neu geladen wurde (Schleife). */
     readonly autoBlocked = shallowRef(false);
@@ -61,12 +70,18 @@ export class AppUpdater {
 
     constructor(private readonly env: UpdateEnvironment) {
         // Hat ein anderer Tab die neue Version aktiviert, läuft hier noch der alte Code unter dem
-        // neuen Service Worker: dann ebenfalls neu laden (beim nächsten Seitenwechsel). Die erste
-        // Übernahme nach der Installation (vorher kein Service Worker) ist kein Update.
+        // neuen Service Worker: dann ebenfalls neu laden (beim nächsten Seitenwechsel). Übernimmt
+        // ein Service Worker eine Seite ohne Kontrolle (erste Installation, Strg+F5), entscheidet
+        // der Vergleich der Build-Kennung.
         let hadController = env.container.controller !== null;
         env.container.addEventListener('controllerchange', () => {
-            if (hadController && !this.applying) {
+            if (this.applying) {
+                return;
+            }
+            if (hadController) {
                 this.markReady();
+            } else {
+                void this.compareBuild();
             }
             hadController = true;
         });
@@ -83,20 +98,38 @@ export class AppUpdater {
             worker?.addEventListener('statechange', () => {
                 if (worker.state === 'installed') {
                     this.markReady();
+                    void this.compareBuild();
                 }
             });
         });
     }
 
-    /** Fragt nach einer neuen Version; offline nicht, Fehler werden ignoriert. */
+    /**
+     * Fragt nach einer neuen Version: Service Worker (registration.update) und Build-Kennung des
+     * Servers. Offline nicht, Fehler werden ignoriert. Ohne Service Worker nur die Kennung.
+     */
     async check(): Promise<void> {
-        if (this.registration === null || !this.env.isOnline()) {
+        if (!this.env.isOnline()) {
             return;
         }
-        try {
-            await this.registration.update();
-        } catch {
-            // Keine Verbindung oder Server gestört: beim nächsten Anlass erneut.
+        if (this.registration !== null) {
+            try {
+                await this.registration.update();
+            } catch {
+                // Keine Verbindung oder Server gestört: beim nächsten Anlass erneut.
+            }
+        }
+        await this.compareBuild();
+    }
+
+    /** Liefert der Server eine andere Version als die laufende, ist ein Update da. */
+    private async compareBuild(): Promise<void> {
+        if (!this.env.isOnline()) {
+            return;
+        }
+        const served = await this.env.fetchBuildId();
+        if (served !== null && served !== this.env.buildId) {
+            this.ready.value = true;
         }
     }
 
@@ -126,6 +159,9 @@ export class AppUpdater {
         }
         this.applying = true;
         this.rememberReload();
+        // Wird die neue Version gerade noch installiert, erst darauf warten: Sonst lieferte der alte
+        // Service Worker beim Neuladen wieder die alte Seite.
+        await this.installed();
         const waiting = this.registration?.waiting ?? null;
         if (waiting !== null) {
             await this.activate(waiting);
@@ -139,6 +175,21 @@ export class AppUpdater {
             return;
         }
         this.ready.value = true;
+    }
+
+    private installed(): Promise<void> {
+        const installing = this.registration?.installing ?? null;
+        if (installing === null) {
+            return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+            installing.addEventListener('statechange', () => {
+                if (installing.state !== 'installing') {
+                    resolve();
+                }
+            });
+            this.env.setTimeout(resolve, ACTIVATION_TIMEOUT_MS);
+        });
     }
 
     private activate(waiting: UpdateWorker): Promise<void> {
@@ -235,7 +286,26 @@ const NO_SERVICE_WORKER: UpdateContainer = {
     removeEventListener: () => undefined,
 };
 
-export function browserUpdateEnvironment(): UpdateEnvironment {
+/** build.json des Builds (neben index.html), am HTTP-Cache vorbei. */
+export async function fetchServedBuildId(fetchFn: typeof fetch = fetch): Promise<string | null> {
+    try {
+        const response = await fetchFn(new URL('build.json', document.baseURI).href, {
+            cache: 'no-store',
+            credentials: 'same-origin',
+        });
+        if (!response.ok) {
+            return null;
+        }
+        const json: unknown = await response.json();
+        const build =
+            typeof json === 'object' && json !== null && 'build' in json ? json.build : null;
+        return typeof build === 'string' && build !== '' ? build : null;
+    } catch {
+        return null;
+    }
+}
+
+export function browserUpdateEnvironment(buildId: string): UpdateEnvironment {
     let storage: Storage | null = null;
     try {
         storage = window.sessionStorage;
@@ -252,5 +322,7 @@ export function browserUpdateEnvironment(): UpdateEnvironment {
             window.location.assign(url);
         },
         setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+        buildId,
+        fetchBuildId: () => fetchServedBuildId(),
     };
 }

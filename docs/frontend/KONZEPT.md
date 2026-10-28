@@ -175,6 +175,17 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   nächsten Seitenwechsel. Fehlen nach einem Deploy Teile der alten Version (Browser ohne Service
   Worker), lädt die App die Zielseite einmal neu.
 - Hinweise für die Anmeldeseite (z. B. „Passwort geändert“) überstehen das Neuladen.
+- Erkennung: Ob eine neue Version da ist, folgt nicht nur aus dem Service Worker, sondern bei jeder
+  Prüfung auch aus dem Vergleich der Kennung der laufenden Version mit der, die der Server gerade
+  ausliefert (Datei `build.json` im Build, ohne Cache). Verschieden heißt Update, egal in welchem
+  Zustand der Service Worker ist. Grund (Fehler im Live-Test): Eine per Strg+F5 geladene Seite steht
+  nicht unter dem Service Worker. Wird nach einem Deploy der neue Service Worker aktiv (z. B. weil
+  der Browser einen anderen Tab schlafen gelegt hatte) und übernimmt die Seite, sah das wie eine
+  Erstinstallation aus; die Seite blieb dauerhaft bei der alten Version.
+- Abgedeckte Fälle (Browser-Tests mit zwei echten Builds): ohne Eingabe automatisch beim
+  Seitenwechsel; mit Eingabe Hinweis und Rückfrage; erster Besuch, Deploy noch vor der Installation
+  des Service Workers; Seite per Strg+F5 geladen, neue Version übernimmt sie; zwei Tabs, einer
+  aktualisiert und der andere folgt beim nächsten Seitenwechsel; zwei Tabs, einer geschlossen.
 - Veraltete App gegen geänderte API: Die App nennt bei jedem Aufruf ihre Vertragsnummer
   (`X-Client-Api`). Später kann der Server eine zu alte App ablehnen („Diese Version ist veraltet –
   bitte aktualisieren“); Plan und Regeln in CLAUDE.md, "Versionierung der API für das Frontend".

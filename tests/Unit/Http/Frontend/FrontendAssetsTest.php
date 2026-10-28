@@ -70,4 +70,11 @@ final class FrontendAssetsTest extends TestCase
     {
         self::assertSame(['js', 'css', 'woff2', 'woff'], array_keys(FrontendAssets::CONTENT_TYPES));
     }
+
+    public function testBuildInfoFileMatchesFrontendSource(): void
+    {
+        $buildInfo = (string) file_get_contents(self::FRONTEND . '/build/buildInfo.ts');
+
+        self::assertStringContainsString(sprintf("export const BUILD_INFO_FILE = '%s';", FrontendAssets::BUILD_INFO_FILE), $buildInfo);
+    }
 }
