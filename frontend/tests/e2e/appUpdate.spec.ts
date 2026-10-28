@@ -192,6 +192,8 @@ test.describe('Updates der App: Seiten ohne Kontrolle des Service Workers, mehre
         });
         const area = newArea(testInfo.project.name);
         await page.goto(`${ORIGIN}/firefighting/${area}/anmelden`);
+        // Die alte Version läuft (der Start wartet höchstens kurz auf die zurückgehaltene
+        // Registrierung, dann erscheint die Seite).
         await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
         await expect(page.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
 
@@ -281,5 +283,65 @@ test.describe('Updates der App: Seiten ohne Kontrolle des Service Workers, mehre
             .toBe('installed');
         await second.close();
         await expectNewVersionAfterNavigation(page, area);
+    });
+});
+
+/** Token wie in tests/e2e/support/update-server.php (nur dieses gilt). */
+const MAIL_TOKEN = 'Upd8-Token_aus-der-Mail_0123456789abcdefghijk';
+
+test.describe('Updates der App: Start mit veralteter Version', () => {
+    test('Mail-Link mit alter Version im Service Worker: neue Version lädt, Token bleibt', async ({
+        page,
+        context,
+    }, testInfo) => {
+        const area = newArea(testInfo.project.name);
+        await openOldVersion(page, area);
+        // Deploy, ohne dass die geöffnete App es bemerkt; dann öffnet das Mailprogramm den Link in
+        // einem neuen Tab (die alte Version liegt im Service Worker). Fehler dieses Tabs prüft der
+        // Test selbst; seine API-Aufrufe beantwortet der Update-Testserver.
+        deploy(area);
+        const mail = await context.newPage();
+        const problems: string[] = [];
+        mail.on('pageerror', (error) => problems.push(`Skriptfehler: ${error.message}`));
+        mail.on('console', (message) => {
+            if (message.type() === 'error') {
+                problems.push(`Konsolenfehler: ${message.text()}`);
+            }
+        });
+        await mail.goto(`${ORIGIN}/firefighting/${area}/email-bestaetigen#token=${MAIL_TOKEN}`);
+
+        await expect(mail.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(mail.getByRole('heading', { level: 1 })).toHaveText(
+            'E-Mail-Adresse bestätigen',
+        );
+        // Das Fragment entfernt erst die neue Version.
+        await expect(mail).toHaveURL(`${ORIGIN}/firefighting/${area}/email-bestaetigen`);
+        await mail.getByRole('button', { name: 'E-Mail-Adresse bestätigen' }).click();
+        await expect(mail.getByTestId('email-verified')).toHaveText(
+            'Ihre E-Mail-Adresse ist bestätigt.',
+        );
+        expect(problems).toEqual([]);
+        await mail.close();
+    });
+
+    test('„Seite nicht gefunden“ prüft zuerst auf eine neue Version', async ({
+        page,
+    }, testInfo) => {
+        const area = newArea(testInfo.project.name);
+        await openOldVersion(page, area);
+        deploy(area);
+        // Seitenwechsel innerhalb der alten App auf eine Seite, die sie nicht kennt (die App hat seit
+        // dem Deploy noch nicht geprüft).
+        await page.evaluate(() => {
+            history.pushState({}, '', 'gibt-es-erst-spaeter#code=ABCD-EFGH-JKMN');
+            dispatchEvent(new PopStateEvent('popstate'));
+        });
+        await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(page).toHaveURL(
+            `${ORIGIN}/firefighting/${area}/gibt-es-erst-spaeter#code=ABCD-EFGH-JKMN`,
+        );
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'Seite nicht gefunden' }),
+        ).toBeVisible();
     });
 });
