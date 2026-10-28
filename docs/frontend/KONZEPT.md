@@ -38,8 +38,9 @@ Das Mockup liegt in `docs/frontend/mockup/` (siehe dortige `LIESMICH.md`).
 
 ## Anmeldung und Registrierung
 
-Die API ist fertig (`CLAUDE.md`: "Benutzer und Anmeldung", "Passwort vergessen", "Einladung,
-Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen").
+API und Frontend sind fertig, alle Seiten unten sind umgesetzt (API: `CLAUDE.md`, "Benutzer und
+Anmeldung", "Passwort vergessen", "Einladung, Registrierung und E-Mail-Bestätigung", "Städte
+verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 
 ### Seiten
 | Adresse | Bereich | Zweck |
@@ -90,7 +91,15 @@ Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen")
    ohne Link geöffnet: Formular „Neuen Bestätigungslink anfordern“ (E-Mail-Adresse). Danach geht es
    zur Anmeldung; bis zur Freischaltung meldet sie „wartet auf Freischaltung“.
 7. **Ungespeicherte Eingaben:** Ein Code oder Token aus einem Link zählt wie eine Eingabe, solange
-   er nicht verwendet ist (nach einem Neuladen stünde er nicht mehr in der Adresse).
+   er nicht verwendet ist (nach einem Neuladen stünde er nicht mehr in der Adresse). Alle Formulare
+   melden ihre Eingaben (siehe "Updates der App").
+8. **Einladung annehmen** (neue Admins, Link aus der Mail des Super-Admins, 24 Stunden gültig):
+   Felder Name und Passwort, Knopf „Konto einrichten“. Die Live-Prüfung kennt Name und Stadt, die
+   E-Mail-Adresse nur der Server (er prüft sie zusätzlich, Meldung am Feld). Danach entsteht keine
+   Sitzung (wie nach „Passwort vergessen“): Die App führt zur Anmeldung mit dem Hinweis „Ihr Konto
+   ist eingerichtet …“. Einladung abgelaufen oder benutzt bzw. Seite ohne Link: Hinweis, beim
+   Super-Admin eine neue Einladung anzufordern (nur er kann sie senden; ein Formular wie bei der
+   E-Mail-Bestätigung gibt es daher nicht).
 
 ### Weitere Regeln
 - Nur eine echte Antwort des Servers entscheidet, ob jemand angemeldet ist (401 = nicht
@@ -103,8 +112,8 @@ Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen")
   „wartet auf Freischaltung“, zu viele Versuche (mit Wartezeit aus `Retry-After`), Link abgelaufen
   oder benutzt (mit Weg zu einem neuen Link), ungültiger Einladungscode, Stadt gesperrt oder
   unbekannt, keine Verbindung. Eingaben bleiben bei Fehlern erhalten.
-- Nach Registrierung und „Passwort vergessen“: Hinweis auf den Spam-Ordner und darauf,
-  `feuerwehr-app@prodad.de` zu den Kontakten hinzuzufügen.
+- Nach Registrierung, „Passwort vergessen“ und neuem Bestätigungslink: Hinweis auf den
+  Spam-Ordner und darauf, `feuerwehr-app@prodad.de` zu den Kontakten hinzuzufügen.
 - `autocomplete` passend für Passwort-Manager und Handys: `username` (E-Mail des Kontos),
   `current-password` beim Anmelden, `new-password` beim Setzen, `name` beim Namen.
 - Bedienelemente mindestens 44 px, alles per Tastatur und Bildschirmleser bedienbar (Reka UI wo

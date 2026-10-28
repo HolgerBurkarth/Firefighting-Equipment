@@ -194,7 +194,7 @@ als `mail_failed (device_notice, Konto #ID)` im Log.
    Nur aktive, nicht gesperrte Konten des Bereichs bekommen eine Mail mit dem Link
    `<base_url>/firefighting/<kürzel>/passwort-zuruecksetzen#token=…` (1 Stunde gültig, nur einmal
    nutzbar; ein neuer Link ersetzt den alten). Eine ungültige Schreibweise der Adresse gibt 400.
-2. Die Seite hinter dem Link (Frontend, noch nicht gebaut) liest das Token hinter `#` und schickt
+2. Die Seite hinter dem Link (`passwort-zuruecksetzen` im Frontend) liest das Token hinter `#` und schickt
    `POST api/v1/auth/password-reset/confirm` mit `{"token":"…","new_password":"…"}`. Danach sind
    alle Sitzungen beendet; man meldet sich mit dem neuen Passwort an.
 
@@ -234,7 +234,7 @@ Ablauf (nur unter einer Stadt):
    gültig). Gibt es die Adresse in der Stadt schon, entsteht kein Konto und der Code wird nicht
    verbraucht; die Antwort ist dieselbe (202, frühestens nach 1,5 s), der Besitzer der Adresse
    bekommt einen Hinweis.
-3. Die Seite hinter dem Link (Frontend, noch nicht gebaut) schickt `POST api/v1/auth/email/verify`
+3. Die Seite hinter dem Link (`email-bestaetigen`, Bestätigung per Knopf) schickt `POST api/v1/auth/email/verify`
    mit `{"token":"…"}`. Das Konto wartet dann auf Freischaltung (`pending`); alle aktiven, nicht
    gesperrten Admins der Stadt bekommen eine Mail. Einen neuen Link gibt es mit
    `POST api/v1/auth/email/resend` und `{"email":"…"}` (immer 202, gleiche Meldung).
@@ -312,7 +312,7 @@ werden über ihre ID angesprochen (siehe `GET api/v1/tenants`).
 2. Weitere Admins: `POST api/v1/tenants/{id}/admins` mit `{"email":"…"}` (gleicher Ablauf).
 3. Einladung erneut senden (nur Status `invited`): `POST api/v1/tenants/{id}/users/{user}/resend-invitation`
    mit `{}`. Der neue Link ersetzt den alten.
-4. Die Seite hinter dem Link (Frontend, noch nicht gebaut) schickt
+4. Die Seite hinter dem Link (`einladung-annehmen` im Frontend) schickt
    `POST /firefighting/<kürzel>/api/v1/auth/invitation/accept` mit
    `{"token":"…","name":"Erika Musterfrau","password":"…"}`. Danach ist das Konto aktiv (Name =
    Anzeigename, E-Mail gilt als bestätigt), eine Sitzung entsteht nicht: Anmeldung mit dem neuen
@@ -1118,8 +1118,9 @@ Zum Ansehen der App braucht die Anwendung lokal eine eigene Datenbank. Nie dafü
    php -S localhost:8000 public/index.php
    ```
 
-5. Einladung annehmen. Solange das Frontend die Seite `einladung-annehmen` noch nicht hat, per
-   curl (Token = Teil hinter `#token=` im Link; Datei danach löschen):
+5. Einladung annehmen: den Link (mit `#token=…`) im Browser öffnen, Name und Passwort festlegen,
+   danach anmelden. Ohne Frontend-Build geht es auch per curl (Token = Teil hinter `#token=` im
+   Link; Datei danach löschen):
 
    ```
    # accept.json: {"token":"<Token>","name":"Erika Musterfrau","password":"<mindestens 10 Zeichen>"}
@@ -1185,7 +1186,8 @@ Fürs Ansehen mit echter API: `npm run build`, dann im Hauptordner
 Anmeldung: `/firefighting/<bereich>/` leitet ohne Sitzung zur Anmeldung, sonst zur Startseite der
 Rolle (User `suchen`, Admin und Super-Admin `dashboard`; beide vorerst Platzhalter). Registrieren
 unter `/firefighting/<stadt>/registrieren` (mit Code aus dem QR-Link `#code=…` oder von Hand),
-Bestätigungslink der Mail auf `email-bestaetigen` (Bestätigung per Knopf, dort auch neuer Link). Abläufe und
+Bestätigungslink der Mail auf `email-bestaetigen` (Bestätigung per Knopf, dort auch neuer Link),
+neue Admins legen auf `einladung-annehmen` Name und Passwort fest. Abläufe und
 Entscheidungen in `docs/frontend/KONZEPT.md`, "Anmeldung und Registrierung".
 
 Die Browser-Tests (Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build, den

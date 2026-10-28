@@ -298,6 +298,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `InvitationCodeValue` daher immer mit dem Frontend und neuen Fällen. Seiten der Mail-Links
   (`AppUrls::*_PAGE`) muss es im Router geben (`appUrlsPages.spec.ts`). `email-bestaetigen` sendet
   das Token erst per Knopf (Virenscanner öffnen Links vorab).
+- `einladung-annehmen` (`InvitationAcceptPage`, neue Admins): Name und Passwort (Live-Prüfung mit
+  Name und Stadt, die E-Mail kennt nur der Server); danach keine Sitzung, sondern Anmeldung mit
+  Hinweis `invitation_accepted` (`LoginNotice`, steht in sessionStorage wie alle Hinweise der
+  Anmeldeseite); `invalid_token` blendet das Formular aus und verweist auf den Super-Admin (nur er
+  sendet neue Einladungen). Mail-Links aller Seiten (`passwort-zuruecksetzen`, `email-bestaetigen`,
+  `einladung-annehmen`, `registrieren#code=…`) lesen Token bzw. Code per `takeFragmentParam`.
 - Neue Passwörter (`NewPasswordField`, Live-Prüfung `src/auth/passwordRules.ts`): Regeln wie
   `PasswordPolicy` OHNE Sperrliste (nur der Server, 422 `weak_password` am Feld). Absenden erst nach
   bestandener Prüfung, daher nie strenger als der Server: gemeinsame Testfälle
@@ -1594,6 +1600,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (API)" und "Hinweise (API)").
 - Frontend: Vue 3 mit Vite, TypeScript, Reka UI, als PWA; ein Build für alle Städte, ausgeliefert
   von PHP (siehe "Frontend" und "Frontend ausliefern"); Konzept in `docs/frontend/KONZEPT.md`.
+- Anmeldung und Registrierung im Frontend (umgesetzt: anmelden, registrieren, email-bestaetigen,
+  passwort-vergessen, passwort-zuruecksetzen, einladung-annehmen, Abmelden; Updates der App; siehe
+  "Frontend" und KONZEPT.md "Anmeldung und Registrierung", "Updates der App").
 - Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
 
 ## GitHub Actions (CI)

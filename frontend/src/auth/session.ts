@@ -2,8 +2,9 @@ import { readonly, shallowRef } from 'vue';
 import type { ApiError } from '../api/client';
 import { fetchMe, logout as apiLogout, type AuthState } from '../api/auth';
 
-/** Hinweis für die Anmeldeseite nach Abmelden, Ablauf der Sitzung oder neuem Passwort. */
-export type LoginNotice = 'logged_out' | 'session_expired' | 'password_reset';
+/** Hinweis für die Anmeldeseite nach Abmelden, Ablauf der Sitzung, neuem Passwort oder Einladung. */
+export type LoginNotice =
+    'logged_out' | 'session_expired' | 'password_reset' | 'invitation_accepted';
 
 /** Wartezeiten zwischen erneuten Versuchen von auth/me; der letzte Wert wiederholt sich. */
 export const RETRY_DELAYS_MS: readonly number[] = [2000, 4000, 8000, 15000];
@@ -12,7 +13,12 @@ const current = shallowRef<AuthState | null>(null);
 /** Ersatz, wenn sessionStorage fehlt oder gesperrt ist. */
 let noticeFallback: LoginNotice | null = null;
 const NOTICE_STORAGE_KEY = 'ff-login-notice';
-const LOGIN_NOTICES: readonly LoginNotice[] = ['logged_out', 'session_expired', 'password_reset'];
+const LOGIN_NOTICES: readonly LoginNotice[] = [
+    'logged_out',
+    'session_expired',
+    'password_reset',
+    'invitation_accepted',
+];
 const checkError = shallowRef<ApiError | null>(null);
 /** true, sobald bekannt ist, ob eine Sitzung besteht (nach auth/me oder Anmelden/Abmelden). */
 let known = false;

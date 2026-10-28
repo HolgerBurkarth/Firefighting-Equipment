@@ -9,9 +9,6 @@ const pages = [...appUrlsPhp.matchAll(/const string \w+_PAGE = '([a-z-]+)';/g)].
     (match) => match[1] ?? '',
 );
 
-/** Kommt mit Schritt 5 (Einladung annehmen). */
-const NOT_YET = ['einladung-annehmen'];
-
 const tenantPaths = createRoutes({
     path: '/firefighting/test/',
     area: 'test',
@@ -22,12 +19,10 @@ describe('Seiten der Mail-Links (AppUrls)', () => {
     it('liest die Seiten aus AppUrls.php', () => {
         expect(pages).toContain('passwort-zuruecksetzen');
         expect(pages).toContain('email-bestaetigen');
+        expect(pages).toContain('einladung-annehmen');
     });
 
-    it.each(pages.filter((page) => !NOT_YET.includes(page)))(
-        '/%s gibt es unter Städten',
-        (page) => {
-            expect(tenantPaths).toContain(`/${page}`);
-        },
-    );
+    it.each(pages)('/%s gibt es unter Städten', (page) => {
+        expect(tenantPaths).toContain(`/${page}`);
+    });
 });

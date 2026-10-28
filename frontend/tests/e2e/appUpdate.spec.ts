@@ -310,7 +310,12 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         });
         await mail.goto(`${ORIGIN}/firefighting/${area}/email-bestaetigen#token=${MAIL_TOKEN}`);
 
-        await expect(mail.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        // Der Browser muss vor dem Neuladen die ganze neue Version installieren (gemessen rund 1,5 s);
+        // im Komplettlauf (fünf Browser, unter Windows ein PHP-Prozess je Server) dauert das
+        // gelegentlich länger als die üblichen 5 s. Bliebe die Seite alt, scheiterte der Test weiter.
+        await expect(mail.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID, {
+            timeout: 15000,
+        });
         await expect(mail.getByRole('heading', { level: 1 })).toHaveText(
             'E-Mail-Adresse bestätigen',
         );
