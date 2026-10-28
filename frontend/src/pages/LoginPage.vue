@@ -17,6 +17,7 @@ import { isTenantUnavailable, tenantState } from '../runtime/tenantState';
 const NOTICES: Readonly<Record<LoginNotice, string>> = {
     logged_out: 'Sie wurden abgemeldet.',
     session_expired: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
+    password_reset: 'Das Passwort wurde geändert. Bitte melden Sie sich mit dem neuen Passwort an.',
 };
 
 const base = currentAppBase();
@@ -138,7 +139,7 @@ async function onResend(): Promise<void> {
         <p
             v-if="notice !== null"
             class="notice"
-            :class="notice === 'logged_out' ? 'notice-success' : 'notice-info'"
+            :class="notice === 'session_expired' ? 'notice-info' : 'notice-success'"
             role="status"
             data-testid="login-notice"
         >
@@ -211,11 +212,21 @@ async function onResend(): Promise<void> {
             >
                 {{ submitLabel }}
             </button>
+            <RouterLink class="forgot" :to="{ name: 'password-forgot' }">
+                Passwort vergessen?
+            </RouterLink>
         </form>
     </div>
 </template>
 
 <style scoped>
+.forgot {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    min-height: var(--touch-min);
+}
+
 .login {
     display: flex;
     flex-direction: column;

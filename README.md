@@ -1187,7 +1187,9 @@ Rolle (User `suchen`, Admin und Super-Admin `dashboard`; beide vorerst Platzhalt
 Entscheidungen in `docs/frontend/KONZEPT.md`, "Anmeldung und Registrierung".
 
 Die Browser-Tests (Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build, den
-Playwright selbst mit `php -S localhost:4173` ausliefern lässt; die API wird simuliert, eine
+Playwright selbst mit `php -S localhost:4173` ausliefern lässt (unter Linux mit 4 PHP-Prozessen über
+`PHP_CLI_SERVER_WORKERS`; unter Windows gibt es das nicht, dort laufen höchstens 4 Tests
+gleichzeitig, sonst weist der eine PHP-Prozess Verbindungen ab, z. B. `NS_ERROR_CONNECTION_REFUSED`); die API wird simuliert, eine
 Datenbank ist nicht nötig. Jeder Konsolenfehler und jede Verletzung der Content-Security-Policy
 lässt einen Test scheitern.
 

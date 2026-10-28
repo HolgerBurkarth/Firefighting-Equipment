@@ -255,6 +255,19 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `AccountPanel`. Anmeldeseite: Formular ausgeblendet bei `tenant_not_found`/`tenant_inactive`,
   Passwort wird unverändert gesendet und nur bei `invalid_credentials` geleert, bei 429 Knopf mit
   Countdown bis `Retry-After`, bei `email_not_verified` „Bestätigungsmail erneut senden“.
+- Tokens und Einladungscodes aus Links (`#token=…`, `#code=…`) nur über `takeFragmentParam`
+  (`src/runtime/fragment.ts`): aus dem Fragment lesen, per POST senden, das Fragment sofort aus der
+  Adresszeile entfernen (per Browser-Test: keine angefragte Adresse enthält das Token).
+- Neue Passwörter (`NewPasswordField`, Live-Prüfung `src/auth/passwordRules.ts`): Regeln wie
+  `PasswordPolicy` OHNE Sperrliste (nur der Server, 422 `weak_password` am Feld). Absenden erst nach
+  bestandener Prüfung, daher nie strenger als der Server: gemeinsame Testfälle
+  `tests/Fixtures/password-policy-cases.json` (`server` = Ergebnis des Backends; bei `blocklist`
+  muss das Frontend `ok` liefern, sonst dasselbe), geprüft von `PasswordPolicyCasesTest` (PHPUnit,
+  echte Sperrliste) und `passwordRules.spec.ts` (Vitest, gleicht auch `MIN_LENGTH`, `MAX_LENGTH`,
+  `MIN_FRAGMENT_LENGTH` und `TENANT_STOPWORDS` mit dem PHP-Code ab). Änderungen an `PasswordPolicy`
+  daher immer mit `passwordRules.ts` und neuen Fällen in der Datei. Vergleichsform nur zerlegte
+  ä/ö/ü zusammensetzen, Kleinschreibung, ß = ss; keine allgemeine NFC-Normalisierung (das Backend
+  hat ohne intl keine). Länge in Unicode-Zeichen (`Array.from`), nicht UTF-16-Einheiten.
 - Service Worker `sw.js` (Workbox, `generateSW`), registriert aus dem Bundle (kein Inline-Skript),
   Scope `/firefighting/<bereich>/`, Rückfall auf `index.html` außer `api/` und
   `manifest.webmanifest`. Das Manifest liefert PHP (`manifest: false` im Plugin).
@@ -266,7 +279,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   ändernde Anfragen `http://localhost:5173` in `http.allowed_origins`).
 - Browser-Tests (Playwright: Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build,
   ausgeliefert von PHP (`php -q -S localhost:4173 public/index.php`, startet Playwright selbst), also
-  mit echter CSP und echtem Caching. API und Manifest simuliert `page.route()`
+  mit echter CSP und echtem Caching. `php -S` arbeitet Anfragen nacheinander ab und weist bei
+  Überlast Verbindungen ab: unter Linux (CI) daher `PHP_CLI_SERVER_WORKERS` = 4, unter Windows (dort
+  ohne Worker) höchstens 4 parallele Playwright-Worker (`playwright.config.ts`). Keine
+  automatischen Wiederholungen (`retries: 0`), sie würden zeitweise Fehler verdecken. API und Manifest simuliert `page.route()`
   (`tests/e2e/fixtures.ts`) mit denselben Bereichen wie die Routen in PHP (unter `service` nur
   `api/v1/app-icon/…`), eine Datenbank wird nicht gebraucht. Weitere Routen je Test über die
   Option `api` (`"METHODE pfad"` → Antwort, Funktion je Anfrage oder `'abort'` für einen

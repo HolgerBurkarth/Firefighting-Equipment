@@ -2,8 +2,8 @@ import { readonly, shallowRef } from 'vue';
 import type { ApiError } from '../api/client';
 import { fetchMe, logout as apiLogout, type AuthState } from '../api/auth';
 
-/** Hinweis für die Anmeldeseite nach Abmelden oder Ablauf der Sitzung. */
-export type LoginNotice = 'logged_out' | 'session_expired';
+/** Hinweis für die Anmeldeseite nach Abmelden, Ablauf der Sitzung oder neuem Passwort. */
+export type LoginNotice = 'logged_out' | 'session_expired' | 'password_reset';
 
 /** Wartezeiten zwischen erneuten Versuchen von auth/me; der letzte Wert wiederholt sich. */
 export const RETRY_DELAYS_MS: readonly number[] = [2000, 4000, 8000, 15000];

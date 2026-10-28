@@ -40,6 +40,19 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { public: true },
         },
         {
+            path: '/passwort-vergessen',
+            name: 'password-forgot',
+            component: () => import('../pages/PasswordForgotPage.vue'),
+            meta: { public: true },
+        },
+        {
+            // Name wie AppUrls::PASSWORD_RESET_PAGE (Link in der Mail).
+            path: '/passwort-zuruecksetzen',
+            name: 'password-reset',
+            component: () => import('../pages/PasswordResetPage.vue'),
+            meta: { public: true },
+        },
+        {
             path: '/dashboard',
             name: 'dashboard',
             component: () => import('../pages/DashboardPage.vue'),

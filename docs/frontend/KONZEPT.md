@@ -48,7 +48,7 @@ Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen")
 | `registrieren` | nur Stadt | Registrierung mit Einladungscode, Name, E-Mail, Passwort |
 | `email-bestaetigen` | nur Stadt | Mail-Link nach der Registrierung |
 | `passwort-vergessen` | Stadt und `service` | Link zum Zurücksetzen anfordern |
-| `passwort-zuruecksetzen` | Stadt und `service` | Mail-Link, neues Passwort setzen |
+| `passwort-zuruecksetzen` | Stadt und `service` | Mail-Link, neues Passwort setzen (Link 1 Stunde gültig; abgelaufen → „Neuen Link anfordern“) |
 | `einladung-annehmen` | nur Stadt | Mail-Link für neue Admins: Name und Passwort |
 | `suchen` | nur Stadt | Startseite des Users am Handy (vorerst Platzhalter) |
 | `dashboard` | Stadt und `service` | Startseite von Admin bzw. Super-Admin (vorerst Platzhalter) |
