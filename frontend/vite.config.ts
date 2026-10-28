@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { appBase } from './build/appBase.ts';
 import { buildId, buildInfo } from './build/buildInfo.ts';
+import { sanitizeFileName } from './build/fileNames.ts';
 
 /** PHP-Entwicklungsserver: php -S localhost:8000 public/index.php (im Hauptordner). */
 const PHP_DEV_SERVER = 'http://localhost:8000';
@@ -48,5 +49,7 @@ export default defineConfig({
         outDir: 'dist',
         emptyOutDir: true,
         target: ['es2022', 'safari16', 'firefox115', 'chrome111'],
+        // Namen wie FrontendAssets (PHP) sie ausliefert; per Browser-Test für jede Datei geprüft.
+        rolldownOptions: { output: { sanitizeFileName } },
     },
 });

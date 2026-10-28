@@ -1,4 +1,4 @@
-import { shallowRef } from 'vue';
+import { shallowRef, type InjectionKey } from 'vue';
 import { START_LOCATION, type Router } from 'vue-router';
 import { hasUnsavedInput } from './unsavedInput';
 
@@ -20,6 +20,11 @@ export const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 export const RELOAD_COOLDOWN_MS = 10 * 60 * 1000;
 /** So lange wird auf die Aktivierung des neuen Service Workers gewartet, dann trotzdem geladen. */
 export const ACTIVATION_TIMEOUT_MS = 5000;
+/**
+ * Höchstens so lange wartet der Start (und „Seite nicht gefunden“) auf die Build-Kennung des Servers;
+ * danach geht es ohne Ergebnis weiter (langsame Verbindung).
+ */
+export const START_CHECK_TIMEOUT_MS = 2000;
 /** Nachricht an den wartenden Service Worker (Workbox generateSW ohne skipWaiting). */
 export const SKIP_WAITING_MESSAGE = { type: 'SKIP_WAITING' } as const;
 export const RELOAD_STORAGE_KEY = 'ff-update-reloaded-at';
@@ -67,6 +72,8 @@ export class AppUpdater {
     readonly autoBlocked = shallowRef(false);
     private registration: UpdateRegistration | null = null;
     private applying = false;
+    /** In dieser Seite hat schon einmal ein anderer Service Worker übernommen (neue Version aktiv). */
+    private controllerChanged = false;
 
     constructor(private readonly env: UpdateEnvironment) {
         // Hat ein anderer Tab die neue Version aktiviert, läuft hier noch der alte Code unter dem
@@ -84,6 +91,7 @@ export class AppUpdater {
                 void this.compareBuild();
             }
             hadController = true;
+            this.controllerChanged = true;
         });
     }
 
@@ -122,9 +130,56 @@ export class AppUpdater {
         await this.compareBuild();
     }
 
+    /**
+     * Beim Start, bevor eine Seite angezeigt wird: Kommt die Seite aus dem Service Worker (also
+     * womöglich veraltet) und liefert der Server eine andere Version, sofort einmal neu laden, und
+     * zwar mit der vollständigen Adresse samt #token bzw. #code (noch hat keine Seite das Fragment
+     * entfernt). Schleifensperre wie beim Seitenwechsel. true = die App lädt neu.
+     */
+    async checkOnStart(
+        url: string,
+        registered: Promise<unknown> = Promise.resolve(),
+    ): Promise<boolean> {
+        // Registrierung abwarten (für das Aktivieren der neuen Version), aber nie unbegrenzt.
+        await this.withTimeout(registered);
+        if (this.env.container.controller === null || !this.env.isOnline()) {
+            return false;
+        }
+        const served = await this.withTimeout(this.env.fetchBuildId());
+        if (served === null || served === this.env.buildId) {
+            return false;
+        }
+        this.ready.value = true;
+        return this.applyOnNavigation(url);
+    }
+
+    /**
+     * Vor „Seite nicht gefunden“: Vielleicht kennt erst die neue Version die Seite. Ist eine da und
+     * nichts ungespeichert, sofort neu laden (Schleifensperre wie sonst). true = die App lädt neu.
+     */
+    async checkBeforeNotFound(url: string): Promise<boolean> {
+        await this.withTimeout(this.check());
+        if (hasUnsavedInput.value) {
+            return false;
+        }
+        return this.applyOnNavigation(url);
+    }
+
+    private withTimeout<T>(promise: Promise<T>): Promise<T | null> {
+        return Promise.race([
+            promise,
+            new Promise<null>((resolve) => {
+                this.env.setTimeout(() => {
+                    resolve(null);
+                }, START_CHECK_TIMEOUT_MS);
+            }),
+        ]);
+    }
+
     /** Liefert der Server eine andere Version als die laufende, ist ein Update da. */
     private async compareBuild(): Promise<void> {
-        if (!this.env.isOnline()) {
+        // Während des Neuladens nicht mehr fragen (der Browser bricht die Anfrage ohnehin ab).
+        if (this.applying || !this.env.isOnline()) {
             return;
         }
         const served = await this.env.fetchBuildId();
@@ -159,8 +214,28 @@ export class AppUpdater {
         }
         this.applying = true;
         this.rememberReload();
-        // Wird die neue Version gerade noch installiert, erst darauf warten: Sonst lieferte der alte
+        // Kennt der Service Worker die neue Version noch nicht (nur die Build-Kennung zeigte sie),
+        // erst danach fragen. Wird sie gerade installiert, darauf warten: Sonst lieferte der alte
         // Service Worker beim Neuladen wieder die alte Seite.
+        const registration = this.registration;
+        if (
+            registration !== null &&
+            registration.waiting === null &&
+            registration.installing === null
+        ) {
+            try {
+                await registration.update();
+            } catch {
+                // Ohne Verbindung trotzdem neu laden (die Schleifensperre greift).
+            }
+            // update() kann fertig sein, bevor der Browser die neue Version als „installing“ meldet
+            // (z. B. wenn er gerade selbst prüft). Hat noch kein neuer Service Worker diese Seite
+            // übernommen, auf die neue Version warten; sonst lieferte der alte beim Neuladen wieder
+            // die alte Seite, und die Schleifensperre verhinderte einen zweiten Versuch.
+            if (!this.controllerChanged) {
+                await this.newWorker(registration);
+            }
+        }
         await this.installed();
         const waiting = this.registration?.waiting ?? null;
         if (waiting !== null) {
@@ -177,9 +252,21 @@ export class AppUpdater {
         this.ready.value = true;
     }
 
+    private newWorker(registration: UpdateRegistration): Promise<void> {
+        if (registration.waiting !== null || registration.installing !== null) {
+            return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+            registration.addEventListener('updatefound', () => {
+                resolve();
+            });
+            this.env.setTimeout(resolve, ACTIVATION_TIMEOUT_MS);
+        });
+    }
+
     private installed(): Promise<void> {
-        const installing = this.registration?.installing ?? null;
-        if (installing === null) {
+        const installing = this.registration?.installing;
+        if (installing?.state !== 'installing') {
             return Promise.resolve();
         }
         return new Promise((resolve) => {
@@ -192,12 +279,22 @@ export class AppUpdater {
         });
     }
 
+    /** Fertig bei controllerchange oder sobald der Worker selbst übernimmt (auch schon vorher). */
     private activate(waiting: UpdateWorker): Promise<void> {
         return new Promise((resolve) => {
             const done = (): void => {
                 this.env.container.removeEventListener('controllerchange', done);
                 resolve();
             };
+            if (waiting.state === 'activating' || waiting.state === 'activated') {
+                done();
+                return;
+            }
+            waiting.addEventListener('statechange', () => {
+                if (waiting.state === 'activating' || waiting.state === 'activated') {
+                    done();
+                }
+            });
             this.env.container.addEventListener('controllerchange', done);
             this.env.setTimeout(done, ACTIVATION_TIMEOUT_MS);
             waiting.postMessage(SKIP_WAITING_MESSAGE);
@@ -224,6 +321,9 @@ export class AppUpdater {
     }
 }
 
+/** Für Seiten, die selbst prüfen (z. B. „Seite nicht gefunden“); in main.ts bereitgestellt. */
+export const UPDATER_KEY: InjectionKey<AppUpdater> = Symbol('AppUpdater');
+
 /** Hinweis oben: neue Version da, aber gerade nicht automatisch (Eingabe oder Schleifensperre). */
 export function updateNotice(updater: AppUpdater): 'unsaved' | 'blocked' | null {
     if (!updater.ready.value) {
@@ -236,12 +336,20 @@ export function updateNotice(updater: AppUpdater): 'unsaved' | 'blocked' | null 
 }
 
 /**
- * Beim Seitenwechsel auf eine andere Seite (anderer Pfad, nicht beim Start und nicht beim Entfernen
- * eines Fragments wie #token=…) die neue Version laden statt in der alten App weiterzublättern.
+ * Beim Seitenwechsel auf eine andere Seite (anderer Pfad, nicht beim Entfernen eines Fragments wie
+ * #token=…) die neue Version laden statt in der alten App weiterzublättern. Beim Start entscheidet
+ * `startup` (AppUpdater.checkOnStart): true = die App lädt neu, die erste Seite erscheint nicht.
  */
-export function installUpdateGuard(router: Router, updater: AppUpdater): void {
-    router.beforeEach((to, from) => {
-        if (from === START_LOCATION || to.path === from.path) {
+export function installUpdateGuard(
+    router: Router,
+    updater: AppUpdater,
+    startup: Promise<boolean> = Promise.resolve(false),
+): void {
+    router.beforeEach(async (to, from) => {
+        if (from === START_LOCATION) {
+            return !(await startup);
+        }
+        if (to.path === from.path) {
             return true;
         }
         const url = new URL(router.resolve(to).href, window.location.href).href;
@@ -319,7 +427,12 @@ export function browserUpdateEnvironment(buildId: string): UpdateEnvironment {
         now: () => Date.now(),
         isOnline: () => navigator.onLine,
         navigate: (url) => {
-            window.location.assign(url);
+            // Gleiche Adresse (auch mit #token=…): assign wäre nur ein Sprung zum Fragment.
+            if (url === window.location.href) {
+                window.location.reload();
+            } else {
+                window.location.assign(url);
+            }
         },
         setTimeout: (callback, ms) => window.setTimeout(callback, ms),
         buildId,

@@ -1,0 +1,1 @@
+import{ht as e,t,x as n}from"./plugin-vue_export-helper-CStXJJQD.js";var r={},i={class:`loading`,role:`status`};function a(t,r){return e(),n(`p`,i,`Wird geladen …`)}var o=t(r,[[`render`,a],[`__scopeId`,`data-v-70a9a5bb`]]);export{o as default};

@@ -1,1 +1,0 @@
-import{F as e,U as t,s as n}from"./index-krW-Cr2G.js";var r={},i={class:`loading`,role:`status`};function a(n,r){return t(),e(`p`,i,`Wird geladen …`)}var o=n(r,[[`render`,a],[`__scopeId`,`data-v-70a9a5bb`]]);export{o as default};

@@ -52,6 +52,17 @@ if (preg_match('#^/firefighting/[a-z0-9-]+/(api/.*|manifest\.webmanifest)$#', $p
     } elseif ($api[1] === 'manifest.webmanifest') {
         header('Content-Type: application/manifest+json; charset=utf-8');
         echo json_encode(['name' => 'Feuerwehr Test – Geräteverwaltung', 'start_url' => '.']);
+    } elseif ($api[1] === 'api/v1/auth/email/verify' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+        // Wie in appUpdate.spec.ts: nur das Token aus dem Mail-Link gilt (belegt, dass es nach dem
+        // Neuladen noch ankommt).
+        $body = json_decode((string) file_get_contents('php://input'), true);
+        header('Content-Type: application/json; charset=utf-8');
+        if (is_array($body) && ($body['token'] ?? null) === 'Upd8-Token_aus-der-Mail_0123456789abcdefghijk') {
+            echo json_encode(['message' => 'Ihre E-Mail-Adresse ist bestätigt.']);
+        } else {
+            http_response_code(400);
+            echo json_encode(['error' => 'invalid_token', 'message' => 'Link ungültig.']);
+        }
     } else {
         http_response_code(404);
         header('Content-Type: application/json; charset=utf-8');

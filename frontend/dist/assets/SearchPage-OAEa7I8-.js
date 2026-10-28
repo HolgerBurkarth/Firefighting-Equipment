@@ -1,1 +1,0 @@
-import{A as e,F as t,L as n,M as r,R as i,U as a,s as o}from"./index-krW-Cr2G.js";import{t as s}from"./AccountPanel-BAdFyIJc.js";var c=o(i({__name:`SearchPage`,setup(i){return(i,o)=>(a(),t(e,null,[o[0]||=r(`h1`,null,`Suchen`,-1),o[1]||=r(`p`,{class:`placeholder`},`Hier entsteht die Suche nach Geräten.`,-1),n(s)],64))}}),[[`__scopeId`,`data-v-3954207a`]]);export{c as default};

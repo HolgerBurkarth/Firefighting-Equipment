@@ -348,10 +348,54 @@ describe('AppUpdater: aktualisieren', () => {
         expect(s.navigated).toEqual(['https://x/a']);
     });
 
-    it('neue Version schon aktiv (kein wartender Worker): nur neu laden', async () => {
+    it('neue Version schon aktiv (ein Service Worker hat übernommen): sofort neu laden', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        s.container.emit('controllerchange');
+        await s.updater.apply('https://x/a');
+        expect(s.navigated).toEqual(['https://x/a']);
+        expect(s.timers).toEqual([]);
+    });
+
+    it('update() fertig, bevor die neue Version gemeldet wird: auf updatefound warten', async () => {
         const s = setup();
         s.served = NEW_BUILD;
         await s.updater.check();
+        const done = s.updater.apply('https://x/a');
+        await flush();
+        expect(s.navigated).toEqual([]);
+
+        const worker = new FakeWorker('installing');
+        activatesOnMessage(s, worker);
+        s.registration.installing = worker;
+        s.registration.emit('updatefound');
+        await flush();
+        s.registration.installing = null;
+        s.registration.waiting = worker;
+        worker.setState('installed');
+        await done;
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual(['https://x/a']);
+    });
+
+    it('keine neue Version gemeldet: nach der Frist trotzdem neu laden', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        await s.updater.check();
+        const done = s.updater.apply('https://x/a');
+        await flush();
+        expect(s.timers.map((t) => t.ms)).toEqual([ACTIVATION_TIMEOUT_MS]);
+        s.timers[0]?.callback();
+        await done;
+        expect(s.navigated).toEqual(['https://x/a']);
+    });
+
+    it('übernimmt der Worker schon selbst (activating), wird sofort geladen', async () => {
+        const s = setup();
+        const worker = installNewVersion(s);
+        worker.onMessage = () => {
+            worker.setState('activating');
+        };
         await s.updater.apply('https://x/a');
         expect(s.navigated).toEqual(['https://x/a']);
     });

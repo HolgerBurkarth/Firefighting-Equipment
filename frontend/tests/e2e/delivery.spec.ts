@@ -1,3 +1,6 @@
+import { readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from './fixtures';
 
 /** Auslieferung durch PHP (FrontendHandler), ohne Browser-Seite geprüft. */
@@ -59,5 +62,22 @@ test.describe('Symbole und Manifest durch PHP', () => {
         const manifest = await request.get('/firefighting/service/manifest.webmanifest');
         expect(manifest.status()).toBe(404);
         expect(await manifest.json()).toMatchObject({ error: 'not_found' });
+    });
+});
+
+test.describe('Jede Datei des Builds', () => {
+    test('liefert PHP aus (Namen passend zu FrontendAssets)', async ({ request }) => {
+        const dist = fileURLToPath(new URL('../../dist/', import.meta.url));
+        const files = readdirSync(dist, { recursive: true, withFileTypes: true })
+            .filter((entry) => entry.isFile())
+            .map((entry) =>
+                relative(dist, join(entry.parentPath, entry.name)).replaceAll('\\', '/'),
+            )
+            .filter((file) => file !== 'index.html');
+        expect(files.length).toBeGreaterThan(10);
+        for (const file of files) {
+            const response = await request.get(`/firefighting/test/${file}`);
+            expect(response.status(), file).toBe(200);
+        }
     });
 });

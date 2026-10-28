@@ -159,7 +159,17 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   keinen Fehler.
 - Ist eine neue Version da und kein Formular angefangen, aktualisiert die App beim nächsten
   Seitenwechsel unbemerkt: Statt in der alten Version weiterzublättern, lädt sie die Zielseite neu.
-  Nicht beim Start und nicht, wenn nur die Adresszeile bereinigt wird (z. B. `#token=…` entfernt).
+  Nicht, wenn nur die Adresszeile bereinigt wird (z. B. `#token=…` entfernt).
+- Beim Start: Kommt die Seite aus dem Service Worker (also womöglich veraltet), fragt die App vor der
+  ersten Seite die Kennung des Servers ab (höchstens 2 Sekunden, offline nicht). Ist eine neuere
+  Version da, lädt sie sofort einmal neu, mit der vollständigen Adresse samt `#token=…` bzw.
+  `#code=…`; das Fragment entfernt erst die neue Version. Grund (Live-Test): Ein Mail-Link öffnete
+  sich in einem Browser mit einer App von vor Schritt 4, die die Seite noch nicht kannte, und zeigte
+  „Seite nicht gefunden“. Eine frisch vom Server geladene Seite prüft beim Start nicht (sie ist
+  aktuell).
+- „Seite nicht gefunden“ prüft vor der Anzeige immer zuerst auf eine neue Version (vielleicht kennt
+  erst sie die Seite) und lädt sie dann sofort, sofern nichts ungespeichert ist.
+- Schleifensperre in allen Fällen gleich (10 Minuten je Tab), danach nur der Hinweis mit Knopf.
 - Ist ein Formular angefangen (z. B. Umbuchung, Registrierung), erscheint oben der Hinweis „Neue
   Version verfügbar – nach dem Speichern wird aktualisiert“ mit dem Knopf „Jetzt aktualisieren“.
   Aktualisiert wird beim nächsten Seitenwechsel (nach dem Speichern führt die App in der Regel auf
@@ -185,7 +195,9 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
 - Abgedeckte Fälle (Browser-Tests mit zwei echten Builds): ohne Eingabe automatisch beim
   Seitenwechsel; mit Eingabe Hinweis und Rückfrage; erster Besuch, Deploy noch vor der Installation
   des Service Workers; Seite per Strg+F5 geladen, neue Version übernimmt sie; zwei Tabs, einer
-  aktualisiert und der andere folgt beim nächsten Seitenwechsel; zwei Tabs, einer geschlossen.
+  aktualisiert und der andere folgt beim nächsten Seitenwechsel; zwei Tabs, einer geschlossen;
+  Mail-Link mit alter Version im Service Worker (neue Version lädt sofort, Token bleibt erhalten und
+  wird verarbeitet); „Seite nicht gefunden“ nach einem Deploy.
 - Veraltete App gegen geänderte API: Die App nennt bei jedem Aufruf ihre Vertragsnummer
   (`X-Client-Api`). Später kann der Server eine zu alte App ablehnen („Diese Version ist veraltet –
   bitte aktualisieren“); Plan und Regeln in CLAUDE.md, "Versionierung der API für das Frontend".

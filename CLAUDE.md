@@ -219,7 +219,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `CacheableResponse` ergänzen). Einzige Ausnahme ohne Endung in der Liste: genau
   `FrontendAssets::BUILD_INFO_FILE` (`build.json`, nur direkt in `frontend/dist`, nicht in `assets/`,
   `application/json; charset=utf-8`; per Test gleich mit `BUILD_INFO_FILE` in
-  `frontend/build/buildInfo.ts`); andere `.json` bleiben 404.
+  `frontend/build/buildInfo.ts`); andere `.json` bleiben 404. Dateinamen des Builds folgen
+  derselben Regel (`frontend/build/fileNames.ts`, `sanitizeFileName` in `vite.config.ts`; z. B. wird
+  Vues `_plugin-vue_export-helper` zu `plugin-vue_export-helper`, sonst 404); `delivery.spec.ts`
+  ruft jede Datei des Builds über PHP ab.
 - Basispfad: `index.html` des Builds enthält genau einmal `<base href="/__FF_BASE__/" />`
   (`FrontendAssets::BASE_PLACEHOLDER` = `BASE_PLACEHOLDER` in `frontend/build/appBase.ts`, per Test
   gleich). PHP ersetzt ihn durch `AppPath::PREFIX/<bereich>/` (HTML-maskiert). Ein Build für alle
@@ -313,8 +316,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `skipWaiting: true`: die laufende App bräuchte sonst gelöschte Teile). Prüfen
   (`registration.update()`) beim Start, bei `visibilitychange` (sichtbar) und stündlich, offline
   nie, Fehler still. Aktualisiert wird beim nächsten Seitenwechsel auf einen anderen Pfad
-  (`installUpdateGuard`; nicht beim Start, nicht bei gleichem Pfad wie beim Entfernen von
-  `#token=…`) oder per Knopf „Jetzt aktualisieren“ im Hinweis von `App.vue` (nur mit ungespeicherten
+  (`installUpdateGuard`; nicht bei gleichem Pfad wie beim Entfernen von `#token=…`), beim Start
+  (`checkOnStart`, vor der ersten Seite; nur wenn ein Service Worker die Seite liefert, Kennung aus
+  `build.json` höchstens `START_CHECK_TIMEOUT_MS` = 2 s abwarten, Registrierung ebenso; neu geladen
+  wird die vollständige Startadresse samt Fragment, bei gleicher Adresse per `location.reload()`, da
+  `assign` nur zum Fragment springen würde), vor „Seite nicht gefunden“ (`checkBeforeNotFound`, über
+  `UPDATER_KEY` per `inject`) oder per Knopf „Jetzt aktualisieren“ im Hinweis von `App.vue` (nur mit ungespeicherten
   Eingaben oder während der Sperre; mit ungespeicherten Eingaben erst nach der Rückfrage „Ihre
   Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?“, Standard „Abbrechen“). Gegen Schleifen: nach einem automatischen Neuladen 10 Minuten
   keines mehr (`RELOAD_COOLDOWN_MS`, sessionStorage je Tab). Die erste Übernahme nach der Installation
@@ -323,8 +330,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (vom Plugin `frontend/build/buildInfo.ts` in den Build gelegt, `fetch` mit `cache: 'no-store'`) mit
   `BUILD_ID`: verschieden = Update, unabhängig vom Zustand des Service Workers (sonst bliebe z. B. eine
   per Strg+F5 geladene Seite, die der neue Service Worker übernimmt, dauerhaft alt). Beim
-  Aktualisieren wartet die App erst auf eine noch laufende Installation, dann `SKIP_WAITING`, dann
-  Neuladen. Ohne Service Worker gilt nur die Kennung. Fehlende Teile nach einem Deploy
+  Aktualisieren fragt die App den Service Worker (`update()`), wartet, falls noch kein neuer Service
+  Worker diese Seite übernommen hat, auf die neue Version (`updatefound`, `update()` kann vorher
+  fertig sein) und ihre Installation, dann `SKIP_WAITING` (fertig bei `controllerchange` oder
+  Zustand `activating`/`activated`), dann Neuladen; jede Wartezeit höchstens
+  `ACTIVATION_TIMEOUT_MS`. Während des Neuladens keine weiteren Abfragen. Ohne Service Worker gilt
+  nur die Kennung. Mail-Links öffnen sich im Test in einem zweiten Tab (wie aus einem
+  Mailprogramm): Ein Seitenwechsel mitten in einer Anfrage meldet WebKit als Skriptfehler. Fehlende Teile nach einem Deploy
   (`isChunkLoadError`) → Zielseite einmal neu laden. Was ein Neuladen überstehen muss (z. B. der
   Hinweis der Anmeldeseite in `session.ts`), steht in sessionStorage.
 - Regel für ALLE Formulare: ungespeicherte Eingaben über `useUnsavedInput(() => …)`

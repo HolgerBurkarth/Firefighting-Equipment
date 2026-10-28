@@ -11,6 +11,7 @@ import { currentAppBase } from './runtime/appBase';
 import { linkManifest } from './runtime/appearance';
 import {
     AppUpdater,
+    UPDATER_KEY,
     browserUpdateEnvironment,
     installUpdateGuard,
     startUpdateChecks,
@@ -31,17 +32,29 @@ if (!base.isService) {
 // Kennung des Builds (Support, Browser-Tests der Updates).
 document.documentElement.dataset['build'] = BUILD_ID;
 
+// Adresse beim Start samt #token=… bzw. #code=… (die Seiten entfernen das Fragment erst danach).
+const startUrl = window.location.href;
 const updater = new AppUpdater(browserUpdateEnvironment(BUILD_ID));
 const router = createAppRouter(base);
-installUpdateGuard(router, updater);
 
-createApp(App, { base, updater }).use(router).mount('#app');
+// Service Worker vor der ersten Seite registrieren: Der Start prüft, ob die Seite aus seinem Cache
+// veraltet ist, und lädt dann sofort die neue Version (KONZEPT.md, "Updates der App").
+const registered = import.meta.env.PROD
+    ? registerServiceWorker(base).then((registration) => {
+          if (registration !== null) {
+              updater.attach(registration);
+          }
+      })
+    : Promise.resolve();
+const startup = import.meta.env.PROD
+    ? updater.checkOnStart(startUrl, registered)
+    : Promise.resolve(false);
+installUpdateGuard(router, updater, startup);
+
+createApp(App, { base, updater }).provide(UPDATER_KEY, updater).use(router).mount('#app');
 
 if (import.meta.env.PROD) {
-    void registerServiceWorker(base).then((registration) => {
-        if (registration !== null) {
-            updater.attach(registration);
-        }
+    void startup.then(() => {
         startUpdateChecks(router, updater);
     });
 }
