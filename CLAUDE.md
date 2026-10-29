@@ -1160,6 +1160,30 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Konstruktor (`backup`) bzw. einen temporären Ordner (`backupDir`); sie vergleichen alle Zeilen
   aller Tabellen `fe_*` vorher und nachher.
 
+### Testdaten der Test-Stadt (`bin/seed-test-city.php`)
+- `php bin/seed-test-city.php --slug=test [--devices=ANZAHL] [--execute] [--config=PFAD]` (Code
+  `src/Cli/SeedTestCityCommand.php`, `src/Device/Seed/`: `TestCityData` Datenplan ohne Zufall,
+  `TestCitySeeder` schreibt, `SeedDevice`, `SeedStep`, `TestCitySeedResult`,
+  `TestCitySeedException`). Exit-Codes 0/1/2. README "Testdaten für die Test-Stadt".
+- AUSSCHLIESSLICH das Kürzel `TestCityData::SLUG` = `test`: exakter Vergleich in `parseArguments`,
+  vor dem Laden der Konfiguration (jedes andere Kürzel → Exit-Code 2). Fest im Code; es darf keine
+  Option, Konfiguration oder Liste geben, die weitere Städte zulässt.
+- Nur in eine Stadt ohne Geräte und Standorte (sonst Exit-Code 1 mit Hinweis auf
+  `purge-device-data`); braucht einen aktiven, nicht gesperrten Admin (legt an mit Kommentar
+  `Testdaten`, sondert aus); der Verlauf (`changeState`) reihum von allen aktiven, nicht gesperrten
+  Konten. Ohne `--execute` Probelauf. Schreibt NUR über die Repositorys (Ereignisse, Versionen,
+  Sperren wie im Betrieb), nie per SQL; keine Mails; Zeitpunkte = Zeit des Aufrufs (die Historie
+  wird nicht zurückdatiert, sie ist nur `INSERT`).
+- Inhalt: 15 Standorte, 60 ausgesuchte Geräte (`TestCityData::devices`) mit Scan-Codes (auch GS1
+  mit GS), Prüfdaten relativ zu heute (`Clock`, Europe/Berlin), Geräten auf dem ganzen Fahrzeug,
+  Verlauf an 7 Geräten, M24 ausgesondert; `--devices=1…5000`: Geräte T0001 …, Verlauf an
+  T0001–T0006, T0007 ausgesondert. Gerätetypen aus den Start-Gerätetypen (fehlt einer oder ist er
+  deaktiviert → Abbruch).
+- Agenten führen den Befehl nur in Tests gegen die Testdatenbank aus
+  (`tests/Integration/Device/SeedTestCityCommandTest`, `FixedClock`; Unit-Tests
+  `tests/Unit/Device/Seed/TestCityDataTest`, `tests/Unit/Cli/SeedTestCityScriptTest`), nie gegen
+  `config.local.php`; live führt ihn nur der Nutzer aus.
+
 ## Gerätetypen und Standorte (API)
 - Nur unter Städten (unter `service` gibt es die Routen nicht, 404). Lesen: `Access::Authenticated`
   (`user` und `admin` der Stadt), Ändern: `Access::Admin`. Code in `src/Device/` (`DeviceTypeName`
