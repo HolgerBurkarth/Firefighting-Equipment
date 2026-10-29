@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ApiResult } from '../../src/api/client';
 import type { DevicePage, DevicePageQuery } from '../../src/api/devices';
 import { DeviceStore, MAX_LOCAL_DEVICES } from '../../src/data/deviceStore';
-import { device, devices, pagedSource } from './support/devices';
+import { device, deviceJson, devices, pagedSource } from './support/devices';
 
 const NETWORK: ApiResult<never> = {
     ok: false,
@@ -255,5 +255,80 @@ describe('DeviceStore: Suche auf dem Server und einzelne Geräte', () => {
         await store.refresh('open');
         expect((await store.findMany([5, 3, 4, 1])).map((d) => d.id)).toEqual([5, 1]);
         expect(asked).toEqual([5, 3, 4, 1]);
+    });
+});
+
+describe('DeviceStore: Buchen', () => {
+    const RESULT = {
+        outcome: 'applied',
+        outcomeLabel: 'übernommen',
+        reason: null,
+        reasonLabel: null,
+        message: 'Übernommen.',
+        staleConfirmed: false,
+        clientRef: 'ref-1',
+        replayed: false,
+        noticeId: null,
+    } as const;
+
+    it('Erfolg: neuer Stand sofort in der Liste, danach neu geladen', async () => {
+        const source = pagedSource(devices(1, 3));
+        const booked = device(2, { version: 2, status: 'defective', status_label: 'defekt' });
+        const sent: unknown[] = [];
+        const store = new DeviceStore(source.fetchPage, undefined, undefined, (id, request) => {
+            sent.push([id, request]);
+            return Promise.resolve({
+                ok: true,
+                status: 200,
+                data: { device: booked, result: RESULT },
+            });
+        });
+        await store.refresh('open');
+        source.set([device(1), booked, device(3)]);
+        const result = await store.book(2, { version: 1, status: 'defective', clientRef: 'ref-1' });
+        expect(result.ok).toBe(true);
+        expect(sent).toEqual([[2, { version: 1, status: 'defective', clientRef: 'ref-1' }]]);
+        expect(store.find(2)?.status).toBe('defective');
+        // Eigene Änderung: Die Liste lädt sofort neu (ohne Mindestabstand).
+        await store.refresh('open');
+        expect(source.calls).toHaveLength(2);
+    });
+
+    it('Konflikt: aktueller Stand aus details.device in der Liste, kein Neuladen', async () => {
+        const source = pagedSource(devices(1, 3));
+        const store = new DeviceStore(source.fetchPage, undefined, undefined, () =>
+            Promise.resolve({
+                ok: false,
+                error: {
+                    code: 'version_conflict',
+                    message: 'Geändert.',
+                    status: 409,
+                    retryAfterSeconds: null,
+                    details: {
+                        device: deviceJson(2, {
+                            version: 4,
+                            status: 'maintenance',
+                            status_label: 'in Wartung',
+                        }),
+                    },
+                },
+            }),
+        );
+        await store.refresh('open');
+        const result = await store.book(2, { version: 1, status: 'defective', clientRef: 'ref-1' });
+        expect(result.ok).toBe(false);
+        expect(store.find(2)?.version).toBe(4);
+        expect(store.find(2)?.status).toBe('maintenance');
+        expect(source.calls).toHaveLength(1);
+    });
+
+    it('fetchCurrent übernimmt den Stand vom Server', async () => {
+        const store = new DeviceStore(pagedSource(devices(1, 3)).fetchPage, undefined, (id) =>
+            Promise.resolve({ ok: true, status: 200, data: device(id, { version: 5 }) }),
+        );
+        await store.refresh('open');
+        const result = await store.fetchCurrent(3);
+        expect(result.ok && result.data.version).toBe(5);
+        expect(store.find(3)?.version).toBe(5);
     });
 });

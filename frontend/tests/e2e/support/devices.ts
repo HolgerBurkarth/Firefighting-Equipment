@@ -57,3 +57,56 @@ export function devicesEndpoint(
 
 /** Leere Geräteliste für Tests, die „Suchen“ nur durchlaufen (die Seite lädt immer die Liste). */
 export const NO_DEVICES = { 'GET api/v1/devices': devicesEndpoint([]) } as const;
+
+/** GET api/v1/devices/{id} für die Umbuchen-Ansicht (Antwort mit allen Feldern, hier die der Liste). */
+export function deviceDetail(device: Record<string, unknown>): Record<string, MockResponse> {
+    return { [`GET api/v1/devices/${String(device['id'])}`]: { status: 200, body: { device } } };
+}
+
+/** Standort wie LocationJson in PHP (Ebene 1 mit Unterstandorten). */
+export function locationJson(
+    id: number,
+    name: string,
+    children: readonly { id: number; name: string }[] = [],
+    kind: 'vehicle' | 'room' | 'external' = 'vehicle',
+): Record<string, unknown> {
+    const labels = { vehicle: 'Fahrzeug', room: 'Raum/Lager', external: 'Extern' };
+    return {
+        id,
+        name,
+        kind,
+        kind_label: labels[kind],
+        level: 1,
+        parent_id: null,
+        active: true,
+        device_count: 0,
+        device_count_total: 0,
+        children: children.map((child) => ({
+            id: child.id,
+            name: child.name,
+            kind,
+            kind_label: labels[kind],
+            level: 2,
+            parent_id: id,
+            active: true,
+            device_count: 0,
+        })),
+    };
+}
+
+/** Standortbaum der Tests: HLF 20 mit G1 (11) und G2 (12), LF 10 (20), Lager (30). */
+export const LOCATIONS = {
+    'GET api/v1/locations': {
+        status: 200,
+        body: {
+            locations: [
+                locationJson(10, 'HLF 20', [
+                    { id: 11, name: 'G1' },
+                    { id: 12, name: 'G2' },
+                ]),
+                locationJson(20, 'LF 10'),
+                locationJson(30, 'Lager', [], 'room'),
+            ],
+        },
+    },
+} as const;

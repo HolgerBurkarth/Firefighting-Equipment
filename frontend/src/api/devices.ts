@@ -158,3 +158,125 @@ export function fetchDevice(
         ...(fetchFn && { fetchFn }),
     });
 }
+
+/** Status, die ein User setzen darf (POST devices/{id}/state; aussondern nur der Admin). */
+export type BookableStatus = Exclude<DeviceStatus, 'retired'>;
+
+export const BOOKABLE_STATUSES: readonly BookableStatus[] = ['ready', 'maintenance', 'defective'];
+
+/** Bezeichnungen wie DeviceStatus::label() in PHP. */
+export const STATUS_LABELS: Readonly<Record<DeviceStatus, string>> = {
+    ready: 'einsatzbereit',
+    maintenance: 'in Wartung',
+    defective: 'defekt',
+    retired: 'ausgesondert',
+};
+
+/** Ergebnis wie BookingOutcome in PHP. */
+export type BookingOutcome = 'applied' | 'unchanged' | 'history_only' | 'not_applied';
+
+const OUTCOMES: readonly BookingOutcome[] = ['applied', 'unchanged', 'history_only', 'not_applied'];
+
+function isOutcome(value: unknown): value is BookingOutcome {
+    return typeof value === 'string' && (OUTCOMES as readonly string[]).includes(value);
+}
+
+/** Feld `result` von POST devices/{id}/state (DeviceBookingJson). */
+export interface BookingResult {
+    readonly outcome: BookingOutcome;
+    readonly outcomeLabel: string;
+    readonly reason: string | null;
+    readonly reasonLabel: string | null;
+    /** Deutscher Satz mit dem Ergebnis. */
+    readonly message: string;
+    readonly staleConfirmed: boolean;
+    readonly clientRef: string | null;
+    /** true: dieselbe Buchung war schon angekommen, nichts wurde erneut geschrieben. */
+    readonly replayed: boolean;
+    readonly noticeId: number | null;
+}
+
+export interface BookingResponse {
+    readonly device: DeviceListItem;
+    readonly result: BookingResult;
+}
+
+export function parseBookingResponse(json: unknown): BookingResponse | null {
+    if (!isRecord(json) || !isRecord(json['result'])) {
+        return null;
+    }
+    const device = parseDeviceListItem(json['device']);
+    const result = json['result'];
+    const { outcome, message, replayed } = result;
+    const outcomeLabel = result['outcome_label'];
+    const reason = nullableString(result['reason']);
+    const reasonLabel = nullableString(result['reason_label']);
+    const staleConfirmed = result['stale_confirmed'];
+    const clientRef = nullableString(result['client_ref']);
+    const noticeId = result['notice_id'];
+    if (
+        device === null ||
+        !isOutcome(outcome) ||
+        typeof outcomeLabel !== 'string' ||
+        reason === undefined ||
+        reasonLabel === undefined ||
+        typeof message !== 'string' ||
+        typeof staleConfirmed !== 'boolean' ||
+        clientRef === undefined ||
+        typeof replayed !== 'boolean' ||
+        !(noticeId === null || isId(noticeId))
+    ) {
+        return null;
+    }
+    return {
+        device,
+        result: {
+            outcome,
+            outcomeLabel,
+            reason,
+            reasonLabel,
+            message,
+            staleConfirmed,
+            clientRef,
+            replayed,
+            noticeId,
+        },
+    };
+}
+
+/** Body von POST devices/{id}/state (online, also ohne `occurred_at`). */
+export interface StateChangeRequest {
+    /** Version des Geräts, auf der die Änderung beruht (veraltet → 409 version_conflict). */
+    readonly version: number;
+    readonly locationId?: number;
+    readonly status?: BookableStatus;
+    readonly comment?: string;
+    /** UUID v4 gegen doppelte Wirkung beim erneuten Senden. */
+    readonly clientRef: string;
+}
+
+/** POST devices/{id}/state: Umbuchen und/oder Status setzen. */
+export function postDeviceState(
+    id: number,
+    request: StateChangeRequest,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<BookingResponse>> {
+    return apiRequest(`devices/${String(id)}/state`, parseBookingResponse, {
+        method: 'POST',
+        body: {
+            version: request.version,
+            ...(request.locationId !== undefined && { location_id: request.locationId }),
+            ...(request.status !== undefined && { status: request.status }),
+            ...(request.comment !== undefined && { comment: request.comment }),
+            client_ref: request.clientRef,
+        },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** Aktueller Stand aus 409 version_conflict (`details.device`), sonst null. */
+export function conflictDevice(
+    details: Readonly<Record<string, unknown>> | null,
+): DeviceListItem | null {
+    return details === null ? null : parseDeviceListItem(details['device']);
+}

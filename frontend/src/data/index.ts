@@ -2,7 +2,9 @@ import { onSessionEnded, session } from '../auth/session';
 import { browserStorage } from '../runtime/theme';
 import { DeviceStore } from './deviceStore';
 import { LocationStore } from './locationStore';
+import { setBookingNotice } from './booking';
 import { addRecent, clearRecent, loadRecent } from './recentDevices';
+import { recentLocations } from './recentLocations';
 
 /**
  * Zentrale Datenschicht (KONZEPT.md, "User am Handy – Entscheidungen", 13): Geräte und Standorte
@@ -20,6 +22,18 @@ export function recentDeviceIds(storage = browserStorage()): number[] {
 export function rememberDevice(id: number, storage = browserStorage()): void {
     if (session.value !== null) {
         addRecent(storage, session.value, id);
+    }
+}
+
+/** Zuletzt benutzte Ziele beim Umbuchen (höchstens 3), neueste zuerst (ohne Sitzung leer). */
+export function recentLocationIds(storage = browserStorage()): number[] {
+    return session.value === null ? [] : recentLocations.load(storage, session.value);
+}
+
+/** Eigenes Ziel einer Umbuchung: nach vorn unter die zuletzt benutzten Standorte. */
+export function rememberLocation(id: number, storage = browserStorage()): void {
+    if (session.value !== null) {
+        recentLocations.add(storage, session.value, id);
     }
 }
 
@@ -42,9 +56,12 @@ export function installDataLayer(
         for (const store of stores) {
             store.clear();
         }
-        // „Zuletzt benutzt“ gilt je Konto über Sitzungen hinweg; nur Abmelden löscht es.
+        setBookingNotice(null);
+        // „Zuletzt benutzt“ (Geräte, Standorte) gilt je Konto über Sitzungen hinweg; nur Abmelden
+        // löscht es.
         if (reason === 'logout') {
             clearRecent(storage, ended);
+            recentLocations.clear(storage, ended);
         }
     });
     const onVisibility = (): void => {

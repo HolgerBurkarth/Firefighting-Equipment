@@ -6,6 +6,7 @@ import type { DeviceListItem } from '../api/devices';
 import DeviceCard from '../components/DeviceCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import { deviceStore, recentDeviceIds } from '../data';
+import { takeBookingNotice } from '../data/booking';
 import {
     findByCode,
     MAX_SEARCH_HITS,
@@ -23,6 +24,8 @@ const input = useTemplateRef<HTMLInputElement>('input');
 const query = ref('');
 /** Nach Enter ohne eindeutigen Treffer (wie ein Scan ohne Treffer). */
 const notFound = ref(false);
+/** Ergebnis der eben gespeicherten Buchung (Entscheidung 22), bis zur nächsten Eingabe. */
+const bookingNotice = shallowRef(takeBookingNotice());
 
 const list = computed(() => deviceStore.state);
 const hasQuery = computed(() => searchTokens(query.value).length > 0);
@@ -101,6 +104,7 @@ onBeforeUnmount(() => {
 
 function onInput(): void {
     notFound.value = false;
+    bookingNotice.value = null;
 }
 
 function openDevice(device: DeviceListItem): void {
@@ -176,6 +180,20 @@ function retry(): void {
             />
         </label>
     </form>
+
+    <p
+        v-if="bookingNotice !== null"
+        class="notice"
+        :class="bookingNotice.kind === 'success' ? 'notice-success' : 'notice-info'"
+        role="status"
+        data-testid="booking-notice"
+    >
+        <!-- Eine Zeile: .notice stapelt seine Kinder. -->
+        <span
+            ><span v-if="bookingNotice.kind === 'success'" aria-hidden="true">✓ </span
+            >{{ bookingNotice.text }}</span
+        >
+    </p>
 
     <p v-if="notFound" class="notice notice-info" role="status" data-testid="search-not-found">
         Kein Gerät mit diesem Code gefunden.

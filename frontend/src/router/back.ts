@@ -12,3 +12,18 @@ export async function goBack(router: Router, fallback: RouteLocationRaw): Promis
     }
     await router.push(fallback);
 }
+
+/**
+ * Nach dem Speichern zu einer festen Seite (z. B. „Suchen“, KONZEPT.md, "User am Handy –
+ * Entscheidungen", 22): War sie die vorige Seite, zurück wie der Knopf des Browsers (sonst stünde
+ * sie zweimal in der Historie und Zurück führte wieder zum Formular); sonst ersetzt sie die
+ * aktuelle Seite.
+ */
+export async function returnTo(router: Router, name: string): Promise<void> {
+    const back: unknown = router.options.history.state['back'];
+    if (typeof back === 'string' && router.resolve(back).name === name) {
+        router.back();
+        return;
+    }
+    await router.replace({ name });
+}

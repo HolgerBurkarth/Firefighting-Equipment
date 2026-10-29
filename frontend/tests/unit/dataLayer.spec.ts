@@ -10,7 +10,14 @@ import {
     type SessionEndReason,
 } from '../../src/auth/session';
 import { DeviceStore } from '../../src/data/deviceStore';
-import { installDataLayer, recentDeviceIds, rememberDevice } from '../../src/data';
+import {
+    installDataLayer,
+    recentDeviceIds,
+    recentLocationIds,
+    rememberDevice,
+    rememberLocation,
+} from '../../src/data';
+import { setBookingNotice, takeBookingNotice } from '../../src/data/booking';
 import { LocationStore } from '../../src/data/locationStore';
 import { devices, pagedSource } from './support/devices';
 import { respond } from './support/fetch';
@@ -185,6 +192,31 @@ describe('installDataLayer', () => {
         expect(await logout(respond(200, { logged_out: true }).fetch)).toBeNull();
         setSession(account(7));
         expect(recentDeviceIds(window.localStorage)).toEqual([]);
+    });
+
+    it('Zuletzt benutzte Standorte: wie „Zuletzt benutzt“ nur beim Abmelden gelöscht', async () => {
+        const deviceStore = new DeviceStore(pagedSource([]).fetchPage);
+        uninstall = installDataLayer(document, [deviceStore], window.localStorage);
+        setSession(account(7));
+        rememberLocation(11, window.localStorage);
+        rememberLocation(20, window.localStorage);
+        expect(recentLocationIds(window.localStorage)).toEqual([20, 11]);
+
+        resetSession();
+        setSession(account(7));
+        expect(recentLocationIds(window.localStorage)).toEqual([20, 11]);
+
+        expect(await logout(respond(200, { logged_out: true }).fetch)).toBeNull();
+        setSession(account(7));
+        expect(recentLocationIds(window.localStorage)).toEqual([]);
+    });
+
+    it('Ende der Sitzung verwirft die Bestätigung einer Buchung', () => {
+        uninstall = installDataLayer(document, [], window.localStorage);
+        setSession(account(7));
+        setBookingNotice({ kind: 'success', text: 'M1 → LF 10 · defekt' });
+        resetSession();
+        expect(takeBookingNotice()).toBeNull();
     });
 
     it('ohne Sitzung kein „Zuletzt benutzt“', () => {

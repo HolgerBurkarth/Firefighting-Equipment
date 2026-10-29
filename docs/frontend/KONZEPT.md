@@ -54,7 +54,7 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `suchen` | nur Stadt | Startseite des Users am Handy (vorerst Platzhalter) |
 | `prueffristen` | nur Stadt | Prüffristen am Handy (vorerst Platzhalter) |
 | `profil` | nur Stadt | Profil am Handy (vorerst Platzhalter mit Abmelden) |
-| `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts (vorerst Platzhalter) |
+| `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts (Standortwahl und Details folgen) |
 | `dashboard` | Stadt und `service` | Startseite von Admin bzw. Super-Admin (vorerst Platzhalter) |
 
 `/` ist nur eine Weiche: ohne Sitzung zur Anmeldung, sonst zur Startseite der Rolle.
@@ -352,7 +352,10 @@ Live-Test von Schritt 1.
     Bibliothek (der eingebaute Scanner fehlt in Safari); die CSP wird nur so weit wie nötig
     erweitert.
 18. **Kommentar:** Bei „defekt“ Pflicht, mindestens 5 Zeichen (prüft nur die Oberfläche). Bei
-    „einsatzbereit“ und „in Wartung“ freiwillig.
+    „einsatzbereit“ und „in Wartung“ freiwillig. Umgesetzt: Pflicht nur, wenn der Status auf
+    „defekt“ wechselt (ein neuer Defekt); ein schon defektes Gerät z. B. in die Werkstatt umbuchen
+    geht ohne Kommentar. Der Kommentar ist einzeilig (Zeilenumbrüche werden zu Leerzeichen),
+    höchstens 500 Zeichen.
 19. **Admins** dürfen alle Handy-Seiten öffnen (`suchen`, `prueffristen`, `profil`, `geraete/…`);
     ihre Startseite bleibt `dashboard`. In der Leiste unten steht für sie zusätzlich „Dashboard“
     (vorne), damit sie zurück in die Admin-Konsole kommen.
@@ -361,9 +364,15 @@ Live-Test von Schritt 1.
     „weiter eingrenzen“. Dafür liefert `GET devices` zusätzlich `serial_number`, `manufacturer`
     und `model`.
 21. **Zuletzt benutzte Standorte** (Umbuchen): die letzten 3 eigenen Ziele, lokal je Konto, beim
-    Abmelden gelöscht.
+    Abmelden gelöscht. Umgesetzt: zur Auswahl stehen der aktuelle Standort und diese Ziele, soweit
+    nicht gesperrt; „Anderen Standort suchen …“ kommt mit der Standortwahl.
 22. **Nach dem Speichern** geht es zurück zu „Suchen“ mit grüner Bestätigung (z. B.
-    „M1 → HLF 20 / G2 · einsatzbereit“).
+    „M1 → HLF 20 / G2 · einsatzbereit“). Umgesetzt: Die Bestätigung bleibt bis zur nächsten
+    Eingabe stehen und übersteht ein Update beim Seitenwechsel. Hat sich das Gerät inzwischen
+    geändert (jemand anderes hat gebucht), zeigt die Ansicht den neuen Stand; die eigene Auswahl
+    bleibt, nicht geänderte Felder übernehmen den neuen Stand, gespeichert wird erst nach erneutem
+    Tippen auf „Speichern“. Jede Buchung trägt eine `client_ref`; wird sie nach einem
+    Verbindungsfehler erneut gesendet, wirkt sie nicht doppelt.
 23. **Auffrischen** beim Zurückwechseln in die App höchstens alle 30 Sekunden.
 24. **Enter im Suchfeld** (z. B. USB-Barcode-Scanner am PC) wirkt wie ein Scan: Ein eindeutiger
     Treffer öffnet das Gerät. Umgesetzt: zuerst Scan-Code bzw. Kennung genau, sonst genau ein

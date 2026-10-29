@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+    conflictDevice,
     fetchDevicePage,
+    parseBookingResponse,
+    postDeviceState,
     parseDeviceListItem,
     parseDevicePage,
     DEVICE_PAGE_LIMIT,
@@ -122,5 +125,80 @@ describe('fetchDevicePage', () => {
         const { fetch } = respond(200, { devices: 'x' });
         const result = await fetchDevicePage({ limit: 200, offset: 0 }, fetch);
         expect(result.ok ? null : result.error.code).toBe('invalid_response');
+    });
+});
+
+describe('Buchung (POST devices/{id}/state)', () => {
+    const RESULT = {
+        outcome: 'applied',
+        outcome_label: 'übernommen',
+        reason: null,
+        reason_label: null,
+        message: 'Übernommen. „M5“ ist jetzt: HLF 20 / G2, defekt.',
+        stale_confirmed: false,
+        client_ref: '3f2b8c1e-5d4a-4b6f-9c2d-1a2b3c4d5e6f',
+        replayed: false,
+        notice_id: null,
+    };
+
+    it('sendet nur die geänderten Felder mit client_ref', async () => {
+        const { fetch, requests } = respond(200, {
+            device: deviceJson(5, { status: 'defective', status_label: 'defekt', version: 3 }),
+            result: RESULT,
+        });
+        const result = await postDeviceState(
+            5,
+            { version: 2, status: 'defective', comment: 'Ventil undicht', clientRef: 'ref-1' },
+            fetch,
+        );
+        expect(requests).toHaveLength(1);
+        expect(requests[0]?.url).toMatch(/\/api\/v1\/devices\/5\/state$/);
+        expect(requests[0]?.method).toBe('POST');
+        expect(requests[0]?.body).toEqual({
+            version: 2,
+            status: 'defective',
+            comment: 'Ventil undicht',
+            client_ref: 'ref-1',
+        });
+        expect(result.ok && result.data.device.version).toBe(3);
+        expect(result.ok && result.data.result).toEqual({
+            outcome: 'applied',
+            outcomeLabel: 'übernommen',
+            reason: null,
+            reasonLabel: null,
+            message: RESULT.message,
+            staleConfirmed: false,
+            clientRef: RESULT.client_ref,
+            replayed: false,
+            noticeId: null,
+        });
+    });
+
+    it('Standort als location_id', async () => {
+        const { fetch, requests } = respond(200, { device: deviceJson(5), result: RESULT });
+        await postDeviceState(5, { version: 1, locationId: 12, clientRef: 'ref-2' }, fetch);
+        expect(requests[0]?.body).toEqual({ version: 1, location_id: 12, client_ref: 'ref-2' });
+    });
+
+    it.each([
+        ['unbekanntes Ergebnis', { outcome: 'done' }],
+        ['Meldung fehlt', { message: undefined }],
+        ['replayed als Text', { replayed: 'false' }],
+        ['notice_id 0', { notice_id: 0 }],
+        ['Grund als Zahl', { reason: 1 }],
+    ])('lehnt ab: %s', (_label, overrides) => {
+        expect(
+            parseBookingResponse({ device: deviceJson(5), result: { ...RESULT, ...overrides } }),
+        ).toBeNull();
+    });
+
+    it('lehnt ein ungültiges Gerät ab', () => {
+        expect(parseBookingResponse({ device: { id: 5 }, result: RESULT })).toBeNull();
+    });
+
+    it('Konflikt: aktueller Stand aus details.device', () => {
+        expect(conflictDevice({ device: deviceJson(5, { version: 7 }) })?.version).toBe(7);
+        expect(conflictDevice({ device: null })).toBeNull();
+        expect(conflictDevice(null)).toBeNull();
     });
 });
