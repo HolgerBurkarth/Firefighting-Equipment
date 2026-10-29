@@ -7,6 +7,7 @@ import DeviceCard from '../components/DeviceCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import { deviceStore, recentDeviceIds } from '../data';
 import { takeBookingNotice } from '../data/booking';
+import { changeTimeText } from '../data/changeTime';
 import {
     findByCode,
     MAX_SEARCH_HITS,
@@ -17,6 +18,8 @@ import {
 
 /** Pause nach dem letzten Tastendruck, bevor im Modus `server` gesucht wird. */
 const SERVER_SEARCH_DELAY_MS = 300;
+/** „vor 5 Min.“ unter „Zuletzt benutzt“ bleibt so aktuell. */
+const CLOCK_TICK_MS = 30_000;
 
 const router = useRouter();
 const input = useTemplateRef<HTMLInputElement>('input');
@@ -83,22 +86,44 @@ const recent = computed<readonly DeviceListItem[]>(() => {
         .map((id) => list.value.devices.find((device) => device.id === id))
         .filter((device): device is DeviceListItem => device !== undefined);
 });
+async function loadServerRecent(): Promise<void> {
+    serverRecent.value = await deviceStore.findMany(recentIds.value);
+}
 watch(
     () => list.value.mode,
-    async (mode) => {
+    (mode) => {
         if (mode === 'server') {
-            serverRecent.value = await deviceStore.findMany(recentIds.value);
+            void loadServerRecent();
         }
     },
 );
 
+// Zeitpunkt der letzten Änderung (Umbuchung/Status) in der Ortszeit des Handys.
+const now = ref(new Date());
+function tick(): void {
+    now.value = new Date();
+}
+const clockTimer = setInterval(tick, CLOCK_TICK_MS);
+// Nach dem Entsperren des Handys sofort, nicht erst beim nächsten Takt.
+document.addEventListener('visibilitychange', tick);
+
+function changeTime(device: DeviceListItem): string | null {
+    return device.stateChangedAt === null ? null : changeTimeText(device.stateChangedAt, now.value);
+}
+
 onMounted(() => {
     recentIds.value = recentDeviceIds();
+    // Zurück auf „Suchen“ (z. B. nach einer Buchung): im Modus `server` frisch vom Server.
+    if (list.value.mode === 'server') {
+        void loadServerRecent();
+    }
     void deviceStore.refresh('open');
 });
 
 onBeforeUnmount(() => {
     clearTimeout(serverTimer);
+    clearInterval(clockTimer);
+    document.removeEventListener('visibilitychange', tick);
     serverSequence += 1;
 });
 
@@ -250,7 +275,7 @@ function retry(): void {
             </p>
             <ul v-else class="device-list" data-testid="recent-list">
                 <li v-for="device in recent" :key="device.id">
-                    <DeviceCard :device="device" />
+                    <DeviceCard :device="device" :change-time="changeTime(device)" />
                 </li>
             </ul>
         </section>

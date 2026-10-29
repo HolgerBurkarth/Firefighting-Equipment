@@ -25,6 +25,7 @@ describe('parseDeviceListItem', () => {
                 serial_number: 'SN-1',
                 manufacturer: 'Dräger',
                 model: 'PSS 5000',
+                state_changed_at: '2026-10-12T08:15:07Z',
             }),
         );
         expect(parsed).toEqual({
@@ -40,7 +41,17 @@ describe('parseDeviceListItem', () => {
             serialNumber: 'SN-1',
             manufacturer: 'Dräger',
             model: 'PSS 5000',
+            stateChangedAt: '2026-10-12T08:15:07Z',
         });
+    });
+
+    it('state_changed_at fehlt oder ist null: null', () => {
+        expect(
+            parseDeviceListItem(deviceJson(5, { state_changed_at: undefined }))?.stateChangedAt,
+        ).toBeNull();
+        expect(
+            parseDeviceListItem(deviceJson(5, { state_changed_at: null }))?.stateChangedAt,
+        ).toBeNull();
     });
 
     it('ignoriert zusätzliche Felder (Antworten mit allen Feldern)', () => {
@@ -60,6 +71,9 @@ describe('parseDeviceListItem', () => {
         ['Seriennummer fehlt', { serial_number: undefined }],
         ['Hersteller als Zahl', { manufacturer: 5 }],
         ['Scan-Code fehlt', { scan_code: undefined }],
+        ['Änderungszeit ohne Zeitzone', { state_changed_at: '2026-10-12T08:15:07' }],
+        ['Änderungszeit kein Datum', { state_changed_at: '2026-13-45T99:00:00Z' }],
+        ['Änderungszeit als Zahl', { state_changed_at: 1760256907 }],
     ])('lehnt ab: %s', (_label, overrides) => {
         expect(parseDeviceListItem(deviceJson(5, overrides))).toBeNull();
     });

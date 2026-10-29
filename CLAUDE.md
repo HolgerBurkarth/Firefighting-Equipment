@@ -315,8 +315,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   „Zuletzt benutzt“ (`src/data/recentDevices.ts`, `recentDeviceIds`/`rememberDevice` aus
   `src/data/index.ts`): localStorage `ff-recent-devices:<kürzel>:<konto-id>`, nur IDs, höchstens 8,
   neueste zuerst; `DevicePage` merkt sich das Gerät beim Öffnen; angezeigt nur Geräte der aktuellen
-  Liste (im Modus `server` per `findMany`). Karten `DeviceCard`, Status `StatusBadge` (Symbol und
-  Wort). Browser-Tests, die „Suchen“ nur durchlaufen, simulieren `GET api/v1/devices` mit
+  Liste (im Modus `server` per `findMany`, auch bei jeder Rückkehr auf „Suchen“). Je Gerät klein
+  unter dem Standort die letzte Umbuchung/Statusänderung (`stateChangedAt` aus `state_changed_at`,
+  `changeTimeText` in `src/data/changeTime.ts`, Ortszeit: „gerade eben“, „vor 5 Min.“ unter 1 h,
+  „heute 14:02“, „gestern 18:30“, sonst „12.10.2026“; `SearchPage` frischt die Uhr alle 30 s und
+  bei `visibilitychange` auf); nach eigener Buchung sofort aus der Antwort (`upsert`). Karten
+  `DeviceCard` (optional `changeTime`), Status `StatusBadge` (Symbol und Wort). Browser-Tests, die „Suchen“ nur durchlaufen, simulieren `GET api/v1/devices` mit
   `NO_DEVICES` (`tests/e2e/support/devices.ts`; dort auch `deviceJson`, `devicesEndpoint`).
 - Umbuchen (`DevicePage`, `geraete/<id>`, KONZEPT.md Entscheidungen 13, 15, 18, 21, 22): Stand
   sofort aus `deviceStore.find`, dann `fetchCurrent`; ausgesondert → Hinweis ohne Formular, 404 →
@@ -1310,7 +1314,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   offset}`; je Gerät (`DeviceJson::listItem`) `id`, `identifier`, `scan_code`, `device_type {id, name}`,
   `location {id, name, path}` (Pfad „HLF 20 / G1“), `status`, `status_label`, `next_inspection_due`,
   `version` (= `DeviceJson::summary`, auch in `inspection-due`) sowie `serial_number`, `manufacturer`,
-  `model` (für die lokale Suche der App; KONZEPT.md "User am Handy – Entscheidungen", 20).
+  `model` (für die lokale Suche der App; KONZEPT.md "User am Handy – Entscheidungen", 20) und
+  `state_changed_at` (UTC `…Z`, Aktionszeit der letzten Änderung von Standort oder Status =
+  `fe_devices.state_changed_at`; für „Zuletzt benutzt“ der App; Stammdaten und Prüfdatum ändern
+  sie nicht). Antworten mit allen Feldern (`DeviceJson::device`) enthalten es ebenso.
 - Sortierung (`DeviceRepository::orderBy`, nur feste Ausdrücke): Kennung `NATURAL_SORT_KEY(identifier)`,
   Gerätetyp `NATURAL_SORT_KEY(t.name)`, Standort `NATURAL_SORT_KEY` des angezeigten Pfads (derselbe
   Ausdruck wie beim Import), Status fachlich per `FIELD` (ready, maintenance, defective, retired),

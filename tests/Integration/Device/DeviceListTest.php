@@ -42,7 +42,8 @@ final class DeviceListTest extends DeviceApiTestCase
         self::assertSame([5, 50, 0], [$json['total'], $json['limit'], $json['offset']]);
         self::assertSame(['M1', 'M2', 'm3', 'M10', 'MA-1'], array_column($json['devices'], 'identifier'));
         self::assertSame(
-            ['id', 'identifier', 'scan_code', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version', 'serial_number', 'manufacturer', 'model'],
+            ['id', 'identifier', 'scan_code', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version', 'serial_number', 'manufacturer', 'model',
+                'state_changed_at'],
             array_keys($json['devices'][0]),
         );
         self::assertSame([null, null, null], [$json['devices'][0]['serial_number'], $json['devices'][0]['manufacturer'], $json['devices'][0]['model']]);
@@ -65,6 +66,28 @@ final class DeviceListTest extends DeviceApiTestCase
         self::assertSame(['SN-4711', 'Dräger', 'FPS 7000'], [$device['serial_number'], $device['manufacturer'], $device['model']]);
         self::assertArrayNotHasKey('note', $device);
         self::assertArrayNotHasKey('procured_on', $device);
+    }
+
+    public function testListContainsTimeOfLastStateChange(): void
+    {
+        $id = $this->createDevice($this->tenantId, $this->typeId, $this->g1, ['identifier' => 'M1']);
+        $this->pdo()->prepare('UPDATE fe_devices SET state_changed_at = ?, updated_at = ? WHERE id = ?')
+            ->execute(['2026-10-12 08:15:07', '2026-10-20 09:00:00', $id]);
+
+        $device = self::json($this->api('GET', 'devices', cookie: $this->user))['devices'][0];
+        self::assertSame('2026-10-12T08:15:07Z', $device['state_changed_at']);
+
+        // Umbuchen setzt die Zeit neu; die Antwort trägt denselben Wert wie danach die Liste.
+        $booked = self::json($this->api('POST', "devices/{$id}/state", ['version' => 1, 'location_id' => $this->room], $this->user));
+        $listed = self::json($this->api('GET', 'devices', cookie: $this->user))['devices'][0];
+        self::assertSame($booked['device']['state_changed_at'], $listed['state_changed_at']);
+        self::assertNotSame('2026-10-12T08:15:07Z', $listed['state_changed_at']);
+        self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $listed['state_changed_at']);
+
+        // Stammdaten ändern sie nicht.
+        $this->api('POST', "devices/{$id}/fields", ['version' => 2, 'model' => 'FPS 7000']);
+        $after = self::json($this->api('GET', 'devices', cookie: $this->user))['devices'][0];
+        self::assertSame($listed['state_changed_at'], $after['state_changed_at']);
     }
 
     public function testRetiredAreHiddenUnlessRequested(): void

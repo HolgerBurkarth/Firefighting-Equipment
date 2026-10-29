@@ -48,7 +48,7 @@ final class DeviceCreateTest extends DeviceApiTestCase
         $device = self::json($response)['device'];
         self::assertSame(
             ['id', 'identifier', 'scan_code', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version',
-                'serial_number', 'manufacturer', 'model', 'procured_on', 'note', 'created_at', 'updated_at'],
+                'serial_number', 'manufacturer', 'model', 'state_changed_at', 'procured_on', 'note', 'created_at', 'updated_at'],
             array_keys($device),
         );
         self::assertSame('MA 01', $device['identifier']);

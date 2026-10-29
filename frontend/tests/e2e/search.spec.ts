@@ -4,6 +4,7 @@ import {
     HTTP_ERROR_CONSOLE,
     meBody,
     test,
+    type MockRequest,
     type MockResponse,
 } from './fixtures';
 import {
@@ -156,6 +157,89 @@ test.describe('Suchen (lokal)', () => {
     });
 });
 
+test.describe('„Zuletzt benutzt“: Zeitpunkt der letzten Änderung', () => {
+    /** 29.10.2026 14:30 in Berlin (Winterzeit, UTC+1; Zeitzone in playwright.config.ts). */
+    const NOW = new Date('2026-10-29T13:30:00Z');
+    let m1: Record<string, unknown>;
+    const others = [
+        deviceJson(2, { identifier: 'M2', state_changed_at: '2026-10-28T17:30:00Z' }),
+        deviceJson(3, { identifier: 'M10', state_changed_at: '2026-10-12T08:00:00Z' }),
+        deviceJson(4, { identifier: 'PA 3', state_changed_at: '2026-10-29T08:02:00Z' }),
+    ];
+    const list = (request: MockRequest): MockResponse => devicesEndpoint([m1, ...others])(request);
+
+    test.use({
+        api: {
+            'GET api/v1/auth/me': ME,
+            'GET api/v1/devices': list,
+            'GET api/v1/devices/1': () => ({ status: 200, body: { device: m1 } }),
+            'POST api/v1/devices/1/state': (request) => {
+                const body = request.body as Record<string, unknown>;
+                m1 = deviceJson(1, {
+                    version: 2,
+                    status: 'maintenance',
+                    status_label: 'in Wartung',
+                    state_changed_at: '2026-10-29T13:30:00Z',
+                });
+                return {
+                    status: 200,
+                    body: {
+                        device: m1,
+                        result: {
+                            outcome: 'applied',
+                            outcome_label: 'übernommen',
+                            reason: null,
+                            reason_label: null,
+                            message: 'Übernommen.',
+                            stale_confirmed: false,
+                            client_ref: body['client_ref'],
+                            replayed: false,
+                            notice_id: null,
+                        },
+                    },
+                };
+            },
+            ...LOCATIONS,
+        },
+    });
+
+    test.beforeEach(async ({ page }) => {
+        m1 = deviceJson(1, { identifier: 'M1', state_changed_at: '2026-10-29T13:25:00Z' });
+        await page.clock.setFixedTime(NOW);
+        await page.addInitScript((key) => {
+            window.localStorage.setItem(key, JSON.stringify([1, 4, 2, 3]));
+        }, RECENT_KEY);
+    });
+
+    test('vor … Min., heute, gestern, Datum; nach eigener Buchung sofort neu', async ({ page }) => {
+        await page.goto('/firefighting/test/suchen');
+        const recent = page.getByTestId('recent-list');
+        await expect(recent.locator('.device-identifier')).toHaveText(['M1', 'PA 3', 'M2', 'M10']);
+        await expect(recent.getByTestId('device-change-time')).toHaveText([
+            'Zuletzt geändert: vor 5 Min.',
+            'Zuletzt geändert: heute 09:02',
+            'Zuletzt geändert: gestern 18:30',
+            'Zuletzt geändert: 12.10.2026',
+        ]);
+        // Klein unter dem Standort.
+        const card = recent.getByTestId('device-card').first();
+        const location = await card.locator('.device-location').boundingBox();
+        const time = await card.getByTestId('device-change-time').boundingBox();
+        expect(time?.y ?? 0).toBeGreaterThanOrEqual(
+            (location?.y ?? 0) + (location?.height ?? 0) - 1,
+        );
+
+        await card.click();
+        await page.getByRole('button', { name: 'in Wartung', exact: true }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/\/suchen$/);
+        await expect(recent.getByTestId('device-change-time').first()).toHaveText(
+            'Zuletzt geändert: gerade eben',
+        );
+        await expect(recent.getByTestId('device-card').first()).toContainText('◐ in Wartung');
+    });
+});
+
 test.describe('Abmelden löscht „Zuletzt benutzt“', () => {
     test.use({
         api: {
@@ -255,6 +339,12 @@ test.describe('Viele Geräte', () => {
             await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('ABC-1');
             await page.getByRole('searchbox', { name: 'Gerät suchen' }).press('Enter');
             await expect(page).toHaveURL(/\/geraete\/4711$/);
+
+            // Zurück auf „Suchen“: „Zuletzt benutzt“ kommt erneut vom Server.
+            await page.getByRole('button', { name: 'Zurück' }).click();
+            await expect(page.getByTestId('recent-list').locator('.device-identifier')).toHaveText([
+                'ABC-1',
+            ]);
         });
     });
 });

@@ -346,11 +346,12 @@ async function save(): Promise<void> {
                         ref="otherLocation"
                         class="other-location"
                         type="button"
+                        data-testid="other-location"
                         @click="openPicker"
                     >
                         <svg
-                            width="18"
-                            height="18"
+                            width="20"
+                            height="20"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
@@ -360,7 +361,19 @@ async function save(): Promise<void> {
                             <circle cx="11" cy="11" r="7" />
                             <path d="M20 20l-4-4" />
                         </svg>
-                        Anderen Standort suchen …
+                        <span class="other-location-text">Anderen Standort suchen …</span>
+                        <svg
+                            class="other-location-arrow"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            aria-hidden="true"
+                        >
+                            <path d="M9 6l6 6-6 6" />
+                        </svg>
                     </button>
                 </section>
 
@@ -498,25 +511,41 @@ async function save(): Promise<void> {
     color: var(--muted);
 }
 
+/* Deutlich als Schaltfläche (Live-Test): umrandet in Akzentfarbe, volle Breite, Abstand zum Status. */
 .other-location {
-    display: inline-flex;
-    align-self: flex-start;
+    display: flex;
     align-items: center;
-    gap: 6px;
-    min-height: var(--touch-min);
-    padding: 0 4px;
-    border: 0;
-    background: none;
+    gap: 10px;
+    width: 100%;
+    min-height: 52px;
+    margin: 2px 0 14px;
+    padding: 0 12px 0 14px;
+    border: 2px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface);
     color: var(--line);
     font: inherit;
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
+    text-align: left;
     cursor: pointer;
 }
 
+.other-location-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.other-location-arrow {
+    flex: none;
+}
+
+/* Hover am PC (KONZEPT.md: Buttons färben sich): kräftig hinterlegt mit Randbalken links. */
 .other-location:hover {
+    background: var(--nav-active);
+    box-shadow: inset 4px 0 0 var(--line);
     color: var(--text);
-    text-decoration: underline;
 }
 
 .status-choices {

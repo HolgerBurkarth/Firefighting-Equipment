@@ -236,6 +236,57 @@ test.describe('Standortwahl', () => {
         await expect(page.getByRole('button', { name: 'Speichern' })).toBeVisible();
     });
 
+    for (const scheme of ['light', 'dark'] as const) {
+        test(`„Anderen Standort suchen …“: umrandete Schaltfläche, volle Breite (${scheme})`, async ({
+            page,
+        }) => {
+            await page.emulateMedia({ colorScheme: scheme });
+            await page.goto('/firefighting/test/geraete/1');
+            const button = page.getByRole('button', { name: 'Anderen Standort suchen …' });
+            await expect(button).toBeVisible();
+            // Lupe links, Pfeil rechts.
+            await expect(button.locator('svg')).toHaveCount(2);
+
+            const box = await button.boundingBox();
+            const choice = await page.getByTestId('location-choice').first().boundingBox();
+            const status = await page.getByRole('heading', { name: 'Status' }).boundingBox();
+            expect(Math.round(box?.height ?? 0)).toBeGreaterThanOrEqual(48);
+            expect(Math.abs((box?.width ?? 0) - (choice?.width ?? 0))).toBeLessThan(1);
+            // Mehr Abstand nach unten als zwischen den Standorten.
+            const gap = (status?.y ?? 0) - ((box?.y ?? 0) + (box?.height ?? 0));
+            expect(gap).toBeGreaterThanOrEqual(28);
+
+            // Umrandet in der Farbe der Schrift, die sich vom Hintergrund abhebt.
+            const style = await button.evaluate((element) => {
+                const css = getComputedStyle(element);
+                return {
+                    width: css.borderTopWidth,
+                    border: css.borderTopColor,
+                    color: css.color,
+                    background: css.backgroundColor,
+                };
+            });
+            expect(style.width).toBe('2px');
+            expect(style.border).toBe(style.color);
+            expect(style.border).not.toBe(style.background);
+        });
+    }
+
+    test('„Anderen Standort suchen …“: Hover am PC hinterlegt kräftig', async ({
+        page,
+        isMobile,
+    }) => {
+        test.skip(isMobile, 'Kein Hover am Handy');
+        await page.goto('/firefighting/test/geraete/1');
+        const button = page.getByRole('button', { name: 'Anderen Standort suchen …' });
+        const before = await button.evaluate(
+            (element) => getComputedStyle(element).backgroundColor,
+        );
+        await button.hover();
+        await expect(button).not.toHaveCSS('background-color', before);
+        await expect(button).not.toHaveCSS('box-shadow', 'none');
+    });
+
     test('Handy-Breite: Einträge mindestens 44 px, kein seitliches Überstehen', async ({
         page,
     }) => {

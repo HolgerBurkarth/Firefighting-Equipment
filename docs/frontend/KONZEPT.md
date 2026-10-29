@@ -313,9 +313,11 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
 - **Start:** großes Suchfeld, Button „Code scannen“, darunter „Zuletzt benutzt“. Leiste unten:
   Suchen, Prüffristen, Profil.
 - **Umbuchen:** oben Gerät mit aktuellem Standort und Status. Standort: aktueller und zuletzt
-  benutzte zur Auswahl, dazu „Anderen Standort suchen …“. Status über drei große Tasten,
-  vorausgewählt ist der jetzige Zustand. Kommentar freiwillig; bei „defekt“ rot hervorgehoben mit
-  Bitte um Beschreibung. Unten groß „Speichern“.
+  benutzte zur Auswahl, dazu „Anderen Standort suchen …“ (nach dem Live-Test deutlich als
+  Schaltfläche: umrandet in der Stadtfarbe, volle Breite, Lupe links, Pfeil rechts, mindestens
+  48 px hoch, darunter mehr Abstand zum Status; Hover am PC hinterlegt mit Randbalken links).
+  Status über drei große Tasten, vorausgewählt ist der jetzige Zustand. Kommentar freiwillig; bei
+  „defekt“ rot hervorgehoben mit Bitte um Beschreibung. Unten groß „Speichern“.
 - **Standortauswahl:** bildschirmfüllend, Suchfeld oben. Ohne Eingabe alle Standorte als Karten;
   ein Fahrzeug klappt mit Antippen der ganzen Zeile auf. Eine aufgeklappte Gruppe hebt sich ab
   (Abstand, Rahmen in der Stadtfarbe, Schatten, getönte Kopfzeile); Fächer darunter eingerückt,
@@ -329,7 +331,8 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
   aufgeklappt. Jeder Standort zeigt die Zahl seiner Geräte (Fahrzeug einschließlich der Fächer).
   Räume und externe Standorte mit Unterteilung haben als ersten Eintrag „Ganzer Raum, ohne Fach“
   bzw. „Ganzer Standort, ohne Fach“. Die Suche verknüpft Wörter mit UND über den ganzen Pfad
-  („hlf g1“), ohne Groß-/Kleinschreibung und Akzente.
+  („hlf g1“), ohne Groß-/Kleinschreibung und Akzente. Mit echten Daten am Handy geprüft
+  (29.10.2026).
 - **Darstellung:** Suchen, Prüffristen und Profil mit Kopfleiste in der Stadtfarbe (Name der Stadt,
   „Hallo <Anzeigename>“) und der Leiste unten; Umbuchen, Standortwahl und Details bildschirmfüllend
   mit weißer Kopfzeile und Zurück-Knopf, ohne Leiste. Zurück führt zur vorigen Seite der App, nach
@@ -353,7 +356,12 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
 16. **„Zuletzt benutzt“:** geöffnete oder umgebuchte Geräte, nur auf diesem Handy, höchstens 8,
     neueste oben; die Angaben kommen immer aus der aktuellen Geräteliste. Abmelden löscht die Liste
     (eine abgelaufene Sitzung nicht: Nach der erneuten Anmeldung ist sie wieder da). Gespeichert wird
-    je Stadt und Konto, ein anderes Konto auf demselben Handy sieht sie nicht.
+    je Stadt und Konto, ein anderes Konto auf demselben Handy sieht sie nicht. Je Gerät steht klein
+    unter dem Standort, wann es zuletzt umgebucht oder sein Status geändert wurde (egal von wem;
+    `state_changed_at` aus `GET devices`, in der Ortszeit des Handys): unter 1 Stunde „vor 5 Min.“
+    (unter 1 Minute „gerade eben“), sonst „heute 14:02“, „gestern 18:30“, ältere „12.10.2026“.
+    Nach einer eigenen Buchung sofort aktuell (die Antwort der Buchung ersetzt das Gerät in der
+    Liste).
 17. **„Code scannen“:** zuerst Vergleich mit dem Scan-Code, dann mit der Kennung (ohne Groß- und
     Kleinschreibung, wie im Backend). Kein Treffer: Hinweis „Kein Gerät mit diesem Code gefunden“,
     der gescannte Text steht danach im Suchfeld. Die Kamera liest QR- und Barcodes über eine
@@ -398,7 +406,6 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
     `ids=` in `GET devices`, Laden „geändert seit“ statt über `offset`.
 
 ## Noch offen (Praxis, vor dem Livegang)
-- Standortauswahl mit echten Daten prüfen.
 - Was steht auf den Hersteller-Barcodes?
 - Handy-Ansichten auch im Dunkelmodus entwerfen (Farben für Dunkel: siehe Mockup „Einstellungen“).
 
