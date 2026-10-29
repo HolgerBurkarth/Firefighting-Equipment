@@ -21,8 +21,19 @@ declare module 'vue-router' {
         landing?: boolean;
         /** Rollen, die die Seite öffnen dürfen (nicht öffentliche Seiten). */
         roles?: readonly UserRole[];
+        /**
+         * Darstellung (App.vue): ohne Angabe Kopfleiste und Inhalt; `user` Handy-Seiten mit Leiste
+         * unten (Suchen, Prüffristen, Profil); `focus` bildschirmfüllend ohne Kopfleiste der App
+         * und ohne Leiste, die Seite zeigt ihre eigene Kopfzeile mit Zurück-Knopf.
+         */
+        layout?: PageLayout;
     }
 }
+
+export type PageLayout = 'user' | 'focus';
+
+/** Handy-Seiten: User und Admin (KONZEPT.md, "User am Handy – Entscheidungen", 19). */
+const DEVICE_ROLES: readonly UserRole[] = ['user', 'admin'];
 
 /** Pfade relativ zum Basispfad; deutsche Adressen wie die Mail-Links (AppUrls in PHP). */
 export function createRoutes(base: AppBase): RouteRecordRaw[] {
@@ -85,7 +96,26 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             path: '/suchen',
             name: 'search',
             component: () => import('../pages/SearchPage.vue'),
-            meta: { roles: ['user'] },
+            meta: { roles: DEVICE_ROLES, layout: 'user' },
+        });
+        routes.push({
+            path: '/prueffristen',
+            name: 'inspections',
+            component: () => import('../pages/InspectionsPage.vue'),
+            meta: { roles: DEVICE_ROLES, layout: 'user' },
+        });
+        routes.push({
+            path: '/profil',
+            name: 'profile',
+            component: () => import('../pages/ProfilePage.vue'),
+            meta: { roles: DEVICE_ROLES, layout: 'user' },
+        });
+        routes.push({
+            // Nur positive Ganzzahlen ohne führende Null (wie die Platzhalter im Backend).
+            path: '/geraete/:id([1-9]\\d{0,17})',
+            name: 'device',
+            component: () => import('../pages/DevicePage.vue'),
+            meta: { roles: DEVICE_ROLES, layout: 'focus' },
         });
     }
     routes.push({

@@ -52,6 +52,9 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `passwort-zuruecksetzen` | Stadt und `service` | Mail-Link, neues Passwort setzen (Link 1 Stunde gültig; abgelaufen → „Neuen Link anfordern“) |
 | `einladung-annehmen` | nur Stadt | Mail-Link für neue Admins: Name und Passwort |
 | `suchen` | nur Stadt | Startseite des Users am Handy (vorerst Platzhalter) |
+| `prueffristen` | nur Stadt | Prüffristen am Handy (vorerst Platzhalter) |
+| `profil` | nur Stadt | Profil am Handy (vorerst Platzhalter mit Abmelden) |
+| `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts (vorerst Platzhalter) |
 | `dashboard` | Stadt und `service` | Startseite von Admin bzw. Super-Admin (vorerst Platzhalter) |
 
 `/` ist nur eine Weiche: ohne Sitzung zur Anmeldung, sonst zur Startseite der Rolle.
@@ -315,6 +318,54 @@ Startseite ist ein Dashboard mit großen, antippbaren Kacheln, die zur gefiltert
   Fahrzeug gebucht werden, auch wenn es Fächer hat; das Backend erlaubt das bereits). Mit
   Suchbegriff eine flache Trefferliste, Fächer mit ihrem Fahrzeug darunter. Gesperrte Standorte
   fehlen. Ein Tipp wählt und führt zurück zum Umbuchen.
+- **Darstellung:** Suchen, Prüffristen und Profil mit Kopfleiste in der Stadtfarbe (Name der Stadt,
+  „Hallo <Anzeigename>“) und der Leiste unten; Umbuchen, Standortwahl und Details bildschirmfüllend
+  mit weißer Kopfzeile und Zurück-Knopf, ohne Leiste. Zurück führt zur vorigen Seite der App, nach
+  einem direkt geöffneten Link zu „Suchen“. Am PC eine Spalte in der Mitte (höchstens 600 px).
+
+### User am Handy – Entscheidungen
+13. **Offline kommt später, die Grundlage jetzt:** Der Offline-Modus wird ein eigener Abschnitt
+    danach. Jetzt wird online gebaut, aber offline-fähig: Alle Daten laufen über eine zentrale
+    Datenschicht, keine Seite ruft die API direkt auf. Jede Buchung (Umbuchen/Status) trägt ab
+    sofort eine eindeutige `client_ref`.
+14. **Suche:** Die App lädt alle Geräte der Stadt einmal (in Blöcken zu 200) und sucht lokal bei
+    jedem Tastendruck. Aufgefrischt wird beim Öffnen, beim Zurückwechseln in die App und nach einer
+    eigenen Buchung. Ab etwa 2.000 Geräten sucht die App automatisch auf dem Server (`q`). Die
+    geladene Liste wird später die lokale Kopie für den Offline-Modus.
+15. **Gerät antippen** öffnet direkt die Umbuchen-Ansicht (Mockup „UserUmbuchen“), unten ein Link
+    „Details und Verlauf“ (Stammdaten, Historie). Admins nutzen dieselbe Umbuchen-Ansicht.
+16. **„Zuletzt benutzt“:** geöffnete oder umgebuchte Geräte, nur auf diesem Handy, höchstens 8,
+    neueste oben; die Angaben kommen immer aus der aktuellen Geräteliste. Abmelden löscht die Liste.
+17. **„Code scannen“:** zuerst Vergleich mit dem Scan-Code, dann mit der Kennung (ohne Groß- und
+    Kleinschreibung, wie im Backend). Kein Treffer: Hinweis „Kein Gerät mit diesem Code gefunden“,
+    der gescannte Text steht danach im Suchfeld. Die Kamera liest QR- und Barcodes über eine
+    Bibliothek (der eingebaute Scanner fehlt in Safari); die CSP wird nur so weit wie nötig
+    erweitert.
+18. **Kommentar:** Bei „defekt“ Pflicht, mindestens 5 Zeichen (prüft nur die Oberfläche). Bei
+    „einsatzbereit“ und „in Wartung“ freiwillig.
+19. **Admins** dürfen alle Handy-Seiten öffnen (`suchen`, `prueffristen`, `profil`, `geraete/…`);
+    ihre Startseite bleibt `dashboard`. In der Leiste unten steht für sie zusätzlich „Dashboard“
+    (vorne), damit sie zurück in die Admin-Konsole kommen.
+20. **Suchfelder:** lokal über Kennung, Scan-Code, Seriennummer, Hersteller, Modell, Gerätetyp und
+    Standortpfad; mehrere Wörter mit UND verknüpft; höchstens 50 Treffer, darüber der Hinweis
+    „weiter eingrenzen“. Dafür liefert `GET devices` zusätzlich `serial_number`, `manufacturer`
+    und `model`.
+21. **Zuletzt benutzte Standorte** (Umbuchen): die letzten 3 eigenen Ziele, lokal je Konto, beim
+    Abmelden gelöscht.
+22. **Nach dem Speichern** geht es zurück zu „Suchen“ mit grüner Bestätigung (z. B.
+    „M1 → HLF 20 / G2 · einsatzbereit“).
+23. **Auffrischen** beim Zurückwechseln in die App höchstens alle 30 Sekunden.
+24. **Enter im Suchfeld** (z. B. USB-Barcode-Scanner am PC) wirkt wie ein Scan: Ein eindeutiger
+    Treffer öffnet das Gerät.
+25. **Prüffristen:** Antippen eines Geräts öffnet die Umbuchen-Ansicht.
+26. **Komprimierung:** STRATO komprimiert die Ausgabe nicht (live geprüft). Der Build erzeugt daher
+    komprimierte Fassungen aller Dateien (`.gz`, ggf. `.br`); PHP liefert sie aus, wenn
+    `Accept-Encoding` es erlaubt (`Content-Encoding`, `Vary: Accept-Encoding`, ETag je Fassung).
+27. **Kamera-Scanner:** `zxing-wasm` (nur Lesemodul, MIT); immer dieselbe Bibliothek, auch wo der
+    Browser einen eigenen `BarcodeDetector` hat (gleiche Ergebnisse bei GS1-Trennzeichen). Die
+    WASM-Datei liegt im Build (kein CDN); CSP nur `script-src 'wasm-unsafe-eval'`.
+28. **Später** (sehr große Bestände bzw. Offline-Abschnitt): genauer Filter für die Kennung und
+    `ids=` in `GET devices`, Laden „geändert seit“ statt über `offset`.
 
 ## Noch offen (Praxis, vor dem Livegang)
 - Standortauswahl mit echten Daten prüfen.
