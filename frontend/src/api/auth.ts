@@ -186,3 +186,18 @@ export function verifyEmail(
         ...(fetchFn && { fetchFn }),
     });
 }
+
+/** POST auth/invitation/accept (nur unter Städten): Token aus dem Mail-Link, Name, Passwort. */
+export function acceptInvitation(
+    token: string,
+    name: string,
+    password: string,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<{ readonly message: string }>> {
+    return apiRequest('auth/invitation/accept', parseMessage, {
+        method: 'POST',
+        body: { token, name, password },
+        public: true,
+        ...(fetchFn && { fetchFn }),
+    });
+}

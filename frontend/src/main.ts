@@ -54,7 +54,10 @@ installUpdateGuard(router, updater, startup);
 createApp(App, { base, updater }).provide(UPDATER_KEY, updater).use(router).mount('#app');
 
 if (import.meta.env.PROD) {
-    void startup.then(() => {
-        startUpdateChecks(router, updater);
+    // Lädt der Start neu, keine Prüfungen mehr (ihre Anfragen bräche das Neuladen ab).
+    void startup.then((reloading) => {
+        if (!reloading) {
+            startUpdateChecks(router, updater);
+        }
     });
 }

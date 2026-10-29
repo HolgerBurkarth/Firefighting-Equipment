@@ -75,6 +75,13 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { public: true },
         });
         routes.push({
+            // Name wie AppUrls::ACCEPT_INVITATION_PAGE (Link in der Einladungsmail neuer Admins).
+            path: '/einladung-annehmen',
+            name: 'invitation-accept',
+            component: () => import('../pages/InvitationAcceptPage.vue'),
+            meta: { public: true },
+        });
+        routes.push({
             path: '/suchen',
             name: 'search',
             component: () => import('../pages/SearchPage.vue'),

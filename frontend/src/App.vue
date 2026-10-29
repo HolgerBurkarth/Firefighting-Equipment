@@ -26,6 +26,11 @@ function applyUpdate(): void {
     void props.updater.apply(window.location.href);
 }
 
+/** Neue Version ließ sich beim Start nicht laden: vom Server neu laden, samt #token bzw. #code. */
+function reloadFromServer(): void {
+    void props.updater.reloadFromServer(window.location.href);
+}
+
 onMounted(() => {
     void loadTenant(props.base);
 });
@@ -71,8 +76,29 @@ onMounted(() => {
         <small>({{ sessionCheckError.code }})</small>
     </p>
 
+    <div
+        v-if="updater.reloadNeeded.value"
+        class="app-update"
+        role="status"
+        data-testid="update-reload-needed"
+    >
+        <span>Die neue Version konnte nicht geladen werden.</span>
+        <button class="btn app-update-button" type="button" @click="reloadFromServer">
+            Neu laden
+        </button>
+    </div>
+
+    <p
+        v-else-if="updater.switching.value"
+        class="app-update"
+        role="status"
+        data-testid="update-switching"
+    >
+        Neue Version wird geladen …
+    </p>
+
     <!-- Neue Version, aber gerade nicht automatisch: Formular angefangen oder kurz zuvor neu geladen. -->
-    <div v-if="notice !== null" class="app-update" role="status" data-testid="update-notice">
+    <div v-else-if="notice !== null" class="app-update" role="status" data-testid="update-notice">
         <span>
             {{
                 notice === 'unsaved'
@@ -93,6 +119,10 @@ onMounted(() => {
     />
 
     <main class="app-main">
+        <!-- Start mit veralteter Version: Die erste Seite wartet auf die neue. -->
+        <p v-if="updater.loadingPage.value" class="hint" role="status" data-testid="update-loading">
+            Seite wird geladen …
+        </p>
         <RouterView />
     </main>
 </template>
@@ -164,6 +194,11 @@ onMounted(() => {
 .app-error small {
     font-weight: var(--font-weight-normal);
     opacity: 0.8;
+}
+
+.hint {
+    margin: 0;
+    color: var(--muted);
 }
 
 .app-main {

@@ -19,6 +19,8 @@ const NOTICES: Readonly<Record<LoginNotice, string>> = {
     logged_out: 'Sie wurden abgemeldet.',
     session_expired: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
     password_reset: 'Das Passwort wurde geändert. Bitte melden Sie sich mit dem neuen Passwort an.',
+    invitation_accepted:
+        'Ihr Konto ist eingerichtet. Bitte melden Sie sich mit Ihrer E-Mail-Adresse und dem neuen Passwort an.',
 };
 
 const base = currentAppBase();

@@ -38,8 +38,9 @@ Das Mockup liegt in `docs/frontend/mockup/` (siehe dortige `LIESMICH.md`).
 
 ## Anmeldung und Registrierung
 
-Die API ist fertig (`CLAUDE.md`: "Benutzer und Anmeldung", "Passwort vergessen", "Einladung,
-Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen").
+API und Frontend sind fertig, alle Seiten unten sind umgesetzt (API: `CLAUDE.md`, "Benutzer und
+Anmeldung", "Passwort vergessen", "Einladung, Registrierung und E-Mail-Bestätigung", "Städte
+verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 
 ### Seiten
 | Adresse | Bereich | Zweck |
@@ -90,7 +91,15 @@ Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen")
    ohne Link geöffnet: Formular „Neuen Bestätigungslink anfordern“ (E-Mail-Adresse). Danach geht es
    zur Anmeldung; bis zur Freischaltung meldet sie „wartet auf Freischaltung“.
 7. **Ungespeicherte Eingaben:** Ein Code oder Token aus einem Link zählt wie eine Eingabe, solange
-   er nicht verwendet ist (nach einem Neuladen stünde er nicht mehr in der Adresse).
+   er nicht verwendet ist (nach einem Neuladen stünde er nicht mehr in der Adresse). Alle Formulare
+   melden ihre Eingaben (siehe "Updates der App").
+8. **Einladung annehmen** (neue Admins, Link aus der Mail des Super-Admins, 24 Stunden gültig):
+   Felder Name und Passwort, Knopf „Konto einrichten“. Die Live-Prüfung kennt Name und Stadt, die
+   E-Mail-Adresse nur der Server (er prüft sie zusätzlich, Meldung am Feld). Danach entsteht keine
+   Sitzung (wie nach „Passwort vergessen“): Die App führt zur Anmeldung mit dem Hinweis „Ihr Konto
+   ist eingerichtet …“. Einladung abgelaufen oder benutzt bzw. Seite ohne Link: Hinweis, beim
+   Super-Admin eine neue Einladung anzufordern (nur er kann sie senden; ein Formular wie bei der
+   E-Mail-Bestätigung gibt es daher nicht).
 
 ### Weitere Regeln
 - Nur eine echte Antwort des Servers entscheidet, ob jemand angemeldet ist (401 = nicht
@@ -103,8 +112,8 @@ Registrierung und E-Mail-Bestätigung", "Städte verwalten und Admins einladen")
   „wartet auf Freischaltung“, zu viele Versuche (mit Wartezeit aus `Retry-After`), Link abgelaufen
   oder benutzt (mit Weg zu einem neuen Link), ungültiger Einladungscode, Stadt gesperrt oder
   unbekannt, keine Verbindung. Eingaben bleiben bei Fehlern erhalten.
-- Nach Registrierung und „Passwort vergessen“: Hinweis auf den Spam-Ordner und darauf,
-  `feuerwehr-app@prodad.de` zu den Kontakten hinzuzufügen.
+- Nach Registrierung, „Passwort vergessen“ und neuem Bestätigungslink: Hinweis auf den
+  Spam-Ordner und darauf, `feuerwehr-app@prodad.de` zu den Kontakten hinzuzufügen.
 - `autocomplete` passend für Passwort-Manager und Handys: `username` (E-Mail des Kontos),
   `current-password` beim Anmelden, `new-password` beim Setzen, `name` beim Namen.
 - Bedienelemente mindestens 44 px, alles per Tastatur und Bildschirmleser bedienbar (Reka UI wo
@@ -157,6 +166,10 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
 - Geprüft wird beim Start, wenn die App wieder in den Vordergrund kommt (z. B. Handy entsperrt,
   Tab gewechselt) und etwa stündlich. Offline wird nicht geprüft; eine gescheiterte Prüfung zeigt
   keinen Fehler.
+- Meldet der Server eine neue Version, der Browser aber noch keinen neuen Service Worker, fragt die
+  App nach kurzen, wachsenden Pausen erneut (0,5 s, 1 s, 2 s, 4 s), danach erst wieder beim nächsten
+  Anlass; keine Endlosschleife. Grund (Prüflauf unter Last): Der Browser legt eine Prüfung mit einer
+  noch laufenden zusammen; begann diese vor dem Deploy, findet keine von beiden die neue Version.
 - Ist eine neue Version da und kein Formular angefangen, aktualisiert die App beim nächsten
   Seitenwechsel unbemerkt: Statt in der alten Version weiterzublättern, lädt sie die Zielseite neu.
   Nicht, wenn nur die Adresszeile bereinigt wird (z. B. `#token=…` entfernt).
@@ -169,6 +182,15 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   aktuell).
 - „Seite nicht gefunden“ prüft vor der Anzeige immer zuerst auf eine neue Version (vielleicht kennt
   erst sie die Seite) und lädt sie dann sofort, sofern nichts ungespeichert ist.
+- Beim Start mit veralteter Version und vor „Seite nicht gefunden“ fragt die App bis rund 30 Sekunden
+  nach der neuen Version (Pausen weiter 8 s, 15 s) und zeigt solange „Seite wird geladen …“, nie kurz
+  „nicht gefunden“. Gelingt es nicht, erscheint „Die neue Version konnte nicht geladen werden.“ mit
+  dem Knopf „Neu laden“: Die App lädt die Adresse samt `#token=…` bzw. `#code=…` direkt vom Server.
+- Neu geladen wird nur, wenn danach sicher die neue Version kommt (der neue Service Worker hat die
+  Seite übernommen). Hängt die Übernahme (Chrome hält sie an, wenn der alte Service Worker genau
+  dann eine Anfrage bekommt), meldet die App den Service Worker ab und lädt die Seite vom Server.
+  Während des Wechsels steht oben „Neue Version wird geladen …“. Beim Zurück-Knopf landet die neue
+  Version auf der richtigen Seite.
 - Schleifensperre in allen Fällen gleich (10 Minuten je Tab), danach nur der Hinweis mit Knopf.
 - Ist ein Formular angefangen (z. B. Umbuchung, Registrierung), erscheint oben der Hinweis „Neue
   Version verfügbar – nach dem Speichern wird aktualisiert“ mit dem Knopf „Jetzt aktualisieren“.
@@ -197,7 +219,9 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   des Service Workers; Seite per Strg+F5 geladen, neue Version übernimmt sie; zwei Tabs, einer
   aktualisiert und der andere folgt beim nächsten Seitenwechsel; zwei Tabs, einer geschlossen;
   Mail-Link mit alter Version im Service Worker (neue Version lädt sofort, Token bleibt erhalten und
-  wird verarbeitet); „Seite nicht gefunden“ nach einem Deploy.
+  wird verarbeitet); „Seite nicht gefunden“ nach einem Deploy; Zurück-Knopf nach einem Deploy. Die
+  sporadischen Fälle (zusammengelegte Prüfung, hängende Übernahme) prüfen Unit-Tests und ein
+  Prüflauf unter Last (3 × 480 Läufe).
 - Veraltete App gegen geänderte API: Die App nennt bei jedem Aufruf ihre Vertragsnummer
   (`X-Client-Api`). Später kann der Server eine zu alte App ablehnen („Diese Version ist veraltet –
   bitte aktualisieren“); Plan und Regeln in CLAUDE.md, "Versionierung der API für das Frontend".

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,9 +18,13 @@ test.use({ serviceWorkers: 'allow' });
 
 let areas = 0;
 
+/**
+ * Eigener Bereich je Test. Eindeutig über alle Läufe: Prozess-IDs werden unter Windows schnell
+ * wiederverwendet, ein neuer Worker hätte sonst den (schon umgestellten) Bereich eines alten.
+ */
 function newArea(project: string): string {
     areas += 1;
-    return `upd-${project}-${process.pid}-${areas}`;
+    return `upd-${project}-${String(areas)}-${randomUUID().slice(0, 8)}`;
 }
 
 /** Alte Version laden und warten, bis ihr Service Worker die Seite kontrolliert. */
@@ -286,6 +291,13 @@ test.describe('Updates der App: Seiten ohne Kontrolle des Service Workers, mehre
     });
 });
 
+/**
+ * Firefox meldet einen Schrift-Download, den das Neuladen abbricht, als Konsolenfehler (Status
+ * 2152398850 = NS_BINDING_ABORTED). Nur dieser Fall ist erwartet; andere Schriftfehler (z. B. 404)
+ * haben einen anderen Status und lassen den Test weiter scheitern.
+ */
+const FONT_ABORTED_BY_RELOAD = /downloadable font: download failed .*status=2152398850 /;
+
 /** Token wie in tests/e2e/support/update-server.php (nur dieses gilt). */
 const MAIL_TOKEN = 'Upd8-Token_aus-der-Mail_0123456789abcdefghijk';
 
@@ -304,7 +316,7 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         const problems: string[] = [];
         mail.on('pageerror', (error) => problems.push(`Skriptfehler: ${error.message}`));
         mail.on('console', (message) => {
-            if (message.type() === 'error') {
+            if (message.type() === 'error' && !FONT_ABORTED_BY_RELOAD.test(message.text())) {
                 problems.push(`Konsolenfehler: ${message.text()}`);
             }
         });
@@ -343,5 +355,26 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         await expect(
             page.getByRole('heading', { level: 1, name: 'Seite nicht gefunden' }),
         ).toBeVisible();
+    });
+});
+
+test.describe('Updates der App: Zurück-Knopf', () => {
+    test('neue Version schon erkannt, Zurück: neue Version auf der richtigen Seite', async ({
+        page,
+    }, testInfo) => {
+        const area = newArea(testInfo.project.name);
+        await openOldVersion(page, area);
+        // In der alten App weiterblättern, dann Deploy und Prüfung (wie beim Zurückkehren).
+        await page.getByRole('link', { name: 'Passwort vergessen?' }).click();
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'Passwort vergessen' }),
+        ).toBeVisible();
+        await deployAndCheck(page, area);
+
+        // Zurück (popstate): Die App lädt neu; die Historie darf das Neuladen nicht überholen.
+        await page.goBack();
+        await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(page).toHaveURL(`${ORIGIN}/firefighting/${area}/anmelden`);
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
     });
 });
