@@ -6,12 +6,19 @@ import {
     test,
     type MockResponse,
 } from './fixtures';
-import { deviceJson, devicesEndpoint, manyDevices, NO_DEVICES } from './support/devices';
+import {
+    deviceDetail,
+    deviceJson,
+    devicesEndpoint,
+    LOCATIONS,
+    manyDevices,
+    NO_DEVICES,
+} from './support/devices';
 
 const ME = { status: 200, body: meBody('user') } as const;
 const RECENT_KEY = 'ff-recent-devices:test:7';
 
-const DEVICES = [
+const DEVICES: Record<string, unknown>[] = [
     deviceJson(1, { identifier: 'M1' }),
     deviceJson(2, {
         identifier: 'M2',
@@ -31,9 +38,19 @@ const DEVICES = [
     deviceJson(5, { identifier: 'HRT 5', scan_code: '04006381333931' }),
 ];
 
+/** Die Umbuchen-Ansicht lädt das Gerät und die Standorte. */
+const DEVICE_PAGES = {
+    ...Object.fromEntries(DEVICES.flatMap((device) => Object.entries(deviceDetail(device)))),
+    ...LOCATIONS,
+};
+
 test.describe('Suchen (lokal)', () => {
     test.use({
-        api: { 'GET api/v1/auth/me': ME, 'GET api/v1/devices': devicesEndpoint(DEVICES) },
+        api: {
+            'GET api/v1/auth/me': ME,
+            'GET api/v1/devices': devicesEndpoint(DEVICES),
+            ...DEVICE_PAGES,
+        },
     });
 
     test('sucht beim Tippen, mehrere Wörter mit UND', async ({ page }) => {
@@ -144,13 +161,16 @@ test.describe('Abmelden löscht „Zuletzt benutzt“', () => {
         api: {
             'GET api/v1/auth/me': ME,
             'GET api/v1/devices': devicesEndpoint(DEVICES),
+            ...DEVICE_PAGES,
             'POST api/v1/auth/logout': { status: 200, body: { logged_out: true } },
         },
     });
 
     test('Liste ist danach leer', async ({ page }) => {
         await page.goto('/firefighting/test/geraete/2');
-        await expect(page.getByRole('heading', { level: 1, name: 'Gerät #2' })).toBeVisible();
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'M2 · Atemschutzmaske' }),
+        ).toBeVisible();
         expect(await page.evaluate((key) => window.localStorage.getItem(key), RECENT_KEY)).toBe(
             '[2]',
         );
@@ -208,6 +228,7 @@ test.describe('Viele Geräte', () => {
                     2001,
                 ),
                 'GET api/v1/devices/4711': { status: 200, body: { device: hits[0] } },
+                ...LOCATIONS,
             },
         });
 

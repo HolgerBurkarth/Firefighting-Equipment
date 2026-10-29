@@ -1,12 +1,16 @@
 import { shallowRef } from 'vue';
 import type { ApiError, ApiResult } from '../api/client';
 import {
+    conflictDevice,
     DEVICE_PAGE_LIMIT,
     fetchDevice,
     fetchDevicePage,
+    postDeviceState,
+    type BookingResponse,
     type DeviceListItem,
     type DevicePage,
     type DevicePageQuery,
+    type StateChangeRequest,
 } from '../api/devices';
 import { Refresher, type RefreshReason } from './refresher';
 
@@ -41,6 +45,7 @@ const EMPTY: DeviceListState = {
 
 type FetchPage = (query: DevicePageQuery) => Promise<ApiResult<DevicePage>>;
 type FetchOne = (id: number) => Promise<ApiResult<DeviceListItem>>;
+type PostState = (id: number, request: StateChangeRequest) => Promise<ApiResult<BookingResponse>>;
 
 /** Höchstlänge von `q` in GET devices (DeviceListHandler). */
 export const MAX_SERVER_QUERY_LENGTH = 100;
@@ -70,6 +75,7 @@ export class DeviceStore {
         private readonly fetchPage: FetchPage = (query) => fetchDevicePage(query),
         now?: () => number,
         private readonly fetchOne: FetchOne = (id) => fetchDevice(id),
+        private readonly postState: PostState = (id, request) => postDeviceState(id, request),
     ) {
         this.refresher = new Refresher(() => this.load(), now);
     }
@@ -125,6 +131,37 @@ export class DeviceStore {
                 (device): device is DeviceListItem =>
                     device !== null && device.status !== 'retired',
             );
+    }
+
+    /**
+     * Aktueller Stand eines Geräts vom Server (GET devices/{id}, auch ausgesonderte), z. B. beim
+     * Öffnen der Umbuchen-Ansicht; die Liste übernimmt ihn.
+     */
+    async fetchCurrent(id: number): Promise<ApiResult<DeviceListItem>> {
+        const result = await this.fetchOne(id);
+        if (result.ok) {
+            this.upsert(result.data);
+        }
+        return result;
+    }
+
+    /**
+     * Umbuchen und/oder Status setzen (POST devices/{id}/state). Bei Erfolg übernimmt die Liste den
+     * neuen Stand sofort und lädt danach neu (eigene Änderung); bei 409 version_conflict den
+     * aktuellen Stand aus der Antwort.
+     */
+    async book(id: number, request: StateChangeRequest): Promise<ApiResult<BookingResponse>> {
+        const result = await this.postState(id, request);
+        if (result.ok) {
+            this.upsert(result.data.device);
+            void this.refresh('changed');
+        } else if (result.error.code === 'version_conflict') {
+            const current = conflictDevice(result.error.details);
+            if (current !== null) {
+                this.upsert(current);
+            }
+        }
+        return result;
     }
 
     /**

@@ -297,9 +297,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `installDataLayer` (in `main.ts`, nur unter Städten): bei `visibilitychange` (sichtbar)
   `refresh('visible')`, bei `onSessionEnded` (`src/auth/session.ts`, mit bisherigem Konto und Grund
   `logout` = Abmelden beim Server erfolgreich, `ended` = `resetSession` z. B. nach 401 oder
-  `setSession(null)`, `replaced` = anderes Konto per `setSession`) `clear()` aller Stores; nur bei
-  `logout` zusätzlich „Zuletzt benutzt“ des Kontos löschen. Im Modus `server`: `searchServer(q,
-  limit)` (`q` getrimmt, höchstens 100 Zeichen) und `findMany(ids)` (einzeln `GET devices/{id}`).
+  `setSession(null)`, `replaced` = anderes Konto per `setSession`) `clear()` aller Stores und die
+  Bestätigung einer Buchung verwerfen; nur bei `logout` zusätzlich „Zuletzt benutzt“ (Geräte und
+  Standorte) des Kontos löschen. Im Modus `server`: `searchServer(q, limit)` (`q` getrimmt,
+  höchstens 100 Zeichen) und `findMany(ids)` (einzeln `GET devices/{id}`). `fetchCurrent(id)`
+  (`GET devices/{id}`, übernimmt den Stand per `upsert`) und `book(id, request)` (siehe Umbuchen).
 - Suchen (`SearchPage`, KONZEPT.md Entscheidungen 14, 16, 20, 24): lokale Suche
   `searchDevices` (`src/data/deviceSearch.ts`): Wörter mit UND über Kennung, Scan-Code,
   Seriennummer, Hersteller, Modell, Gerätetyp, Standortpfad; Vergleichsform `searchKey` (ohne
@@ -316,6 +318,32 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Liste (im Modus `server` per `findMany`). Karten `DeviceCard`, Status `StatusBadge` (Symbol und
   Wort). Browser-Tests, die „Suchen“ nur durchlaufen, simulieren `GET api/v1/devices` mit
   `NO_DEVICES` (`tests/e2e/support/devices.ts`; dort auch `deviceJson`, `devicesEndpoint`).
+- Umbuchen (`DevicePage`, `geraete/<id>`, KONZEPT.md Entscheidungen 13, 15, 18, 21, 22): Stand
+  sofort aus `deviceStore.find`, dann `fetchCurrent`; ausgesondert → Hinweis ohne Formular, 404 →
+  „Dieses Gerät gibt es nicht (mehr).“. Standort: aktueller und die letzten 3 eigenen Ziele
+  (`recentLocationIds`/`rememberLocation` aus `src/data/index.ts`, `src/data/recentLocations.ts`,
+  localStorage `ff-recent-locations:<kürzel>:<konto-id>`; gemeinsame Klasse `RecentIds` in
+  `src/data/recentIds.ts`, auch für „Zuletzt benutzt“), nur aktive aus `locationStore`
+  (`locationPaths`). Status über drei Tasten (`aria-pressed`, Bezeichnungen `STATUS_LABELS` wie
+  `DeviceStatus::label()`, per Test). Auswahl `null` = unverändert (folgt dem aktuellen Stand);
+  gesendet werden nur geänderte Felder (`deviceStore.book` → `POST devices/{id}/state`, online nie
+  `occurred_at`), nichts geändert → Hinweis ohne Anfrage. `client_ref` (`ClientRefKeeper` in
+  `src/data/booking.ts`, UUID v4): gleicher Inhalt (Gerät, Version, Felder) behält die Kennung
+  (erneutes Senden nach einem Netzwerkfehler wirkt nicht doppelt), anderer Inhalt bekommt eine neue.
+  Kommentar: Zeilenumbrüche und Steuerzeichen → Leerzeichen (`normalizeComment`, der Server nimmt
+  nur eine Zeile), höchstens 500; Pflicht mit mindestens 5 Zeichen (`commentLength`, Unicode-Zeichen)
+  nur, wenn der Status auf „defekt“ WECHSELT (dann rot „Was ist defekt?“). 409 `version_conflict`:
+  Stand aus `details.device` übernehmen (Kopf und Liste), eigene Wahl bleibt, nicht geänderte Felder
+  folgen dem neuen Stand, Hinweis; erneut speichern sendet die neue Version mit neuer `client_ref`.
+  Andere Fehler: `ErrorNotice`, Eingaben bleiben. Erfolg: Liste übernimmt den Stand und lädt neu
+  (`changed`), Gerät in „Zuletzt benutzt“, Ziel (nur bei `applied`) unter die Standorte, Bestätigung
+  (`setBookingNotice`, sessionStorage `ff-booking-notice`, übersteht ein Neuladen; `applied` grün
+  „M1 → HLF 20 / G2 · einsatzbereit“, sonst `result.message`), dann `returnTo(router, 'search')`
+  (`src/router/back.ts`: ist „Suchen“ die vorige Seite, `back()`, sonst `replace`). „Suchen“ zeigt
+  die Bestätigung bis zur nächsten Eingabe. Noch nicht: „Anderen Standort suchen …“ (Standortwahl)
+  und „Details und Verlauf“ (ausgeblendet). Browser-Tests mit der Umbuchen-Ansicht simulieren
+  `GET api/v1/devices/{id}` (`deviceDetail`) und `GET api/v1/locations` (`LOCATIONS`), beide in
+  `tests/e2e/support/devices.ts`; Tests in `tests/e2e/booking.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und

@@ -1,6 +1,6 @@
 import type { Locator } from '@playwright/test';
 import { expect, meBody, test } from './fixtures';
-import { NO_DEVICES } from './support/devices';
+import { deviceDetail, deviceJson, LOCATIONS, NO_DEVICES } from './support/devices';
 
 /** Höhe in px, gerundet: WebKit misst wegen seiner Skalierung z. B. 43,99 statt 44. */
 async function height(locator: Locator): Promise<number> {
@@ -16,6 +16,8 @@ test.describe('Handy-Seiten als User', () => {
         api: {
             'GET api/v1/auth/me': { status: 200, body: meBody('user', 'Jonas') },
             ...NO_DEVICES,
+            ...deviceDetail(deviceJson(12)),
+            ...LOCATIONS,
         },
     });
 
@@ -65,7 +67,9 @@ test.describe('Handy-Seiten als User', () => {
         page,
     }) => {
         await page.goto('/firefighting/test/geraete/12');
-        await expect(page.getByRole('heading', { level: 1, name: 'Gerät #12' })).toBeVisible();
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'M12 · Atemschutzmaske' }),
+        ).toBeVisible();
         await expect(page.getByTestId('app-title')).toHaveCount(0);
         await expect(page.getByRole('navigation', { name: 'Hauptmenü' })).toHaveCount(0);
         const back = page.getByRole('button', { name: 'Zurück' });
@@ -94,7 +98,12 @@ test.describe('Handy-Seiten als User', () => {
 
 test.describe('Handy-Seiten als Admin', () => {
     test.use({
-        api: { 'GET api/v1/auth/me': { status: 200, body: meBody('admin') }, ...NO_DEVICES },
+        api: {
+            'GET api/v1/auth/me': { status: 200, body: meBody('admin') },
+            ...NO_DEVICES,
+            ...deviceDetail(deviceJson(5)),
+            ...LOCATIONS,
+        },
     });
 
     // Breite ausdrücklich gesetzt: Das Dashboard hat die Leiste nur bei Handy-Breite (unter 768 px),
@@ -140,13 +149,21 @@ test.describe('Handy-Seiten als Admin', () => {
 
     test('Geräteseite öffnen', async ({ page }) => {
         await page.goto('/firefighting/test/geraete/5');
-        await expect(page.getByRole('heading', { level: 1, name: 'Gerät #5' })).toBeVisible();
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'M5 · Atemschutzmaske' }),
+        ).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Speichern' })).toBeVisible();
     });
 });
 
 test.describe('Hell und dunkel', () => {
     test.use({
-        api: { 'GET api/v1/auth/me': { status: 200, body: meBody('user') }, ...NO_DEVICES },
+        api: {
+            'GET api/v1/auth/me': { status: 200, body: meBody('user') },
+            ...NO_DEVICES,
+            ...deviceDetail(deviceJson(12)),
+            ...LOCATIONS,
+        },
     });
 
     for (const [label, scheme, stored, surface] of [
@@ -167,7 +184,10 @@ test.describe('Hell und dunkel', () => {
                 surface,
             );
             await page.goto('/firefighting/test/geraete/12');
-            await expect(page.locator('header')).toHaveCSS('background-color', surface);
+            await expect(page.locator('header.focus-header')).toHaveCSS(
+                'background-color',
+                surface,
+            );
         });
     }
 });
