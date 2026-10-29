@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 /**
  * Nur für die Browser-Tests der Updates (tests/e2e/appUpdate.spec.ts), nie auf dem Server:
- * `php -S localhost:4174 frontend/tests/e2e/support/update-server.php` (startet Playwright).
+ * `php -S localhost:<port> frontend/tests/e2e/support/update-server.php` (startet je
+ * Playwright-Worker tests/e2e/fixtures.ts).
  *
  * Wie public/index.php, aber das Frontend kommt je Bereich aus einem von zwei Builds: ohne
  * Schaltdatei aus frontend/dist (alte Version), mit test-builds/state/<bereich> aus
@@ -71,7 +72,14 @@ if (preg_match('#^/firefighting/[a-z0-9-]+/(api/.*|manifest\.webmanifest)$#', $p
     return;
 }
 
-$next = $area !== '' && is_file($frontend . '/test-builds/state/' . $area);
+/*
+ * Inhalt der Schaltdatei: `next` = alles aus der neuen Version; `build-json` = nur build.json (die
+ * App erkennt die neue Version, der Browser findet aber keinen neuen Service Worker).
+ */
+$stateFile = $frontend . '/test-builds/state/' . $area;
+$state = $area !== '' && is_file($stateFile) ? trim((string) file_get_contents($stateFile)) : '';
+$next = $state === 'next'
+    || ($state === 'build-json' && str_ends_with($path, '/' . FrontendAssets::BUILD_INFO_FILE));
 $directory = $next ? $frontend . '/test-builds/next' : FrontendAssets::defaultDirectory();
 
 $noDatabase = new LazyConnection(static function (): never {

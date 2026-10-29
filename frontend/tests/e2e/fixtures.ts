@@ -1,4 +1,5 @@
 import { test as base, expect, type Page, type Route } from '@playwright/test';
+import { startPhpServer, workerPorts, type PhpServer } from './support/phpServer';
 
 /** Antwort von GET api/v1/tenant wie im Backend (TenantHandler). */
 export interface TenantResponse {
@@ -107,6 +108,20 @@ interface Fixtures {
     guard: undefined;
 }
 
+/**
+ * Eigene Server je Playwright-Worker (Ports aus `parallelIndex`, tests/e2e/support/phpServer.ts):
+ * `php -S` beantwortet Anfragen nacheinander; ein gemeinsamer Server bremste mehrere Worker aus und
+ * wies unter Last Verbindungen ab.
+ */
+interface WorkerFixtures {
+    /** public/index.php wie auf dem Server; `baseURL` aller Tests. */
+    appServer: PhpServer;
+    /** Update-Testserver (tests/e2e/support/update-server.php), nur für appUpdate.spec.ts. */
+    updateServer: PhpServer;
+}
+
+const SERVER_START_TIMEOUT_MS = 90_000;
+
 function requestBody(route: Route): unknown {
     const text = route.request().postData();
     if (text === null) {
@@ -207,7 +222,32 @@ async function watchProblems(
     });
 }
 
-export const test = base.extend<Options & Fixtures>({
+export const test = base.extend<Options & Fixtures, WorkerFixtures>({
+    appServer: [
+        async ({}, use, workerInfo) => {
+            const server = await startPhpServer(
+                workerPorts(workerInfo.parallelIndex).app,
+                'public/index.php',
+            );
+            await use(server);
+            await server.stop();
+        },
+        { scope: 'worker', timeout: SERVER_START_TIMEOUT_MS },
+    ],
+    updateServer: [
+        async ({}, use, workerInfo) => {
+            const server = await startPhpServer(
+                workerPorts(workerInfo.parallelIndex).update,
+                'frontend/tests/e2e/support/update-server.php',
+            );
+            await use(server);
+            await server.stop();
+        },
+        { scope: 'worker', timeout: SERVER_START_TIMEOUT_MS },
+    ],
+    baseURL: async ({ appServer }, use) => {
+        await use(appServer.origin);
+    },
     tenant: [TEST_TENANT, { option: true }],
     allowedConsoleError: [null, { option: true }],
     api: [{}, { option: true }],

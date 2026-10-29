@@ -1172,6 +1172,8 @@ cd frontend
 npm ci                                            # Abhängigkeiten
 npx playwright install chromium firefox webkit    # einmalig: Browser für die Tests
 npm test                                          # Lint, Vitest, Typprüfung + Build, Playwright
+npm run test:e2e:all                              # Browser-Tests mit allen fünf Profilen
+npm run test:load -- tests/e2e/appUpdate.spec.ts  # Lastlauf (jeder Test 10-mal, alle Profile)
 npm run build                                     # nur Build nach frontend/dist
 npm run dev                                       # Entwicklung: http://localhost:5173/firefighting/test/
 npm run format                                    # Prettier und ESLint --fix
@@ -1190,21 +1192,45 @@ Bestätigungslink der Mail auf `email-bestaetigen` (Bestätigung per Knopf, dort
 neue Admins legen auf `einladung-annehmen` Name und Passwort fest. Abläufe und
 Entscheidungen in `docs/frontend/KONZEPT.md`, "Anmeldung und Registrierung".
 
-Die Browser-Tests (Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build, den
-Playwright selbst mit `php -S localhost:4173` ausliefern lässt (unter Linux mit 4 PHP-Prozessen über
-`PHP_CLI_SERVER_WORKERS`; unter Windows gibt es das nicht, dort laufen höchstens 4 Tests
-gleichzeitig, sonst weist der eine PHP-Prozess Verbindungen ab, z. B. `NS_ERROR_CONNECTION_REFUSED`); die API wird simuliert, eine
-Datenbank ist nicht nötig. Jeder Konsolenfehler und jede Verletzung der Content-Security-Policy
-lässt einen Test scheitern.
+Die Browser-Tests (Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build, den PHP
+ausliefert: Jeder Playwright-Worker startet eigene Server (`php -S localhost:<port>`, Ports ab 4173,
+je Worker zwei; unter Linux mit 4 PHP-Prozessen über `PHP_CLI_SERVER_WORKERS`). Die API wird
+simuliert, eine Datenbank ist nicht nötig. Jeder Konsolenfehler und jede Verletzung der
+Content-Security-Policy lässt einen Test scheitern. Ist ein Port belegt (z. B. ein hängender Server
+eines abgebrochenen Laufs), scheitern die Tests mit „… is already used“; dann den alten `php.exe`
+beenden.
+
+Lokal prüfen `npm test` und `npm run test:e2e` nur Chromium und WebKit; Firefox und die
+Handy-Profile prüft vor allem GitHub Actions (dort immer alle fünf), lokal bei Bedarf
+`npm run test:e2e:all`. `npm run test:load` wiederholt Tests unter Last (Optionen `--runs=N`,
+`--project=…`, `--repeat-each=N`) und legt jeden Durchgang in `test-results/load/<Zeit>-<n>` ab;
+der nächste normale Lauf leert `test-results/`.
+
+Unter Windows gibt es `PHP_CLI_SERVER_WORKERS` nicht; ein Server mit einem Prozess weist unter hoher
+Last Verbindungen ab (Firefox: `NS_ERROR_CONNECTION_REFUSED`). Gemessen am 29.10.2026 (16 Threads,
+je 3 Komplettläufe und ein Lastlauf der Update-Tests mit `--repeat-each=5`):
+
+| Worker | alle fünf Profile (590 Tests)                            | Chromium und WebKit (236 Tests) |
+| ------ | -------------------------------------------------------- | ------------------------------- |
+| 4      | 217–231 s, stabil (einmal Firefox-Fehler #43413)         | 64–65 s, stabil                 |
+| 6      | 183–185 s, Firefox: Verbindung abgewiesen, Lastlauf hing | 58–60 s, stabil                 |
+| 8      | 164–175 s, Firefox: Verbindung abgewiesen                | 58–59 s, stabil                 |
+| 12     | 160–164 s, 5–13 Fehler in allen Browsern                 | –                               |
+
+Daher `WINDOWS_TEST_WORKERS` in `frontend/playwright.config.ts`: 6 für Chromium und WebKit, 4 für
+alle Profile. `npm test` dauerte vorher (alle Profile, ein gemeinsamer Server) im Median 252 s,
+danach (Chromium und WebKit, 6 Worker) 85 s: Lint 15,5 s, Vitest 4,8 s, Build 6,7 s, Playwright
+58,0 s.
 
 Updates nach einem Deploy (KONZEPT.md, "Updates der App"): Die App lädt eine neue Version selbst,
 beim nächsten Seitenwechsel bzw. nach dem Speichern eines angefangenen Formulars; Strg+F5 ist nicht
 nötig. Die Kennung des geladenen Builds steht an `<html data-build="…">` (in GitHub Actions der
 Commit, lokal `dev`, sonst `FF_BUILD_ID`), die des ausgelieferten in `/firefighting/<bereich>/build.json`;
 die App vergleicht beide bei jeder Prüfung. Für die Browser-Tests der Updates baut Playwright vorab
-eine zweite Version nach `frontend/test-builds/next` (rund 7 s) und startet einen zweiten Server
-(`php -S localhost:4174 frontend/tests/e2e/support/update-server.php`), der je Test-Bereich die
-alte (`frontend/dist`) oder die neue Version ausliefert.
+eine zweite Version nach `frontend/test-builds/next` (rund 7 s); je Worker liefert ein zweiter
+Server (`frontend/tests/e2e/support/update-server.php`) je Test-Bereich die alte (`frontend/dist`)
+oder die neue Version aus. Feste Wartezeiten der App (z. B. die Suche bis rund 30 s nach einem neuen
+Service Worker) spulen die Tests mit `page.clock` vor.
 
 Jeder API-Aufruf der App trägt `X-Client-Api: 1` (Vertragsnummer der API, `resources/client-api.json`);
 das Backend wertet den Header noch nicht aus (Plan in `CLAUDE.md`, "Versionierung der API für das
