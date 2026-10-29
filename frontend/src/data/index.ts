@@ -1,5 +1,6 @@
 import { onSessionEnded, session } from '../auth/session';
 import { browserStorage } from '../runtime/theme';
+import { DeviceHistory } from './deviceHistory';
 import { DeviceStore } from './deviceStore';
 import { LocationStore } from './locationStore';
 import { setBookingNotice } from './booking';
@@ -12,6 +13,11 @@ import { recentLocations } from './recentLocations';
  */
 export const deviceStore = new DeviceStore();
 export const locationStore = new LocationStore();
+
+/** Verlauf eines Geräts („Details und Verlauf“), je Ansicht neu. */
+export function deviceHistory(id: number): DeviceHistory {
+    return new DeviceHistory(id);
+}
 
 /** IDs „Zuletzt benutzt“ des angemeldeten Kontos, neueste zuerst (ohne Sitzung leer). */
 export function recentDeviceIds(storage = browserStorage()): number[] {

@@ -263,7 +263,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
-  `client.ts`; `devices.ts`, `locations.ts`), `src/data/` (Datenschicht für Geräte und Standorte),
+  `client.ts`; `devices.ts`, `deviceEvents.ts`, `locations.ts`), `src/data/` (Datenschicht für Geräte und Standorte),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
@@ -345,10 +345,27 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   „M1 → HLF 20 / G2 · einsatzbereit“, sonst `result.message`), dann `returnTo(router, 'search')`
   (`src/router/back.ts`: ist „Suchen“ die vorige Seite, `back()`, sonst `replace`). „Suchen“ zeigt
   die Bestätigung bis zur nächsten Eingabe. Nach jeder Buchung `locationStore.refresh('changed')`
-  (Gerätezahlen). Noch nicht: „Details und Verlauf“ (ausgeblendet). Browser-Tests mit der
+  (Gerätezahlen). Browser-Tests mit der
   Umbuchen-Ansicht simulieren `GET api/v1/devices/{id}` (`deviceDetail`) und `GET api/v1/locations`
   (`LOCATIONS`, mit Gerätezahlen), beide in `tests/e2e/support/devices.ts`; Tests in
   `tests/e2e/booking.spec.ts`.
+- Details und Verlauf (`DeviceDetails` in `src/components/`, KONZEPT.md Entscheidung 15): Link
+  „Details und Verlauf“ unten auf der Umbuchen-Seite (auch bei ausgesonderten Geräten), eine
+  Ansicht derselben Seite über `?details=1` wie die Standortwahl (Eingaben bleiben, Zurück-Knopf
+  schließt nur die Ansicht; `FocusHeader` mit `backAction` = `closeQueryView` und `focusTitle`).
+  Inhalt: aktueller Standort, Status, nächste Prüfung (überfällig rot, Vergleich mit heute in der
+  Ortszeit), Stammdaten (leer „–“, Scan-Code mit `scanCodeDisplay` wie `ScanCode::display`,
+  Beschaffungsdatum und Notiz aus `GET devices/{id}`: `fetchCurrent` liefert `DeviceDetail`), dann
+  der Verlauf: `deviceHistory(id)` aus `src/data/index.ts` (`DeviceHistory` in
+  `src/data/deviceHistory.ts`, `GET devices/{id}/events` in Blöcken zu `EVENT_PAGE_LIMIT` = 20,
+  „Weitere Einträge laden“, doppelte IDs entfernt, Fehler behält die geladenen Einträge). Je Eintrag
+  `type_label`, Aktionszeit (`eventTimeText`: „heute 14:02“, „gestern 18:30“, sonst „12.10.2026,
+  09:15“), „von <Name>“, Zeilen aus `eventLines` (`src/data/eventDisplay.ts`: Standort und Status
+  „alt → neu“, bei nicht übernommenen „(gewünscht)“ und „Grund“, Prüfdatum und Stammdaten mit
+  „keins“/„leer“, „Eingang beim Server“ ab 1 Minute nach der Aktionszeit) und Kommentar. Tests in
+  `tests/e2e/deviceDetails.spec.ts` (Hilfen `fullDevice`, `eventJson`, `eventsEndpoint` in
+  `tests/e2e/support/devices.ts`; `deviceDetail` liefert alle Felder) und
+  `tests/unit/deviceHistory.spec.ts`.
 - Standortwahl („Anderen Standort suchen …“, `LocationPicker` in `src/components/`, Logik
   `src/data/locationSearch.ts`): eine Ansicht der Umbuchen-Seite, geöffnet über `?standortwahl=1`
   am selben Pfad (kein eigener Pfad: Eingaben bleiben, `installUpdateGuard` lädt bei gleichem Pfad
@@ -547,7 +564,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Suche bis rund 30 s nach dem neuen Service Worker) werden in den Browser-Tests mit `page.clock`
   vorgespult (`install()` vor dem Laden, dann `runFor()`), nie abgewartet. Netzwerk und Service
   Worker laufen dabei in Echtzeit: Hängt die nächste Wartezeit an einer Antwort (z. B. `update()`),
-  in kleinen Schritten vorspulen (`expect.poll` mit `runFor(1000)`, `intervals: [50]`). Nur gezielt
+  in kleinen Schritten vorspulen (`expect.poll` mit `runFor(1000)`, `intervals: [50]`). Begrenzt
+  die App das Warten auf eine echte Antwort mit einem Timer (z. B. `START_CHECK_TIMEOUT_MS` für
+  `build.json` beim Start), erst vorspulen, wenn die Antwort sichtbar verarbeitet ist (z. B.
+  `update-loading` sichtbar); sonst läuft der Timer unter Last vor der Antwort ab. Nur gezielt
   in diesen Tests, nicht global.
 - Formatierung: Prettier (4 Leerzeichen laut `.editorconfig`, JSON 2), ESLint mit typgeprüften
   strikten Regeln, `no-console`, nur `<script setup lang="ts">`, kein `v-html`.

@@ -9,6 +9,7 @@ import {
 } from './fixtures';
 import {
     deviceDetail,
+    fullDevice,
     deviceJson,
     devicesEndpoint,
     LOCATIONS,
@@ -172,7 +173,7 @@ test.describe('„Zuletzt benutzt“: Zeitpunkt der letzten Änderung', () => {
         api: {
             'GET api/v1/auth/me': ME,
             'GET api/v1/devices': list,
-            'GET api/v1/devices/1': () => ({ status: 200, body: { device: m1 } }),
+            'GET api/v1/devices/1': () => ({ status: 200, body: { device: fullDevice(m1) } }),
             'POST api/v1/devices/1/state': (request) => {
                 const body = request.body as Record<string, unknown>;
                 m1 = deviceJson(1, {
@@ -296,10 +297,8 @@ test.describe('Viele Geräte', () => {
     });
 
     test.describe('auf dem Server (mehr als 2000)', () => {
-        const hits = [
-            deviceJson(4711, { identifier: 'ABC-1' }),
-            deviceJson(4712, { identifier: 'ABC-2' }),
-        ];
+        const abc1 = deviceJson(4711, { identifier: 'ABC-1' });
+        const hits = [abc1, deviceJson(4712, { identifier: 'ABC-2' })];
         test.use({
             api: {
                 'GET api/v1/auth/me': ME,
@@ -311,7 +310,7 @@ test.describe('Viele Geräte', () => {
                         ),
                     2001,
                 ),
-                'GET api/v1/devices/4711': { status: 200, body: { device: hits[0] } },
+                ...deviceDetail(abc1),
                 ...LOCATIONS,
             },
         });

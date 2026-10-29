@@ -7,8 +7,10 @@ import {
     conflictDevice,
     STATUS_LABELS,
     type BookableStatus,
+    type DeviceDetail,
     type DeviceListItem,
 } from '../api/devices';
+import DeviceDetails from '../components/DeviceDetails.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FocusHeader from '../components/FocusHeader.vue';
 import LocationPicker from '../components/LocationPicker.vue';
@@ -43,6 +45,9 @@ const deviceId = Number(route.params['id']);
  */
 const PICKER_QUERY = 'standortwahl';
 const otherLocationButton = useTemplateRef<HTMLButtonElement>('otherLocation');
+/** „Details und Verlauf“ ebenso als Ansicht dieser Seite (`?details=1`): Eingaben bleiben. */
+const DETAILS_QUERY = 'details';
+const detailsButton = useTemplateRef<HTMLButtonElement>('detailsLink');
 
 /** Symbole wie StatusBadge (Statusfarben immer mit Symbol und Wort). */
 const SYMBOLS: Readonly<Record<BookableStatus, string>> = {
@@ -53,6 +58,8 @@ const SYMBOLS: Readonly<Record<BookableStatus, string>> = {
 
 // Stand des Geräts: sofort aus der Liste (falls geladen), dann frisch vom Server.
 const device = shallowRef<DeviceListItem | null>(deviceStore.find(deviceId));
+/** Alle Felder vom Server (Beschaffungsdatum, Notiz für die Details). */
+const detail = shallowRef<DeviceDetail | null>(null);
 const loadError = shallowRef<ApiError | null>(null);
 const loading = ref(false);
 
@@ -152,6 +159,25 @@ const pickerOpen = computed(
         device.value.status !== 'retired',
 );
 
+const detailsOpen = computed(() => route.query[DETAILS_QUERY] === '1' && device.value !== null);
+
+async function openDetails(): Promise<void> {
+    await router.push({ query: { ...route.query, [DETAILS_QUERY]: '1' } });
+}
+
+function closeDetails(): Promise<void> {
+    return closeQueryView(router, DETAILS_QUERY);
+}
+
+// Nach dem Schließen der Details zurück zum Link, oben beginnen.
+watch(detailsOpen, async (open) => {
+    if (!open) {
+        window.scrollTo(0, 0);
+        await nextTick();
+        detailsButton.value?.focus({ preventScroll: true });
+    }
+});
+
 async function openPicker(): Promise<void> {
     void locationStore.refresh('open');
     await router.push({ query: { ...route.query, [PICKER_QUERY]: '1' } });
@@ -185,6 +211,7 @@ async function load(): Promise<void> {
     loading.value = false;
     if (result.ok) {
         device.value = result.data;
+        detail.value = result.data;
         loadError.value = null;
     } else {
         loadError.value = result.error;
@@ -281,6 +308,14 @@ async function save(): Promise<void> {
         @retry="retryLocations"
     />
 
+    <DeviceDetails
+        v-else-if="detailsOpen && device !== null"
+        :device="device"
+        :detail="detail"
+        :title="title"
+        @close="closeDetails"
+    />
+
     <template v-else>
         <FocusHeader :title="title" :subtitle="subtitle" />
 
@@ -300,6 +335,9 @@ async function save(): Promise<void> {
             <div class="notice notice-info" role="status" data-testid="device-retired">
                 <p>Dieses Gerät ist ausgesondert und kann nicht umgebucht werden.</p>
             </div>
+            <button ref="detailsLink" class="details-link" type="button" @click="openDetails">
+                Details und Verlauf
+            </button>
         </div>
 
         <form v-else class="device-form" novalidate @submit.prevent="save">
@@ -430,6 +468,10 @@ async function save(): Promise<void> {
                         {{ MIN_DEFECT_COMMENT_LENGTH }} Zeichen.
                     </p>
                 </section>
+
+                <button ref="detailsLink" class="details-link" type="button" @click="openDetails">
+                    Details und Verlauf
+                </button>
             </div>
 
             <div class="device-footer">
@@ -656,5 +698,25 @@ async function save(): Promise<void> {
 .hint {
     margin: 0;
     color: var(--muted);
+}
+
+/* Link „Details und Verlauf“ (Entscheidung 15): unten, zurückhaltend, aber mindestens 44 px. */
+.details-link {
+    align-self: center;
+    min-height: var(--touch-min);
+    padding: 0 12px;
+    border: 0;
+    background: none;
+    color: var(--line);
+    font: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.details-link:hover {
+    color: var(--text);
 }
 </style>

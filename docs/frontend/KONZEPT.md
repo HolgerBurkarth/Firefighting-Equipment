@@ -54,7 +54,7 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `suchen` | nur Stadt | Startseite des Users am Handy (vorerst Platzhalter) |
 | `prueffristen` | nur Stadt | Prüffristen am Handy (vorerst Platzhalter) |
 | `profil` | nur Stadt | Profil am Handy (vorerst Platzhalter mit Abmelden) |
-| `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts; `?standortwahl=1` öffnet die Standortwahl (Details folgen) |
+| `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts; `?standortwahl=1` öffnet die Standortwahl, `?details=1` „Details und Verlauf“ |
 | `dashboard` | Stadt und `service` | Startseite von Admin bzw. Super-Admin (vorerst Platzhalter) |
 
 `/` ist nur eine Weiche: ohne Sitzung zur Anmeldung, sonst zur Startseite der Rolle.
@@ -353,6 +353,15 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
     löschen die Liste.
 15. **Gerät antippen** öffnet direkt die Umbuchen-Ansicht (Mockup „UserUmbuchen“), unten ein Link
     „Details und Verlauf“ (Stammdaten, Historie). Admins nutzen dieselbe Umbuchen-Ansicht.
+    Umgesetzt: „Details und Verlauf“ ist wie die Standortwahl eine Ansicht der Umbuchen-Seite
+    (`?details=1`); angefangene Eingaben bleiben, der Zurück-Knopf führt zum Umbuchen. Oben der
+    aktuelle Standort, Status und die nächste Prüfung (überfällig rot), darunter alle Stammdaten
+    (leere als „–“), dann der Verlauf, neueste zuerst, je 20 Einträge mit „Weitere Einträge
+    laden“. Je Eintrag: was geschah, wann (Aktionszeit in der Ortszeit: „heute 14:02“, „gestern
+    18:30“, sonst „12.10.2026, 09:15“), von wem, was sich geändert hat („alt → neu“) und der
+    Kommentar. Nicht übernommene Offline-Buchungen sind gestrichelt abgesetzt und zeigen das
+    Gewünschte, den Grund und, wenn sie später ankamen, den Eingang beim Server. Auch ausgesonderte
+    Geräte haben den Link.
 16. **„Zuletzt benutzt“:** geöffnete oder umgebuchte Geräte, nur auf diesem Handy, höchstens 8,
     neueste oben; die Angaben kommen immer aus der aktuellen Geräteliste. Abmelden löscht die Liste
     (eine abgelaufene Sitzung nicht: Nach der erneuten Anmeldung ist sie wieder da). Gespeichert wird

@@ -351,6 +351,10 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         writeFileSync(join(STATE, area), 'build-json');
         await page.clock.install();
         await page.reload();
+        // Erst vorspulen, wenn der Start die neue Kennung erkannt hat und sucht: Das Abwarten von
+        // build.json (START_CHECK_TIMEOUT_MS) ist ein Timer der App; vorgespult liefe er unter Last
+        // ab, bevor die echte Antwort da ist, und die alte Anmeldeseite erschiene.
+        await expect(page.getByTestId('update-loading')).toBeVisible();
         const started = await page.evaluate(() => Date.now());
         const notice = page.getByTestId('update-reload-needed');
         await expect
