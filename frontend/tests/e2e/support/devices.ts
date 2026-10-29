@@ -63,12 +63,13 @@ export function deviceDetail(device: Record<string, unknown>): Record<string, Mo
     return { [`GET api/v1/devices/${String(device['id'])}`]: { status: 200, body: { device } } };
 }
 
-/** Standort wie LocationJson in PHP (Ebene 1 mit Unterstandorten). */
+/** Standort wie LocationJson in PHP (Ebene 1 mit Unterstandorten); `own` = Geräte direkt dort. */
 export function locationJson(
     id: number,
     name: string,
-    children: readonly { id: number; name: string }[] = [],
+    children: readonly { id: number; name: string; count?: number }[] = [],
     kind: 'vehicle' | 'room' | 'external' = 'vehicle',
+    own = 0,
 ): Record<string, unknown> {
     const labels = { vehicle: 'Fahrzeug', room: 'Raum/Lager', external: 'Extern' };
     return {
@@ -79,8 +80,8 @@ export function locationJson(
         level: 1,
         parent_id: null,
         active: true,
-        device_count: 0,
-        device_count_total: 0,
+        device_count: own,
+        device_count_total: children.reduce((sum, child) => sum + (child.count ?? 0), own),
         children: children.map((child) => ({
             id: child.id,
             name: child.name,
@@ -89,23 +90,26 @@ export function locationJson(
             level: 2,
             parent_id: id,
             active: true,
-            device_count: 0,
+            device_count: child.count ?? 0,
         })),
     };
 }
 
-/** Standortbaum der Tests: HLF 20 mit G1 (11) und G2 (12), LF 10 (20), Lager (30). */
+/**
+ * Standortbaum der Tests: HLF 20 (10) mit G1 (11, 6 Geräte) und G2 (12, 3), LF 10 (20, ohne
+ * Fächer, 2), Lager (30, Raum, 5).
+ */
 export const LOCATIONS = {
     'GET api/v1/locations': {
         status: 200,
         body: {
             locations: [
                 locationJson(10, 'HLF 20', [
-                    { id: 11, name: 'G1' },
-                    { id: 12, name: 'G2' },
+                    { id: 11, name: 'G1', count: 6 },
+                    { id: 12, name: 'G2', count: 3 },
                 ]),
-                locationJson(20, 'LF 10'),
-                locationJson(30, 'Lager', [], 'room'),
+                locationJson(20, 'LF 10', [], 'vehicle', 2),
+                locationJson(30, 'Lager', [], 'room', 5),
             ],
         },
     },

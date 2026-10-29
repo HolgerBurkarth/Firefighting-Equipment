@@ -28,10 +28,10 @@ declare module 'vue-router' {
          */
         layout?: PageLayout;
         /**
-         * Ohne `layout`: bei Handy-Breite trotzdem die Leiste unten (Dashboard des Admins, bis die
+         * Ohne `layout`: trotzdem die Leiste unten, in jeder Breite (Dashboard des Admins, bis die
          * Admin-Konsole ihr eigenes Menü hat; KONZEPT.md, "Admin-Konsole").
          */
-        mobileTabBar?: boolean;
+        tabBar?: boolean;
     }
 }
 
@@ -72,9 +72,7 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             path: '/dashboard',
             name: 'dashboard',
             component: () => import('../pages/DashboardPage.vue'),
-            meta: base.isService
-                ? { roles: ['superadmin'] }
-                : { roles: ['admin'], mobileTabBar: true },
+            meta: base.isService ? { roles: ['superadmin'] } : { roles: ['admin'], tabBar: true },
         },
     ];
     if (!base.isService) {

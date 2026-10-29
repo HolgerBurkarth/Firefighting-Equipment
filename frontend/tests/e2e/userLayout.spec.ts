@@ -106,8 +106,8 @@ test.describe('Handy-Seiten als Admin', () => {
         },
     });
 
-    // Breite ausdrücklich gesetzt: Das Dashboard hat die Leiste nur bei Handy-Breite (unter 768 px),
-    // die Profile laufen in PC- und Handy-Breite.
+    // Breite ausdrücklich gesetzt: Die Leiste steht in jeder Breite (auch am PC, bis die
+    // Admin-Konsole ihr Menü hat); die Profile laufen in PC- und Handy-Breite.
     test('Handy-Breite: Leiste mit Dashboard, auch auf dem Dashboard', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto('/firefighting/test/suchen');
@@ -131,7 +131,7 @@ test.describe('Handy-Seiten als Admin', () => {
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
     });
 
-    test('PC-Breite: Leiste auf den Handy-Seiten, nicht auf dem Dashboard', async ({ page }) => {
+    test('PC-Breite: Leiste auf den Handy-Seiten und auf dem Dashboard', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 800 });
         await page.goto('/firefighting/test/suchen');
         const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
@@ -144,7 +144,14 @@ test.describe('Handy-Seiten als Admin', () => {
         await nav.getByRole('link', { name: 'Dashboard' }).click();
         await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
         await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
-        await expect(page.getByRole('navigation', { name: 'Hauptmenü' })).toBeHidden();
+        await expect(nav).toBeVisible();
+        await expect(nav.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+            'aria-current',
+            'page',
+        );
+        // Am PC der einzige Weg zu „Suchen“ ohne Adresszeile.
+        await nav.getByRole('link', { name: 'Suchen' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
     });
 
     test('Geräteseite öffnen', async ({ page }) => {

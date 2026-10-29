@@ -54,7 +54,7 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `suchen` | nur Stadt | Startseite des Users am Handy (vorerst Platzhalter) |
 | `prueffristen` | nur Stadt | Prüffristen am Handy (vorerst Platzhalter) |
 | `profil` | nur Stadt | Profil am Handy (vorerst Platzhalter mit Abmelden) |
-| `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts (Standortwahl und Details folgen) |
+| `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts; `?standortwahl=1` öffnet die Standortwahl (Details folgen) |
 | `dashboard` | Stadt und `service` | Startseite von Admin bzw. Super-Admin (vorerst Platzhalter) |
 
 `/` ist nur eine Weiche: ohne Sitzung zur Anmeldung, sonst zur Startseite der Rolle.
@@ -269,9 +269,10 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
 Super-Admin und Admin: Menü links, Inhalt rechts; links unten Einstellungen, Profil, Abmelden.
 Startseite ist ein Dashboard mit großen, antippbaren Kacheln, die zur gefilterten Liste führen.
 Das Menü des Admins enthält „Suchen“ (die Handy-Seite `suchen`, Entscheidung 19). Bis die
-Admin-Konsole ihr eigenes Menü hat, zeigt das Dashboard (Platzhalter) bei Handy-Breite dieselbe
-Leiste unten wie die Handy-Seiten (Dashboard | Suchen | Prüffristen | Profil); Befund aus dem
-Live-Test von Schritt 1.
+Admin-Konsole ihr eigenes Menü hat, zeigt das Dashboard (Platzhalter) in jeder Breite dieselbe
+Leiste unten wie die Handy-Seiten (Dashboard | Suchen | Prüffristen | Profil); Befunde aus den
+Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu „Suchen“ außer
+über die Adresszeile).
 
 | | Admin | Super-Admin |
 |---|---|---|
@@ -322,6 +323,13 @@ Live-Test von Schritt 1.
   Fahrzeug gebucht werden, auch wenn es Fächer hat; das Backend erlaubt das bereits). Mit
   Suchbegriff eine flache Trefferliste, Fächer mit ihrem Fahrzeug darunter. Gesperrte Standorte
   fehlen. Ein Tipp wählt und führt zurück zum Umbuchen.
+  Umgesetzt: Die Standortwahl ist eine Ansicht der Umbuchen-Seite (Adresse `?standortwahl=1`). So
+  bleiben Status und Kommentar stehen, ein Update der App lädt dabei nicht neu, und der Zurück-Knopf
+  des Handys schließt nur die Auswahl. Zu Beginn ist die Gruppe des gewählten Standorts
+  aufgeklappt. Jeder Standort zeigt die Zahl seiner Geräte (Fahrzeug einschließlich der Fächer).
+  Räume und externe Standorte mit Unterteilung haben als ersten Eintrag „Ganzer Raum, ohne Fach“
+  bzw. „Ganzer Standort, ohne Fach“. Die Suche verknüpft Wörter mit UND über den ganzen Pfad
+  („hlf g1“), ohne Groß-/Kleinschreibung und Akzente.
 - **Darstellung:** Suchen, Prüffristen und Profil mit Kopfleiste in der Stadtfarbe (Name der Stadt,
   „Hallo <Anzeigename>“) und der Leiste unten; Umbuchen, Standortwahl und Details bildschirmfüllend
   mit weißer Kopfzeile und Zurück-Knopf, ohne Leiste. Zurück führt zur vorigen Seite der App, nach
@@ -365,7 +373,8 @@ Live-Test von Schritt 1.
     und `model`.
 21. **Zuletzt benutzte Standorte** (Umbuchen): die letzten 3 eigenen Ziele, lokal je Konto, beim
     Abmelden gelöscht. Umgesetzt: zur Auswahl stehen der aktuelle Standort und diese Ziele, soweit
-    nicht gesperrt; „Anderen Standort suchen …“ kommt mit der Standortwahl.
+    nicht gesperrt, dazu ein in der Standortwahl gewählter („gewählt“) und „Anderen Standort
+    suchen …“.
 22. **Nach dem Speichern** geht es zurück zu „Suchen“ mit grüner Bestätigung (z. B.
     „M1 → HLF 20 / G2 · einsatzbereit“). Umgesetzt: Die Bestätigung bleibt bis zur nächsten
     Eingabe stehen und übersteht ein Update beim Seitenwechsel. Hat sich das Gerät inzwischen
