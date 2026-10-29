@@ -2,7 +2,8 @@
 import type { DeviceListItem } from '../api/devices';
 import StatusBadge from './StatusBadge.vue';
 
-defineProps<{ device: DeviceListItem }>();
+/** `changeTime`: letzte Umbuchung/Statusänderung als Text („vor 5 Min.“), nur unter „Zuletzt benutzt“. */
+defineProps<{ device: DeviceListItem; changeTime?: string | null }>();
 </script>
 
 <!-- Gerät als Karte (Mockup UserStart); Antippen öffnet das Umbuchen (Entscheidung 15). -->
@@ -16,6 +17,9 @@ defineProps<{ device: DeviceListItem }>();
         <span class="device-text">
             <span class="device-type">{{ device.deviceType.name }}</span>
             <span class="device-location">{{ device.location.path }}</span>
+            <span v-if="changeTime" class="device-time" data-testid="device-change-time">
+                <span class="visually-hidden">Zuletzt geändert: </span>{{ changeTime }}
+            </span>
         </span>
         <StatusBadge :status="device.status" :label="device.statusLabel" />
     </RouterLink>
@@ -61,6 +65,11 @@ defineProps<{ device: DeviceListItem }>();
 
 .device-location {
     font-size: var(--font-size-sm);
+    color: var(--muted);
+}
+
+.device-time {
+    font-size: var(--font-size-xs);
     color: var(--muted);
 }
 </style>

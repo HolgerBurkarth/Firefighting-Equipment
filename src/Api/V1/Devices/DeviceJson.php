@@ -34,7 +34,8 @@ final class DeviceJson
 
     /**
      * Eintrag von GET devices: summary() plus die Felder, die die App lokal durchsucht
-     * (KONZEPT.md, "User am Handy – Entscheidungen", 20).
+     * (KONZEPT.md, "User am Handy – Entscheidungen", 20), und state_changed_at (UTC): Aktionszeit
+     * der letzten Änderung von Standort oder Status, die App zeigt sie unter "Zuletzt benutzt".
      *
      * @return array<string, mixed>
      */
@@ -45,6 +46,7 @@ final class DeviceJson
             'serial_number' => $device->serialNumber,
             'manufacturer' => $device->manufacturer,
             'model' => $device->model,
+            'state_changed_at' => AuthJson::time($device->stateChangedAt ?? $device->updatedAt),
         ];
     }
 

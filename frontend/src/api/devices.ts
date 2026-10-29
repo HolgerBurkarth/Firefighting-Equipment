@@ -21,6 +21,8 @@ export interface DeviceListItem {
     readonly serialNumber: string | null;
     readonly manufacturer: string | null;
     readonly model: string | null;
+    /** Letzte Umbuchung/Statusänderung (Aktionszeit, UTC `…Z`); null = nicht geliefert. */
+    readonly stateChangedAt: string | null;
 }
 
 export interface DevicePage {
@@ -45,6 +47,13 @@ function isStatus(value: unknown): value is DeviceStatus {
     return typeof value === 'string' && (STATUSES as readonly string[]).includes(value);
 }
 
+/** Zeitpunkte wie AuthJson::time in PHP: `JJJJ-MM-TTTHH:MM:SSZ` (UTC). */
+const UTC_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+export function isUtcTime(value: unknown): value is string {
+    return typeof value === 'string' && UTC_TIME.test(value) && !Number.isNaN(Date.parse(value));
+}
+
 /** String oder null; sonst undefined (ungültig). */
 function nullableString(value: unknown): string | null | undefined {
     if (value === null) {
@@ -66,6 +75,8 @@ export function parseDeviceListItem(json: unknown): DeviceListItem | null {
     const serialNumber = nullableString(json['serial_number']);
     const manufacturer = nullableString(json['manufacturer']);
     const model = nullableString(json['model']);
+    // Neu in der Liste: fehlt es (ältere Antwort), gilt null.
+    const stateChangedAt = json['state_changed_at'] ?? null;
     if (
         !isId(id) ||
         typeof identifier !== 'string' ||
@@ -81,7 +92,8 @@ export function parseDeviceListItem(json: unknown): DeviceListItem | null {
         due === undefined ||
         serialNumber === undefined ||
         manufacturer === undefined ||
-        model === undefined
+        model === undefined ||
+        (stateChangedAt !== null && !isUtcTime(stateChangedAt))
     ) {
         return null;
     }
@@ -98,6 +110,7 @@ export function parseDeviceListItem(json: unknown): DeviceListItem | null {
         serialNumber,
         manufacturer,
         model,
+        stateChangedAt,
     };
 }
 

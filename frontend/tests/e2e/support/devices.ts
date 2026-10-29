@@ -18,6 +18,7 @@ export function deviceJson(
         serial_number: null,
         manufacturer: null,
         model: null,
+        state_changed_at: '2026-10-01T08:00:00Z',
         ...overrides,
     };
 }
