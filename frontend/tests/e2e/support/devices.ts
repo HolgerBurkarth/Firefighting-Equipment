@@ -61,7 +61,27 @@ export const NO_DEVICES = { 'GET api/v1/devices': devicesEndpoint([]) } as const
 
 /** GET api/v1/devices/{id} für die Umbuchen-Ansicht (Antwort mit allen Feldern, hier die der Liste). */
 export function deviceDetail(device: Record<string, unknown>): Record<string, MockResponse> {
-    return { [`GET api/v1/devices/${String(device['id'])}`]: { status: 200, body: { device } } };
+    return {
+        [`GET api/v1/devices/${String(device['id'])}`]: {
+            status: 200,
+            body: { device: fullDevice(device) },
+        },
+    };
+}
+
+/** Gerät mit allen Feldern wie DeviceJson::device (GET devices/{id}): Eintrag der Liste plus Rest. */
+export function fullDevice(
+    device: Record<string, unknown>,
+    overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+    return {
+        procured_on: null,
+        note: null,
+        created_at: '2026-01-05T09:00:00Z',
+        updated_at: '2026-10-01T08:00:00Z',
+        ...device,
+        ...overrides,
+    };
 }
 
 /** Standort wie LocationJson in PHP (Ebene 1 mit Unterstandorten); `own` = Geräte direkt dort. */
@@ -115,3 +135,51 @@ export const LOCATIONS = {
         },
     },
 } as const;
+
+/**
+ * Eintrag von GET devices/{id}/events wie DeviceEventJson::event (Standard: Umbuchung, übernommen).
+ * Eingang (`created_at`, `received_at`) wie die Aktionszeit, sofern nicht angegeben (Serveraktion).
+ */
+export function eventJson(
+    id: number,
+    overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+    const occurred = overrides['occurred_at'] ?? '2026-10-29T12:00:00Z';
+    return {
+        id,
+        type: 'state_changed',
+        type_label: 'Umgebucht',
+        created_at: occurred,
+        occurred_at: occurred,
+        received_at: occurred,
+        applied: true,
+        not_applied_reason: null,
+        not_applied_label: null,
+        client_ref: null,
+        user: { id: 7, name: 'Anna Muster' },
+        comment: null,
+        location: {
+            from: { id: 11, name: 'G1', path: 'HLF 20 / G1' },
+            to: { id: 20, name: 'LF 10', path: 'LF 10' },
+        },
+        status: null,
+        inspection_due: null,
+        field: null,
+        ...overrides,
+    };
+}
+
+/** GET api/v1/devices/{id}/events: Blöcke nach `limit`/`offset` aus `all` (neueste zuerst). */
+export function eventsEndpoint(
+    all: readonly Record<string, unknown>[],
+): (request: MockRequest) => MockResponse {
+    return (request) => {
+        const params = new URL(request.url).searchParams;
+        const limit = Number(params.get('limit') ?? '50');
+        const offset = Number(params.get('offset') ?? '0');
+        return {
+            status: 200,
+            body: { events: all.slice(offset, offset + limit), total: all.length, limit, offset },
+        };
+    };
+}

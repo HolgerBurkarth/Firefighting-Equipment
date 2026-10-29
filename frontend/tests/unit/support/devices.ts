@@ -1,6 +1,8 @@
 import type { ApiResult } from '../../../src/api/client';
 import {
+    parseDeviceDetail,
     parseDeviceListItem,
+    type DeviceDetail,
     type DeviceListItem,
     type DevicePage,
 } from '../../../src/api/devices';
@@ -30,6 +32,22 @@ export function deviceJson(
 
 export function device(id: number, overrides: Record<string, unknown> = {}): DeviceListItem {
     const parsed = parseDeviceListItem(deviceJson(id, overrides));
+    if (parsed === null) {
+        throw new Error(`Ungültiges Testgerät ${id}`);
+    }
+    return parsed;
+}
+
+/** Gerät mit allen Feldern wie GET devices/{id} (DeviceJson::device). */
+export function detail(id: number, overrides: Record<string, unknown> = {}): DeviceDetail {
+    const parsed = parseDeviceDetail(
+        deviceJson(id, {
+            procured_on: null,
+            note: null,
+            created_at: '2026-01-05T09:00:00Z',
+            ...overrides,
+        }),
+    );
     if (parsed === null) {
         throw new Error(`Ungültiges Testgerät ${id}`);
     }

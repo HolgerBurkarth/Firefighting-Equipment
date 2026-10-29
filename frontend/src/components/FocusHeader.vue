@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted, useTemplateRef } from 'vue';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import { goBack } from '../router/back';
 
@@ -9,14 +10,32 @@ const props = withDefaults(
         /** Ziel, wenn es keine vorige Seite der App gibt (direkt geöffneter Link). */
         fallback?: RouteLocationRaw;
         backLabel?: string;
+        /** Statt goBack, z. B. eine Ansicht per Parameter der Adresse schließen. */
+        backAction?: (() => Promise<void>) | null;
+        /** Fokus beim Anzeigen auf den Titel (Ansicht gewechselt, z. B. für Bildschirmleser). */
+        focusTitle?: boolean;
     }>(),
-    { subtitle: null, fallback: () => ({ name: 'search' }), backLabel: 'Zurück' },
+    {
+        subtitle: null,
+        fallback: () => ({ name: 'search' }),
+        backLabel: 'Zurück',
+        backAction: null,
+        focusTitle: false,
+    },
 );
+
+const titleElement = useTemplateRef<HTMLHeadingElement>('titleElement');
+
+onMounted(() => {
+    if (props.focusTitle) {
+        titleElement.value?.focus();
+    }
+});
 
 const router = useRouter();
 
 function onBack(): void {
-    void goBack(router, props.fallback);
+    void (props.backAction ?? (() => goBack(router, props.fallback)))();
 }
 </script>
 
@@ -37,7 +56,9 @@ function onBack(): void {
             </svg>
         </button>
         <div class="focus-text">
-            <h1 class="focus-title">{{ title }}</h1>
+            <h1 ref="titleElement" class="focus-title" :tabindex="focusTitle ? -1 : undefined">
+                {{ title }}
+            </h1>
             <span v-if="subtitle !== null" class="focus-subtitle">{{ subtitle }}</span>
         </div>
     </header>

@@ -7,6 +7,7 @@ import {
     fetchDevicePage,
     postDeviceState,
     type BookingResponse,
+    type DeviceDetail,
     type DeviceListItem,
     type DevicePage,
     type DevicePageQuery,
@@ -44,7 +45,7 @@ const EMPTY: DeviceListState = {
 };
 
 type FetchPage = (query: DevicePageQuery) => Promise<ApiResult<DevicePage>>;
-type FetchOne = (id: number) => Promise<ApiResult<DeviceListItem>>;
+type FetchOne = (id: number) => Promise<ApiResult<DeviceDetail>>;
 type PostState = (id: number, request: StateChangeRequest) => Promise<ApiResult<BookingResponse>>;
 
 /** Höchstlänge von `q` in GET devices (DeviceListHandler). */
@@ -128,16 +129,15 @@ export class DeviceStore {
         return results
             .map((result) => (result.ok ? result.data : null))
             .filter(
-                (device): device is DeviceListItem =>
-                    device !== null && device.status !== 'retired',
+                (device): device is DeviceDetail => device !== null && device.status !== 'retired',
             );
     }
 
     /**
      * Aktueller Stand eines Geräts vom Server (GET devices/{id}, auch ausgesonderte), z. B. beim
-     * Öffnen der Umbuchen-Ansicht; die Liste übernimmt ihn.
+     * Öffnen der Umbuchen-Ansicht; die Liste übernimmt ihn. Mit allen Feldern (Details).
      */
-    async fetchCurrent(id: number): Promise<ApiResult<DeviceListItem>> {
+    async fetchCurrent(id: number): Promise<ApiResult<DeviceDetail>> {
         const result = await this.fetchOne(id);
         if (result.ok) {
             this.upsert(result.data);

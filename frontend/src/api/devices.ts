@@ -55,7 +55,7 @@ export function isUtcTime(value: unknown): value is string {
 }
 
 /** String oder null; sonst undefined (ungültig). */
-function nullableString(value: unknown): string | null | undefined {
+export function nullableString(value: unknown): string | null | undefined {
     if (value === null) {
         return null;
     }
@@ -162,14 +162,34 @@ export function parseDeviceResponse(json: unknown): DeviceListItem | null {
     return isRecord(json) ? parseDeviceListItem(json['device']) : null;
 }
 
-/** GET devices/{id} (auch ausgesonderte; fremd oder unbekannt 404). */
-export function fetchDevice(
-    id: number,
-    fetchFn?: typeof fetch,
-): Promise<ApiResult<DeviceListItem>> {
-    return apiRequest(`devices/${String(id)}`, parseDeviceResponse, {
-        ...(fetchFn && { fetchFn }),
-    });
+/** Gerät mit allen Feldern (DeviceJson::device), für „Details und Verlauf“. */
+export interface DeviceDetail extends DeviceListItem {
+    /** JJJJ-MM-TT oder null. */
+    readonly procuredOn: string | null;
+    /** Mehrzeilig (LF) oder null. */
+    readonly note: string | null;
+}
+
+export function parseDeviceDetail(json: unknown): DeviceDetail | null {
+    const item = parseDeviceListItem(json);
+    if (item === null || !isRecord(json)) {
+        return null;
+    }
+    const procuredOn = nullableString(json['procured_on']);
+    const note = nullableString(json['note']);
+    if (procuredOn === undefined || note === undefined) {
+        return null;
+    }
+    return { ...item, procuredOn, note };
+}
+
+/** GET devices/{id} (auch ausgesonderte; fremd oder unbekannt 404), alle Felder. */
+export function fetchDevice(id: number, fetchFn?: typeof fetch): Promise<ApiResult<DeviceDetail>> {
+    return apiRequest(
+        `devices/${String(id)}`,
+        (json) => (isRecord(json) ? parseDeviceDetail(json['device']) : null),
+        { ...(fetchFn && { fetchFn }) },
+    );
 }
 
 /** Status, die ein User setzen darf (POST devices/{id}/state; aussondern nur der Admin). */

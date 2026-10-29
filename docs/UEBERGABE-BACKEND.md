@@ -7,7 +7,7 @@ Backend-Chat, was sich seit seinem letzten Stand geändert hat.
 Eintrag: Datum, Commit-Betreff (bei noch nicht committeten Änderungen „noch nicht committet“, der
 Nutzer ergänzt den Betreff), was sich geändert hat, warum, Tests, Stelle in `CLAUDE.md`.
 
-## 2026-10-29 – noch nicht committet (Wünsche aus dem Live-Test von Schritt 5)
+## 2026-10-29 – „Umbuchen: Standortsuche als Schaltfläche, Zuletzt benutzt mit Änderungszeit“
 
 `GET api/v1/devices` liefert je Gerät zusätzlich `state_changed_at` (UTC, Format wie alle Zeiten
 `JJJJ-MM-TTTHH:MM:SSZ`): die Aktionszeit der letzten Änderung von Standort oder Status

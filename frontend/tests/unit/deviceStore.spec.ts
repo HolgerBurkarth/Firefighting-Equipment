@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ApiResult } from '../../src/api/client';
 import type { DevicePage, DevicePageQuery } from '../../src/api/devices';
 import { DeviceStore, MAX_LOCAL_DEVICES } from '../../src/data/deviceStore';
-import { device, deviceJson, devices, pagedSource } from './support/devices';
+import { detail, device, deviceJson, devices, pagedSource } from './support/devices';
 
 const NETWORK: ApiResult<never> = {
     ok: false,
@@ -247,8 +247,8 @@ describe('DeviceStore: Suche auf dem Server und einzelne Geräte', () => {
                     status: 200,
                     data:
                         id === 4
-                            ? device(4, { status: 'retired', status_label: 'ausgesondert' })
-                            : device(id),
+                            ? detail(4, { status: 'retired', status_label: 'ausgesondert' })
+                            : detail(id),
                 });
             },
         );
@@ -324,7 +324,7 @@ describe('DeviceStore: Buchen', () => {
 
     it('fetchCurrent übernimmt den Stand vom Server', async () => {
         const store = new DeviceStore(pagedSource(devices(1, 3)).fetchPage, undefined, (id) =>
-            Promise.resolve({ ok: true, status: 200, data: device(id, { version: 5 }) }),
+            Promise.resolve({ ok: true, status: 200, data: detail(id, { version: 5 }) }),
         );
         await store.refresh('open');
         const result = await store.fetchCurrent(3);
