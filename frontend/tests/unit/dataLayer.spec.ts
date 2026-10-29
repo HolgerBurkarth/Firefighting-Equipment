@@ -2,11 +2,18 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ApiResult } from '../../src/api/client';
 import { parseAuthState, type AuthState } from '../../src/api/auth';
 import type { Location } from '../../src/api/locations';
-import { onSessionEnded, resetSession, setSession } from '../../src/auth/session';
+import {
+    logout,
+    onSessionEnded,
+    resetSession,
+    setSession,
+    type SessionEndReason,
+} from '../../src/auth/session';
 import { DeviceStore } from '../../src/data/deviceStore';
-import { installDataLayer } from '../../src/data';
+import { installDataLayer, recentDeviceIds, rememberDevice } from '../../src/data';
 import { LocationStore } from '../../src/data/locationStore';
 import { devices, pagedSource } from './support/devices';
+import { respond } from './support/fetch';
 import { meBody } from './support/me';
 
 function account(id: number, slug = 'test'): AuthState {
@@ -88,6 +95,26 @@ describe('Sitzungsende (onSessionEnded)', () => {
         expect(ended).toBe(2);
     });
 
+    it('nennt Konto und Grund', async () => {
+        const reasons: [number, SessionEndReason][] = [];
+        const stopReasons = onSessionEnded((previous, reason) => {
+            reasons.push([previous.user.id, reason]);
+        });
+        setSession(account(7));
+        setSession(account(8));
+        resetSession();
+        setSession(account(9));
+        expect(await logout(respond(200, { logged_out: true }).fetch)).toBeNull();
+        stopReasons();
+        expect(reasons).toEqual([
+            [7, 'replaced'],
+            [8, 'ended'],
+            [9, 'logout'],
+        ]);
+        // Abmelden meldet das Ende genau einmal.
+        expect(ended).toBe(3);
+    });
+
     it('nicht bei derselben Sitzung oder ohne vorherige', () => {
         setSession(null);
         resetSession();
@@ -141,6 +168,29 @@ describe('installDataLayer', () => {
         expect(source.calls).toHaveLength(2);
         // Standorte wurden nie angefordert: kein Aufruf.
         expect(locations.calls).toBe(0);
+    });
+
+    it('„Zuletzt benutzt“ löscht nur das Abmelden, nicht das Ende der Sitzung', async () => {
+        const deviceStore = new DeviceStore(pagedSource([]).fetchPage);
+        uninstall = installDataLayer(document, [deviceStore], window.localStorage);
+        setSession(account(7));
+        rememberDevice(3, window.localStorage);
+        rememberDevice(5, window.localStorage);
+        expect(recentDeviceIds(window.localStorage)).toEqual([5, 3]);
+
+        resetSession();
+        setSession(account(7));
+        expect(recentDeviceIds(window.localStorage)).toEqual([5, 3]);
+
+        expect(await logout(respond(200, { logged_out: true }).fetch)).toBeNull();
+        setSession(account(7));
+        expect(recentDeviceIds(window.localStorage)).toEqual([]);
+    });
+
+    it('ohne Sitzung kein „Zuletzt benutzt“', () => {
+        setSession(null);
+        rememberDevice(3, window.localStorage);
+        expect(recentDeviceIds(window.localStorage)).toEqual([]);
     });
 
     it('nach dem Deinstallieren keine Wirkung mehr', async () => {

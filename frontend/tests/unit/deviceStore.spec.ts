@@ -208,3 +208,52 @@ describe('DeviceStore: einzelne Geräte', () => {
         expect(store.state).toMatchObject({ mode: null, devices: [], total: null });
     });
 });
+
+describe('DeviceStore: Suche auf dem Server und einzelne Geräte', () => {
+    it('searchServer fragt q mit limit, gekürzt auf 100 Zeichen', async () => {
+        const queries: DevicePageQuery[] = [];
+        const store = new DeviceStore((query) => {
+            queries.push(query);
+            return Promise.resolve({
+                ok: true,
+                status: 200,
+                data: { devices: devices(1, 2), total: 75, limit: query.limit, offset: 0 },
+            });
+        });
+        const result = await store.searchServer(`  ${'x'.repeat(120)} `, 50);
+        expect(queries[0]).toEqual({ limit: 50, offset: 0, q: 'x'.repeat(100) });
+        expect(result.ok && result.data.total).toBe(75);
+        expect(result.ok && result.data.hits.map((d) => d.id)).toEqual([1, 2]);
+    });
+
+    it('findMany lokal aus der Liste, in der gewünschten Reihenfolge', async () => {
+        const store = new DeviceStore(pagedSource(devices(1, 5)).fetchPage);
+        await store.refresh('open');
+        expect((await store.findMany([4, 99, 2])).map((d) => d.id)).toEqual([4, 2]);
+    });
+
+    it('findMany im Modus server einzeln vom Server, ohne Fehler und ausgesonderte', async () => {
+        const asked: number[] = [];
+        const store = new DeviceStore(
+            pagedSource(devices(1, MAX_LOCAL_DEVICES + 1)).fetchPage,
+            undefined,
+            (id) => {
+                asked.push(id);
+                if (id === 3) {
+                    return Promise.resolve(NETWORK);
+                }
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    data:
+                        id === 4
+                            ? device(4, { status: 'retired', status_label: 'ausgesondert' })
+                            : device(id),
+                });
+            },
+        );
+        await store.refresh('open');
+        expect((await store.findMany([5, 3, 4, 1])).map((d) => d.id)).toEqual([5, 1]);
+        expect(asked).toEqual([5, 3, 4, 1]);
+    });
+});

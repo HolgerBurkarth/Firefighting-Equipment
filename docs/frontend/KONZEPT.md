@@ -268,10 +268,14 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
 ## Admin-Konsole
 Super-Admin und Admin: Menü links, Inhalt rechts; links unten Einstellungen, Profil, Abmelden.
 Startseite ist ein Dashboard mit großen, antippbaren Kacheln, die zur gefilterten Liste führen.
+Das Menü des Admins enthält „Suchen“ (die Handy-Seite `suchen`, Entscheidung 19). Bis die
+Admin-Konsole ihr eigenes Menü hat, zeigt das Dashboard (Platzhalter) bei Handy-Breite dieselbe
+Leiste unten wie die Handy-Seiten (Dashboard | Suchen | Prüffristen | Profil); Befund aus dem
+Live-Test von Schritt 1.
 
 | | Admin | Super-Admin |
 |---|---|---|
-| Menü | Dashboard, Geräte, Standorte, Gerätetypen, Benutzer, Protokoll | Dashboard, Städte, Super-Admins |
+| Menü | Dashboard, Suchen, Geräte, Standorte, Gerätetypen, Benutzer, Protokoll | Dashboard, Städte, Super-Admins |
 | Kacheln | Einsatzbereitschaft (z. B. 42 von 45), nicht einsatzbereit, Prüffristen, offene Hinweise; dazu Listen „nicht einsatzbereit“ und „letzte Aktivitäten“ | aktive und gesperrte Städte, offene Admin-Einladungen mit „Erneut senden“ (Link läuft nach 24 h ab), Benutzer gesamt |
 
 ### Listen
@@ -339,7 +343,9 @@ Startseite ist ein Dashboard mit großen, antippbaren Kacheln, die zur gefiltert
 15. **Gerät antippen** öffnet direkt die Umbuchen-Ansicht (Mockup „UserUmbuchen“), unten ein Link
     „Details und Verlauf“ (Stammdaten, Historie). Admins nutzen dieselbe Umbuchen-Ansicht.
 16. **„Zuletzt benutzt“:** geöffnete oder umgebuchte Geräte, nur auf diesem Handy, höchstens 8,
-    neueste oben; die Angaben kommen immer aus der aktuellen Geräteliste. Abmelden löscht die Liste.
+    neueste oben; die Angaben kommen immer aus der aktuellen Geräteliste. Abmelden löscht die Liste
+    (eine abgelaufene Sitzung nicht: Nach der erneuten Anmeldung ist sie wieder da). Gespeichert wird
+    je Stadt und Konto, ein anderes Konto auf demselben Handy sieht sie nicht.
 17. **„Code scannen“:** zuerst Vergleich mit dem Scan-Code, dann mit der Kennung (ohne Groß- und
     Kleinschreibung, wie im Backend). Kein Treffer: Hinweis „Kein Gerät mit diesem Code gefunden“,
     der gescannte Text steht danach im Suchfeld. Die Kamera liest QR- und Barcodes über eine
@@ -360,7 +366,9 @@ Startseite ist ein Dashboard mit großen, antippbaren Kacheln, die zur gefiltert
     „M1 → HLF 20 / G2 · einsatzbereit“).
 23. **Auffrischen** beim Zurückwechseln in die App höchstens alle 30 Sekunden.
 24. **Enter im Suchfeld** (z. B. USB-Barcode-Scanner am PC) wirkt wie ein Scan: Ein eindeutiger
-    Treffer öffnet das Gerät.
+    Treffer öffnet das Gerät. Umgesetzt: zuerst Scan-Code bzw. Kennung genau, sonst genau ein
+    Treffer der Suche; bei mehreren Treffern schließt sich nur die Tastatur, ohne Treffer erscheint
+    „Kein Gerät mit diesem Code gefunden.“ und der Text bleibt im Suchfeld.
 25. **Prüffristen:** Antippen eines Geräts öffnet die Umbuchen-Ansicht.
 26. **Komprimierung:** STRATO komprimiert die Ausgabe nicht (live geprüft). Der Build erzeugt daher
     komprimierte Fassungen aller Dateien (`.gz`, ggf. `.br`); PHP liefert sie aus, wenn

@@ -1,5 +1,6 @@
 import type { Locator } from '@playwright/test';
 import { expect, meBody, test } from './fixtures';
+import { NO_DEVICES } from './support/devices';
 
 /** Höhe in px, gerundet: WebKit misst wegen seiner Skalierung z. B. 43,99 statt 44. */
 async function height(locator: Locator): Promise<number> {
@@ -11,7 +12,12 @@ const SURFACE_LIGHT = 'rgb(255, 255, 255)';
 const SURFACE_DARK = 'rgb(27, 34, 43)';
 
 test.describe('Handy-Seiten als User', () => {
-    test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('user', 'Jonas') } } });
+    test.use({
+        api: {
+            'GET api/v1/auth/me': { status: 200, body: meBody('user', 'Jonas') },
+            ...NO_DEVICES,
+        },
+    });
 
     test('Kopfleiste mit Begrüßung und Leiste unten', async ({ page }) => {
         await page.goto('/firefighting/test/suchen');
@@ -87,9 +93,14 @@ test.describe('Handy-Seiten als User', () => {
 });
 
 test.describe('Handy-Seiten als Admin', () => {
-    test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('admin') } } });
+    test.use({
+        api: { 'GET api/v1/auth/me': { status: 200, body: meBody('admin') }, ...NO_DEVICES },
+    });
 
-    test('öffnet alle Handy-Seiten, Leiste mit Dashboard', async ({ page }) => {
+    // Breite ausdrücklich gesetzt: Das Dashboard hat die Leiste nur bei Handy-Breite (unter 768 px),
+    // die Profile laufen in PC- und Handy-Breite.
+    test('Handy-Breite: Leiste mit Dashboard, auch auf dem Dashboard', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
         await page.goto('/firefighting/test/suchen');
         await expect(page.getByRole('heading', { level: 1, name: 'Suchen' })).toBeVisible();
         const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
@@ -101,9 +112,30 @@ test.describe('Handy-Seiten als Admin', () => {
         ]);
         await nav.getByRole('link', { name: 'Dashboard' }).click();
         await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
-        // Das Dashboard hat die Darstellung der Admin-Konsole, ohne Leiste unten.
+        // Das Dashboard hat die Kopfleiste der Admin-Konsole und bei Handy-Breite dieselbe Leiste.
         await expect(page.getByTestId('app-subtitle')).toHaveText('Geräteverwaltung');
-        await expect(page.getByRole('navigation', { name: 'Hauptmenü' })).toHaveCount(0);
+        await expect(nav.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+            'aria-current',
+            'page',
+        );
+        await nav.getByRole('link', { name: 'Suchen' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
+    });
+
+    test('PC-Breite: Leiste auf den Handy-Seiten, nicht auf dem Dashboard', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await page.goto('/firefighting/test/suchen');
+        const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
+        await expect(nav.getByRole('link')).toHaveText([
+            'Dashboard',
+            'Suchen',
+            'Prüffristen',
+            'Profil',
+        ]);
+        await nav.getByRole('link', { name: 'Dashboard' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
+        await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
+        await expect(page.getByRole('navigation', { name: 'Hauptmenü' })).toBeHidden();
     });
 
     test('Geräteseite öffnen', async ({ page }) => {
@@ -113,7 +145,9 @@ test.describe('Handy-Seiten als Admin', () => {
 });
 
 test.describe('Hell und dunkel', () => {
-    test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('user') } } });
+    test.use({
+        api: { 'GET api/v1/auth/me': { status: 200, body: meBody('user') }, ...NO_DEVICES },
+    });
 
     for (const [label, scheme, stored, surface] of [
         ['System hell', 'light', 'system', SURFACE_LIGHT],

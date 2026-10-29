@@ -29,14 +29,22 @@ let generation = 0;
 /** Angemeldetes Konto (null = nicht angemeldet oder noch unbekannt). */
 export const session = readonly(current);
 
-const endedListeners = new Set<() => void>();
+/**
+ * Warum eine Sitzung endet: `logout` (Abmelden beim Server erfolgreich), `ended` (vergessen, z. B.
+ * nach 401 oder einem neuen Passwort), `replaced` (ein anderes Konto meldet sich an).
+ */
+export type SessionEndReason = 'logout' | 'ended' | 'replaced';
+
+type SessionEndedListener = (ended: AuthState, reason: SessionEndReason) => void;
+
+const endedListeners = new Set<SessionEndedListener>();
 
 /**
  * Wird aufgerufen, wenn eine bekannte Sitzung endet (Abmelden, 401, Sitzung vergessen) oder ein
- * anderes Konto sie ersetzt. Die Datenschicht (src/data/) löscht dann die Daten des Kontos. Liefert
- * eine Funktion zum Abmelden des Empfängers.
+ * anderes Konto sie ersetzt, mit dem bisherigen Konto. Die Datenschicht (src/data/) löscht dann die
+ * Daten des Kontos. Liefert eine Funktion zum Abmelden des Empfängers.
  */
-export function onSessionEnded(listener: () => void): () => void {
+export function onSessionEnded(listener: SessionEndedListener): () => void {
     endedListeners.add(listener);
     return () => endedListeners.delete(listener);
 }
@@ -46,11 +54,11 @@ function sameAccount(a: AuthState, b: AuthState): boolean {
 }
 
 /** Meldet das Ende, wenn bisher ein Konto angemeldet war und `next` ein anderes oder keins ist. */
-function notifyIfEnded(next: AuthState | null): void {
+function notifyIfEnded(next: AuthState | null, reason: 'logout' | 'ended'): void {
     const previous = current.value;
     if (previous !== null && (next === null || !sameAccount(previous, next))) {
         for (const listener of endedListeners) {
-            listener();
+            listener(previous, next === null ? reason : 'replaced');
         }
     }
 }
@@ -59,7 +67,11 @@ function notifyIfEnded(next: AuthState | null): void {
 export const sessionCheckError = readonly(checkError);
 
 export function setSession(state: AuthState | null): void {
-    notifyIfEnded(state);
+    applySession(state, 'ended');
+}
+
+function applySession(state: AuthState | null, reason: 'logout' | 'ended'): void {
+    notifyIfEnded(state, reason);
     current.value = state;
     known = true;
 }
@@ -67,7 +79,7 @@ export function setSession(state: AuthState | null): void {
 /** Vergisst die Sitzung (z. B. nach 401); der nächste Wächter fragt auth/me erneut. */
 export function resetSession(): void {
     generation += 1;
-    notifyIfEnded(null);
+    notifyIfEnded(null, 'ended');
     current.value = null;
     checkError.value = null;
     known = false;
@@ -181,7 +193,7 @@ export async function logout(fetchFn?: typeof fetch): Promise<ApiError | null> {
     if (!result.ok) {
         return result.error;
     }
-    setSession(null);
+    applySession(null, 'logout');
     setLoginNotice('logged_out');
     return null;
 }

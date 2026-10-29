@@ -2,6 +2,7 @@ import { shallowRef } from 'vue';
 import type { ApiError, ApiResult } from '../api/client';
 import {
     DEVICE_PAGE_LIMIT,
+    fetchDevice,
     fetchDevicePage,
     type DeviceListItem,
     type DevicePage,
@@ -39,6 +40,10 @@ const EMPTY: DeviceListState = {
 };
 
 type FetchPage = (query: DevicePageQuery) => Promise<ApiResult<DevicePage>>;
+type FetchOne = (id: number) => Promise<ApiResult<DeviceListItem>>;
+
+/** Höchstlänge von `q` in GET devices (DeviceListHandler). */
+export const MAX_SERVER_QUERY_LENGTH = 100;
 
 type LoadResult =
     | { readonly ok: false; readonly error: ApiError }
@@ -64,6 +69,7 @@ export class DeviceStore {
     constructor(
         private readonly fetchPage: FetchPage = (query) => fetchDevicePage(query),
         now?: () => number,
+        private readonly fetchOne: FetchOne = (id) => fetchDevice(id),
     ) {
         this.refresher = new Refresher(() => this.load(), now);
     }
@@ -79,6 +85,46 @@ export class DeviceStore {
 
     find(id: number): DeviceListItem | null {
         return this.current.value.devices.find((device) => device.id === id) ?? null;
+    }
+
+    /**
+     * Suche auf dem Server (Modus `server`): `q` als Teiltext in Kennung, Scan-Code, Seriennummer,
+     * Hersteller, Modell, höchstens `limit` Treffer, `total` = alle Treffer.
+     */
+    searchServer(
+        query: string,
+        limit: number,
+    ): Promise<ApiResult<{ readonly hits: readonly DeviceListItem[]; readonly total: number }>> {
+        const q = Array.from(query.trim()).slice(0, MAX_SERVER_QUERY_LENGTH).join('');
+        return this.fetchPage({ limit, offset: 0, q }).then((result) =>
+            result.ok
+                ? {
+                      ok: true,
+                      status: result.status,
+                      data: { hits: result.data.devices, total: result.data.total },
+                  }
+                : result,
+        );
+    }
+
+    /**
+     * Geräte zu IDs in derselben Reihenfolge (z. B. „Zuletzt benutzt“). Lokal aus der Liste, im
+     * Modus `server` einzeln vom Server (gleichzeitig); unbekannte, ausgesonderte und nicht ladbare
+     * fehlen im Ergebnis.
+     */
+    async findMany(ids: readonly number[]): Promise<DeviceListItem[]> {
+        if (this.current.value.mode !== 'server') {
+            return ids
+                .map((id) => this.find(id))
+                .filter((device): device is DeviceListItem => device !== null);
+        }
+        const results = await Promise.all(ids.map((id) => this.fetchOne(id)));
+        return results
+            .map((result) => (result.ok ? result.data : null))
+            .filter(
+                (device): device is DeviceListItem =>
+                    device !== null && device.status !== 'retired',
+            );
     }
 
     /**

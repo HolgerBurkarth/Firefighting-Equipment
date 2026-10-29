@@ -7,6 +7,7 @@ import {
     NOT_AUTHENTICATED,
     test,
 } from './fixtures';
+import { NO_DEVICES } from './support/devices';
 
 test.describe('Weiche „/“ und Wächter', () => {
     test.describe('ohne Sitzung', () => {
@@ -34,7 +35,9 @@ test.describe('Weiche „/“ und Wächter', () => {
     });
 
     test.describe('als User', () => {
-        test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('user') } } });
+        test.use({
+            api: { 'GET api/v1/auth/me': { status: 200, body: meBody('user') }, ...NO_DEVICES },
+        });
 
         test('„/“ führt zu „Suchen“', async ({ page }) => {
             await page.goto('/firefighting/test/');
