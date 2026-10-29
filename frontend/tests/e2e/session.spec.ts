@@ -71,6 +71,12 @@ test.describe('Weiche „/“ und Wächter', () => {
         });
     });
 
+    /**
+     * Wartezeit vor dem ersten erneuten Versuch (RETRY_DELAYS_MS[0] in src/auth/session.ts), per
+     * page.clock vorgespult statt abgewartet.
+     */
+    const FIRST_RETRY_MS = 2000;
+
     test.describe('Störung bei auth/me', () => {
         test.use({ allowedConsoleError: NETWORK_ERROR_CONSOLE });
 
@@ -89,8 +95,9 @@ test.describe('Weiche „/“ und Wächter', () => {
                     },
                 });
 
-                test.beforeEach(() => {
+                test.beforeEach(async ({ page }) => {
                     calls = 0;
+                    await page.clock.install();
                 });
 
                 test('führt nie zur Anmeldung, versucht es erneut', async ({ page }) => {
@@ -100,6 +107,7 @@ test.describe('Weiche „/“ und Wächter', () => {
                     );
                     await expect(page).not.toHaveURL(/anmelden/);
                     // Nach dem erneuten Versuch geht es normal weiter.
+                    await page.clock.runFor(FIRST_RETRY_MS);
                     await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
                     await expect(page.getByTestId('connection-notice')).toBeHidden();
                     expect(calls).toBe(2);
@@ -110,6 +118,7 @@ test.describe('Weiche „/“ und Wächter', () => {
                 }) => {
                     await page.goto('/firefighting/test/dashboard');
                     await expect(page.getByTestId('connection-notice')).toBeVisible();
+                    await page.clock.runFor(FIRST_RETRY_MS);
                     await expect(
                         page.getByRole('heading', { level: 1, name: 'Dashboard' }),
                     ).toBeVisible();
@@ -129,13 +138,15 @@ test.describe('Weiche „/“ und Wächter', () => {
                 },
             });
 
-            test.beforeEach(() => {
+            test.beforeEach(async ({ page }) => {
                 calls = 0;
+                await page.clock.install();
             });
 
             test('erst die echte 401 führt zur Anmeldung', async ({ page }) => {
                 await page.goto('/firefighting/test/suchen');
                 await expect(page.getByTestId('connection-notice')).toBeVisible();
+                await page.clock.runFor(FIRST_RETRY_MS);
                 await expect(page).toHaveURL(/anmelden\?weiter=\/suchen$/);
                 await expect(page.getByTestId('connection-notice')).toBeHidden();
             });

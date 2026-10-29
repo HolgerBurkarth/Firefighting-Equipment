@@ -17,7 +17,6 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Das Repository ist öffentlich: niemals Passwörter, Zugangsdaten oder
   `config/config.local.php` committen.
 - Code und Bezeichner auf Englisch, Dokumentation und Oberflächentexte auf Deutsch.
-- Antworten an den Nutzer immer auf Deutsch.
 - Status von Nachrichten an den Nutzer – jede Nachricht beginnt mit genau einer Kennzeichnung:
   - "⏳ ZWISCHENSTAND – ich arbeite weiter": Es läuft noch etwas. Dazu: was gerade läuft, wie lange
     es voraussichtlich dauert und was danach kommt. Der Nutzer muss nichts tun.
@@ -394,16 +393,27 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Befehle (in `frontend/`): `npm ci`, einmalig `npx playwright install chromium firefox webkit`;
   `npm test` (ESLint + Prettier, Vitest, `vue-tsc` + Build, Playwright) muss vor jedem Commit grün
   sein. Einzeln: `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test:unit`,
-  `npm run build`, `npm run test:e2e` (braucht den Build). Entwicklung: `npm run dev`
+  `npm run build`, `npm run test:e2e` (braucht den Build; lokal nur Chromium und WebKit),
+  `npm run test:e2e:all` (alle fünf Profile, `playwright.all.config.ts`), `npm run test:load`
+  (Lastläufe, siehe unten). Entwicklung: `npm run dev`
   (`http://localhost:5173/firefighting/test/`, API per Proxy an `php -S localhost:8000`; für
   ändernde Anfragen `http://localhost:5173` in `http.allowed_origins`).
 - Browser-Tests (Playwright: Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build,
-  ausgeliefert von PHP (`php -q -S localhost:4173 public/index.php`, startet Playwright selbst), also
-  mit echter CSP und echtem Caching. Nie fremde Server mitbenutzen: `reuseExistingServer: false`
-  (auch lokal) und `port` statt `url` (Prüfung per TCP, erkennt auch einen hängenden Server eines
-  abgebrochenen Laufs); ist 4173 oder 4174 belegt, bricht der Lauf mit „… is already used“ ab. `php -S` arbeitet Anfragen nacheinander ab und weist bei
-  Überlast Verbindungen ab: unter Linux (CI) daher `PHP_CLI_SERVER_WORKERS` = 4, unter Windows (dort
-  ohne Worker) höchstens 4 parallele Playwright-Worker (`playwright.config.ts`). Keine
+  ausgeliefert von PHP (`php -q -S localhost:<port> public/index.php`), also mit echter CSP und
+  echtem Caching. Profile: in CI (`CI` gesetzt) alle fünf, lokal mit `npm test`/`npm run test:e2e`
+  nur `chromium` und `webkit` (`LOCAL_PROJECTS` in `playwright.config.ts`); Firefox und die
+  Handy-Profile prüft vor allem CI, lokal `npm run test:e2e:all`. Server: Jeder Playwright-Worker
+  startet eigene (Worker-Fixtures `appServer`, `updateServer` in `tests/e2e/fixtures.ts`,
+  `tests/e2e/support/phpServer.ts`): Ports `4173 + 2 × parallelIndex` (App) und eins darüber
+  (Update-Testserver, nur gestartet, wenn ein Test ihn braucht); `baseURL` kommt aus dem Fixture,
+  kein `webServer` in der Konfiguration. Nie fremde Server mitbenutzen: Ist ein Port belegt (Prüfung
+  per TCP auf IPv4 und IPv6, erkennt auch einen hängenden Server eines abgebrochenen Laufs), scheitert
+  der Start mit „… is already used“. `php -S` arbeitet Anfragen nacheinander ab: unter Linux (CI)
+  `PHP_CLI_SERVER_WORKERS` = 4 je Server, Zahl der Worker nach Standard von Playwright; unter
+  Windows (dort ohne) weist ein Server unter hoher Last Verbindungen ab (Firefox:
+  `NS_ERROR_CONNECTION_REFUSED`), daher `WINDOWS_TEST_WORKERS` in `playwright.config.ts`: 6 für
+  Chromium und WebKit, 4 für alle fünf Profile (gemessen 29.10.2026, README "Frontend"; erst nach
+  neuer Messung ändern). Keine
   automatischen Wiederholungen (`retries: 0`), sie würden zeitweise Fehler verdecken. API und Manifest simuliert `page.route()`
   (`tests/e2e/fixtures.ts`) mit denselben Bereichen wie die Routen in PHP (unter `service` nur
   `api/v1/app-icon/…`), eine Datenbank wird nicht gebraucht. Weitere Routen je Test über die
@@ -416,21 +426,31 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Browsermeldung nur per Option `allowedConsoleError`, nie für CSP). Service Worker sind gesperrt
   außer in `serviceWorker.spec.ts` und `appUpdate.spec.ts`; der Offline-Test läuft nur in Chromium (`setOffline` umgeht in
   Firefox/WebKit den Service Worker). Update-Tests (`appUpdate.spec.ts`) mit zwei echten Builds: `globalSetup.ts` baut
-  die neue Version (`FF_BUILD_ID=e2e-next`) nach `frontend/test-builds/` (in `.gitignore`), ein
-  zweiter Server `php -S localhost:4174 frontend/tests/e2e/support/update-server.php` (nur für Tests)
-  liefert je Bereich `frontend/dist` oder, mit Schaltdatei `test-builds/state/<bereich>`, die neue;
-  jeder Test hat einen eigenen Bereich. Er beantwortet die öffentlichen Aufrufe der Anmeldeseite
+  die neue Version (`FF_BUILD_ID=e2e-next`) nach `frontend/test-builds/` (in `.gitignore`), der
+  Update-Testserver des Workers (`frontend/tests/e2e/support/update-server.php`, nur für Tests,
+  `baseURL` dieser Testdatei) liefert je Bereich `frontend/dist` oder, mit Schaltdatei
+  `test-builds/state/<bereich>`, die neue (Inhalt `next`; `build-json` = nur `build.json` neu, `sw.js`
+  bleibt alt); jeder Test hat einen eigenen Bereich. Er beantwortet die öffentlichen Aufrufe der Anmeldeseite
   selbst, weil WebKit Anfragen einer vom Service Worker kontrollierten Seite nicht an `page.route()`
   gibt. Bereiche je Test über `randomUUID` (Prozess-IDs werden unter Windows wiederverwendet).
   Abgedeckte Fälle: ohne/mit Eingabe, Rückfrage, erster Besuch mit Deploy vor der
   Installation (Registrierung per Init-Skript zurückgehalten), Seite per Strg+F5 geladen und vom
   neuen Service Worker übernommen (nur Chromium: `Page.reload` mit `ignoreCache` über CDP), zwei Tabs
   (einer aktualisiert, der andere folgt; einer geschlossen), Mail-Link mit alter Version, „Seite nicht
-  gefunden“, Zurück-Knopf nach erkannter neuer Version. Firefox meldet einen Schrift-Download, den das
+  gefunden“, Zurück-Knopf nach erkannter neuer Version, neue Kennung ohne neuen Service Worker (nach
+  rund 30 s „Neu laden“). Firefox meldet einen Schrift-Download, den das
   Neuladen abbricht (Status 2152398850 = `NS_BINDING_ABORTED`), als Konsolenfehler; nur diesen lässt
   der Mail-Link-Test zu. Sporadische Fehler der Update-Logik nie mit längeren Wartezeiten
-  überdecken: unter Last wiederholen (`--repeat-each`, mehrere Worker, `--output` je Durchgang, damit
-  die Traces bleiben) und die Ursache im Trace suchen.
+  überdecken: unter Last wiederholen (`npm run test:load -- [Datei] [--project=…] [--runs=N]`,
+  `tests/e2e/support/loadRun.ts`: alle fünf Profile, ohne Angabe `--repeat-each=10`, je Durchgang
+  `--output=test-results/load/<Zeit>-<n>`, damit die Traces bleiben; der nächste normale Lauf leert
+  `test-results/`) und die Ursache im Trace suchen.
+- Feste Wartezeiten der App (Wiederholungen nach 2 s bei `auth/me`, Countdown nach `Retry-After`,
+  Suche bis rund 30 s nach dem neuen Service Worker) werden in den Browser-Tests mit `page.clock`
+  vorgespult (`install()` vor dem Laden, dann `runFor()`), nie abgewartet. Netzwerk und Service
+  Worker laufen dabei in Echtzeit: Hängt die nächste Wartezeit an einer Antwort (z. B. `update()`),
+  in kleinen Schritten vorspulen (`expect.poll` mit `runFor(1000)`, `intervals: [50]`). Nur gezielt
+  in diesen Tests, nicht global.
 - Formatierung: Prettier (4 Leerzeichen laut `.editorconfig`, JSON 2), ESLint mit typgeprüften
   strikten Regeln, `no-console`, nur `<script setup lang="ts">`, kein `v-html`.
 
@@ -1663,10 +1683,16 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (mysqldump wie auf dem Server), dann `composer validate --strict`, `composer install`,
   `composer test`. Unter Linux laufen auch die Tests der Unix-Dateirechte und mit mysqldump.
 - Job `frontend`: PHP (für `php -S` in den Browser-Tests) und Node aus `frontend/.nvmrc`; `npm ci`,
-  `npm run lint`, `npm run test:unit`, `npm run build`, Playwright mit Chromium, Firefox, WebKit.
+  `npm run lint`, `npm run test:unit`, `npm run build`, Playwright mit Chromium, Firefox, WebKit
+  (alle fünf Profile, weil `CI` gesetzt ist).
   Der getestete Build wird als Artefakt `frontend-dist` hochgeladen (bei Fehlern zusätzlich der
   Playwright-Bericht mit `playwright-report/` und `test-results/`, darin die Traces gescheiterter
   Tests: `trace: 'retain-on-failure'` in `playwright.config.ts`).
+- Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Einzige Ausnahme: Ein Lauf, der
+  ausschließlich am bekannten Firefox-Fehler beim Schließen des Browser-Kontexts scheitert
+  (`_maybeDontRestoreTabs`, [microsoft/playwright#43413](https://github.com/microsoft/playwright/issues/43413),
+  Playwright 1.64 mit Firefox 157, als „not planned“ geschlossen), darf EINMAL neu gestartet werden.
+  Scheitert auch der neue Lauf, wird nicht noch einmal neu gestartet, sondern untersucht.
 - Job `deploy`: nur bei Push auf `main` und nur, wenn `php` und `frontend` grün sind; nie parallel
   (`concurrency: deploy-branch`). Lädt das Artefakt und ruft
   `bash scripts/publish-deploy-branch.sh <main-commit> <dist-ordner>` auf.

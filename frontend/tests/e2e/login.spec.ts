@@ -258,6 +258,8 @@ test.describe('Fehler beim Anmelden', () => {
         });
 
         test('zeigt die Wartezeit und sperrt den Knopf bis dahin', async ({ page }) => {
+            // Die 3 s aus Retry-After werden vorgespult statt abgewartet.
+            await page.clock.install();
             await page.goto('/firefighting/test/anmelden');
             await fillAndSubmit(page);
             await expect(page.getByRole('alert')).toContainText(
@@ -266,7 +268,8 @@ test.describe('Fehler beim Anmelden', () => {
             const submit = page.getByTestId('login-submit');
             await expect(submit).toBeDisabled();
             await expect(submit).toContainText('wieder möglich in 0:0');
-            await expect(submit).toBeEnabled({ timeout: 6000 });
+            await page.clock.runFor(3000);
+            await expect(submit).toBeEnabled();
             await expect(submit).toHaveText('Anmelden');
         });
     });

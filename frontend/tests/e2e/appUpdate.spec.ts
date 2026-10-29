@@ -3,15 +3,19 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { expect, test } from './fixtures';
+import { expect, test as base } from './fixtures';
 import { NEXT_BUILD_ID } from './globalSetup';
 
 /**
- * Updates mit zwei echten Builds: Der Update-Testserver (Port 4174, tests/e2e/support/
+ * Updates mit zwei echten Builds: Der Update-Testserver des Workers (tests/e2e/support/
  * update-server.php) liefert je Bereich frontend/dist (alt) oder test-builds/next (neu). Jeder Test
  * hat einen eigenen Bereich und damit einen eigenen Service Worker.
  */
-const ORIGIN = 'http://localhost:4174';
+const test = base.extend({
+    baseURL: async ({ updateServer }, use) => {
+        await use(updateServer.origin);
+    },
+});
 const STATE = fileURLToPath(new URL('../../test-builds/state/', import.meta.url));
 
 test.use({ serviceWorkers: 'allow' });
@@ -29,7 +33,7 @@ function newArea(project: string): string {
 
 /** Alte Version laden und warten, bis ihr Service Worker die Seite kontrolliert. */
 async function openOldVersion(page: Page, area: string): Promise<void> {
-    await page.goto(`${ORIGIN}/firefighting/${area}/anmelden`);
+    await page.goto(`/firefighting/${area}/anmelden`);
     await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
     await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
     await expect(page.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
@@ -72,7 +76,7 @@ test.describe('Updates der App', () => {
 
         await page.getByRole('link', { name: 'Passwort vergessen?' }).click();
         await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
-        await expect(page).toHaveURL(`${ORIGIN}/firefighting/${area}/passwort-vergessen`);
+        await expect(page).toHaveURL(`/firefighting/${area}/passwort-vergessen`);
         await expect(
             page.getByRole('heading', { level: 1, name: 'Passwort vergessen' }),
         ).toBeVisible();
@@ -130,7 +134,7 @@ test.describe('Updates der App', () => {
         await updateButton.click();
         await dialog.getByRole('button', { name: 'Aktualisieren' }).click();
         await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
-        await expect(page).toHaveURL(`${ORIGIN}/firefighting/${area}/anmelden`);
+        await expect(page).toHaveURL(`/firefighting/${area}/anmelden`);
         await expect(page.getByTestId('update-notice')).toBeHidden();
     });
 });
@@ -167,7 +171,7 @@ async function waitForSettledWorker(page: Page): Promise<void> {
 /** Seitenwechsel in der App; danach muss die neue Version geladen sein. */
 async function expectNewVersionAfterNavigation(page: Page, area: string): Promise<void> {
     await page.getByRole('link', { name: 'Passwort vergessen?' }).click();
-    await expect(page).toHaveURL(`${ORIGIN}/firefighting/${area}/passwort-vergessen`);
+    await expect(page).toHaveURL(`/firefighting/${area}/passwort-vergessen`);
     await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
     await expect(page.getByRole('heading', { level: 1, name: 'Passwort vergessen' })).toBeVisible();
 }
@@ -196,7 +200,7 @@ test.describe('Updates der App: Seiten ohne Kontrolle des Service Workers, mehre
                 gate.then(() => register(...args));
         });
         const area = newArea(testInfo.project.name);
-        await page.goto(`${ORIGIN}/firefighting/${area}/anmelden`);
+        await page.goto(`/firefighting/${area}/anmelden`);
         // Die alte Version läuft (der Start wartet höchstens kurz auf die zurückgehaltene
         // Registrierung, dann erscheint die Seite).
         await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
@@ -320,20 +324,50 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
                 problems.push(`Konsolenfehler: ${message.text()}`);
             }
         });
-        await mail.goto(`${ORIGIN}/firefighting/${area}/email-bestaetigen#token=${MAIL_TOKEN}`);
+        await mail.goto(`/firefighting/${area}/email-bestaetigen#token=${MAIL_TOKEN}`);
 
         await expect(mail.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
         await expect(mail.getByRole('heading', { level: 1 })).toHaveText(
             'E-Mail-Adresse bestätigen',
         );
         // Das Fragment entfernt erst die neue Version.
-        await expect(mail).toHaveURL(`${ORIGIN}/firefighting/${area}/email-bestaetigen`);
+        await expect(mail).toHaveURL(`/firefighting/${area}/email-bestaetigen`);
         await mail.getByRole('button', { name: 'E-Mail-Adresse bestätigen' }).click();
         await expect(mail.getByTestId('email-verified')).toHaveText(
             'Ihre E-Mail-Adresse ist bestätigt.',
         );
         expect(problems).toEqual([]);
         await mail.close();
+    });
+
+    test('neue Kennung, aber kein neuer Service Worker: nach rund 30 s „Neu laden“', async ({
+        page,
+    }, testInfo) => {
+        const area = newArea(testInfo.project.name);
+        await openOldVersion(page, area);
+        // Deploy, bei dem nur build.json neu ist (sw.js bleibt alt): Der Start sucht bis rund 30 s
+        // (START_RETRY_DELAYS_MS) nach dem neuen Service Worker. Die Wartezeiten werden vorgespult;
+        // update() und Netzwerk laufen in Echtzeit, daher in kleinen Schritten.
+        writeFileSync(join(STATE, area), 'build-json');
+        await page.clock.install();
+        await page.reload();
+        const started = await page.evaluate(() => Date.now());
+        const notice = page.getByTestId('update-reload-needed');
+        await expect
+            .poll(
+                async () => {
+                    await page.clock.runFor(1000);
+                    return notice.isVisible();
+                },
+                { intervals: [50], timeout: 30_000 },
+            )
+            .toBe(true);
+        expect(await page.evaluate(() => Date.now())).toBeGreaterThanOrEqual(started + 30_000);
+        await expect(notice).toContainText('Die neue Version konnte nicht geladen werden.');
+        await expect(notice.getByRole('button', { name: 'Neu laden' })).toBeVisible();
+        // Die Seite bleibt beim Laden, nie kurz die alte Anmeldeseite.
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeHidden();
+        await expect(page.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
     });
 
     test('„Seite nicht gefunden“ prüft zuerst auf eine neue Version', async ({
@@ -350,7 +384,7 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         });
         await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
         await expect(page).toHaveURL(
-            `${ORIGIN}/firefighting/${area}/gibt-es-erst-spaeter#code=ABCD-EFGH-JKMN`,
+            `/firefighting/${area}/gibt-es-erst-spaeter#code=ABCD-EFGH-JKMN`,
         );
         await expect(
             page.getByRole('heading', { level: 1, name: 'Seite nicht gefunden' }),
@@ -374,7 +408,7 @@ test.describe('Updates der App: Zurück-Knopf', () => {
         // Zurück (popstate): Die App lädt neu; die Historie darf das Neuladen nicht überholen.
         await page.goBack();
         await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
-        await expect(page).toHaveURL(`${ORIGIN}/firefighting/${area}/anmelden`);
+        await expect(page).toHaveURL(`/firefighting/${area}/anmelden`);
         await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
     });
 });
