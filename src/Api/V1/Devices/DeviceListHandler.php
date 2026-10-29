@@ -46,7 +46,7 @@ final readonly class DeviceListHandler implements RequestHandler
         $page = new DeviceRepository($context->db->get())->list($tenant, $filter, $sort, $direction, $limit, $offset);
 
         return new JsonResponse([
-            'devices' => array_map(DeviceJson::summary(...), $page->devices),
+            'devices' => array_map(DeviceJson::listItem(...), $page->devices),
             'total' => $page->total,
             'limit' => $limit,
             'offset' => $offset,
