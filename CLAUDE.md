@@ -340,10 +340,27 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (`setBookingNotice`, sessionStorage `ff-booking-notice`, übersteht ein Neuladen; `applied` grün
   „M1 → HLF 20 / G2 · einsatzbereit“, sonst `result.message`), dann `returnTo(router, 'search')`
   (`src/router/back.ts`: ist „Suchen“ die vorige Seite, `back()`, sonst `replace`). „Suchen“ zeigt
-  die Bestätigung bis zur nächsten Eingabe. Noch nicht: „Anderen Standort suchen …“ (Standortwahl)
-  und „Details und Verlauf“ (ausgeblendet). Browser-Tests mit der Umbuchen-Ansicht simulieren
-  `GET api/v1/devices/{id}` (`deviceDetail`) und `GET api/v1/locations` (`LOCATIONS`), beide in
-  `tests/e2e/support/devices.ts`; Tests in `tests/e2e/booking.spec.ts`.
+  die Bestätigung bis zur nächsten Eingabe. Nach jeder Buchung `locationStore.refresh('changed')`
+  (Gerätezahlen). Noch nicht: „Details und Verlauf“ (ausgeblendet). Browser-Tests mit der
+  Umbuchen-Ansicht simulieren `GET api/v1/devices/{id}` (`deviceDetail`) und `GET api/v1/locations`
+  (`LOCATIONS`, mit Gerätezahlen), beide in `tests/e2e/support/devices.ts`; Tests in
+  `tests/e2e/booking.spec.ts`.
+- Standortwahl („Anderen Standort suchen …“, `LocationPicker` in `src/components/`, Logik
+  `src/data/locationSearch.ts`): eine Ansicht der Umbuchen-Seite, geöffnet über `?standortwahl=1`
+  am selben Pfad (kein eigener Pfad: Eingaben bleiben, `installUpdateGuard` lädt bei gleichem Pfad
+  nicht neu, der Zurück-Knopf schließt nur die Auswahl). Schließen (Abbrechen oder Wahl) über
+  `closeQueryView` (`src/router/back.ts`: war die Adresse ohne Parameter die vorige, `back()`, sonst
+  `replace`). Ohne Suchbegriff `locationGroups`: Standorte der Ebene 1 (ohne gesperrte) mit
+  `device_count_total`; mit Unterstandorten klappt die ganze Zeile auf (`aria-expanded`, zu Beginn
+  die Gruppe des gewählten Standorts), erster Eintrag `WHOLE_LABELS` („Ganzes Fahrzeug, ohne Fach“,
+  bei Räumen „Ganzer Raum, ohne Fach“, Extern „Ganzer Standort, ohne Fach“) = der Standort selbst,
+  dann die Fächer; ohne Unterstandorte wählt Antippen. Mit Suchbegriff `searchLocations`: Wörter mit
+  UND (Vergleichsform `searchKey`) im Namen der Ebene 1 bzw. im ganzen Pfad eines Unterstandorts
+  („hlf g1“), flach, Fächer mit ihrem Fahrzeug darunter, „N Treffer“, sonst „Kein Standort passt zu
+  „…“.“. Markierung „aktuell“ und Häkchen „gewählt“. Ein gewählter Standort, der nicht unter den
+  zuletzt benutzten steht, erscheint beim Umbuchen nach dem aktuellen mit „gewählt“. Fokus: beim
+  Öffnen die Überschrift, danach „Anderen Standort suchen …“. Tests in
+  `tests/e2e/locationPicker.spec.ts` und `tests/unit/locationSearch.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
@@ -352,8 +369,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `goBack` in `src/router/back.ts`: vorige Seite der App laut `history.state.back`, sonst
   „Suchen“). Handy-Seiten (`suchen`, `prueffristen`, `profil`, `geraete/<id>` mit `<id>` wie die
   Platzhalter im Backend) für `user` und `admin` (KONZEPT.md "User am Handy – Entscheidungen").
-  `meta.mobileTabBar` (nur Dashboard unter einer Stadt, bis die Admin-Konsole ein eigenes Menü
-  hat): Leiste unten auch ohne `layout`, aber nur bei Handy-Breite (unter 768 px). Der Wächter fragt `auth/me`
+  `meta.tabBar` (nur Dashboard unter einer Stadt, bis die Admin-Konsole ein eigenes Menü hat):
+  Leiste unten auch ohne `layout`, in jeder Breite (am PC sonst kein Weg zu „Suchen“). Der Wächter fragt `auth/me`
   höchstens einmal je Seitenaufruf (`ensureSession`); ohne Sitzung → `anmelden?weiter=…`, falsche
   Rolle → Startseite der Rolle (`landingRoute`: `user` → `suchen`, `admin`/`superadmin` →
   `dashboard`). Nur eine echte Antwort entscheidet über die Sitzung (401 = nicht angemeldet,

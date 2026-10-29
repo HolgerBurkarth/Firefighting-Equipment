@@ -101,12 +101,12 @@ describe('Wächter', () => {
         );
     });
 
-    it('Dashboard des Admins mit Leiste bei Handy-Breite, des Super-Admins ohne', async () => {
+    it('Dashboard des Admins mit Leiste (jede Breite), des Super-Admins ohne', async () => {
         setSession(state('admin'));
-        expect((await routerAt('/dashboard')).currentRoute.value.meta.mobileTabBar).toBe(true);
+        expect((await routerAt('/dashboard')).currentRoute.value.meta.tabBar).toBe(true);
         setSession(state('superadmin'));
         expect(
-            (await routerAt('/dashboard', SERVICE)).currentRoute.value.meta.mobileTabBar,
+            (await routerAt('/dashboard', SERVICE)).currentRoute.value.meta.tabBar,
         ).toBeUndefined();
     });
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRouter, createWebHistory, type Router } from 'vue-router';
-import { goBack, returnTo } from '../../src/router/back';
+import { closeQueryView, goBack, returnTo } from '../../src/router/back';
 
 const Empty = { template: '<div />' };
 
@@ -86,5 +86,37 @@ describe('returnTo', () => {
         await router.push('/geraete/12');
         await returnTo(router, 'search');
         expect(router.currentRoute.value.name).toBe('search');
+    });
+});
+
+describe('closeQueryView', () => {
+    beforeEach(() => {
+        window.history.replaceState(null, '', '/suchen');
+    });
+
+    it('geöffnet über einen Knopf → zurück (wie der Knopf des Browsers)', async () => {
+        const router = testRouter();
+        await router.push('/suchen');
+        await router.push('/geraete/12');
+        await router.push({ path: '/geraete/12', query: { standortwahl: '1' } });
+        const done = new Promise<void>((resolve) => {
+            const stop = router.afterEach(() => {
+                stop();
+                resolve();
+            });
+        });
+        await closeQueryView(router, 'standortwahl');
+        await done;
+        expect(router.currentRoute.value.fullPath).toBe('/geraete/12');
+        expect(window.history.state).toMatchObject({ back: '/suchen' });
+    });
+
+    it('direkt geöffnet (z. B. neu geladen) → Adresse ohne Parameter ersetzt sie', async () => {
+        const router = testRouter();
+        await router.push('/suchen');
+        await router.push({ path: '/geraete/12', query: { standortwahl: '1', x: 'y' } });
+        await closeQueryView(router, 'standortwahl');
+        expect(router.currentRoute.value.fullPath).toBe('/geraete/12?x=y');
+        expect(window.history.state).toMatchObject({ back: '/suchen' });
     });
 });

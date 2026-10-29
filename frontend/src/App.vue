@@ -139,10 +139,7 @@ onMounted(() => {
         </p>
         <RouterView />
     </main>
-    <UserTabBar
-        v-if="layout === 'user' || route.meta.mobileTabBar === true"
-        :mobile-only="layout !== 'user'"
-    />
+    <UserTabBar v-if="layout === 'user' || route.meta.tabBar === true" />
 </template>
 
 <style scoped>

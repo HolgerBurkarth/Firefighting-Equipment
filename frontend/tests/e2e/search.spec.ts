@@ -309,11 +309,19 @@ test.describe('Dashboard des Admins', () => {
         await expect(page).toHaveURL(/\/suchen$/);
     });
 
-    test('PC-Breite: keine Leiste', async ({ page }) => {
+    test('PC-Breite: Leiste unten, „Suchen“ erreichbar', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 800 });
         await page.goto('/firefighting/test/dashboard');
         await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
-        await expect(page.getByRole('navigation', { name: 'Hauptmenü' })).toBeHidden();
+        const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
+        await expect(nav.getByRole('link')).toHaveText([
+            'Dashboard',
+            'Suchen',
+            'Prüffristen',
+            'Profil',
+        ]);
+        await nav.getByRole('link', { name: 'Suchen' }).click();
+        await expect(page).toHaveURL(/\/suchen$/);
     });
 });
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../api/devices';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FocusHeader from '../components/FocusHeader.vue';
+import LocationPicker from '../components/LocationPicker.vue';
 import {
     deviceStore,
     locationStore,
@@ -28,12 +29,20 @@ import {
     setBookingNotice,
 } from '../data/booking';
 import { locationPaths, type LocationChoice } from '../data/recentLocations';
-import { returnTo } from '../router/back';
+import { closeQueryView, returnTo } from '../router/back';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 
 const route = useRoute();
 const router = useRouter();
 const deviceId = Number(route.params['id']);
+
+/**
+ * Die Standortwahl ist eine Ansicht dieser Seite, geöffnet über `?standortwahl=1`: Eingaben bleiben
+ * stehen, ein Update beim Seitenwechsel lädt nicht neu (gleicher Pfad), und der Zurück-Knopf des
+ * Browsers bzw. Handys schließt nur die Auswahl.
+ */
+const PICKER_QUERY = 'standortwahl';
+const otherLocationButton = useTemplateRef<HTMLButtonElement>('otherLocation');
 
 /** Symbole wie StatusBadge (Statusfarben immer mit Symbol und Wort). */
 const SYMBOLS: Readonly<Record<BookableStatus, string>> = {
@@ -101,13 +110,21 @@ useUnsavedInput(
 
 const paths = computed(() => locationPaths(locationStore.state.locations ?? []));
 
-/** Aktueller Standort und die letzten 3 eigenen Ziele (Entscheidung 21), ohne gesperrte. */
+/**
+ * Aktueller Standort, ein in der Standortwahl gewählter und die letzten 3 eigenen Ziele
+ * (Entscheidung 21), ohne gesperrte.
+ */
 const locationChoices = computed<(LocationChoice & { hint: string })[]>(() => {
     const current = device.value?.location;
     if (current === undefined) {
         return [];
     }
     const choices = [{ id: current.id, path: current.path, hint: 'aktuell' }];
+    const chosen =
+        chosenLocation.value === null ? undefined : paths.value.get(chosenLocation.value);
+    if (chosen !== undefined && chosen.id !== current.id && !recentIds.value.includes(chosen.id)) {
+        choices.push({ ...chosen, hint: 'gewählt' });
+    }
     for (const id of recentIds.value) {
         const known = paths.value.get(id);
         if (known !== undefined && id !== current.id) {
@@ -127,6 +144,40 @@ const subtitle = computed(() =>
         ? null
         : `Jetzt: ${device.value.location.path} · ${device.value.statusLabel}`,
 );
+
+const pickerOpen = computed(
+    () =>
+        route.query[PICKER_QUERY] === '1' &&
+        device.value !== null &&
+        device.value.status !== 'retired',
+);
+
+async function openPicker(): Promise<void> {
+    void locationStore.refresh('open');
+    await router.push({ query: { ...route.query, [PICKER_QUERY]: '1' } });
+}
+
+function closePicker(): Promise<void> {
+    return closeQueryView(router, PICKER_QUERY);
+}
+
+async function pickFromPicker(id: number): Promise<void> {
+    pickLocation(id);
+    await closePicker();
+}
+
+function retryLocations(): void {
+    void locationStore.refresh('changed');
+}
+
+// Ansicht gewechselt: oben beginnen; nach dem Schließen zurück zum Knopf der Standortwahl.
+watch(pickerOpen, async (open) => {
+    window.scrollTo(0, 0);
+    if (!open) {
+        await nextTick();
+        otherLocationButton.value?.focus({ preventScroll: true });
+    }
+});
 
 async function load(): Promise<void> {
     loading.value = true;
@@ -207,6 +258,8 @@ async function save(): Promise<void> {
         rememberLocation(content.locationId);
     }
     rememberDevice(deviceId);
+    // Gerätezahlen der Standortwahl stimmen danach nicht mehr.
+    void locationStore.refresh('changed');
     setBookingNotice(bookingNotice(result.data));
     saved.value = true;
     await returnTo(router, 'search');
@@ -215,129 +268,168 @@ async function save(): Promise<void> {
 
 <!-- Umbuchen und Status (Mockup UserUmbuchen); Admins nutzen dieselbe Ansicht (Entscheidung 15). -->
 <template>
-    <FocusHeader :title="title" :subtitle="subtitle" />
+    <LocationPicker
+        v-if="pickerOpen && device !== null"
+        :locations="locationStore.state.locations"
+        :loading="locationStore.state.loading"
+        :error="locationStore.state.error"
+        :current-id="device.location.id"
+        :selected-id="locationId ?? device.location.id"
+        :device-label="title"
+        @pick="pickFromPicker"
+        @close="closePicker"
+        @retry="retryLocations"
+    />
 
-    <div v-if="device === null" class="device-content">
-        <p v-if="loadError === null" class="hint" role="status">Gerät wird geladen …</p>
-        <div v-else-if="loadError.status === 404" class="notice notice-info" role="alert">
-            <p>Dieses Gerät gibt es nicht (mehr).</p>
+    <template v-else>
+        <FocusHeader :title="title" :subtitle="subtitle" />
+
+        <div v-if="device === null" class="device-content">
+            <p v-if="loadError === null" class="hint" role="status">Gerät wird geladen …</p>
+            <div v-else-if="loadError.status === 404" class="notice notice-info" role="alert">
+                <p>Dieses Gerät gibt es nicht (mehr).</p>
+            </div>
+            <ErrorNotice v-else :error="loadError">
+                <button class="btn" type="button" :disabled="loading" @click="load">
+                    Erneut versuchen
+                </button>
+            </ErrorNotice>
         </div>
-        <ErrorNotice v-else :error="loadError">
-            <button class="btn" type="button" :disabled="loading" @click="load">
-                Erneut versuchen
-            </button>
-        </ErrorNotice>
-    </div>
 
-    <div v-else-if="device.status === 'retired'" class="device-content">
-        <div class="notice notice-info" role="status" data-testid="device-retired">
-            <p>Dieses Gerät ist ausgesondert und kann nicht umgebucht werden.</p>
+        <div v-else-if="device.status === 'retired'" class="device-content">
+            <div class="notice notice-info" role="status" data-testid="device-retired">
+                <p>Dieses Gerät ist ausgesondert und kann nicht umgebucht werden.</p>
+            </div>
         </div>
-    </div>
 
-    <form v-else class="device-form" novalidate @submit.prevent="save">
-        <div class="device-content">
-            <div
-                v-if="conflict"
-                class="notice notice-info"
-                role="alert"
-                data-testid="booking-conflict"
-            >
-                <p>
-                    Das Gerät wurde inzwischen geändert. Oben steht jetzt der aktuelle Stand. Bitte
-                    prüfen Sie Ihre Auswahl und speichern Sie erneut.
-                </p>
+        <form v-else class="device-form" novalidate @submit.prevent="save">
+            <div class="device-content">
+                <div
+                    v-if="conflict"
+                    class="notice notice-info"
+                    role="alert"
+                    data-testid="booking-conflict"
+                >
+                    <p>
+                        Das Gerät wurde inzwischen geändert. Oben steht jetzt der aktuelle Stand.
+                        Bitte prüfen Sie Ihre Auswahl und speichern Sie erneut.
+                    </p>
+                </div>
+
+                <section class="device-section" aria-labelledby="location-heading">
+                    <h2 id="location-heading" class="device-heading">Standort</h2>
+                    <button
+                        v-for="choice in locationChoices"
+                        :key="choice.id"
+                        class="location-choice"
+                        type="button"
+                        :aria-pressed="choice.id === locationId"
+                        data-testid="location-choice"
+                        @click="pickLocation(choice.id)"
+                    >
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            aria-hidden="true"
+                        >
+                            <path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z" />
+                            <circle cx="12" cy="9" r="2.5" />
+                        </svg>
+                        <span class="location-path">{{ choice.path }}</span>
+                        <span class="location-hint">{{ choice.hint }}</span>
+                    </button>
+                    <button
+                        ref="otherLocation"
+                        class="other-location"
+                        type="button"
+                        @click="openPicker"
+                    >
+                        <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            aria-hidden="true"
+                        >
+                            <circle cx="11" cy="11" r="7" />
+                            <path d="M20 20l-4-4" />
+                        </svg>
+                        Anderen Standort suchen …
+                    </button>
+                </section>
+
+                <section class="device-section" aria-labelledby="status-heading">
+                    <h2 id="status-heading" class="device-heading">Status</h2>
+                    <div class="status-choices">
+                        <button
+                            v-for="value in BOOKABLE_STATUSES"
+                            :key="value"
+                            class="status-choice"
+                            :class="`status-choice-${value}`"
+                            type="button"
+                            :aria-pressed="value === status"
+                            data-testid="status-choice"
+                            @click="pickStatus(value)"
+                        >
+                            <span class="status-symbol" aria-hidden="true">{{
+                                SYMBOLS[value]
+                            }}</span>
+                            {{ STATUS_LABELS[value] }}
+                        </button>
+                    </div>
+                </section>
+
+                <section class="device-section">
+                    <label for="booking-comment" class="device-heading">
+                        {{ reportsDefect ? 'Was ist defekt?' : 'Kommentar (optional)' }}
+                    </label>
+                    <span v-if="reportsDefect" id="booking-comment-hint" class="defect-hint">
+                        Bitte kurz beschreiben, was nicht funktioniert. Das hilft bei der Reparatur.
+                    </span>
+                    <textarea
+                        id="booking-comment"
+                        v-model="comment"
+                        class="comment"
+                        :class="{ 'comment-defect': reportsDefect }"
+                        rows="2"
+                        :maxlength="MAX_COMMENT_LENGTH"
+                        :placeholder="
+                            reportsDefect
+                                ? 'z. B. Ausatemventil undicht'
+                                : 'z. B. nach Übung gereinigt'
+                        "
+                        :aria-invalid="showCommentError"
+                        :aria-describedby="commentDescribedBy"
+                    />
+                    <p
+                        v-if="showCommentError"
+                        id="booking-comment-error"
+                        class="field-error"
+                        data-testid="comment-error"
+                    >
+                        Bitte beschreiben Sie den Defekt mit mindestens
+                        {{ MIN_DEFECT_COMMENT_LENGTH }} Zeichen.
+                    </p>
+                </section>
             </div>
 
-            <section class="device-section" aria-labelledby="location-heading">
-                <h2 id="location-heading" class="device-heading">Standort</h2>
-                <button
-                    v-for="choice in locationChoices"
-                    :key="choice.id"
-                    class="location-choice"
-                    type="button"
-                    :aria-pressed="choice.id === locationId"
-                    data-testid="location-choice"
-                    @click="pickLocation(choice.id)"
-                >
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        aria-hidden="true"
-                    >
-                        <path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z" />
-                        <circle cx="12" cy="9" r="2.5" />
-                    </svg>
-                    <span class="location-path">{{ choice.path }}</span>
-                    <span class="location-hint">{{ choice.hint }}</span>
-                </button>
-            </section>
-
-            <section class="device-section" aria-labelledby="status-heading">
-                <h2 id="status-heading" class="device-heading">Status</h2>
-                <div class="status-choices">
-                    <button
-                        v-for="value in BOOKABLE_STATUSES"
-                        :key="value"
-                        class="status-choice"
-                        :class="`status-choice-${value}`"
-                        type="button"
-                        :aria-pressed="value === status"
-                        data-testid="status-choice"
-                        @click="pickStatus(value)"
-                    >
-                        <span class="status-symbol" aria-hidden="true">{{ SYMBOLS[value] }}</span>
-                        {{ STATUS_LABELS[value] }}
-                    </button>
-                </div>
-            </section>
-
-            <section class="device-section">
-                <label for="booking-comment" class="device-heading">
-                    {{ reportsDefect ? 'Was ist defekt?' : 'Kommentar (optional)' }}
-                </label>
-                <span v-if="reportsDefect" id="booking-comment-hint" class="defect-hint">
-                    Bitte kurz beschreiben, was nicht funktioniert. Das hilft bei der Reparatur.
-                </span>
-                <textarea
-                    id="booking-comment"
-                    v-model="comment"
-                    class="comment"
-                    :class="{ 'comment-defect': reportsDefect }"
-                    rows="2"
-                    :maxlength="MAX_COMMENT_LENGTH"
-                    :placeholder="
-                        reportsDefect ? 'z. B. Ausatemventil undicht' : 'z. B. nach Übung gereinigt'
-                    "
-                    :aria-invalid="showCommentError"
-                    :aria-describedby="commentDescribedBy"
-                />
-                <p
-                    v-if="showCommentError"
-                    id="booking-comment-error"
-                    class="field-error"
-                    data-testid="comment-error"
-                >
-                    Bitte beschreiben Sie den Defekt mit mindestens
-                    {{ MIN_DEFECT_COMMENT_LENGTH }} Zeichen.
+            <div class="device-footer">
+                <p v-if="nothingChanged" class="notice notice-info" role="status">
+                    Bitte wählen Sie einen anderen Standort oder Status.
                 </p>
-            </section>
-        </div>
-
-        <div class="device-footer">
-            <p v-if="nothingChanged" class="notice notice-info" role="status">
-                Bitte wählen Sie einen anderen Standort oder Status.
-            </p>
-            <ErrorNotice v-if="saveError !== null" :error="saveError" />
-            <button class="btn btn-primary" type="submit" :disabled="saving">
-                {{ saving ? 'Wird gespeichert …' : 'Speichern' }}
-            </button>
-        </div>
-    </form>
+                <ErrorNotice v-if="saveError !== null" :error="saveError" />
+                <button class="btn btn-primary" type="submit" :disabled="saving">
+                    {{ saving ? 'Wird gespeichert …' : 'Speichern' }}
+                </button>
+            </div>
+        </form>
+    </template>
 </template>
 
 <style scoped>
@@ -404,6 +496,27 @@ async function save(): Promise<void> {
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-normal);
     color: var(--muted);
+}
+
+.other-location {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--touch-min);
+    padding: 0 4px;
+    border: 0;
+    background: none;
+    color: var(--line);
+    font: inherit;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+}
+
+.other-location:hover {
+    color: var(--text);
+    text-decoration: underline;
 }
 
 .status-choices {
