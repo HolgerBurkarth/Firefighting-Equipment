@@ -1,0 +1,1 @@
+import{A as e,O as t,ht as n,s as r,v as i,x as a}from"./plugin-vue_export-helper-CStXJJQD.js";import{t as o}from"./AccountPanel-8Lmt0WXs.js";var s=e({__name:`ProfilePage`,setup(e){return(e,s)=>(n(),a(r,null,[s[0]||=i(`h1`,null,`Profil`,-1),t(o)],64))}});export{s as default};

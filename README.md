@@ -1127,8 +1127,10 @@ Zum Ansehen der App braucht die Anwendung lokal eine eigene Datenbank. Nie dafü
    curl.exe -H "Content-Type: application/json" --data-binary "@accept.json" http://localhost:8000/firefighting/test/api/v1/auth/invitation/accept
    ```
 
-Danach `http://localhost:8000/firefighting/test/` öffnen. Mit dem Admin-Konto lassen sich
-Standorte und Geräte über die API anlegen (Beispiele oben unter "Gerätetypen und Standorte" und
+Danach `http://localhost:8000/firefighting/test/` öffnen. Testdaten (Standorte, Geräte, Verlauf)
+legt nach dem Annehmen der Einladung `php bin/seed-test-city.php --slug=test --execute` an (siehe
+„Testdaten für die Test-Stadt“). Mit dem Admin-Konto lassen sich Standorte und Geräte auch über
+die API anlegen (Beispiele oben unter "Gerätetypen und Standorte" und
 "Geräte", Adresse `http://localhost:8000/firefighting/test/…`) oder per CSV-Import. Ganz von vorn:
 `DROP DATABASE firefighting_dev;` und ab Schritt 1 wiederholen.
 
@@ -1557,6 +1559,47 @@ Auf dem Server:
 
 ```
 cd ~/htdocs/apps/firefighting-equipment && php85 bin/tenant.php purge-device-data --slug=immendingen
+```
+
+### Testdaten für die Test-Stadt
+
+```
+php bin/seed-test-city.php --slug=test                          # Probelauf
+php bin/seed-test-city.php --slug=test --execute                # rund 60 ausgesuchte Geräte
+php bin/seed-test-city.php --slug=test --devices=2500 --execute # 2500 Geräte T0001 … T2500
+```
+
+Legt in der Test-Stadt Testdaten für Live-Tests der App an. **Nur für das Kürzel `test`**: Die
+Sperre steht fest im Code (`TestCityData::SLUG`), jedes andere Kürzel (auch `Test` oder `test-2`)
+wird vor dem Verbindungsaufbau abgelehnt (Exit-Code 2).
+
+- Inhalt: 15 Standorte (HLF 20 mit G1–G4 und Fahrerhaus, LF 10 mit G1, G3 und Fahrerhaus, MTW mit
+  Fahrerhaus, Lager Gerätehaus, Kleiderkammer, Atemschutzwerkstatt als Extern) und 60 Geräte
+  (Atemschutzmasken M1–M24, Atemschutzgeräte PA 1–PA 12, Funkgeräte HRT 1–HRT 20, Wärmebildkameras
+  WBK 1–WBK 4) mit Seriennummer, Hersteller, Modell, Beschaffungsdatum, gemischtem Status, Scan-Codes
+  (Masken: Seriennummer, Atemschutzgeräte: GS1 mit Trennzeichen GS, Funkgeräte: 13 Ziffern; einige
+  ohne Code) und Prüfdaten relativ zu heute (überfällig, in 30 Tagen fällig, später, ohne). Einige
+  Geräte liegen auf dem ganzen Fahrzeug (ohne Fach). Sieben Geräte haben einen Verlauf mit 2–3
+  Umbuchungen bzw. Statuswechseln, eines (M24) wird ausgesondert.
+- `--devices=ANZAHL` (1–5000) legt stattdessen ANZAHL Geräte T0001 … an (z. B. 2500, um die Suche auf
+  dem Server zu prüfen; die App sucht ab 2001 Geräten dort); Verlauf an T0001–T0006, T0007
+  ausgesondert.
+- Angelegt wird über die normalen Repositorys: jedes Gerät mit Ereignis „Angelegt“ (Kommentar
+  „Testdaten“, durch den ersten aktiven Admin der Stadt), der Verlauf reihum von allen aktiven,
+  nicht gesperrten Konten der Stadt. Alle Zeitpunkte sind die Zeit des Aufrufs. Es werden keine
+  Mails verschickt.
+- Nur in eine leere Stadt: Hat sie schon Geräte oder Standorte, bricht der Befehl ab (Exit-Code 1).
+  Vorher von Hand `bin/tenant.php purge-device-data --slug=test` (siehe oben). Ohne aktiven Admin
+  ebenfalls Abbruch. Bricht ein Fehler mittendrin ab, bleibt Angelegtes stehen; dann ebenso mit
+  `purge-device-data` aufräumen.
+- Laufzeit: lokal rund 5 s für 2500 Geräte (eine Transaktion je Gerät); auf STRATO entsprechend
+  länger.
+
+Auf dem Server (nur in der Test-Stadt):
+
+```
+cd ~/htdocs/apps/firefighting-equipment && php85 bin/seed-test-city.php --slug=test
+cd ~/htdocs/apps/firefighting-equipment && php85 bin/seed-test-city.php --slug=test --execute
 ```
 
 ## Super-Admins und Benutzer verwalten
