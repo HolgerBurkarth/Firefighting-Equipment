@@ -1,0 +1,56 @@
+import { shallowRef } from 'vue';
+import type { ApiError, ApiResult } from '../api/client';
+import { fetchLocations, type Location } from '../api/locations';
+import { Refresher, type RefreshReason } from './refresher';
+
+export interface LocationListState {
+    /** Standortbaum ohne gesperrte Standorte; null, solange er noch nie geladen wurde. */
+    readonly locations: readonly Location[] | null;
+    readonly loading: boolean;
+    /** Fehler der letzten Auffrischung; der bisherige Baum bleibt dann stehen. */
+    readonly error: ApiError | null;
+}
+
+const EMPTY: LocationListState = { locations: null, loading: false, error: null };
+
+/** Standorte der Stadt (GET locations) für Umbuchen und Standortwahl. */
+export class LocationStore {
+    private readonly current = shallowRef<LocationListState>(EMPTY);
+    private readonly refresher: Refresher;
+    private generation = 0;
+
+    constructor(
+        private readonly fetchTree: () => Promise<ApiResult<readonly Location[]>> = () =>
+            fetchLocations(),
+        now?: () => number,
+    ) {
+        this.refresher = new Refresher(() => this.load(), now);
+    }
+
+    get state(): LocationListState {
+        return this.current.value;
+    }
+
+    refresh(reason: RefreshReason): Promise<void> {
+        return this.refresher.refresh(reason);
+    }
+
+    clear(): void {
+        this.generation += 1;
+        this.refresher.reset();
+        this.current.value = EMPTY;
+    }
+
+    private async load(): Promise<boolean> {
+        const generation = this.generation;
+        this.current.value = { ...this.current.value, loading: true };
+        const result = await this.fetchTree();
+        if (generation !== this.generation) {
+            return false;
+        }
+        this.current.value = result.ok
+            ? { locations: result.data, loading: false, error: null }
+            : { ...this.current.value, loading: false, error: result.error };
+        return result.ok;
+    }
+}

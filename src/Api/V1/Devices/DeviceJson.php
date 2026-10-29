@@ -8,8 +8,9 @@ use FirefightingEquipment\Api\V1\Auth\AuthJson;
 use FirefightingEquipment\Device\Device;
 
 /**
- * JSON-Darstellung eines Geräts: summary() für die Liste, device() mit allen Feldern. Datumsfelder
- * als JJJJ-MM-TT, Zeiten in UTC, Status mit deutscher Bezeichnung (status_label).
+ * JSON-Darstellung eines Geräts: summary() kurz (z. B. Prüffristen), listItem() für GET devices,
+ * device() mit allen Feldern. Datumsfelder als JJJJ-MM-TT, Zeiten in UTC, Status mit deutscher
+ * Bezeichnung (status_label).
  */
 final class DeviceJson
 {
@@ -32,15 +33,28 @@ final class DeviceJson
     }
 
     /**
+     * Eintrag von GET devices: summary() plus die Felder, die die App lokal durchsucht
+     * (KONZEPT.md, "User am Handy – Entscheidungen", 20).
+     *
      * @return array<string, mixed>
      */
-    public static function device(Device $device): array
+    public static function listItem(Device $device): array
     {
         return [
             ...self::summary($device),
             'serial_number' => $device->serialNumber,
             'manufacturer' => $device->manufacturer,
             'model' => $device->model,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function device(Device $device): array
+    {
+        return [
+            ...self::listItem($device),
             'procured_on' => $device->procuredOn?->value,
             'note' => $device->note,
             'created_at' => AuthJson::time($device->createdAt),

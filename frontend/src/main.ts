@@ -6,6 +6,7 @@ import './styles/base.css';
 
 import { createApp } from 'vue';
 import App from './App.vue';
+import { installDataLayer } from './data';
 import { createAppRouter } from './router';
 import { currentAppBase } from './runtime/appBase';
 import { linkManifest } from './runtime/appearance';
@@ -24,9 +25,10 @@ const base = currentAppBase();
 
 // Gespeicherten Anzeigemodus vor dem ersten Zeichnen der App setzen.
 applyThemeMode(document.documentElement, loadThemeMode(browserStorage()));
-// Web-App-Manifest nur unter Städten (unter service gibt es keins).
+// Web-App-Manifest und Gerätedaten nur unter Städten (unter service gibt es beides nicht).
 if (!base.isService) {
     linkManifest(document);
+    installDataLayer();
 }
 
 // Kennung des Builds (Support, Browser-Tests der Updates).

@@ -331,7 +331,11 @@ Startseite ist ein Dashboard mit großen, antippbaren Kacheln, die zur gefiltert
 14. **Suche:** Die App lädt alle Geräte der Stadt einmal (in Blöcken zu 200) und sucht lokal bei
     jedem Tastendruck. Aufgefrischt wird beim Öffnen, beim Zurückwechseln in die App und nach einer
     eigenen Buchung. Ab etwa 2.000 Geräten sucht die App automatisch auf dem Server (`q`). Die
-    geladene Liste wird später die lokale Kopie für den Offline-Modus.
+    geladene Liste wird später die lokale Kopie für den Offline-Modus. Umgesetzt (`src/data/`): Die
+    Blöcke werden nacheinander geladen; ändert sich der Bestand währenddessen, lädt die App die
+    Liste einmal neu. Bei einem Fehler bleibt die bisherige Liste stehen. Schnelle Seitenwechsel
+    (innerhalb von 5 Sekunden) laden nicht doppelt. Abmelden und eine abgelaufene Sitzung (401)
+    löschen die Liste.
 15. **Gerät antippen** öffnet direkt die Umbuchen-Ansicht (Mockup „UserUmbuchen“), unten ein Link
     „Details und Verlauf“ (Stammdaten, Historie). Admins nutzen dieselbe Umbuchen-Ansicht.
 16. **„Zuletzt benutzt“:** geöffnete oder umgebuchte Geräte, nur auf diesem Handy, höchstens 8,

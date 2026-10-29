@@ -42,11 +42,29 @@ final class DeviceListTest extends DeviceApiTestCase
         self::assertSame([5, 50, 0], [$json['total'], $json['limit'], $json['offset']]);
         self::assertSame(['M1', 'M2', 'm3', 'M10', 'MA-1'], array_column($json['devices'], 'identifier'));
         self::assertSame(
-            ['id', 'identifier', 'scan_code', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version'],
+            ['id', 'identifier', 'scan_code', 'device_type', 'location', 'status', 'status_label', 'next_inspection_due', 'version', 'serial_number', 'manufacturer', 'model'],
             array_keys($json['devices'][0]),
         );
+        self::assertSame([null, null, null], [$json['devices'][0]['serial_number'], $json['devices'][0]['manufacturer'], $json['devices'][0]['model']]);
         self::assertSame(['id' => $this->g1, 'name' => 'G1', 'path' => 'HLF 20 / G1'], $json['devices'][0]['location']);
         self::assertSame(['id' => $this->typeId, 'name' => 'Atemschutzmaske'], $json['devices'][0]['device_type']);
+    }
+
+    public function testListContainsSearchableMasterData(): void
+    {
+        $this->createDevice($this->tenantId, $this->typeId, $this->g1, [
+            'identifier' => 'M1',
+            'serial_number' => 'SN-4711',
+            'manufacturer' => 'Dräger',
+            'model' => 'FPS 7000',
+            'note' => 'nicht in der Liste',
+        ]);
+
+        $device = self::json($this->api('GET', 'devices', cookie: $this->user))['devices'][0];
+
+        self::assertSame(['SN-4711', 'Dräger', 'FPS 7000'], [$device['serial_number'], $device['manufacturer'], $device['model']]);
+        self::assertArrayNotHasKey('note', $device);
+        self::assertArrayNotHasKey('procured_on', $device);
     }
 
     public function testRetiredAreHiddenUnlessRequested(): void

@@ -256,7 +256,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
-  `client.ts`), `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
+  `client.ts`; `devices.ts`, `locations.ts`), `src/data/` (Datenschicht für Geräte und Standorte),
+  `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
   `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung,
@@ -275,6 +276,20 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `invalid_response`). Jede Antwort prüft ein Parser. 401 einer nicht öffentlichen Anfrage ruft den
   Abmelde-Weg des Routers (Sitzung vergessen, Hinweis, `anmelden?weiter=<Seite>`); öffentliche
   Aufrufe (`public: true`, z. B. `auth/login`, `auth/me` im Wächter) behandeln 401 selbst.
+- Datenschicht `src/data/` (KONZEPT.md "User am Handy – Entscheidungen", 13 und 14): Geräte und
+  Standorte lesen Seiten NUR hier (`deviceStore`, `locationStore` aus `src/data/index.ts`), nie direkt
+  über `src/api/`; sie ist später die lokale Kopie für den Offline-Modus. `DeviceStore` lädt
+  `GET devices` in Blöcken zu 200 (`DEVICE_PAGE_LIMIT`, nacheinander), entfernt doppelte IDs und
+  lädt einmal neu, wenn sich `total` während des Ladens ändert oder die Anzahl nicht passt; mehr als
+  `MAX_LOCAL_DEVICES` (2000) → Modus `server` (nur der erste Block, Suche später per `q`). Fehler
+  behalten die bisherige Liste (`error` im Zustand). `upsert` übernimmt ein Gerät aus einer Antwort
+  (nur neuere Version, ausgesondert → aus der Liste). Auffrischen über `Refresher`
+  (`refresh(reason)`): höchstens eine Abfrage gleichzeitig, `changed` während einer laufenden →
+  danach noch einmal; Mindestabstand seit dem letzten Erfolg `REFRESH_MIN_INTERVAL_MS` (`open` 5 s,
+  `visible` 30 s, `changed` 0); `visible` erst, nachdem die Daten einmal angefordert wurden.
+  `installDataLayer` (in `main.ts`, nur unter Städten): bei `visibilitychange` (sichtbar)
+  `refresh('visible')`, bei `onSessionEnded` (`src/auth/session.ts`: Abmelden, `resetSession` z. B.
+  nach 401, anderes Konto per `setSession`) `clear()` aller Stores.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
@@ -1195,8 +1210,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `identifier` Standard, `device_type`, `location`, `status`, `next_inspection_due`), `dir`
   (`SortDirection`: `asc` Standard, `desc`; beide nur exakt kleingeschrieben, sonst 400; gelesen von
   `DeviceListHandler::sort`), `limit` 1–200 (Standard 50), `offset` 0–1000000. Unbekannte oder fremde IDs im Filter → leere Liste. Antwort `{devices, total, limit,
-  offset}`; je Gerät `id`, `identifier`, `scan_code`, `device_type {id, name}`, `location {id, name, path}`
-  (Pfad „HLF 20 / G1“), `status`, `status_label`, `next_inspection_due`, `version`.
+  offset}`; je Gerät (`DeviceJson::listItem`) `id`, `identifier`, `scan_code`, `device_type {id, name}`,
+  `location {id, name, path}` (Pfad „HLF 20 / G1“), `status`, `status_label`, `next_inspection_due`,
+  `version` (= `DeviceJson::summary`, auch in `inspection-due`) sowie `serial_number`, `manufacturer`,
+  `model` (für die lokale Suche der App; KONZEPT.md "User am Handy – Entscheidungen", 20).
 - Sortierung (`DeviceRepository::orderBy`, nur feste Ausdrücke): Kennung `NATURAL_SORT_KEY(identifier)`,
   Gerätetyp `NATURAL_SORT_KEY(t.name)`, Standort `NATURAL_SORT_KEY` des angezeigten Pfads (derselbe
   Ausdruck wie beim Import), Status fachlich per `FIELD` (ready, maintenance, defective, retired),
