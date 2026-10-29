@@ -394,9 +394,11 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
     Abmelden gelöscht. Umgesetzt: zur Auswahl stehen der aktuelle Standort und diese Ziele, soweit
     nicht gesperrt, dazu ein in der Standortwahl gewählter („gewählt“) und „Anderen Standort
     suchen …“.
-22. **Nach dem Speichern** geht es zurück zu „Suchen“ mit grüner Bestätigung (z. B.
-    „M1 → HLF 20 / G2 · einsatzbereit“). Umgesetzt: Die Bestätigung bleibt bis zur nächsten
-    Eingabe stehen und übersteht ein Update beim Seitenwechsel. Hat sich das Gerät inzwischen
+22. **Nach dem Speichern** geht es zurück dorthin, woher man kam („Suchen“ oder „Prüffristen“),
+    mit grüner Bestätigung auf dieser Seite (z. B. „M1 → HLF 20 / G2 · einsatzbereit“); nach
+    einem direkt geöffneten Link zu „Suchen“. Umgesetzt: Die Bestätigung bleibt auf „Suchen“ bis
+    zur nächsten Eingabe stehen, auf „Prüffristen“ bis zum Verlassen der Seite, und übersteht ein
+    Update beim Seitenwechsel. Hat sich das Gerät inzwischen
     geändert (jemand anderes hat gebucht), zeigt die Ansicht den neuen Stand; die eigene Auswahl
     bleibt, nicht geänderte Felder übernehmen den neuen Stand, gespeichert wird erst nach erneutem
     Tippen auf „Speichern“. Jede Buchung trägt eine `client_ref`; wird sie nach einem

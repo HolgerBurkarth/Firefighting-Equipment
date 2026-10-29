@@ -65,26 +65,38 @@ describe('returnTo', () => {
         await router.push('/geraete/12');
         const length = window.history.length;
         const done = navigated(router);
-        await returnTo(router, 'search');
+        await returnTo(router, ['search', 'inspections']);
         await done;
         expect(router.currentRoute.value.name).toBe('search');
         expect(window.history.state).toMatchObject({ forward: '/geraete/12' });
         expect(window.history.length).toBe(length);
     });
 
-    it('andere vorige Seite → Ziel ersetzt die aktuelle Seite', async () => {
+    it('zweites Ziel war die vorige Seite → zurück dorthin', async () => {
+        const router = testRouter();
+        await router.push('/suchen');
+        await router.push('/prueffristen');
+        await router.push('/geraete/12');
+        const done = navigated(router);
+        await returnTo(router, ['search', 'inspections']);
+        await done;
+        expect(router.currentRoute.value.name).toBe('inspections');
+        expect(window.history.state).toMatchObject({ back: '/suchen', forward: '/geraete/12' });
+    });
+
+    it('andere vorige Seite → erstes Ziel ersetzt die aktuelle Seite', async () => {
         const router = testRouter();
         await router.push('/prueffristen');
         await router.push('/geraete/12');
-        await returnTo(router, 'search');
+        await returnTo(router, ['search']);
         expect(router.currentRoute.value.name).toBe('search');
         expect(window.history.state).toMatchObject({ back: '/prueffristen' });
     });
 
-    it('ohne vorige Seite → Ziel ersetzt die aktuelle Seite', async () => {
+    it('ohne vorige Seite → erstes Ziel ersetzt die aktuelle Seite', async () => {
         const router = testRouter();
         await router.push('/geraete/12');
-        await returnTo(router, 'search');
+        await returnTo(router, ['search', 'inspections']);
         expect(router.currentRoute.value.name).toBe('search');
     });
 });

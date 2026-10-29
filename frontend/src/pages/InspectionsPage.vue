@@ -2,15 +2,19 @@
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import type { ApiError } from '../api/client';
 import type { InspectionOverview } from '../api/inspections';
+import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
 import DeviceCard from '../components/DeviceCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import { deviceStore, fetchServerInspections } from '../data';
+import { takeBookingNotice } from '../data/booking';
 import { localDateKey } from '../data/changeTime';
 import { inspectionOverview, inspectionText } from '../data/inspections';
 import { useNow } from '../runtime/now';
 
 const list = computed(() => deviceStore.state);
 const now = useNow();
+/** Ergebnis der eben gespeicherten Buchung (Entscheidung 22), bis die Seite verlassen wird. */
+const bookingNotice = takeBookingNotice();
 
 // Modus `server` (zu viele Geräte für die lokale Liste): Abschnitte vom Server.
 const serverOverview = shallowRef<InspectionOverview | null>(null);
@@ -69,6 +73,8 @@ function countText(total: number): string {
 <!-- Prüffristen am Handy: überfällig und in 30 Tagen fällig; Antippen öffnet das Umbuchen (Entscheidung 25). -->
 <template>
     <h1 class="page-heading">Prüffristen</h1>
+
+    <BookingNoticeMessage v-if="bookingNotice !== null" :notice="bookingNotice" />
 
     <template v-if="overview === null">
         <p v-if="error === null" class="hint" role="status">Prüffristen werden geladen …</p>
