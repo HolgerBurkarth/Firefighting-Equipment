@@ -289,7 +289,8 @@ async function save(): Promise<void> {
     void locationStore.refresh('changed');
     setBookingNotice(bookingNotice(result.data));
     saved.value = true;
-    await returnTo(router, 'search');
+    // Zurück, woher man kam (Suchen oder Prüffristen), sonst zu „Suchen“ (Entscheidung 22).
+    await returnTo(router, ['search', 'inspections']);
 }
 </script>
 

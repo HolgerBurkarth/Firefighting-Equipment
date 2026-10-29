@@ -65,7 +65,10 @@ export function confirmationText(device: DeviceListItem): string {
     return `${device.identifier} → ${device.location.path} · ${device.statusLabel}`;
 }
 
-/** Hinweis für „Suchen“ nach dem Speichern: `success` grün, sonst die Meldung des Servers. */
+/**
+ * Hinweis für „Suchen“ bzw. „Prüffristen“ nach dem Speichern: `success` grün, sonst die Meldung des
+ * Servers.
+ */
 export interface BookingNotice {
     readonly kind: 'success' | 'info';
     readonly text: string;
@@ -128,7 +131,7 @@ function parseNotice(text: string | null): BookingNotice | null {
     }
 }
 
-/** Hinweis einmal abholen („Suchen“ zeigt ihn, danach ist er weg). */
+/** Hinweis einmal abholen (die Seite nach dem Speichern zeigt ihn, danach ist er weg). */
 export function takeBookingNotice(
     storage: SessionStorage | null = sessionStore(),
 ): BookingNotice | null {

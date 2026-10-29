@@ -344,9 +344,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Andere Fehler: `ErrorNotice`, Eingaben bleiben. Erfolg: Liste übernimmt den Stand und lädt neu
   (`changed`), Gerät in „Zuletzt benutzt“, Ziel (nur bei `applied`) unter die Standorte, Bestätigung
   (`setBookingNotice`, sessionStorage `ff-booking-notice`, übersteht ein Neuladen; `applied` grün
-  „M1 → HLF 20 / G2 · einsatzbereit“, sonst `result.message`), dann `returnTo(router, 'search')`
-  (`src/router/back.ts`: ist „Suchen“ die vorige Seite, `back()`, sonst `replace`). „Suchen“ zeigt
-  die Bestätigung bis zur nächsten Eingabe. Nach jeder Buchung `locationStore.refresh('changed')`
+  „M1 → HLF 20 / G2 · einsatzbereit“, sonst `result.message`), dann
+  `returnTo(router, ['search', 'inspections'])` (`src/router/back.ts`: ist eine der Seiten die
+  vorige, `back()`, sonst `replace` auf die erste, also „Suchen“ nach einem direkt geöffneten Link).
+  Die Seite zeigt die Bestätigung (`BookingNoticeMessage`, holt sie per `takeBookingNotice`):
+  „Suchen“ bis zur nächsten Eingabe, „Prüffristen“ bis zum Verlassen. Nach jeder Buchung
+  `locationStore.refresh('changed')`
   (Gerätezahlen). Browser-Tests mit der
   Umbuchen-Ansicht simulieren `GET api/v1/devices/{id}` (`deviceDetail`) und `GET api/v1/locations`
   (`LOCATIONS`, mit Gerätezahlen), beide in `tests/e2e/support/devices.ts`; Tests in
@@ -363,7 +366,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   geladenen Liste erneut, „Angezeigt werden die ersten N.“, wenn `total` größer ist. Je Gerät
   `DeviceCard` (Typ `DeviceSummary`, Zusatzzeile per Slot) mit „Prüfung: 01.10.2026 · seit 28 Tagen
   überfällig“ (rot, `--status-defective-fg`) bzw. „· heute/morgen/in N Tagen fällig“ (gelb,
-  `--status-maintenance-fg`; `inspectionText`). Antippen öffnet das Umbuchen. Tests
+  `--status-maintenance-fg`; `inspectionText`). Antippen öffnet das Umbuchen; nach dem Speichern
+  zurück auf „Prüffristen“ mit Bestätigung (siehe Umbuchen). Tests
   `tests/e2e/inspections.spec.ts`, `tests/unit/inspections.spec.ts`, `inspectionWindow.spec.ts`.
 - Details und Verlauf (`DeviceDetails` in `src/components/`, KONZEPT.md Entscheidung 15): Link
   „Details und Verlauf“ unten auf der Umbuchen-Seite (auch bei ausgesonderten Geräten), eine

@@ -41,8 +41,31 @@ test.describe('Prüffristen (lokal)', () => {
         api: {
             'GET api/v1/auth/me': ME,
             'GET api/v1/devices': devicesEndpoint(DEVICES),
+            ...deviceDetail(DEVICES[0] ?? {}),
             ...deviceDetail(DEVICES[2] ?? {}),
             ...LOCATIONS,
+            'POST api/v1/devices/1/state': {
+                status: 200,
+                body: {
+                    device: deviceJson(1, {
+                        version: 2,
+                        status: 'maintenance',
+                        status_label: 'in Wartung',
+                        next_inspection_due: '2026-10-28',
+                    }),
+                    result: {
+                        outcome: 'applied',
+                        outcome_label: 'übernommen',
+                        reason: null,
+                        reason_label: null,
+                        message: 'Übernommen.',
+                        stale_confirmed: false,
+                        client_ref: '00000000-0000-4000-8000-000000000001',
+                        replayed: false,
+                        notice_id: null,
+                    },
+                },
+            },
         },
     });
 
@@ -106,6 +129,45 @@ test.describe('Prüffristen (lokal)', () => {
         ).toBeVisible();
         await page.getByRole('button', { name: 'Zurück', exact: true }).click();
         await expect(page).toHaveURL(/\/prueffristen$/);
+    });
+
+    test('nach dem Speichern zurück zu den Prüffristen mit Bestätigung', async ({
+        page,
+        apiRequests,
+    }) => {
+        await page.goto('/firefighting/test/prueffristen');
+        await page
+            .getByTestId('overdue-list')
+            .getByTestId('device-card')
+            .filter({ hasText: 'M1' })
+            .click();
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'M1 · Atemschutzmaske' }),
+        ).toBeVisible();
+        await page.getByRole('button', { name: 'in Wartung', exact: true }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+
+        await expect(page).toHaveURL(/\/firefighting\/test\/prueffristen$/);
+        await expect(page.getByTestId('booking-notice')).toHaveText(
+            '✓ M1 → HLF 20 / G1 · in Wartung',
+        );
+        await expect(page.getByTestId('booking-notice')).toHaveClass(/notice-success/);
+        expect(
+            apiRequests.filter((r) => r.method === 'POST' && r.path === 'api/v1/devices/1/state'),
+        ).toHaveLength(1);
+        // Zurück wie der Knopf des Browsers: „Prüffristen“ steht nicht zweimal in der Historie.
+        expect(await page.evaluate(() => window.history.state as unknown)).toMatchObject({
+            forward: '/geraete/1',
+        });
+
+        // Die Bestätigung gilt nur für diesen Besuch, auch „Suchen“ zeigt sie nicht mehr.
+        const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
+        await nav.getByRole('link', { name: 'Suchen' }).click();
+        await expect(page.getByRole('searchbox', { name: 'Gerät suchen' })).toBeVisible();
+        await expect(page.getByTestId('booking-notice')).toBeHidden();
+        await nav.getByRole('link', { name: 'Prüffristen' }).click();
+        await expect(page.getByTestId('overdue-count')).toBeVisible();
+        await expect(page.getByTestId('booking-notice')).toBeHidden();
     });
 
     test('Handy-Breite: kein seitliches Überstehen', async ({ page }) => {

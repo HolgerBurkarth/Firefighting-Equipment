@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, 
 import { useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
 import type { DeviceListItem } from '../api/devices';
+import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
 import DeviceCard from '../components/DeviceCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import { deviceStore, recentDeviceIds } from '../data';
@@ -197,19 +198,7 @@ function retry(): void {
         </label>
     </form>
 
-    <p
-        v-if="bookingNotice !== null"
-        class="notice"
-        :class="bookingNotice.kind === 'success' ? 'notice-success' : 'notice-info'"
-        role="status"
-        data-testid="booking-notice"
-    >
-        <!-- Eine Zeile: .notice stapelt seine Kinder. -->
-        <span
-            ><span v-if="bookingNotice.kind === 'success'" aria-hidden="true">✓ </span
-            >{{ bookingNotice.text }}</span
-        >
-    </p>
+    <BookingNoticeMessage v-if="bookingNotice !== null" :notice="bookingNotice" />
 
     <p v-if="notFound" class="notice notice-info" role="status" data-testid="search-not-found">
         Kein Gerät mit diesem Code gefunden.
