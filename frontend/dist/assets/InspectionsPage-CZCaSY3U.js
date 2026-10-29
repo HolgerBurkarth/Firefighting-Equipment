@@ -1,0 +1,1 @@
+import{ht as e,s as t,t as n,v as r,x as i}from"./plugin-vue_export-helper-CStXJJQD.js";var a={};function o(n,a){return e(),i(t,null,[a[0]||=r(`h1`,null,`Prüffristen`,-1),a[1]||=r(`p`,{class:`placeholder`},`Hier entsteht die Übersicht der Prüffristen.`,-1)],64)}var s=n(a,[[`render`,o],[`__scopeId`,`data-v-4c128b10`]]);export{s as default};

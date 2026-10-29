@@ -254,7 +254,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   verbindliches Konzept in `docs/frontend/KONZEPT.md`, Gestaltung nach `docs/frontend/mockup/`
   (`LIESMICH.md`). Oberflächentexte deutsch, Code und Bezeichner englisch.
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
-  `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter), `src/pages/`,
+  `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
   `client.ts`), `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
@@ -276,7 +276,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Abmelde-Weg des Routers (Sitzung vergessen, Hinweis, `anmelden?weiter=<Seite>`); öffentliche
   Aufrufe (`public: true`, z. B. `auth/login`, `auth/me` im Wächter) behandeln 401 selbst.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
-  `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`. Der Wächter fragt `auth/me`
+  `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
+  ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
+  Leiste unten (`UserTabBar`: Suchen, Prüffristen, Profil; für Admins vorne zusätzlich Dashboard),
+  `focus` bildschirmfüllend ohne Kopfleiste der App, die Seite zeigt `FocusHeader` (Zurück über
+  `goBack` in `src/router/back.ts`: vorige Seite der App laut `history.state.back`, sonst
+  „Suchen“). Handy-Seiten (`suchen`, `prueffristen`, `profil`, `geraete/<id>` mit `<id>` wie die
+  Platzhalter im Backend) für `user` und `admin` (KONZEPT.md "User am Handy – Entscheidungen"). Der Wächter fragt `auth/me`
   höchstens einmal je Seitenaufruf (`ensureSession`); ohne Sitzung → `anmelden?weiter=…`, falsche
   Rolle → Startseite der Rolle (`landingRoute`: `user` → `suchen`, `admin`/`superadmin` →
   `dashboard`). Nur eine echte Antwort entscheidet über die Sitzung (401 = nicht angemeldet,

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useRoute } from 'vue-router';
+import { userLabel } from './api/auth';
 import { errorMessage } from './auth/errorMessages';
-import { sessionCheckError } from './auth/session';
+import { session, sessionCheckError } from './auth/session';
 import ConfirmDialog from './components/ConfirmDialog.vue';
+import UserTabBar from './components/UserTabBar.vue';
 import type { AppBase } from './runtime/appBase';
 import { updateNotice, type AppUpdater } from './runtime/appUpdate';
 import { loadTenant, tenantState } from './runtime/tenantState';
@@ -10,6 +13,16 @@ import { loadTenant, tenantState } from './runtime/tenantState';
 const props = defineProps<{ base: AppBase; updater: AppUpdater }>();
 
 const notice = computed(() => updateNotice(props.updater));
+
+const route = useRoute();
+/** Darstellung der Seite (RouteMeta.layout in src/router/index.ts). */
+const layout = computed(() => route.meta.layout ?? 'standard');
+/** Handy-Seiten: „Hallo <Anzeigename>“ statt „Geräteverwaltung“ (Mockup UserStart). */
+const subtitle = computed(() =>
+    layout.value === 'user' && session.value !== null
+        ? `Hallo ${userLabel(session.value.user)}`
+        : 'Geräteverwaltung',
+);
 
 const confirmOpen = ref(false);
 
@@ -37,7 +50,8 @@ onMounted(() => {
 </script>
 
 <template>
-    <header class="app-header">
+    <!-- Bildschirmfüllende Seiten (focus) zeigen ihre eigene Kopfzeile mit Zurück-Knopf. -->
+    <header v-if="layout !== 'focus'" class="app-header">
         <div class="app-header-icon">
             <svg
                 width="22"
@@ -56,7 +70,7 @@ onMounted(() => {
             <span class="app-header-title" data-testid="app-title">
                 {{ base.isService ? 'Super-Admin' : (tenantState.tenant?.name ?? 'Feuerwehr') }}
             </span>
-            <span class="app-header-subtitle">Geräteverwaltung</span>
+            <span class="app-header-subtitle" data-testid="app-subtitle">{{ subtitle }}</span>
         </div>
     </header>
 
@@ -118,13 +132,14 @@ onMounted(() => {
         @confirm="applyUpdate"
     />
 
-    <main class="app-main">
+    <main class="app-main" :class="`app-main-${layout}`">
         <!-- Start mit veralteter Version: Die erste Seite wartet auf die neue. -->
         <p v-if="updater.loadingPage.value" class="hint" role="status" data-testid="update-loading">
             Seite wird geladen …
         </p>
         <RouterView />
     </main>
+    <UserTabBar v-if="layout === 'user'" />
 </template>
 
 <style scoped>
@@ -209,8 +224,22 @@ onMounted(() => {
     padding: 16px;
 }
 
+/* Handy-Seiten: eine Spalte, am PC mittig; die Leiste unten bleibt am unteren Rand. */
+.app-main-user,
+.app-main-focus {
+    flex: 1 0 auto;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.app-main-focus {
+    gap: 0;
+    padding: 0;
+}
+
 @media (min-width: 768px) {
-    .app-main {
+    .app-main-standard {
         padding: 28px 32px;
     }
 }

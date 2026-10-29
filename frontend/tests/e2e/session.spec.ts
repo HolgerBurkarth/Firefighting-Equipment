@@ -40,7 +40,7 @@ test.describe('Weiche „/“ und Wächter', () => {
             await page.goto('/firefighting/test/');
             await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
             await expect(page.getByRole('heading', { level: 1, name: 'Suchen' })).toBeVisible();
-            await expect(page.getByTestId('account-name')).toHaveText('Anna');
+            await expect(page.getByTestId('app-subtitle')).toHaveText('Hallo Anna');
         });
 
         test('Dashboard ist für User gesperrt', async ({ page }) => {
@@ -183,11 +183,11 @@ test.describe('Abmelden', () => {
         });
 
         test('bleibt angemeldet und sagt warum', async ({ page }) => {
-            await page.goto('/firefighting/test/suchen');
+            await page.goto('/firefighting/test/profil');
             await page.getByRole('button', { name: 'Abmelden' }).click();
             await expect(page.getByRole('alert')).toContainText('Keine Verbindung');
             await expect(page.getByTestId('error-code')).toHaveText('Code: network');
-            await expect(page).toHaveURL(/\/suchen$/);
+            await expect(page).toHaveURL(/\/profil$/);
         });
     });
 });

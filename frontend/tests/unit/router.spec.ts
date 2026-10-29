@@ -74,14 +74,46 @@ describe('Wächter', () => {
     it('falsche Rolle → Startseite der eigenen Rolle', async () => {
         setSession(state('user'));
         expect((await routerAt('/dashboard')).currentRoute.value.name).toBe('search');
-        setSession(state('admin'));
-        expect((await routerAt('/suchen')).currentRoute.value.name).toBe('dashboard');
     });
 
-    it('unter service gibt es „suchen“ nicht', async () => {
-        setSession(state('superadmin'));
-        expect((await routerAt('/suchen', SERVICE)).currentRoute.value.name).toBe('not-found');
+    it.each([
+        ['/suchen', 'search', 'user'],
+        ['/prueffristen', 'inspections', 'user'],
+        ['/profil', 'profile', 'user'],
+        ['/geraete/12', 'device', 'focus'],
+    ] as const)('Handy-Seite %s für User und Admin', async (path, name, layout) => {
+        for (const role of ['user', 'admin'] as const) {
+            setSession(state(role));
+            const route = (await routerAt(path)).currentRoute.value;
+            expect(route.name, role).toBe(name);
+            expect(route.meta.layout).toBe(layout);
+        }
     });
+
+    it('Gerät nur mit positiver Ganzzahl ohne führende Null', async () => {
+        setSession(state('user'));
+        expect((await routerAt('/geraete/1')).currentRoute.value.params['id']).toBe('1');
+        for (const path of ['/geraete/0', '/geraete/012', '/geraete/abc', '/geraete/1x']) {
+            expect((await routerAt(path)).currentRoute.value.name, path).toBe('not-found');
+        }
+        expect((await routerAt('/geraete/1234567890123456789')).currentRoute.value.name).toBe(
+            'not-found',
+        );
+    });
+
+    it('Seiten ohne eigene Darstellung haben kein layout', async () => {
+        setSession(state('admin'));
+        expect((await routerAt('/dashboard')).currentRoute.value.meta.layout).toBeUndefined();
+        expect((await routerAt('/anmelden')).currentRoute.value.meta.layout).toBeUndefined();
+    });
+
+    it.each(['/suchen', '/prueffristen', '/profil', '/geraete/12'])(
+        'unter service gibt es %s nicht',
+        async (path) => {
+            setSession(state('superadmin'));
+            expect((await routerAt(path, SERVICE)).currentRoute.value.name).toBe('not-found');
+        },
+    );
 
     it('einladung-annehmen gibt es nur unter Städten, öffentlich', async () => {
         const fetchSpy = vi.fn();
