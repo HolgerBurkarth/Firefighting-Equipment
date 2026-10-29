@@ -27,6 +27,11 @@ declare module 'vue-router' {
          * und ohne Leiste, die Seite zeigt ihre eigene Kopfzeile mit Zurück-Knopf.
          */
         layout?: PageLayout;
+        /**
+         * Ohne `layout`: bei Handy-Breite trotzdem die Leiste unten (Dashboard des Admins, bis die
+         * Admin-Konsole ihr eigenes Menü hat; KONZEPT.md, "Admin-Konsole").
+         */
+        mobileTabBar?: boolean;
     }
 }
 
@@ -67,7 +72,9 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             path: '/dashboard',
             name: 'dashboard',
             component: () => import('../pages/DashboardPage.vue'),
-            meta: { roles: base.isService ? ['superadmin'] : ['admin'] },
+            meta: base.isService
+                ? { roles: ['superadmin'] }
+                : { roles: ['admin'], mobileTabBar: true },
         },
     ];
     if (!base.isService) {

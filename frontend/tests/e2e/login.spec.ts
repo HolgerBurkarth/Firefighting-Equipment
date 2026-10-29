@@ -9,6 +9,7 @@ import {
     test,
     type MockResponse,
 } from './fixtures';
+import { NO_DEVICES } from './support/devices';
 
 const LOGIN = 'POST api/v1/auth/login';
 
@@ -151,7 +152,7 @@ test.describe('Erfolgreiche Anmeldung', () => {
         ['superadmin', 'service', 'dashboard'],
     ] as const) {
         test.describe(role, () => {
-            test.use({ api: { [LOGIN]: { status: 200, body: meBody(role) } } });
+            test.use({ api: { [LOGIN]: { status: 200, body: meBody(role) }, ...NO_DEVICES } });
 
             test(`führt zu ${target}`, async ({ page, apiRequests }) => {
                 await page.goto(`/firefighting/${area}/anmelden`);
@@ -191,7 +192,7 @@ test.describe('Erfolgreiche Anmeldung', () => {
     });
 
     test.describe('Seite für die Rolle gesperrt', () => {
-        test.use({ api: { [LOGIN]: { status: 200, body: meBody('user') } } });
+        test.use({ api: { [LOGIN]: { status: 200, body: meBody('user') }, ...NO_DEVICES } });
 
         test('führt zur Startseite der Rolle', async ({ page }) => {
             await page.goto('/firefighting/test/anmelden?weiter=%2Fdashboard');

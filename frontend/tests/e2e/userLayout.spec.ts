@@ -1,5 +1,6 @@
 import type { Locator } from '@playwright/test';
 import { expect, meBody, test } from './fixtures';
+import { NO_DEVICES } from './support/devices';
 
 /** Höhe in px, gerundet: WebKit misst wegen seiner Skalierung z. B. 43,99 statt 44. */
 async function height(locator: Locator): Promise<number> {
@@ -11,7 +12,12 @@ const SURFACE_LIGHT = 'rgb(255, 255, 255)';
 const SURFACE_DARK = 'rgb(27, 34, 43)';
 
 test.describe('Handy-Seiten als User', () => {
-    test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('user', 'Jonas') } } });
+    test.use({
+        api: {
+            'GET api/v1/auth/me': { status: 200, body: meBody('user', 'Jonas') },
+            ...NO_DEVICES,
+        },
+    });
 
     test('Kopfleiste mit Begrüßung und Leiste unten', async ({ page }) => {
         await page.goto('/firefighting/test/suchen');
@@ -87,7 +93,9 @@ test.describe('Handy-Seiten als User', () => {
 });
 
 test.describe('Handy-Seiten als Admin', () => {
-    test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('admin') } } });
+    test.use({
+        api: { 'GET api/v1/auth/me': { status: 200, body: meBody('admin') }, ...NO_DEVICES },
+    });
 
     test('öffnet alle Handy-Seiten, Leiste mit Dashboard', async ({ page }) => {
         await page.goto('/firefighting/test/suchen');
@@ -113,7 +121,9 @@ test.describe('Handy-Seiten als Admin', () => {
 });
 
 test.describe('Hell und dunkel', () => {
-    test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('user') } } });
+    test.use({
+        api: { 'GET api/v1/auth/me': { status: 200, body: meBody('user') }, ...NO_DEVICES },
+    });
 
     for (const [label, scheme, stored, surface] of [
         ['System hell', 'light', 'system', SURFACE_LIGHT],

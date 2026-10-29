@@ -139,7 +139,10 @@ onMounted(() => {
         </p>
         <RouterView />
     </main>
-    <UserTabBar v-if="layout === 'user'" />
+    <UserTabBar
+        v-if="layout === 'user' || route.meta.mobileTabBar === true"
+        :mobile-only="layout !== 'user'"
+    />
 </template>
 
 <style scoped>
@@ -217,6 +220,7 @@ onMounted(() => {
 }
 
 .app-main {
+    flex: 1 0 auto;
     display: flex;
     flex-direction: column;
     gap: 20px;

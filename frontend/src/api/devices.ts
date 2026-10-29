@@ -143,3 +143,18 @@ export function fetchDevicePage(
         ...(fetchFn && { fetchFn }),
     });
 }
+
+/** Antworten mit einem Gerät (`{"device": …}`); hier nur die Felder der Liste. */
+export function parseDeviceResponse(json: unknown): DeviceListItem | null {
+    return isRecord(json) ? parseDeviceListItem(json['device']) : null;
+}
+
+/** GET devices/{id} (auch ausgesonderte; fremd oder unbekannt 404). */
+export function fetchDevice(
+    id: number,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<DeviceListItem>> {
+    return apiRequest(`devices/${String(id)}`, parseDeviceResponse, {
+        ...(fetchFn && { fetchFn }),
+    });
+}

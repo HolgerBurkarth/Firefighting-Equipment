@@ -17,6 +17,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Das Repository ist öffentlich: niemals Passwörter, Zugangsdaten oder
   `config/config.local.php` committen.
 - Code und Bezeichner auf Englisch, Dokumentation und Oberflächentexte auf Deutsch.
+- Jede Änderung an der REST-API (auch neue Felder) kommt zusätzlich in `docs/UEBERGABE-BACKEND.md`
+  (Datum, Commit-Betreff, was und warum, Tests), damit der Backend-Chat sie kennt.
 - Status von Nachrichten an den Nutzer – jede Nachricht beginnt mit genau einer Kennzeichnung:
   - "⏳ ZWISCHENSTAND – ich arbeite weiter": Es läuft noch etwas. Dazu: was gerade läuft, wie lange
     es voraussichtlich dauert und was danach kommt. Der Nutzer muss nichts tun.
@@ -288,8 +290,27 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   danach noch einmal; Mindestabstand seit dem letzten Erfolg `REFRESH_MIN_INTERVAL_MS` (`open` 5 s,
   `visible` 30 s, `changed` 0); `visible` erst, nachdem die Daten einmal angefordert wurden.
   `installDataLayer` (in `main.ts`, nur unter Städten): bei `visibilitychange` (sichtbar)
-  `refresh('visible')`, bei `onSessionEnded` (`src/auth/session.ts`: Abmelden, `resetSession` z. B.
-  nach 401, anderes Konto per `setSession`) `clear()` aller Stores.
+  `refresh('visible')`, bei `onSessionEnded` (`src/auth/session.ts`, mit bisherigem Konto und Grund
+  `logout` = Abmelden beim Server erfolgreich, `ended` = `resetSession` z. B. nach 401 oder
+  `setSession(null)`, `replaced` = anderes Konto per `setSession`) `clear()` aller Stores; nur bei
+  `logout` zusätzlich „Zuletzt benutzt“ des Kontos löschen. Im Modus `server`: `searchServer(q,
+  limit)` (`q` getrimmt, höchstens 100 Zeichen) und `findMany(ids)` (einzeln `GET devices/{id}`).
+- Suchen (`SearchPage`, KONZEPT.md Entscheidungen 14, 16, 20, 24): lokale Suche
+  `searchDevices` (`src/data/deviceSearch.ts`): Wörter mit UND über Kennung, Scan-Code,
+  Seriennummer, Hersteller, Modell, Gerätetyp, Standortpfad; Vergleichsform `searchKey` (ohne
+  Groß-/Kleinschreibung und Akzente, ß = ss); Reihenfolge Kennung genau, Kennung beginnt mit dem
+  ersten Wort, Rest (je in der Reihenfolge der Liste); höchstens `MAX_SEARCH_HITS` (50), darüber
+  „Mehr als 50 Treffer – bitte weiter eingrenzen.“. Modus `server`: 300 ms nach dem letzten
+  Tastendruck `searchServer`, ältere Antworten verworfen. Enter (auch USB-Scanner) wie ein Scan:
+  `findByCode` (Scan-Code exakt, dann Kennung wie `identifier_key` mit `toLowerCase`, mehrere
+  Leerzeichen wie eines, Leerraum am Rand egal) → Gerät öffnen; sonst genau ein Treffer → öffnen;
+  mehrere → Tastatur schließen; keiner → „Kein Gerät mit diesem Code gefunden.“, Text bleibt.
+  „Zuletzt benutzt“ (`src/data/recentDevices.ts`, `recentDeviceIds`/`rememberDevice` aus
+  `src/data/index.ts`): localStorage `ff-recent-devices:<kürzel>:<konto-id>`, nur IDs, höchstens 8,
+  neueste zuerst; `DevicePage` merkt sich das Gerät beim Öffnen; angezeigt nur Geräte der aktuellen
+  Liste (im Modus `server` per `findMany`). Karten `DeviceCard`, Status `StatusBadge` (Symbol und
+  Wort). Browser-Tests, die „Suchen“ nur durchlaufen, simulieren `GET api/v1/devices` mit
+  `NO_DEVICES` (`tests/e2e/support/devices.ts`; dort auch `deviceJson`, `devicesEndpoint`).
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
@@ -297,7 +318,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `focus` bildschirmfüllend ohne Kopfleiste der App, die Seite zeigt `FocusHeader` (Zurück über
   `goBack` in `src/router/back.ts`: vorige Seite der App laut `history.state.back`, sonst
   „Suchen“). Handy-Seiten (`suchen`, `prueffristen`, `profil`, `geraete/<id>` mit `<id>` wie die
-  Platzhalter im Backend) für `user` und `admin` (KONZEPT.md "User am Handy – Entscheidungen"). Der Wächter fragt `auth/me`
+  Platzhalter im Backend) für `user` und `admin` (KONZEPT.md "User am Handy – Entscheidungen").
+  `meta.mobileTabBar` (nur Dashboard unter einer Stadt, bis die Admin-Konsole ein eigenes Menü
+  hat): Leiste unten auch ohne `layout`, aber nur bei Handy-Breite (unter 768 px). Der Wächter fragt `auth/me`
   höchstens einmal je Seitenaufruf (`ensureSession`); ohne Sitzung → `anmelden?weiter=…`, falsche
   Rolle → Startseite der Rolle (`landingRoute`: `user` → `suchen`, `admin`/`superadmin` →
   `dashboard`). Nur eine echte Antwort entscheidet über die Sitzung (401 = nicht angemeldet,

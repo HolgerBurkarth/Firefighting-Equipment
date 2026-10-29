@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import FocusHeader from '../components/FocusHeader.vue';
+import { rememberDevice } from '../data';
 
 const route = useRoute();
 const deviceId = computed(() => Number(route.params['id']));
+
+// Geöffnet → „Zuletzt benutzt“ (Entscheidung 16).
+onMounted(() => {
+    rememberDevice(deviceId.value);
+});
 </script>
 
 <!-- Platzhalter: Umbuchen/Status eines Geräts (Mockup UserUmbuchen). -->

@@ -101,6 +101,15 @@ describe('Wächter', () => {
         );
     });
 
+    it('Dashboard des Admins mit Leiste bei Handy-Breite, des Super-Admins ohne', async () => {
+        setSession(state('admin'));
+        expect((await routerAt('/dashboard')).currentRoute.value.meta.mobileTabBar).toBe(true);
+        setSession(state('superadmin'));
+        expect(
+            (await routerAt('/dashboard', SERVICE)).currentRoute.value.meta.mobileTabBar,
+        ).toBeUndefined();
+    });
+
     it('Seiten ohne eigene Darstellung haben kein layout', async () => {
         setSession(state('admin'));
         expect((await routerAt('/dashboard')).currentRoute.value.meta.layout).toBeUndefined();
