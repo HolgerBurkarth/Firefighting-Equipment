@@ -1,6 +1,7 @@
 import type { Locator } from '@playwright/test';
 import { expect, meBody, test } from './fixtures';
 import { deviceDetail, deviceJson, LOCATIONS, NO_DEVICES } from './support/devices';
+import { CURRENT_SESSION_ONLY } from './support/profile';
 
 /** Höhe in px, gerundet: WebKit misst wegen seiner Skalierung z. B. 43,99 statt 44. */
 async function height(locator: Locator): Promise<number> {
@@ -18,6 +19,7 @@ test.describe('Handy-Seiten als User', () => {
             ...NO_DEVICES,
             ...deviceDetail(deviceJson(12)),
             ...LOCATIONS,
+            ...CURRENT_SESSION_ONLY,
         },
     });
 

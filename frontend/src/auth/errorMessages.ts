@@ -61,6 +61,8 @@ export function errorMessage(error: ApiError, options: ErrorOptions = {}): strin
             return 'Der Server ist gerade nicht erreichbar. Bitte versuchen Sie es in einigen Minuten erneut.';
         case 'invalid_credentials':
             return 'E-Mail-Adresse oder Passwort ist falsch.';
+        case 'invalid_current_password':
+            return 'Das aktuelle Passwort ist falsch.';
         case 'account_locked':
             return `Ihr Konto ist gesperrt. Bitte wenden Sie sich an ${contact}.`;
         case 'email_not_verified':

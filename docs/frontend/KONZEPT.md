@@ -53,7 +53,7 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `einladung-annehmen` | nur Stadt | Mail-Link für neue Admins: Name und Passwort |
 | `suchen` | nur Stadt | Startseite des Users am Handy: Suche, „Zuletzt benutzt“ |
 | `prueffristen` | nur Stadt | Prüffristen am Handy: überfällig und in den nächsten 30 Tagen fällig |
-| `profil` | nur Stadt | Profil am Handy (vorerst Platzhalter mit Abmelden) |
+| `profil` | nur Stadt | Profil am Handy: Konto mit Abmelden, Anzeigemodus, Passwort ändern, angemeldete Geräte |
 | `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts; `?standortwahl=1` öffnet die Standortwahl, `?details=1` „Details und Verlauf“ |
 | `dashboard` | Stadt und `service` | Startseite von Admin bzw. Super-Admin (vorerst Platzhalter) |
 
@@ -335,6 +335,17 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
   bzw. „Ganzer Standort, ohne Fach“. Die Suche verknüpft Wörter mit UND über den ganzen Pfad
   („hlf g1“), ohne Groß-/Kleinschreibung und Akzente. Mit echten Daten am Handy geprüft
   (29.10.2026).
+- **Profil:** von oben nach unten Konto (Name, Rolle, „Abmelden“), Anzeigemodus, Passwort und
+  angemeldete Geräte. Umgesetzt: Der Anzeigemodus (System, Hell, Dunkel wie im Mockup
+  „Einstellungen“) wirkt sofort und gilt nur für dieses Gerät; bei „System“ steht dabei, wie das
+  Gerät gerade eingestellt ist. „Passwort ändern“ klappt ein Formular auf: aktuelles Passwort und
+  neues Passwort mit Live-Prüfung wie bei der Registrierung. Ein falsches aktuelles Passwort steht
+  rot am Feld (das Feld wird geleert), ein vom Server abgelehntes neues Passwort am neuen Feld; nach
+  zu vielen Fehlversuchen ist „Passwort speichern“ mit Countdown gesperrt (wie beim Anmelden). Nach
+  dem Ändern bleibt nur dieses Gerät angemeldet, die Seite sagt es. „Angemeldete Geräte“ zeigt
+  dieses Gerät zuerst („Dieses Gerät“, seit wann angemeldet), dann die anderen mit „zuletzt aktiv“
+  und Anmeldedatum, je mit „Abmelden“; darunter „Alle anderen Geräte abmelden“ mit Rückfrage. Die
+  Benachrichtigung „Log“ für Admins kommt mit der Admin-Konsole („Einstellungen“).
 - **Darstellung:** Suchen, Prüffristen und Profil mit Kopfleiste in der Stadtfarbe (Name der Stadt,
   „Hallo <Anzeigename>“) und der Leiste unten; Umbuchen, Standortwahl und Details bildschirmfüllend
   mit weißer Kopfzeile und Zurück-Knopf, ohne Leiste. Zurück führt zur vorigen Seite der App, nach

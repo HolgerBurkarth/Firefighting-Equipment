@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { login, logout, parseAuthState, userLabel } from '../../src/api/auth';
+import {
+    changePassword,
+    endSession,
+    fetchSessions,
+    login,
+    logout,
+    logoutOtherSessions,
+    parseAuthState,
+    parseSessions,
+    userLabel,
+} from '../../src/api/auth';
 import { respond } from './support/fetch';
 import { meBody } from './support/me';
 
@@ -76,5 +86,99 @@ describe('userLabel', () => {
         expect(userLabel({ ...user, displayName: null })).toBe('Name');
         expect(userLabel({ ...user, displayName: null, name: null })).toBe('x@example.org');
         expect(userLabel({ ...user, displayName: null, name: null, email: null })).toBe('Konto #9');
+    });
+});
+
+/** Sitzung wie AuthJson::session. */
+function sessionJson(id: number, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+        id,
+        device_label: 'Chrome auf Android',
+        created_at: '2026-10-20T08:00:00Z',
+        last_seen_at: '2026-10-29T12:55:00Z',
+        expires_at: '2027-01-18T08:00:00Z',
+        current: false,
+        ...overrides,
+    };
+}
+
+describe('Passwort ändern', () => {
+    it('sendet aktuelles und neues Passwort unverändert, liefert die neue Sitzung', async () => {
+        const { fetch, requests } = respond(200, ME);
+        const result = await changePassword(' alt ', 'neues Passwort 1', fetch);
+        expect(result.ok && result.data.user.id).toBe(7);
+        expect(requests[0]?.url).toMatch(/\/api\/v1\/auth\/password$/);
+        expect(requests[0]?.method).toBe('POST');
+        expect(requests[0]?.body).toEqual({
+            current_password: ' alt ',
+            new_password: 'neues Passwort 1',
+        });
+    });
+
+    it('403 invalid_current_password kommt als Fehler (keine Abmeldung)', async () => {
+        const { fetch } = respond(403, {
+            error: 'invalid_current_password',
+            message: 'Das aktuelle Passwort ist falsch.',
+        });
+        const result = await changePassword('falsch', 'neues Passwort 1', fetch);
+        expect(result.ok ? null : result.error).toMatchObject({
+            code: 'invalid_current_password',
+            status: 403,
+        });
+    });
+});
+
+describe('Angemeldete Geräte', () => {
+    it('liest die Sitzungen', async () => {
+        const { fetch, requests } = respond(200, {
+            sessions: [sessionJson(3, { current: true }), sessionJson(5, { device_label: null })],
+        });
+        const result = await fetchSessions(fetch);
+        expect(requests[0]?.url).toMatch(/\/api\/v1\/auth\/sessions$/);
+        expect(result.ok ? result.data : null).toEqual([
+            {
+                id: 3,
+                deviceLabel: 'Chrome auf Android',
+                createdAt: '2026-10-20T08:00:00Z',
+                lastSeenAt: '2026-10-29T12:55:00Z',
+                current: true,
+            },
+            {
+                id: 5,
+                deviceLabel: null,
+                createdAt: '2026-10-20T08:00:00Z',
+                lastSeenAt: '2026-10-29T12:55:00Z',
+                current: false,
+            },
+        ]);
+    });
+
+    it.each([
+        ['kein Objekt', null],
+        ['ohne Liste', {}],
+        ['ID kein int', { sessions: [sessionJson(1, { id: '1' })] }],
+        ['Bezeichnung falscher Typ', { sessions: [sessionJson(1, { device_label: 3 })] }],
+        ['Zeit ohne Z', { sessions: [sessionJson(1, { created_at: '2026-10-20 08:00:00' })] }],
+        ['current fehlt', { sessions: [sessionJson(1, { current: undefined })] }],
+    ])('lehnt ab: %s', (_label, json) => {
+        expect(parseSessions(json)).toBeNull();
+    });
+
+    it('beendet eine Sitzung per DELETE mit {}', async () => {
+        const { fetch, requests } = respond(200, { deleted: true, current: false });
+        const result = await endSession(5, fetch);
+        expect(result.ok ? result.data : null).toEqual({ current: false });
+        expect(requests[0]?.url).toMatch(/\/api\/v1\/auth\/sessions\/5$/);
+        expect(requests[0]?.method).toBe('DELETE');
+        expect(requests[0]?.body).toEqual({});
+    });
+
+    it('meldet alle anderen ab und liefert die Anzahl', async () => {
+        const { fetch, requests } = respond(200, { ended_sessions: 2 });
+        const result = await logoutOtherSessions(fetch);
+        expect(result.ok ? result.data : null).toEqual({ endedSessions: 2 });
+        expect(requests[0]?.url).toMatch(/\/api\/v1\/auth\/sessions\/logout-others$/);
+        expect(requests[0]?.method).toBe('POST');
+        expect(requests[0]?.body).toEqual({});
     });
 });

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Label } from 'reka-ui';
-import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from 'vue';
+import { computed, nextTick, ref, useTemplateRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
 import { login, resendVerification } from '../api/auth';
@@ -12,6 +12,7 @@ import ErrorNotice from '../components/ErrorNotice.vue';
 import MailHint from '../components/MailHint.vue';
 import PasswordField from '../components/PasswordField.vue';
 import { currentAppBase } from '../runtime/appBase';
+import { useCountdown } from '../runtime/countdown';
 import { isTenantUnavailable, tenantState } from '../runtime/tenantState';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 
@@ -41,29 +42,8 @@ const emailInput = useTemplateRef<HTMLInputElement>('emailInput');
 const passwordField = useTemplateRef<InstanceType<typeof PasswordField>>('passwordField');
 
 // Bremse (429): Knopf gesperrt, bis die Wartezeit aus Retry-After abgelaufen ist.
-const blockedSeconds = ref(0);
-let timer: ReturnType<typeof setInterval> | null = null;
-
-function startCountdown(seconds: number): void {
-    stopCountdown();
-    const until = Date.now() + seconds * 1000;
-    blockedSeconds.value = seconds;
-    timer = setInterval(() => {
-        blockedSeconds.value = Math.max(0, Math.ceil((until - Date.now()) / 1000));
-        if (blockedSeconds.value === 0) {
-            stopCountdown();
-        }
-    }, 250);
-}
-
-function stopCountdown(): void {
-    if (timer !== null) {
-        clearInterval(timer);
-        timer = null;
-    }
-}
-
-onBeforeUnmount(stopCountdown);
+const countdown = useCountdown();
+const blockedSeconds = countdown.seconds;
 
 // „Mail erneut senden“ bei email_not_verified
 const resendBusy = ref(false);
@@ -115,7 +95,7 @@ async function onSubmit(): Promise<void> {
         await nextTick();
         passwordField.value?.focus();
     } else if (result.error.code === 'too_many_attempts') {
-        startCountdown(result.error.retryAfterSeconds ?? 60);
+        countdown.start(result.error.retryAfterSeconds ?? 60);
     }
 }
 

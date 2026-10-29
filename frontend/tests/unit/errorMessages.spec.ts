@@ -11,6 +11,7 @@ describe('errorMessage', () => {
         ['network', 'Keine Verbindung zum Server'],
         ['invalid_response', 'Fehler aufgetreten'],
         ['invalid_credentials', 'E-Mail-Adresse oder Passwort ist falsch.'],
+        ['invalid_current_password', 'Das aktuelle Passwort ist falsch.'],
         ['account_locked', 'Ihr Konto ist gesperrt'],
         ['email_not_verified', 'noch nicht bestätigt'],
         ['pending_approval', 'wartet auf Freischaltung'],

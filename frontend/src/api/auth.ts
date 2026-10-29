@@ -116,6 +116,101 @@ export const ROLE_LABELS: Readonly<Record<UserRole, string>> = {
     superadmin: 'Super-Admin',
 };
 
+/**
+ * POST auth/password: eigenes Passwort ändern. Antwort wie auth/me mit der neuen Sitzung (der Server
+ * ersetzt das Cookie und beendet alle anderen Sitzungen). Ein falsches aktuelles Passwort ist 403
+ * `invalid_current_password` (nicht 401, sonst würde abgemeldet) und zählt in die Bremse (429).
+ */
+export function changePassword(
+    currentPassword: string,
+    newPassword: string,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<AuthState>> {
+    return apiRequest('auth/password', parseAuthState, {
+        method: 'POST',
+        body: { current_password: currentPassword, new_password: newPassword },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** Sitzung des eigenen Kontos wie AuthJson::session (Zeiten in UTC, `…Z`). */
+export interface AccountSession {
+    readonly id: number;
+    /** Grobe Gerätebezeichnung, z. B. „Chrome auf Android“; null = unbekannt. */
+    readonly deviceLabel: string | null;
+    readonly createdAt: string;
+    readonly lastSeenAt: string;
+    readonly current: boolean;
+}
+
+const UTC_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+function parseSession(json: unknown): AccountSession | null {
+    if (!isRecord(json)) {
+        return null;
+    }
+    const { id, device_label: label, created_at: created, last_seen_at: seen, current } = json;
+    if (
+        typeof id !== 'number' ||
+        !Number.isInteger(id) ||
+        (label !== null && typeof label !== 'string') ||
+        typeof created !== 'string' ||
+        !UTC_TIME.test(created) ||
+        typeof seen !== 'string' ||
+        !UTC_TIME.test(seen) ||
+        typeof current !== 'boolean'
+    ) {
+        return null;
+    }
+    return { id, deviceLabel: label, createdAt: created, lastSeenAt: seen, current };
+}
+
+export function parseSessions(json: unknown): readonly AccountSession[] | null {
+    if (!isRecord(json) || !Array.isArray(json['sessions'])) {
+        return null;
+    }
+    const sessions = json['sessions'].map(parseSession);
+    return sessions.every((session) => session !== null) ? sessions : null;
+}
+
+/** GET auth/sessions: gültige Sitzungen des eigenen Kontos, zuletzt benutzte zuerst. */
+export function fetchSessions(
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<readonly AccountSession[]>> {
+    return apiRequest('auth/sessions', parseSessions, { ...(fetchFn && { fetchFn }) });
+}
+
+/** DELETE auth/sessions/{id}: eine eigene Sitzung beenden (fremd oder schon beendet: 404). */
+export function endSession(
+    id: number,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<{ readonly current: boolean }>> {
+    return apiRequest(
+        `auth/sessions/${String(id)}`,
+        (json) =>
+            isRecord(json) && typeof json['current'] === 'boolean'
+                ? { current: json['current'] }
+                : null,
+        { method: 'DELETE', ...(fetchFn && { fetchFn }) },
+    );
+}
+
+/** POST auth/sessions/logout-others: alle anderen Sitzungen beenden; liefert deren Anzahl. */
+export function logoutOtherSessions(
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<{ readonly endedSessions: number }>> {
+    return apiRequest(
+        'auth/sessions/logout-others',
+        (json) =>
+            isRecord(json) &&
+            typeof json['ended_sessions'] === 'number' &&
+            Number.isInteger(json['ended_sessions'])
+                ? { endedSessions: json['ended_sessions'] }
+                : null,
+        { method: 'POST', ...(fetchFn && { fetchFn }) },
+    );
+}
+
 /** POST auth/email/resend: immer 202 mit derselben Meldung (nur unter Städten). */
 export function resendVerification(
     email: string,

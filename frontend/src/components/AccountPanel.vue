@@ -24,7 +24,7 @@ async function onLogout(): Promise<void> {
 </script>
 
 <template>
-    <section v-if="session !== null" class="card account" aria-label="Angemeldetes Konto">
+    <section v-if="session !== null" class="card" aria-label="Angemeldetes Konto">
         <p class="account-text">
             Angemeldet als <strong data-testid="account-name">{{ label }}</strong>
             <span class="account-role">({{ role }})</span>
@@ -35,10 +35,6 @@ async function onLogout(): Promise<void> {
 </template>
 
 <style scoped>
-.account {
-    max-width: 420px;
-}
-
 .account-text {
     margin: 0;
 }
