@@ -8,6 +8,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 ## Arbeitsweise
 - Alle Antworten an den Nutzer immer auf Deutsch, auch Zwischenstände und Rückfragen.
 - In kleinen Schritten arbeiten. Vor größeren Änderungen erst einen Plan vorlegen.
+- Wünsche für später stehen in `docs/TODO-SPAETER.md`; nicht vorziehen, neue Wünsche dort ergänzen.
 - Bestehende Funktionen dürfen nicht kaputtgehen: Jede Änderung bekommt Tests,
   vor jedem Commit müssen alle Tests grün sein.
 - Agenten committen und pushen nie; das macht der Nutzer.
@@ -263,12 +264,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
-  `client.ts`; `devices.ts`, `deviceEvents.ts`, `locations.ts`), `src/data/` (Datenschicht für Geräte und Standorte),
+  `client.ts`; `devices.ts`, `deviceEvents.ts`, `inspections.ts`, `locations.ts`), `src/data/` (Datenschicht für Geräte und Standorte),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
   `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung,
-  `appUpdate.ts` Updates, `unsavedInput.ts` ungespeicherte Eingaben, `build.ts` Build-Kennung), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
+  `appUpdate.ts` Updates, `unsavedInput.ts` ungespeicherte Eingaben, `build.ts` Build-Kennung,
+  `now.ts` `useNow` für Zeitangaben: alle 30 s und bei `visibilitychange` neu), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
   `tests/unit/` (Vitest), `tests/e2e/` (Playwright). Build nach `frontend/dist/` (in `.gitignore`).
 - Design-Variablen nur in `src/styles/tokens.css` (Farben hell/dunkel aus dem Mockup, Statusfarben,
@@ -349,6 +351,20 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Umbuchen-Ansicht simulieren `GET api/v1/devices/{id}` (`deviceDetail`) und `GET api/v1/locations`
   (`LOCATIONS`, mit Gerätezahlen), beide in `tests/e2e/support/devices.ts`; Tests in
   `tests/e2e/booking.spec.ts`.
+- Prüffristen (`InspectionsPage`, `prueffristen`, KONZEPT.md Entscheidung 25): Abschnitte
+  „Überfällig“ und „In den nächsten 30 Tagen fällig“ (`INSPECTION_WINDOW_DAYS` = 30, per Test gleich
+  `InspectionWindow::DEFAULT_DAYS`) mit Anzahl. Im Modus `local` aus der Geräteliste
+  (`inspectionOverview` in `src/data/inspections.ts`, heute = `localDateKey` der Ortszeit über
+  `useNow`, Tage per `daysBetween` ohne Zeitzone; Grenzen wie `GET inspection-due`: überfällig
+  Prüfdatum < heute, bald fällig heute bis heute + 30; sortiert nach Prüfdatum, bei Gleichstand wie
+  die Liste nach Kennung; ausgesonderte nie), daher nach eigener Buchung sofort aktuell. Im Modus
+  `server` `fetchServerInspections` (`src/data/index.ts`, `GET inspection-due?days=30&limit=200`,
+  `src/api/inspections.ts`; Geräte als `DeviceSummary` = `DeviceJson::summary`), nach jeder neu
+  geladenen Liste erneut, „Angezeigt werden die ersten N.“, wenn `total` größer ist. Je Gerät
+  `DeviceCard` (Typ `DeviceSummary`, Zusatzzeile per Slot) mit „Prüfung: 01.10.2026 · seit 28 Tagen
+  überfällig“ (rot, `--status-defective-fg`) bzw. „· heute/morgen/in N Tagen fällig“ (gelb,
+  `--status-maintenance-fg`; `inspectionText`). Antippen öffnet das Umbuchen. Tests
+  `tests/e2e/inspections.spec.ts`, `tests/unit/inspections.spec.ts`, `inspectionWindow.spec.ts`.
 - Details und Verlauf (`DeviceDetails` in `src/components/`, KONZEPT.md Entscheidung 15): Link
   „Details und Verlauf“ unten auf der Umbuchen-Seite (auch bei ausgesonderten Geräten), eine
   Ansicht derselben Seite über `?details=1` wie die Standortwahl (Eingaben bleiben, Zurück-Knopf

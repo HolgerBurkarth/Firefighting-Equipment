@@ -5,8 +5,8 @@ export type DeviceStatus = 'ready' | 'maintenance' | 'defective' | 'retired';
 
 const STATUSES: readonly DeviceStatus[] = ['ready', 'maintenance', 'defective', 'retired'];
 
-/** Eintrag von GET devices (DeviceJson::listItem); Antworten mit allen Feldern enthalten ihn auch. */
-export interface DeviceListItem {
+/** Kurzform eines Geräts (DeviceJson::summary, z. B. in GET inspection-due). */
+export interface DeviceSummary {
     readonly id: number;
     readonly identifier: string;
     readonly scanCode: string | null;
@@ -18,6 +18,10 @@ export interface DeviceListItem {
     /** JJJJ-MM-TT oder null. */
     readonly nextInspectionDue: string | null;
     readonly version: number;
+}
+
+/** Eintrag von GET devices (DeviceJson::listItem); Antworten mit allen Feldern enthalten ihn auch. */
+export interface DeviceListItem extends DeviceSummary {
     readonly serialNumber: string | null;
     readonly manufacturer: string | null;
     readonly model: string | null;
@@ -62,7 +66,7 @@ export function nullableString(value: unknown): string | null | undefined {
     return typeof value === 'string' ? value : undefined;
 }
 
-export function parseDeviceListItem(json: unknown): DeviceListItem | null {
+export function parseDeviceSummary(json: unknown): DeviceSummary | null {
     if (!isRecord(json) || !isRecord(json['device_type']) || !isRecord(json['location'])) {
         return null;
     }
@@ -72,11 +76,6 @@ export function parseDeviceListItem(json: unknown): DeviceListItem | null {
     const statusLabel = json['status_label'];
     const scanCode = nullableString(json['scan_code']);
     const due = nullableString(json['next_inspection_due']);
-    const serialNumber = nullableString(json['serial_number']);
-    const manufacturer = nullableString(json['manufacturer']);
-    const model = nullableString(json['model']);
-    // Neu in der Liste: fehlt es (ältere Antwort), gilt null.
-    const stateChangedAt = json['state_changed_at'] ?? null;
     if (
         !isId(id) ||
         typeof identifier !== 'string' ||
@@ -89,11 +88,7 @@ export function parseDeviceListItem(json: unknown): DeviceListItem | null {
         typeof statusLabel !== 'string' ||
         !isId(version) ||
         scanCode === undefined ||
-        due === undefined ||
-        serialNumber === undefined ||
-        manufacturer === undefined ||
-        model === undefined ||
-        (stateChangedAt !== null && !isUtcTime(stateChangedAt))
+        due === undefined
     ) {
         return null;
     }
@@ -107,11 +102,28 @@ export function parseDeviceListItem(json: unknown): DeviceListItem | null {
         statusLabel,
         nextInspectionDue: due,
         version,
-        serialNumber,
-        manufacturer,
-        model,
-        stateChangedAt,
     };
+}
+
+export function parseDeviceListItem(json: unknown): DeviceListItem | null {
+    const summary = parseDeviceSummary(json);
+    if (summary === null || !isRecord(json)) {
+        return null;
+    }
+    const serialNumber = nullableString(json['serial_number']);
+    const manufacturer = nullableString(json['manufacturer']);
+    const model = nullableString(json['model']);
+    // Neu in der Liste: fehlt es (ältere Antwort), gilt null.
+    const stateChangedAt = json['state_changed_at'] ?? null;
+    if (
+        serialNumber === undefined ||
+        manufacturer === undefined ||
+        model === undefined ||
+        (stateChangedAt !== null && !isUtcTime(stateChangedAt))
+    ) {
+        return null;
+    }
+    return { ...summary, serialNumber, manufacturer, model, stateChangedAt };
 }
 
 export function parseDevicePage(json: unknown): DevicePage | null {

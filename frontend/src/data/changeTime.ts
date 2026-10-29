@@ -63,3 +63,17 @@ export function germanDate(date: string): string {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
     return match === null ? date : `${match[3] ?? ''}.${match[2] ?? ''}.${match[1] ?? ''}`;
 }
+
+/** Kalendertag in der Ortszeit als `JJJJ-MM-TT` (Vergleich mit Datumsfeldern des Servers). */
+export function localDateKey(time: Date): string {
+    return `${String(time.getFullYear())}-${twoDigits(time.getMonth() + 1)}-${twoDigits(time.getDate())}`;
+}
+
+/** Tage von `from` bis `to` (beide `JJJJ-MM-TT`), ohne Zeitzone; negativ, wenn `to` davor liegt. */
+export function daysBetween(from: string, to: string): number {
+    const day = (date: string): number => {
+        const [year = 0, month = 1, dayOfMonth = 1] = date.split('-').map(Number);
+        return Date.UTC(year, month - 1, dayOfMonth);
+    };
+    return Math.round((day(to) - day(from)) / 86_400_000);
+}

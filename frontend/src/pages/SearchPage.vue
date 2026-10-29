@@ -8,6 +8,7 @@ import ErrorNotice from '../components/ErrorNotice.vue';
 import { deviceStore, recentDeviceIds } from '../data';
 import { takeBookingNotice } from '../data/booking';
 import { changeTimeText } from '../data/changeTime';
+import { useNow } from '../runtime/now';
 import {
     findByCode,
     MAX_SEARCH_HITS,
@@ -18,8 +19,6 @@ import {
 
 /** Pause nach dem letzten Tastendruck, bevor im Modus `server` gesucht wird. */
 const SERVER_SEARCH_DELAY_MS = 300;
-/** „vor 5 Min.“ unter „Zuletzt benutzt“ bleibt so aktuell. */
-const CLOCK_TICK_MS = 30_000;
 
 const router = useRouter();
 const input = useTemplateRef<HTMLInputElement>('input');
@@ -99,13 +98,7 @@ watch(
 );
 
 // Zeitpunkt der letzten Änderung (Umbuchung/Status) in der Ortszeit des Handys.
-const now = ref(new Date());
-function tick(): void {
-    now.value = new Date();
-}
-const clockTimer = setInterval(tick, CLOCK_TICK_MS);
-// Nach dem Entsperren des Handys sofort, nicht erst beim nächsten Takt.
-document.addEventListener('visibilitychange', tick);
+const now = useNow();
 
 function changeTime(device: DeviceListItem): string | null {
     return device.stateChangedAt === null ? null : changeTimeText(device.stateChangedAt, now.value);
@@ -122,8 +115,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     clearTimeout(serverTimer);
-    clearInterval(clockTimer);
-    document.removeEventListener('visibilitychange', tick);
     serverSequence += 1;
 });
 
