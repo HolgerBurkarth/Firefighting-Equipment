@@ -19,6 +19,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Code und Bezeichner auf Englisch, Dokumentation und Oberflächentexte auf Deutsch.
 - Jede Änderung an der REST-API (auch neue Felder) kommt zusätzlich in `docs/UEBERGABE-BACKEND.md`
   (Datum, Commit-Betreff, was und warum, Tests), damit der Backend-Chat sie kennt.
+- Hängt eine Änderung von Bildschirmbreite oder Browser ab (Layout, Leisten, Touch, Kamera, Service
+  Worker), vor „✅ FERTIG“ zusätzlich in `frontend/` `npm run test:e2e:all` (alle fünf Profile, auch
+  Firefox und Handy-Breite) laufen lassen; `npm test` prüft lokal nur Chromium und WebKit in
+  PC-Breite. Tests, deren Erwartung von der Breite abhängt, setzen sie ausdrücklich
+  (`page.setViewportSize`).
 - Status von Nachrichten an den Nutzer – jede Nachricht beginnt mit genau einer Kennzeichnung:
   - "⏳ ZWISCHENSTAND – ich arbeite weiter": Es läuft noch etwas. Dazu: was gerade läuft, wie lange
     es voraussichtlich dauert und was danach kommt. Der Nutzer muss nichts tun.
