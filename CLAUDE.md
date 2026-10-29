@@ -270,7 +270,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
   `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung,
   `appUpdate.ts` Updates, `unsavedInput.ts` ungespeicherte Eingaben, `build.ts` Build-Kennung,
-  `now.ts` `useNow` für Zeitangaben: alle 30 s und bei `visibilitychange` neu), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
+  `now.ts` `useNow` für Zeitangaben: alle 30 s und bei `visibilitychange` neu, `countdown.ts`
+  `useCountdown` Sperre nach 429 bis `Retry-After`), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
   `tests/unit/` (Vitest), `tests/e2e/` (Playwright). Build nach `frontend/dist/` (in `.gitignore`).
 - Design-Variablen nur in `src/styles/tokens.css` (Farben hell/dunkel aus dem Mockup, Statusfarben,
@@ -386,6 +387,23 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `tests/e2e/deviceDetails.spec.ts` (Hilfen `fullDevice`, `eventJson`, `eventsEndpoint` in
   `tests/e2e/support/devices.ts`; `deviceDetail` liefert alle Felder) und
   `tests/unit/deviceHistory.spec.ts`.
+- Profil (`ProfilePage`, `profil`, KONZEPT.md "User am Handy", Profil): `AccountPanel` (Konto,
+  Abmelden), `ThemeModeSetting` (Radiogruppe System/Hell/Dunkel, sofort `saveThemeMode` und
+  `applyThemeMode`, Hinweis per `matchMedia`), `PasswordChangeForm` (aufklappbar; `changePassword`
+  → `POST auth/password` mit Passwörtern unverändert; vorher leeres aktuelles Passwort und
+  `checkPassword` mit E-Mail, Name, Anzeigename und Stadt der Sitzung; Erfolg: `setSession` mit der
+  Antwort (neue Sitzung, dasselbe Konto), Formular zu, Hinweis, Liste der Geräte neu; 403
+  `invalid_current_password` → Meldung am Feld „Aktuelles Passwort“, Feld geleert und fokussiert; 422
+  `weak_password` → `serverError` von `NewPasswordField`; 429 → `useCountdown`, Knopf „Wieder
+  möglich in m:ss“; ungespeicherte Eingaben per `useUnsavedInput`), `SessionList`
+  (`fetchSessions`, `endSession` → `DELETE auth/sessions/{id}` (404 = schon beendet, gilt als
+  erledigt), `logoutOtherSessions` → `POST auth/sessions/logout-others` nach `ConfirmDialog`; nach
+  jeder Aktion neu laden; Anzeige `src/auth/sessionList.ts`: dieses Gerät zuerst, ohne eigenen Knopf,
+  „Angemeldet heute 08:05“, andere „Zuletzt aktiv vor 5 Min. · angemeldet 12.10.2026“ über
+  `changeTimeText`; Knöpfe „Abmelden“ mit `aria-label` „<Gerät> abmelden“). Browser-Tests, die das
+  Profil nur öffnen, simulieren `GET api/v1/auth/sessions` mit `CURRENT_SESSION_ONLY`
+  (`tests/e2e/support/profile.ts`, dort auch `sessionJson`); Tests in `tests/e2e/profile.spec.ts`,
+  `tests/unit/sessionList.spec.ts`, `countdown.spec.ts`, `auth.spec.ts`.
 - Standortwahl („Anderen Standort suchen …“, `LocationPicker` in `src/components/`, Logik
   `src/data/locationSearch.ts`): eine Ansicht der Umbuchen-Seite, geöffnet über `?standortwahl=1`
   am selben Pfad (kein eigener Pfad: Eingaben bleiben, `installUpdateGuard` lädt bei gleichem Pfad

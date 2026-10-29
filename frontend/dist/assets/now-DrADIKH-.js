@@ -1,0 +1,1 @@
+import{at as e,yn as t}from"./plugin-vue_export-helper-CStXJJQD.js";var n=3e4;function r(r=document){let i=t(new Date),a=()=>{i.value=new Date},o=setInterval(a,n);return r.addEventListener(`visibilitychange`,a),e(()=>{clearInterval(o),r.removeEventListener(`visibilitychange`,a)}),i}export{r as t};

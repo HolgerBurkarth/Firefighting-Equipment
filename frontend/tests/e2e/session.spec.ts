@@ -8,6 +8,7 @@ import {
     test,
 } from './fixtures';
 import { NO_DEVICES } from './support/devices';
+import { CURRENT_SESSION_ONLY } from './support/profile';
 
 test.describe('Weiche „/“ und Wächter', () => {
     test.describe('ohne Sitzung', () => {
@@ -181,6 +182,7 @@ test.describe('Abmelden', () => {
             api: {
                 'GET api/v1/auth/me': { status: 200, body: meBody('user') },
                 'POST api/v1/auth/logout': 'abort',
+                ...CURRENT_SESSION_ONLY,
             },
             allowedConsoleError: /internet|network|Failed to load|ERR_/i,
         });

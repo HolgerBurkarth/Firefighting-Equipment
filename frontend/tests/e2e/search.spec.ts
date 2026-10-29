@@ -16,6 +16,7 @@ import {
     manyDevices,
     NO_DEVICES,
 } from './support/devices';
+import { CURRENT_SESSION_ONLY } from './support/profile';
 
 const ME = { status: 200, body: meBody('user') } as const;
 const RECENT_KEY = 'ff-recent-devices:test:7';
@@ -248,6 +249,7 @@ test.describe('Abmelden löscht „Zuletzt benutzt“', () => {
             'GET api/v1/devices': devicesEndpoint(DEVICES),
             ...DEVICE_PAGES,
             'POST api/v1/auth/logout': { status: 200, body: { logged_out: true } },
+            ...CURRENT_SESSION_ONLY,
         },
     });
 
