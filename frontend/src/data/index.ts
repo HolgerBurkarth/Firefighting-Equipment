@@ -1,7 +1,10 @@
+import type { ApiResult } from '../api/client';
+import { fetchInspectionOverview, type InspectionOverview } from '../api/inspections';
 import { onSessionEnded, session } from '../auth/session';
 import { browserStorage } from '../runtime/theme';
 import { DeviceHistory } from './deviceHistory';
 import { DeviceStore } from './deviceStore';
+import { INSPECTION_WINDOW_DAYS, SERVER_INSPECTION_LIMIT } from './inspections';
 import { LocationStore } from './locationStore';
 import { setBookingNotice } from './booking';
 import { addRecent, clearRecent, loadRecent } from './recentDevices';
@@ -17,6 +20,17 @@ export const locationStore = new LocationStore();
 /** Verlauf eines Geräts („Details und Verlauf“), je Ansicht neu. */
 export function deviceHistory(id: number): DeviceHistory {
     return new DeviceHistory(id);
+}
+
+/**
+ * Prüffristen vom Server (GET inspection-due), nur im Modus `server` der Geräteliste (zu viele
+ * Geräte für die lokale Liste); sonst rechnet die Seite mit `inspectionOverview` lokal.
+ */
+export function fetchServerInspections(): Promise<ApiResult<InspectionOverview>> {
+    return fetchInspectionOverview({
+        days: INSPECTION_WINDOW_DAYS,
+        limit: SERVER_INSPECTION_LIMIT,
+    });
 }
 
 /** IDs „Zuletzt benutzt“ des angemeldeten Kontos, neueste zuerst (ohne Sitzung leer). */

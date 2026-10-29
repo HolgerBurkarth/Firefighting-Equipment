@@ -51,8 +51,8 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `passwort-vergessen` | Stadt und `service` | Link zum Zurücksetzen anfordern |
 | `passwort-zuruecksetzen` | Stadt und `service` | Mail-Link, neues Passwort setzen (Link 1 Stunde gültig; abgelaufen → „Neuen Link anfordern“) |
 | `einladung-annehmen` | nur Stadt | Mail-Link für neue Admins: Name und Passwort |
-| `suchen` | nur Stadt | Startseite des Users am Handy (vorerst Platzhalter) |
-| `prueffristen` | nur Stadt | Prüffristen am Handy (vorerst Platzhalter) |
+| `suchen` | nur Stadt | Startseite des Users am Handy: Suche, „Zuletzt benutzt“ |
+| `prueffristen` | nur Stadt | Prüffristen am Handy: überfällig und in den nächsten 30 Tagen fällig |
 | `profil` | nur Stadt | Profil am Handy (vorerst Platzhalter mit Abmelden) |
 | `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts; `?standortwahl=1` öffnet die Standortwahl, `?details=1` „Details und Verlauf“ |
 | `dashboard` | Stadt und `service` | Startseite von Admin bzw. Super-Admin (vorerst Platzhalter) |
@@ -292,7 +292,9 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
 - **Geräte:** Liste mit Import- und Export-Button. Detail: oben Kennung, Typ, Standort, Status
   groß und farbig, darunter Stammdaten, unten die Historie. Aktionen: groß „Umbuchen / Status
   ändern“, kleiner „Bearbeiten“, „Code zuordnen“ (QR oder Barcode einscannen), rot und abseits
-  „Aussondern“.
+  „Aussondern“. Ausgesonderte Geräte sind in der Suche am Handy bewusst ausgeblendet; die
+  Geräteliste der Admin-Konsole braucht daher einen Filter „Ausgesonderte anzeigen“, von dem aus
+  der Admin die Details öffnet und das Gerät wieder aufnimmt.
 - **Standorte:** Baum statt Liste, Fahrzeug mit Fächern darunter, Symbol für Fahrzeug, Raum oder
   extern, Zahl der Geräte; Klick zeigt die Geräte dort.
 - **Gerätetypen:** einfache Liste mit Name und Gerätezahl; umbenennen, deaktivieren.
@@ -404,7 +406,14 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
     Treffer öffnet das Gerät. Umgesetzt: zuerst Scan-Code bzw. Kennung genau, sonst genau ein
     Treffer der Suche; bei mehreren Treffern schließt sich nur die Tastatur, ohne Treffer erscheint
     „Kein Gerät mit diesem Code gefunden.“ und der Text bleibt im Suchfeld.
-25. **Prüffristen:** Antippen eines Geräts öffnet die Umbuchen-Ansicht.
+25. **Prüffristen:** Antippen eines Geräts öffnet die Umbuchen-Ansicht. Umgesetzt: zwei
+    Abschnitte „Überfällig“ und „In den nächsten 30 Tagen fällig“ mit Anzahl, sortiert nach
+    Prüfdatum (am stärksten überfällig zuerst). Je Gerät die Karte wie bei „Suchen“, darunter
+    „Prüfung: 01.10.2026 · seit 28 Tagen überfällig“ (rot) bzw. „· heute fällig“, „· morgen
+    fällig“, „· in 4 Tagen fällig“ (gelb), wie im Mockup „AdminHandy“. Berechnet aus der geladenen
+    Geräteliste (nach einer eigenen Buchung sofort aktuell, „heute“ in der Ortszeit des Handys);
+    bei mehr als 2.000 Geräten vom Server (höchstens 200 je Abschnitt). Geräte ohne Prüfdatum
+    erscheinen hier nicht.
 26. **Komprimierung:** STRATO komprimiert die Ausgabe nicht (live geprüft). Der Build erzeugt daher
     komprimierte Fassungen aller Dateien (`.gz`, ggf. `.br`); PHP liefert sie aus, wenn
     `Accept-Encoding` es erlaubt (`Content-Encoding`, `Vary: Accept-Encoding`, ETag je Fassung).

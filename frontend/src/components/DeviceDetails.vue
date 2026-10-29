@@ -2,7 +2,7 @@
 import { computed, onMounted } from 'vue';
 import type { DeviceDetail, DeviceListItem } from '../api/devices';
 import { deviceHistory } from '../data';
-import { eventTimeText, germanDate } from '../data/changeTime';
+import { eventTimeText, germanDate, localDateKey } from '../data/changeTime';
 import { eventLines, scanCodeDisplay } from '../data/eventDisplay';
 import ErrorNotice from './ErrorNotice.vue';
 import FocusHeader from './FocusHeader.vue';
@@ -24,12 +24,8 @@ const state = computed(() => history.state);
 /** Zeitpunkte relativ zu „heute“ beim Öffnen. */
 const now = new Date();
 
-/** Heute in der Ortszeit als JJJJ-MM-TT (Vergleich mit dem Prüfdatum). */
-const today = [
-    String(now.getFullYear()),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-].join('-');
+/** Heute in der Ortszeit (Vergleich mit dem Prüfdatum). */
+const today = localDateKey(now);
 
 const overdue = computed(
     () => props.device.nextInspectionDue !== null && props.device.nextInspectionDue < today,
