@@ -8,6 +8,7 @@ import {
     isChunkLoadError,
     RELOAD_COOLDOWN_MS,
     RELOAD_STORAGE_KEY,
+    REQUEST_SETTLE_TIMEOUT_MS,
     SKIP_WAITING_MESSAGE,
     START_CHECK_TIMEOUT_MS,
     START_RETRY_DELAYS_MS,
@@ -242,6 +243,36 @@ describe('AppUpdater: neue Version erkennen', () => {
         const s = setup({ controller: null });
         installNewVersion(s);
         expect(s.updater.ready.value).toBe(false);
+    });
+
+    it('erste Installation, WebKit meldet den neuen Service Worker schon als controller → kein Update', async () => {
+        // Reihenfolge in WebKit: controller ist schon der neue Worker, sein Zustand noch „installed“.
+        const s = setup({ controller: null });
+        const worker = new FakeWorker('installing');
+        s.registration.installing = worker;
+        s.registration.emit('updatefound');
+        s.registration.installing = null;
+        s.container.controller = worker;
+        worker.setState('installed');
+        await flush();
+        expect(s.updater.ready.value).toBe(false);
+        // Entschieden hat die Build-Kennung (gleich): beim Seitenwechsel kein Aktualisieren.
+        expect(s.buildFetches).toBe(1);
+        expect(await s.updater.applyNow('https://x/a')).toBe(false);
+        expect(s.registration.updates).toBe(0);
+    });
+
+    it('erste Installation, WebKit-Reihenfolge, Server liefert schon eine andere Version → bereit', async () => {
+        const s = setup({ controller: null });
+        s.served = NEW_BUILD;
+        const worker = new FakeWorker('installing');
+        s.registration.installing = worker;
+        s.registration.emit('updatefound');
+        s.registration.installing = null;
+        s.container.controller = worker;
+        worker.setState('installed');
+        await flush();
+        expect(s.updater.ready.value).toBe(true);
     });
 
     it('erste Übernahme nach der Installation (clientsClaim) ist kein Update', async () => {
@@ -642,6 +673,106 @@ describe('AppUpdater: update() mit laufender Prüfung zusammengelegt', () => {
         expect(await runTimers(s)).toEqual([500, TAKEOVER_TIMEOUT_MS]);
         expect(await done).toBe(true);
         expect(s.navigated).toEqual(['https://x/a']);
+    });
+});
+
+describe('AppUpdater: Neuladen erst ohne laufende Anfragen', () => {
+    /** update() bleibt offen, bis der Test es beendet. */
+    function pendingUpdate(s: Setup): () => void {
+        let finish: () => void = () => undefined;
+        s.registration.update = () => {
+            s.registration.updates += 1;
+            return new Promise<void>((resolve) => {
+                finish = resolve;
+            });
+        };
+        return () => {
+            finish();
+        };
+    }
+
+    it('laufendes update() wird abgewartet, erst dann neu geladen', async () => {
+        // WebKit meldet ein vom Neuladen abgebrochenes update() als Fehler (sw.js).
+        const s = setup();
+        const worker = installNewVersion(s);
+        activatesOnMessage(s, worker);
+        const finish = pendingUpdate(s);
+        void s.updater.check();
+        const done = s.updater.applyNow('https://x/a');
+        await flush();
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual([]);
+        finish();
+        expect(await done).toBe(true);
+        expect(s.navigated).toEqual(['https://x/a']);
+    });
+
+    it('laufende Abfrage von build.json wird ebenso abgewartet', async () => {
+        const s = setup();
+        const worker = installNewVersion(s);
+        activatesOnMessage(s, worker);
+        let answer: (build: string | null) => void = () => undefined;
+        const updater = new AppUpdater({
+            container: s.container,
+            storage: null,
+            now: () => s.now,
+            isOnline: () => true,
+            navigate: (url) => s.navigated.push(url),
+            setTimeout: (callback, ms) => s.timers.push({ callback, ms }),
+            buildId: RUNNING_BUILD,
+            fetchBuildId: () =>
+                new Promise((resolve) => {
+                    answer = resolve;
+                }),
+        });
+        updater.attach(s.registration);
+        void updater.check();
+        const done = updater.applyNow('https://x/a');
+        await flush();
+        expect(s.navigated).toEqual([]);
+        answer(RUNNING_BUILD);
+        expect(await done).toBe(true);
+        expect(s.navigated).toEqual(['https://x/a']);
+    });
+
+    it('hängt die Anfrage, wird nach REQUEST_SETTLE_TIMEOUT_MS trotzdem neu geladen', async () => {
+        const s = setup();
+        const worker = installNewVersion(s);
+        activatesOnMessage(s, worker);
+        pendingUpdate(s);
+        void s.updater.check();
+        const done = s.updater.applyNow('https://x/a');
+        await flush();
+        expect(s.navigated).toEqual([]);
+        expect(s.timers.at(-1)?.ms).toBe(REQUEST_SETTLE_TIMEOUT_MS);
+        s.timers.at(-1)?.callback();
+        expect(await done).toBe(true);
+        expect(s.navigated).toEqual(['https://x/a']);
+    });
+
+    it('ohne laufende Anfrage sofort neu laden (keine Wartezeit)', async () => {
+        const s = setup();
+        const worker = installNewVersion(s);
+        activatesOnMessage(s, worker);
+        await s.updater.check();
+        expect(await s.updater.applyNow('https://x/a')).toBe(true);
+        expect(s.timers.map((timer) => timer.ms)).not.toContain(REQUEST_SETTLE_TIMEOUT_MS);
+    });
+
+    it('nach dem Neuladen keine Anfragen mehr: geplante Wiederholungen und Prüfungen entfallen', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        await s.updater.check();
+        expect(s.registration.updates).toBe(1);
+        expect(s.timers).toHaveLength(1);
+        await s.updater.reloadFromServer('https://x/a');
+        expect(s.navigated).toEqual(['https://x/a']);
+        // Die schon geplante Wiederholung der Suche fragt nicht mehr.
+        await runTimers(s);
+        expect(s.registration.updates).toBe(1);
+        await s.updater.check();
+        expect(s.registration.updates).toBe(1);
+        expect(s.buildFetches).toBe(1);
     });
 });
 

@@ -43,6 +43,12 @@ export const UPDATE_RETRY_DELAYS_MS: readonly number[] = [500, 1000, 2000, 4000]
  * bleibt „Seite wird geladen …“ stehen, danach der Hinweis mit dem Knopf „Neu laden“.
  */
 export const START_RETRY_DELAYS_MS: readonly number[] = [...UPDATE_RETRY_DELAYS_MS, 8000, 15000];
+/**
+ * Vor dem Neuladen wird höchstens so lange auf laufende Anfragen (update(), build.json) gewartet.
+ * Bricht das Neuladen eine Anfrage an sw.js ab, meldet WebKit einen Fehler („… due to access control
+ * checks“).
+ */
+export const REQUEST_SETTLE_TIMEOUT_MS = 1000;
 /** Nachricht an den wartenden Service Worker (Workbox generateSW ohne skipWaiting). */
 export const SKIP_WAITING_MESSAGE = { type: 'SKIP_WAITING' } as const;
 export const RELOAD_STORAGE_KEY = 'ff-update-reloaded-at';
@@ -112,6 +118,10 @@ export class AppUpdater {
     /** Laufende Suche nach dem neuen Service Worker (gemeinsam für alle Aufrufer). */
     private search: Promise<boolean> | null = null;
     private searchDelays: readonly number[] = [];
+    /** Die App lädt neu: keine Anfragen mehr, auch keine geplanten Wiederholungen der Suche. */
+    private reloading = false;
+    /** Laufende Anfragen an den Server (update(), build.json); vor dem Neuladen abgewartet. */
+    private readonly requests = new Set<Promise<unknown>>();
 
     constructor(private readonly env: UpdateEnvironment) {
         // Hat ein anderer Tab die neue Version aktiviert, läuft hier noch der alte Code unter dem
@@ -154,7 +164,10 @@ export class AppUpdater {
                 // NICHT build.json fragen: Die Anfrage liefe über den alten Service Worker, und
                 // aktiviert ein anderer Tab genau jetzt die neue Version, startet Chrome den alten
                 // dafür neu und die Aktivierung bleibt stehen (Ursache sporadisch alter Seiten).
-                if (this.env.container.controller !== null) {
+                // Nur ein ANDERER Service Worker in Kontrolle zählt: WebKit meldet bei der ersten
+                // Installation den neuen schon als controller, während er noch „installed“ ist.
+                const controller = this.env.container.controller;
+                if (controller !== null && controller !== worker) {
                     this.markReady();
                 } else {
                     void this.compareBuild();
@@ -170,7 +183,7 @@ export class AppUpdater {
      * Worker, fragt die App im Hintergrund erneut (UPDATE_RETRY_DELAYS_MS).
      */
     async check(): Promise<void> {
-        if (!this.env.isOnline()) {
+        if (this.reloading || !this.env.isOnline()) {
             return;
         }
         const registration = this.registration;
@@ -204,7 +217,7 @@ export class AppUpdater {
         if (this.env.container.controller === null || !this.env.isOnline()) {
             return false;
         }
-        const served = await this.withTimeout(this.env.fetchBuildId());
+        const served = await this.withTimeout(this.track(this.env.fetchBuildId()));
         if (served === null || served === this.env.buildId) {
             return false;
         }
@@ -236,8 +249,35 @@ export class AppUpdater {
         this.applying = true;
         this.switching.value = true;
         await this.unregister();
+        await this.reload(url);
+    }
+
+    /**
+     * Lädt `url` neu. Vorher enden alle Anfragen: Ab jetzt beginnt keine neue (auch keine geplante
+     * Wiederholung der Suche, keine Prüfung), laufende werden höchstens REQUEST_SETTLE_TIMEOUT_MS
+     * abgewartet. Sonst bräche das Neuladen z. B. ein update() ab, und WebKit meldet das als Fehler.
+     */
+    private async reload(url: string): Promise<void> {
+        this.reloading = true;
+        if (this.requests.size > 0) {
+            await Promise.race([
+                Promise.allSettled(this.requests),
+                new Promise<void>((resolve) => {
+                    this.env.setTimeout(resolve, REQUEST_SETTLE_TIMEOUT_MS);
+                }),
+            ]);
+        }
         this.rememberReload();
         this.env.navigate(url);
+    }
+
+    /** Merkt sich die Anfrage, bis sie endet (siehe reload). */
+    private track<T>(request: Promise<T>): Promise<T> {
+        const tracked = request.finally(() => {
+            this.requests.delete(tracked);
+        });
+        this.requests.add(tracked);
+        return tracked;
     }
 
     /**
@@ -275,7 +315,7 @@ export class AppUpdater {
         if (this.applying || !this.env.isOnline()) {
             return false;
         }
-        const served = await this.env.fetchBuildId();
+        const served = await this.track(this.env.fetchBuildId());
         if (served === null || served === this.env.buildId) {
             return false;
         }
@@ -358,8 +398,7 @@ export class AppUpdater {
                 return false;
             }
         }
-        this.rememberReload();
-        this.env.navigate(url);
+        await this.reload(url);
         return true;
     }
 
@@ -389,8 +428,11 @@ export class AppUpdater {
     }
 
     private async updateQuietly(registration: UpdateRegistration): Promise<void> {
+        if (this.reloading) {
+            return;
+        }
         try {
-            await registration.update();
+            await this.track(registration.update());
         } catch {
             // Keine Verbindung oder Server gestört: beim nächsten Anlass erneut.
         }
@@ -420,13 +462,14 @@ export class AppUpdater {
                 return true;
             }
             const delay = this.searchDelays[attempt];
-            if (delay === undefined) {
+            if (delay === undefined || this.reloading) {
                 return false;
             }
             await this.newWorker(registration, delay);
             if (this.hasNewWorker(registration)) {
                 return true;
             }
+            // Lädt die App inzwischen neu, fragt updateQuietly nicht mehr (siehe reload).
             await this.updateQuietly(registration);
         }
     }

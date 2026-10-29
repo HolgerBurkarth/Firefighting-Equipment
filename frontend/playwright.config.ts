@@ -48,21 +48,25 @@ export default defineConfig({
         { name: 'handy-webkit', use: { ...devices['iPhone 13'] } },
         { name: 'handy-chromium', use: { ...devices['Pixel 7'] } },
     ],
+    // Ist ein Port schon belegt (z. B. ein hängender Server eines abgebrochenen Laufs), bricht der
+    // Lauf ab („… is already used“), auch lokal: Fremde Server werden nie mitbenutzt. `port` statt
+    // `url`: Playwright prüft dann per TCP-Verbindung (IPv4 und IPv6); die Prüfung über `url` hinge
+    // an einem Server, der Verbindungen annimmt, aber nicht antwortet.
     webServer: [
         {
             command: `php -q -S localhost:${PORT} public/index.php`,
             cwd: '..',
             ...(!isWindows && { env: { PHP_CLI_SERVER_WORKERS: String(PHP_SERVER_WORKERS) } }),
-            url: `http://localhost:${PORT}/firefighting/test/`,
-            reuseExistingServer: !isCi,
+            port: PORT,
+            reuseExistingServer: false,
             timeout: 60_000,
         },
         {
             command: `php -q -S localhost:${UPDATE_PORT} frontend/tests/e2e/support/update-server.php`,
             cwd: '..',
             ...(!isWindows && { env: { PHP_CLI_SERVER_WORKERS: String(PHP_SERVER_WORKERS) } }),
-            url: `http://localhost:${UPDATE_PORT}/firefighting/test/`,
-            reuseExistingServer: !isCi,
+            port: UPDATE_PORT,
+            reuseExistingServer: false,
             timeout: 60_000,
         },
     ],

@@ -6,6 +6,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 Änderung wird protokolliert. Mehrere Städte (Mandanten) nutzen denselben Code.
 
 ## Arbeitsweise
+- Alle Antworten an den Nutzer immer auf Deutsch, auch Zwischenstände und Rückfragen.
 - In kleinen Schritten arbeiten. Vor größeren Änderungen erst einen Plan vorlegen.
 - Bestehende Funktionen dürfen nicht kaputtgehen: Jede Änderung bekommt Tests,
   vor jedem Commit müssen alle Tests grün sein.
@@ -355,7 +356,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Strg+F5, dann Deploy; `claimedByNewer`), ist die übernehmende Version vermutlich die neue, sicher
   nicht (die Antwort kann nach einem späteren Deploy kommen): Beim Aktualisieren genügt dann EIN
   `update()` ohne Suche; findet es keinen neueren Service Worker, wird neu geladen. Die Übernahme
-  durch einen anderen Tab ist ein Update.
+  durch einen anderen Tab ist ein Update. Eine installierte Version gilt nur als wartendes Update,
+  wenn ein ANDERER Service Worker die Seite kontrolliert (`controller !== worker`): WebKit meldet bei
+  der ersten Installation den neuen schon als `controller`, während er noch `installed` ist.
   Zusätzlich vergleicht jede Prüfung (und jede
   Übernahme einer Seite ohne Kontrolle, jede neu installierte Version einer Seite ohne Kontrolle) die
   Kennung in `build.json`
@@ -373,7 +376,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Sperre verhinderte einen zweiten Versuch). Solange: Hinweis „Neue Version wird geladen …“
   (`switching`). Lädt die App neu, lässt der Wächter den Seitenwechsel offen (Promise ohne Ende) statt
   ihn abzubrechen: Ein Abbruch setzte bei Zurück/Vor (popstate) die Historie zurück, das überholte das
-  Neuladen. Während des Neuladens keine weiteren Abfragen. Ohne Service Worker gilt
+  Neuladen. Vor und während des Neuladens (`reload`) beginnt keine Anfrage mehr (keine Prüfung, keine
+  geplante Wiederholung der Suche; der Start beginnt die regelmäßigen Prüfungen nur, wenn er nicht neu
+  lädt); laufende (`update()`, `build.json`) wartet die App höchstens `REQUEST_SETTLE_TIMEOUT_MS`
+  (1 s) ab. Grund: Bricht das Neuladen ein `update()` ab, meldet WebKit „…/sw.js due to access control
+  checks“ als Skriptfehler. Ohne Service Worker gilt
   nur die Kennung. Mail-Links öffnen sich im Test in einem zweiten Tab (wie aus einem
   Mailprogramm): Ein Seitenwechsel mitten in einer Anfrage meldet WebKit als Skriptfehler. Fehlende Teile nach einem Deploy
   (`isChunkLoadError`) → Zielseite einmal neu laden. Was ein Neuladen überstehen muss (z. B. der
@@ -392,7 +399,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   ändernde Anfragen `http://localhost:5173` in `http.allowed_origins`).
 - Browser-Tests (Playwright: Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build,
   ausgeliefert von PHP (`php -q -S localhost:4173 public/index.php`, startet Playwright selbst), also
-  mit echter CSP und echtem Caching. `php -S` arbeitet Anfragen nacheinander ab und weist bei
+  mit echter CSP und echtem Caching. Nie fremde Server mitbenutzen: `reuseExistingServer: false`
+  (auch lokal) und `port` statt `url` (Prüfung per TCP, erkennt auch einen hängenden Server eines
+  abgebrochenen Laufs); ist 4173 oder 4174 belegt, bricht der Lauf mit „… is already used“ ab. `php -S` arbeitet Anfragen nacheinander ab und weist bei
   Überlast Verbindungen ab: unter Linux (CI) daher `PHP_CLI_SERVER_WORKERS` = 4, unter Windows (dort
   ohne Worker) höchstens 4 parallele Playwright-Worker (`playwright.config.ts`). Keine
   automatischen Wiederholungen (`retries: 0`), sie würden zeitweise Fehler verdecken. API und Manifest simuliert `page.route()`
