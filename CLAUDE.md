@@ -286,9 +286,18 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   per Test genau so). Spätere Bausteine ergänzen gezielt nur, was sie brauchen, mit Begründung im
   Kommentar (z. B. QR-Code/Logo-Vorschau: `img-src data: blob:`).
   Daher im Frontend keine Inline-Skripte, keine `<style>`-Elemente und kein `style=""` im HTML;
-  Schriften liegen im Build (kein Google Fonts). Auch kein `<select>`: Playwright-WebKit meldet dafür
-  eine CSP-Verletzung (`style-src`), obwohl die Seite keinen Inline-Stil setzt (geprüft 30.10.2026);
-  stattdessen Knöpfe mit `aria-pressed` oder Radiogruppen.
+  Schriften liegen im Build (kein Google Fonts). Kein natives `<select>`: Auswahllisten (Gerätetyp,
+  Standort, Rolle …) mit `Select` bzw. `Combobox` von Reka UI, kurze feste Auswahlen (z. B.
+  Sortierung am Handy) auch als Knöpfe mit `aria-pressed` oder Radiogruppe. Ursache: Ein natives
+  `<select>` löst in Playwright-WebKit (unter Windows, 30.10.2026) beim Laden die Konsolenmeldung
+  „Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in
+  the style-src directive“ und ein `securitypolicyviolation` (`style-src-attr`, `inline`) aus, auch
+  auf einer leeren Seite ohne Inline-Stil (das eigene Stylesheet des Steuerelements); die Tests
+  scheitern daran. Beobachtet nur in Playwright-WebKit; ob echtes Safari das ebenso meldet, ist nicht
+  geprüft (`docs/TODO-SPAETER.md`, T8). Auswahllisten über `AppSelect` (`src/components/`): ohne
+  `name` (sonst legt Reka UI in einem Formular ein verstecktes natives `<select>` an) und ohne
+  `SelectViewport` bzw. `ComboboxViewport` (fügen ein `<style>`-Element ein, das die CSP blockiert;
+  nur für `position="item-aligned"` und Scroll-Knöpfe nötig, die Liste scrollt in `SelectContent`).
 - Build fehlt oder `index.html` ohne Platzhalter → 503 `frontend_unavailable` (Einzelheiten nur im
   Protokoll); die API läuft weiter.
 
@@ -325,6 +334,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `invalid_response`). Jede Antwort prüft ein Parser. 401 einer nicht öffentlichen Anfrage ruft den
   Abmelde-Weg des Routers (Sitzung vergessen, Hinweis, `anmelden?weiter=<Seite>`); öffentliche
   Aufrufe (`public: true`, z. B. `auth/login`, `auth/me` im Wächter) behandeln 401 selbst.
+  Downloads (CSV-Export) über `apiDownload` (ebenda): GET mit Cookie und `X-Client-Api`, Ergebnis
+  `{blob, fileName}` (Name aus `Content-Disposition`, nur `a-z0-9.-`, sonst Ersatzname), Fehler wie
+  bei `apiRequest` als `ApiError` (401 meldet ab); die Seite speichert die Datei über eine
+  `blob:`-Adresse und `<a download>` (kein Link direkt auf die API: Fehler kämen sonst als Datei).
 - Datenschicht `src/data/` (KONZEPT.md "User am Handy – Entscheidungen", 13 und 14): Geräte und
   Standorte lesen Seiten NUR hier (`deviceStore`, `locationStore` aus `src/data/index.ts`), nie direkt
   über `src/api/`; sie ist später die lokale Kopie für den Offline-Modus. `DeviceStore` lädt
@@ -425,11 +438,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (`changed`), Gerät in „Zuletzt benutzt“, Ziel (nur bei `applied`) unter die Standorte, Bestätigung
   (`setBookingNotice`, sessionStorage `ff-booking-notice`, übersteht ein Neuladen; `applied` grün
   „M1 → HLF 20 / G2 · einsatzbereit“, sonst `result.message`), dann
-  `returnTo(router, ['search', 'inspections'])` (`src/router/back.ts`: ist eine der Seiten die
+  `returnTo(router, ['search', 'inspections', 'devices'])` (`src/router/back.ts`: ist eine der Seiten die
   vorige, `back()`, sonst `replace` auf die erste, also „Suchen“ nach einem direkt geöffneten Link).
   Die Seite zeigt die Bestätigung (`BookingNoticeMessage`, holt sie per `takeBookingNotice`):
-  „Suchen“ bis zur nächsten Eingabe, „Prüffristen“ bis zum Verlassen. Nach jeder Buchung
-  `locationStore.refresh('changed')`
+  „Suchen“ bis zur nächsten Eingabe, „Prüffristen“ und die Geräteliste der Admin-Konsole bis zum
+  Verlassen. Nach jeder Buchung `locationStore.refresh('changed')` und
+  `adminDeviceList.refresh('changed')` (nur, wenn die Geräteliste schon geladen ist)
   (Gerätezahlen). Browser-Tests mit der
   Umbuchen-Ansicht simulieren `GET api/v1/devices/{id}` (`deviceDetail`) und `GET api/v1/locations`
   (`LOCATIONS`, mit Gerätezahlen), beide in `tests/e2e/support/devices.ts`; Tests in
@@ -519,8 +533,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Einsatzbereitschaft „42 von 45“ mit Balken (`<progress>`), nicht einsatzbereit „2 defekt · 1 in
   Wartung“, Prüffristen (führt zu `prueffristen`), offene Hinweise plus Freischaltungen; Listen „Nicht
   einsatzbereit“ („… und N weitere“) und „Letzte Aktivitäten“ (Zeit, Kennung, Art, Wer, Zeilen aus
-  `eventLines`, Kommentar; nicht übernommene abgesetzt); Geräte öffnen vorerst das Umbuchen. Die
-  übrigen Kacheln führen zur gefilterten Liste, sobald es sie gibt. Browser-Tests, die als Admin auf
+  `eventLines`, Kommentar; nicht übernommene abgesetzt); Geräte öffnen vorerst das Umbuchen.
+  Einsatzbereitschaft führt zu `geraete`, nicht einsatzbereit und „… und N weitere“ zu
+  `geraete?status=maintenance,defective`; offene Hinweise führen später zu Protokoll und Benutzern.
+  Browser-Tests, die als Admin auf
   dem Dashboard landen, simulieren dessen Abfragen mit `ADMIN_OVERVIEW` (`tests/e2e/support/admin.ts`,
   dort auch `adminOverview`, `summaryJson`, `userJson`, `tenantEventJson`); Tests in
   `tests/e2e/adminConsole.spec.ts` (Menü in drei Breiten, Dashboard) und
@@ -547,8 +563,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   übergeordneten Standort. Gerätetypen als Tabelle (`deviceTypeRows`: Name natürlich per
   `Intl.Collator` mit `numeric`, Gerätezahl, Gleichstand nach Name; Spaltenköpfe mit `aria-sort`, am
   Handy Karten und Knöpfe „Sortieren“ statt `<select>`, siehe CSP), Deaktivieren mit Rückfrage
-  (vorhandene Geräte behalten den Typ). Erfolg als `success-notice`. Klick auf einen Standort bzw.
-  Typ zeigt die Geräte dort erst mit der Geräteliste. Browser-Tests `tests/e2e/locations.spec.ts`,
+  (vorhandene Geräte behalten den Typ). Erfolg als `success-notice`. Der Name eines Standorts bzw.
+  Typs führt zur Geräteliste (`geraete?standort=<id>` bzw. `?typ=<id>`). Browser-Tests
+  `tests/e2e/locations.spec.ts`,
   `tests/e2e/deviceTypes.spec.ts` mit zustandsbehafteten Servern (`locationServer`,
   `deviceTypeServer`, je Test neu über `delegate` und `test.beforeEach`;
   `tests/e2e/support/masterData.ts`), waagerechter Überstand am Handy über `horizontalOverflow`
@@ -557,6 +574,31 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Unit-Tests `masterData.spec.ts`, `deviceTypesApi.spec.ts`,
   `deviceTypeStore.spec.ts`, `locationsApi.spec.ts`, `router.spec.ts` (jeder Menüeintrag hat eine
   Seite).
+- Geräteliste der Admin-Konsole (`DevicesPage`, `geraete`, nur `admin`, `layout: 'admin'`, Menü
+  „Geräte“ nach „Suchen“; Mockups „Geraete“ und „AdminHandy“, KONZEPT.md Entscheidung 33): anders
+  als „Suchen“ ohne lokale Kopie, Filter und Sortierung rechnet der Server (wie beim Export, auch
+  ausgesonderte und mehr als 2.000 Geräte). Store `adminDeviceList` (`AdminDeviceList` in
+  `src/data/adminDeviceList.ts`, in `installDataLayer`): `show(filter)` lädt bei neuem Filter die
+  erste Seite neu (Liste leer bis zur Antwort, ältere Antworten verworfen), bei gleichem nur
+  `refresh('open')`; `more()` hängt die nächsten `ADMIN_DEVICE_PAGE_SIZE` (50) an („Weitere laden“,
+  „50 von 312 angezeigt“, doppelte IDs entfernt); Auffrischen lädt so viele wie geladen (höchstens
+  200). Filter (`src/data/deviceList.ts`) stehen in der Adresse (`filterFromQuery`/`filterToQuery`,
+  `router.replace`): `suche` (an den Server als `q` nach 300 ms, höchstens 100 Zeichen), `typ`,
+  `standort` (immer mit Fächern, `include_sublocations=1`), `status` (`ready`, `maintenance`,
+  `defective`, kommagetrennt), `ausgesonderte=1` (mit Status als weiterer Status `retired`, sonst
+  `include_retired=1`), `sortierung` (`DeviceSort`), `richtung` (`desc`); Unbekanntes fällt still auf
+  den Standard. Oberfläche: Suchfeld, `AppSelect` „Gerätetyp“ und „Standort“ (aus `deviceTypeStore`
+  bzw. `adminLocationStore`, gesperrte/deaktivierte markiert), Status als Knöpfe mit `aria-pressed`,
+  „Ausgesonderte anzeigen“, „Filter zurücksetzen“, Anzahl („45 Geräte“, mit Filter „12 Geräte
+  gefunden“). Tabelle Kennung (öffnet vorerst das Umbuchen), Gerätetyp, Standort, Status, Nächste
+  Prüfung (überfällig rot, bis 30 Tage „bald fällig“ gelb, `dueState`; ausgesonderte nie), Spaltenköpfe
+  mit `aria-sort`; unter 768 px Karten mit `AppSelect` „Sortieren nach“ und Knopf für die Richtung.
+  „Export (CSV)“: `GET devices/export` mit denselben Filtern und derselben Sortierung
+  (`downloadDeviceExport`, `apiDownload`), Fehler als `ErrorNotice`. Kein Import und kein „Neues
+  Gerät“ (Schritte 6 und 7). Browser-Tests `tests/e2e/devices.spec.ts` (Server-Attrappe
+  `deviceServer` mit Status, Typ, Standort samt Fächern, `q` und Seiten; Download über
+  `MockResponse.text`/`contentType`); Unit-Tests `deviceList.spec.ts`, `adminDeviceList.spec.ts`,
+  `client.spec.ts` (`apiDownload`).
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
@@ -710,7 +752,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (`tests/e2e/fixtures.ts`) mit denselben Bereichen wie die Routen in PHP (unter `service` nur
   `api/v1/app-icon/…`), eine Datenbank wird nicht gebraucht. Weitere Routen je Test über die
   Option `api` (`"METHODE pfad"` → Antwort, Funktion je Anfrage oder `'abort'` für einen
-  Netzwerkfehler; gesendete Bodys in `apiRequests`); Hilfen `meBody(role)`, `NOT_AUTHENTICATED`,
+  Netzwerkfehler; Antwort ohne JSON über `text` und `contentType`; gesendete Bodys in `apiRequests`); Hilfen `meBody(role)`, `NOT_AUTHENTICATED`,
   `DATABASE_UNAVAILABLE`, `HTTP_ERROR_CONSOLE` (Browsermeldung zu 4xx/5xx) und
   `NETWORK_ERROR_CONSOLE` (zusätzlich abgebrochene Anfragen), beide nur per `allowedConsoleError`. Tests auf öffentlichen
   Seiten (z. B. `anmelden`) brauchen kein `auth/me`. Jeder Konsolenfehler, Skriptfehler,

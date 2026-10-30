@@ -25,6 +25,9 @@ export type MockResponse =
           readonly status: number;
           readonly body?: unknown;
           readonly headers?: Readonly<Record<string, string>>;
+          /** Antwort ohne JSON (z. B. ein CSV-Download): `text` unverändert mit `contentType`. */
+          readonly text?: string;
+          readonly contentType?: string;
       }
     | 'abort';
 
@@ -139,11 +142,12 @@ async function fulfillMock(route: Route, response: MockResponse): Promise<void> 
         await route.abort('internetdisconnected');
         return;
     }
+    const json = response.body === undefined ? '' : JSON.stringify(response.body);
     await route.fulfill({
         status: response.status,
         headers: { 'Cache-Control': 'no-store', ...response.headers },
-        contentType: 'application/json; charset=utf-8',
-        body: response.body === undefined ? '' : JSON.stringify(response.body),
+        contentType: response.contentType ?? 'application/json; charset=utf-8',
+        body: response.text ?? json,
     });
 }
 

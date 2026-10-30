@@ -25,6 +25,10 @@ defineProps<{ name: AdminMenuIconName }>();
             <circle cx="11" cy="11" r="7" />
             <path d="M20 20l-4-4" />
         </template>
+        <template v-else-if="name === 'devices'">
+            <path d="M21 8l-9-5-9 5 9 5 9-5z" />
+            <path d="M3 8v8l9 5 9-5V8" />
+        </template>
         <template v-else-if="name === 'location'">
             <path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z" />
             <circle cx="12" cy="9" r="2.5" />

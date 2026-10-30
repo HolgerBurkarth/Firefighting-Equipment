@@ -1,4 +1,4 @@
-import { apiRequest, isRecord, type ApiResult } from './client';
+import { apiDownload, apiRequest, isRecord, type ApiResult, type DownloadedFile } from './client';
 
 /** Status wie DeviceStatus in PHP. */
 export type DeviceStatus = 'ready' | 'maintenance' | 'defective' | 'retired';
@@ -145,18 +145,65 @@ export function parseDevicePage(json: unknown): DevicePage | null {
     return { devices, total, limit, offset };
 }
 
-export interface DevicePageQuery {
-    readonly limit: number;
-    readonly offset: number;
+/** Sortierung wie DeviceSort in PHP. */
+export type DeviceSort =
+    'identifier' | 'device_type' | 'location' | 'status' | 'next_inspection_due';
+
+/** Filter und Sortierung von GET devices und GET devices/export (DeviceListHandler). */
+export interface DeviceListParams {
     /** Suche auf dem Server (Teiltext in Kennung, Scan-Code, Seriennummer, Hersteller, Modell). */
     readonly q?: string;
     /** Scan-Code genau (`scan_code`; Regeln wie `ScanCode`, sonst 400). */
     readonly scanCode?: string;
     /** Nur diese Status (`status`, kommagetrennt; mit `retired` auch ausgesonderte). */
     readonly status?: readonly DeviceStatus[];
+    /** Ohne `status`: auch ausgesonderte (`include_retired=1`). */
+    readonly includeRetired?: boolean;
+    readonly deviceTypeId?: number;
+    /** Standort, mit `includeSublocations` auch seine Fächer. */
+    readonly locationId?: number;
+    readonly includeSublocations?: boolean;
     /** Sortierung wie DeviceSort/SortDirection (Standard Kennung aufsteigend). */
-    readonly sort?: 'identifier' | 'device_type' | 'location' | 'status' | 'next_inspection_due';
+    readonly sort?: DeviceSort;
     readonly dir?: 'asc' | 'desc';
+}
+
+export interface DevicePageQuery extends DeviceListParams {
+    readonly limit: number;
+    readonly offset: number;
+}
+
+/** Query-String von GET devices bzw. devices/export (ohne `limit`/`offset`). */
+export function deviceListSearchParams(params: DeviceListParams): URLSearchParams {
+    const search = new URLSearchParams();
+    if (params.q !== undefined) {
+        search.set('q', params.q);
+    }
+    if (params.scanCode !== undefined) {
+        search.set('scan_code', params.scanCode);
+    }
+    if (params.status !== undefined) {
+        search.set('status', params.status.join(','));
+    }
+    if (params.includeRetired === true) {
+        search.set('include_retired', '1');
+    }
+    if (params.deviceTypeId !== undefined) {
+        search.set('device_type_id', String(params.deviceTypeId));
+    }
+    if (params.locationId !== undefined) {
+        search.set('location_id', String(params.locationId));
+        if (params.includeSublocations === true) {
+            search.set('include_sublocations', '1');
+        }
+    }
+    if (params.sort !== undefined) {
+        search.set('sort', params.sort);
+    }
+    if (params.dir !== undefined) {
+        search.set('dir', params.dir);
+    }
+    return search;
 }
 
 /** GET devices (ohne Angabe von `status` ohne ausgesonderte Geräte, sortiert nach Kennung). */
@@ -168,24 +215,25 @@ export function fetchDevicePage(
         limit: String(query.limit),
         offset: String(query.offset),
     });
-    if (query.q !== undefined) {
-        params.set('q', query.q);
-    }
-    if (query.scanCode !== undefined) {
-        params.set('scan_code', query.scanCode);
-    }
-    if (query.status !== undefined) {
-        params.set('status', query.status.join(','));
-    }
-    if (query.sort !== undefined) {
-        params.set('sort', query.sort);
-    }
-    if (query.dir !== undefined) {
-        params.set('dir', query.dir);
+    for (const [key, value] of deviceListSearchParams(query)) {
+        params.set(key, value);
     }
     return apiRequest(`devices?${params.toString()}`, parseDevicePage, {
         ...(fetchFn && { fetchFn }),
     });
+}
+
+/** GET devices/export: CSV mit denselben Filtern und derselben Sortierung, ohne Seiten. */
+export function downloadDeviceExport(
+    params: DeviceListParams,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<DownloadedFile>> {
+    const search = deviceListSearchParams(params).toString();
+    return apiDownload(
+        `devices/export${search === '' ? '' : `?${search}`}`,
+        'geraete.csv',
+        fetchFn,
+    );
 }
 
 /** Antworten mit einem Gerät (`{"device": …}`); hier nur die Felder der Liste. */

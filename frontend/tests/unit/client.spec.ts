@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { apiRequest, parseRetryAfter, setUnauthorizedHandler } from '../../src/api/client';
+import {
+    apiDownload,
+    apiRequest,
+    downloadFileName,
+    parseRetryAfter,
+    setUnauthorizedHandler,
+} from '../../src/api/client';
 import { respond } from './support/fetch';
 
 const parseOk = (json: unknown): { ok: true } | null =>
@@ -116,5 +122,41 @@ describe('parseRetryAfter', () => {
         ['Wed, 21 Oct 2026 07:28:00 GMT', null],
     ])('%j → %j', (value, expected) => {
         expect(parseRetryAfter(value)).toBe(expected);
+    });
+});
+
+describe('apiDownload', () => {
+    it('lädt die Datei mit X-Client-Api und dem Namen aus Content-Disposition', async () => {
+        const { fetch, requests } = respond(200, '﻿Kennung;Gerätetyp\r\nM1;Maske\r\n', {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': 'attachment; filename="geraete-test-2026-10-30.csv"',
+        });
+        const result = await apiDownload('devices/export?status=defective', 'geraete.csv', fetch);
+        expect(result.ok).toBe(true);
+        expect(result.ok && result.data.fileName).toBe('geraete-test-2026-10-30.csv');
+        expect(result.ok && (await result.data.blob.text())).toContain('M1;Maske');
+        expect(requests[0]?.url).toBe(
+            'https://www.prodad.de/firefighting/test/api/v1/devices/export?status=defective',
+        );
+        expect(requests[0]?.headers['X-Client-Api']).toBe('1');
+    });
+
+    it('Fehler kommen als ApiError, 401 meldet ab', async () => {
+        const unauthorized = vi.fn();
+        setUnauthorizedHandler(unauthorized);
+        const { fetch } = respond(401, { error: 'not_authenticated', message: 'Bitte anmelden.' });
+        const result = await apiDownload('devices/export', 'geraete.csv', fetch);
+        expect(!result.ok && result.error.code).toBe('not_authenticated');
+        expect(unauthorized).toHaveBeenCalledOnce();
+
+        const failing: typeof globalThis.fetch = () => Promise.reject(new TypeError('offline'));
+        const offline = await apiDownload('devices/export', 'geraete.csv', failing);
+        expect(!offline.ok && offline.error.code).toBe('network');
+    });
+
+    it('Dateiname nur in der Form des Backends, sonst der Ersatz', () => {
+        expect(downloadFileName('attachment; filename="a-1.csv"', 'x.csv')).toBe('a-1.csv');
+        expect(downloadFileName('attachment; filename="../böse.csv"', 'x.csv')).toBe('x.csv');
+        expect(downloadFileName(null, 'x.csv')).toBe('x.csv');
     });
 });
