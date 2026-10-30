@@ -130,6 +130,25 @@ describe('Wächter', () => {
         expect((await routerAt(path, SERVICE)).currentRoute.value.name).toBe('not-found');
     });
 
+    it.each(['/benutzer', '/protokoll', '/protokoll/7'])(
+        'Mail-Link %s führt vorerst auf das Dashboard',
+        async (path) => {
+            setSession(state('admin'));
+            expect((await routerAt(path)).currentRoute.value.name).toBe('dashboard');
+            setSession(state('user'));
+            expect((await routerAt(path)).currentRoute.value.name).toBe('search');
+            setSession(state('superadmin'));
+            expect((await routerAt(path, SERVICE)).currentRoute.value.name).toBe('not-found');
+        },
+    );
+
+    it('Mail-Link ohne Sitzung: nach der Anmeldung auf das Dashboard', async () => {
+        setSession(null);
+        const route = (await routerAt('/protokoll/7')).currentRoute.value;
+        expect(route.name).toBe('login');
+        expect(route.query['weiter']).toBe('/dashboard');
+    });
+
     it('jeder Eintrag im Menü der Admin-Konsole hat eine Seite mit deren Darstellung', async () => {
         setSession(state('admin'));
         const router = await routerAt('/dashboard');

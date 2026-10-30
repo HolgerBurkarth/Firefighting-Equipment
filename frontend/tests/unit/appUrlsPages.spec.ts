@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { createMemoryHistory, createRouter } from 'vue-router';
 import { createRoutes } from '../../src/router';
 
 /** Seiten, auf die Mail-Links zeigen (AppUrls::*_PAGE im Backend), muss es im Frontend geben. */
@@ -24,5 +25,21 @@ describe('Seiten der Mail-Links (AppUrls)', () => {
 
     it.each(pages)('/%s gibt es unter Städten', (page) => {
         expect(tenantPaths).toContain(`/${page}`);
+    });
+
+    it('liest auch die Seiten der Admin-Konsole', () => {
+        expect(pages).toEqual(expect.arrayContaining(['geraete', 'protokoll', 'benutzer']));
+    });
+
+    // AppUrls::deviceDetails und AppUrls::notice hängen eine ID an.
+    it.each([
+        ['/geraete/42/details', 'device-details'],
+        ['/protokoll/7', 'notice'],
+    ])('%s gibt es unter Städten', (path, name) => {
+        const router = createRouter({
+            history: createMemoryHistory(),
+            routes: createRoutes({ path: '/firefighting/test/', area: 'test', isService: false }),
+        });
+        expect(router.resolve(path).name).toBe(name);
     });
 });

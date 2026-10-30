@@ -18,6 +18,11 @@ final class AppUrls
     public const string PASSWORD_RESET_PAGE = 'passwort-zuruecksetzen';
     public const string VERIFY_EMAIL_PAGE = 'email-bestaetigen';
     public const string ACCEPT_INVITATION_PAGE = 'einladung-annehmen';
+    /** Geräteliste der Admin-Konsole; Gerätedetail unter geraete/<id>/details */
+    public const string DEVICES_PAGE = 'geraete';
+    /** Hinweise der Admin-Konsole; einzelner Hinweis unter protokoll/<id> */
+    public const string NOTICES_PAGE = 'protokoll';
+    public const string USERS_PAGE = 'benutzer';
 
     private ?string $baseUrl = null;
 
@@ -75,5 +80,49 @@ final class AppUrls
     public function acceptInvitation(Tenant $tenant, OneTimeToken $token): string
     {
         return $this->area($tenant) . self::ACCEPT_INVITATION_PAGE . '#token=' . $token->value();
+    }
+
+    /**
+     * Geräteliste der Admin-Konsole (Log-Mail eines CSV-Imports).
+     */
+    public function devices(Tenant $tenant): string
+    {
+        return $this->area($tenant) . self::DEVICES_PAGE;
+    }
+
+    /**
+     * Gerätedetail der Admin-Konsole (Log-Mails an Admins der Stadt).
+     */
+    public function deviceDetails(Tenant $tenant, int $deviceId): string
+    {
+        return $this->area($tenant) . self::DEVICES_PAGE . '/' . self::id($deviceId) . '/details';
+    }
+
+    /**
+     * Ein Hinweis zu einer Offline-Buchung in der Admin-Konsole.
+     */
+    public function notice(Tenant $tenant, int $noticeId): string
+    {
+        return $this->area($tenant) . self::NOTICES_PAGE . '/' . self::id($noticeId);
+    }
+
+    /**
+     * Benutzerverwaltung der Admin-Konsole (Registrierung wartet auf Freischaltung).
+     */
+    public function users(Tenant $tenant): string
+    {
+        return $this->area($tenant) . self::USERS_PAGE;
+    }
+
+    /**
+     * IDs wie die Platzhalter des Routers: nur positive Ganzzahlen.
+     */
+    private static function id(int $id): string
+    {
+        if ($id < 1) {
+            throw new \InvalidArgumentException('Ungültige ID.');
+        }
+
+        return (string) $id;
     }
 }

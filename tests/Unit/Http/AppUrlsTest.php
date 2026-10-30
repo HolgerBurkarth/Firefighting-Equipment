@@ -63,6 +63,24 @@ final class AppUrlsTest extends TestCase
         self::assertSame('https://www.prodad.de/firefighting/immendingen/einladung-annehmen#token=' . $token->value(), $link);
     }
 
+    public function testPagesOfTheAdminConsole(): void
+    {
+        $urls = AppUrls::fixed('https://www.prodad.de');
+        $area = 'https://www.prodad.de/firefighting/immendingen/';
+
+        self::assertSame($area . 'geraete', $urls->devices(self::tenant()));
+        self::assertSame($area . 'geraete/42/details', $urls->deviceDetails(self::tenant(), 42));
+        self::assertSame($area . 'protokoll/7', $urls->notice(self::tenant(), 7));
+        self::assertSame($area . 'benutzer', $urls->users(self::tenant()));
+    }
+
+    public function testIdsMustBePositive(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        AppUrls::fixed('https://www.prodad.de')->deviceDetails(self::tenant(), 0);
+    }
+
     public function testBaseUrlFromConfigIsLoadedOnceAndOnlyWhenNeeded(): void
     {
         $loads = 0;

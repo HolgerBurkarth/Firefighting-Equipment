@@ -44,7 +44,10 @@ export function createConfig(projects: Projects, windowsWorkers: number): Playwr
         // Keine Wiederholungen: Sie würden zeitweise auftretende Fehler verdecken.
         retries: 0,
         ...(process.platform === 'win32' && { workers: windowsWorkers }),
-        reporter: isCi ? [['github'], ['html', { open: 'never' }]] : [['list']],
+        // CI teilt die Tests auf mehrere Jobs auf (`--shard`, .github/workflows/ci.yml): Jeder legt
+        // einen Teilbericht in blob-report/ an, der Job e2e-report führt sie zu einem HTML-Bericht
+        // zusammen (`playwright merge-reports`).
+        reporter: isCi ? [['github'], ['blob']] : [['list']],
         use: {
             locale: 'de-DE',
             timezoneId: 'Europe/Berlin',

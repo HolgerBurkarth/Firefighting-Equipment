@@ -321,6 +321,24 @@ angelegt.", $mail->text);
         self::assertTextRules($mail, self::URL);
     }
 
+    public function testDeviceLogLinksToTheDeviceOrHasNoLink(): void
+    {
+        $at = new \DateTimeImmutable('2026-07-01 08:30:00', new \DateTimeZone('UTC'));
+        $event = self::event(DeviceEventType::StateChanged, $at, fromStatus: DeviceStatus::Ready, toStatus: DeviceStatus::Defective);
+        $link = self::URL . 'geraete/3/details';
+
+        $mail = MailTemplates::deviceLog(self::user(), self::tenant(), self::device(), [$event], $link);
+
+        self::assertStringContainsString("\nStatus: einsatzbereit → defekt\n\nZum Gerät in der Anwendung:\n\n{$link}\n\nSie erhalten", $mail->text);
+        self::assertTextRules($mail, $link);
+
+        $withoutLink = MailTemplates::deviceLog(self::user(), self::tenant(), self::device(), [$event], null);
+
+        self::assertStringContainsString("\nStatus: einsatzbereit → defekt\n\nSie erhalten diese E-Mail", $withoutLink->text);
+        self::assertStringNotContainsString('http', $withoutLink->text);
+        self::assertTextRules($withoutLink);
+    }
+
     public function testDeviceLogNeedsEvents(): void
     {
         $this->expectException(\InvalidArgumentException::class);

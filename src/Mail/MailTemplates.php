@@ -183,7 +183,7 @@ final class MailTemplates
      * An einen Admin der Stadt: Eine Registrierung ist bestätigt und wartet auf Freischaltung.
      * Name und E-Mail der neuen Person stehen in eigenen Zeilen (können länger als 76 Zeichen sein).
      *
-     * @param string $url Startseite der Stadt (dort: Benutzerverwaltung)
+     * @param string $url Benutzerverwaltung der Stadt (AppUrls::users)
      *
      * @throws MailException
      */
@@ -340,11 +340,11 @@ final class MailTemplates
      * sein; Zeilenumbrüche in Notizen werden zu Leerzeichen, lange Werte gekürzt).
      *
      * @param list<DeviceEvent> $events in der Reihenfolge des Schreibens, mindestens eines
-     * @param string            $url    Startseite der Stadt
+     * @param string|null       $url    Gerätedetail (AppUrls::deviceDetails), null = ohne Link
      *
      * @throws MailException
      */
-    public static function deviceLog(User $recipient, Tenant $tenant, Device $device, array $events, string $url): MailMessage
+    public static function deviceLog(User $recipient, Tenant $tenant, Device $device, array $events, ?string $url): MailMessage
     {
         if ($events === []) {
             throw new \InvalidArgumentException('Mindestens ein Ereignis erwartet.');
@@ -365,6 +365,7 @@ final class MailTemplates
             $lines[] = 'Kommentar: ' . self::logValue($first->comment);
         }
         $details = implode("\n", $lines);
+        $link = self::logLink('Zum Gerät in der Anwendung:', $url);
         $footer = self::deviceLogFooter();
         $text = <<<TXT
             {$greeting}
@@ -374,11 +375,7 @@ final class MailTemplates
 
             {$details}
 
-            Zur Anwendung:
-
-            {$url}
-
-            {$footer}
+            {$link}{$footer}
             TXT;
 
         $reason = $device->identifier->value . ' ' . self::deviceLogReason($events);
@@ -392,11 +389,11 @@ final class MailTemplates
      * overwritten der überschriebene, sonst der Stand beim Eingang). Betreff „Log <Stadt>: Hinweis –
      * <Kennung> <Grund>“.
      *
-     * @param string $url Startseite der Stadt
+     * @param string|null $url Hinweis in der Admin-Konsole (AppUrls::notice), null = ohne Link
      *
      * @throws MailException
      */
-    public static function deviceNotice(User $recipient, Tenant $tenant, DeviceNotice $notice, ?string $comment, string $url): MailMessage
+    public static function deviceNotice(User $recipient, Tenant $tenant, DeviceNotice $notice, ?string $comment, ?string $url): MailMessage
     {
         $greeting = self::greeting($recipient);
         $area = self::area($tenant);
@@ -432,6 +429,9 @@ final class MailTemplates
             array_push($lines, '', 'Die Buchung war älter als erlaubt und wurde nach Rückfrage', 'gesendet.');
         }
         $details = implode("\n", $lines);
+        $link = $url === null
+            ? "Den Hinweis prüfen und erledigen die Admins der Stadt in der Anwendung.\n\n"
+            : self::logLink('Bitte prüfen und den Hinweis in der Anwendung erledigen:', $url);
         $footer = self::deviceLogFooter();
         $text = <<<TXT
             {$greeting}
@@ -441,11 +441,7 @@ final class MailTemplates
 
             {$details}
 
-            Bitte prüfen und den Hinweis in der Anwendung erledigen:
-
-            {$url}
-
-            {$footer}
+            {$link}{$footer}
             TXT;
 
         $reason = 'Hinweis – ' . $notice->deviceIdentifier . ' ' . $notice->kind->subjectReason();
@@ -457,7 +453,7 @@ final class MailTemplates
      * Benachrichtigung „Log“ für einen CSV-Import: eine Mail mit Zusammenfassung und höchstens
      * $maxLines Zeilen mit Einzelheiten (neue und geänderte Geräte), danach „… und N weitere“.
      *
-     * @param string $url Startseite der Stadt
+     * @param string|null $url Geräteliste (AppUrls::devices), null = ohne Link
      *
      * @throws MailException
      */
@@ -468,7 +464,7 @@ final class MailTemplates
         DeviceImportPlan $plan,
         ?string $comment,
         \DateTimeImmutable $at,
-        string $url,
+        ?string $url,
         int $maxLines = 50,
     ): MailMessage {
         $new = $plan->count(ImportResult::New);
@@ -504,6 +500,7 @@ final class MailTemplates
             $rowLines[] = sprintf('… und %d weitere', count($rows) - count($rowLines));
         }
         $rowText = implode("\n", $rowLines);
+        $link = self::logLink('Zur Geräteliste in der Anwendung:', $url);
         $footer = self::deviceLogFooter();
         $text = <<<TXT
             {$greeting}
@@ -517,11 +514,7 @@ final class MailTemplates
 
             {$rowText}
 
-            Zur Anwendung:
-
-            {$url}
-
-            {$footer}
+            {$link}{$footer}
             TXT;
 
         return self::message($recipient, self::logSubject($tenant, sprintf('CSV-Import: %d neu, %d geändert', $new, $changed)), $text);
@@ -648,6 +641,14 @@ final class MailTemplates
     private static function noticeUser(NoticeUser $user): string
     {
         return self::logValue($user->name) . ($user->email === null ? '' : ' (' . $user->email . ')');
+    }
+
+    /**
+     * Absatz mit Link vor der Fußzeile einer Log-Mail (mit Leerzeile danach); ohne Link leer.
+     */
+    private static function logLink(string $intro, ?string $url): string
+    {
+        return $url === null ? '' : "{$intro}\n\n{$url}\n\n";
     }
 
     private static function deviceLogFooter(): string

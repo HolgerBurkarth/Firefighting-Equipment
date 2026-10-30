@@ -55,7 +55,7 @@ final class EmailVerificationTest extends AuthTestCase
         self::assertSame('Neue Registrierung wartet auf Freischaltung', $mail->subject);
         self::assertStringStartsWith("Hallo Wehrführer,\n", $mail->text);
         self::assertStringContainsString("\nName: Max Mustermann\nE-Mail: max@example.org\n", $mail->text);
-        self::assertStringContainsString("\n" . self::BASE_URL . "/firefighting/immendingen/\n", $mail->text);
+        self::assertStringContainsString("\n" . self::BASE_URL . "/firefighting/immendingen/benutzer\n", $mail->text, 'Link auf die Benutzerverwaltung');
         self::assertSame(1, $this->attempts(1));
 
         self::assertError(403, 'pending_approval', $this->login('immendingen', 'max@example.org'));

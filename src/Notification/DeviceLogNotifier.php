@@ -18,6 +18,7 @@ use FirefightingEquipment\Mail\Notifier;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\User;
 use FirefightingEquipment\User\UserRepository;
+use FirefightingEquipment\User\UserRole;
 
 /**
  * Benachrichtigung „Log“: nach jedem Vorgang, der in der Geräte-Historie protokolliert wird, eine
@@ -29,6 +30,8 @@ use FirefightingEquipment\User\UserRepository;
  * Begrenzung: höchstens MAX_RECIPIENTS Empfänger (zuerst die Admins der Stadt, dann Super-Admins;
  * Überschreitung als device_log_recipients_capped im Protokoll) und ein Zeitbudget je Anfrage
  * (danach keine weitere Mail). Mehrere Mails gehen über eine SMTP-Verbindung (Mailer::sendMany).
+ * Links: Admins direkt auf das Gerätedetail, den Hinweis bzw. (Import) die Geräteliste; Super-Admins
+ * ohne Link.
  */
 final readonly class DeviceLogNotifier
 {
@@ -79,12 +82,12 @@ final readonly class DeviceLogNotifier
         if ($events === []) {
             return 0;
         }
-        $url = $this->urls->area($tenant);
+        $url = $this->urls->deviceDetails($tenant, $device->id);
 
         return $this->send(
             $tenant,
             $actor,
-            static fn (User $recipient): MailMessage => MailTemplates::deviceLog($recipient, $tenant, $device, $events, $url),
+            static fn (User $recipient): MailMessage => MailTemplates::deviceLog($recipient, $tenant, $device, $events, self::linkFor($recipient, $url)),
         );
     }
 
@@ -105,12 +108,12 @@ final readonly class DeviceLogNotifier
             return 0;
         }
         $comment = ($event[0] ?? null)?->comment;
-        $url = $this->urls->area($tenant);
+        $url = $this->urls->notice($tenant, $notice->id);
 
         return $this->send(
             $tenant,
             $actor,
-            static fn (User $recipient): MailMessage => MailTemplates::deviceNotice($recipient, $tenant, $notice, $comment, $url),
+            static fn (User $recipient): MailMessage => MailTemplates::deviceNotice($recipient, $tenant, $notice, $comment, self::linkFor($recipient, $url)),
             self::NOTICE_PURPOSE,
         );
     }
@@ -125,7 +128,7 @@ final readonly class DeviceLogNotifier
         if ($plan->count(ImportResult::New) + $plan->count(ImportResult::Changed) === 0) {
             return 0;
         }
-        $url = $this->urls->area($tenant);
+        $url = $this->urls->devices($tenant);
 
         return $this->send(
             $tenant,
@@ -137,10 +140,19 @@ final readonly class DeviceLogNotifier
                 $plan,
                 $comment,
                 $at,
-                $url,
+                self::linkFor($recipient, $url),
                 self::MAX_IMPORT_LINES,
             ),
         );
+    }
+
+    /**
+     * Links führen in die Admin-Konsole der Stadt; Super-Admins sehen dort keine Geräte und
+     * erhalten keinen Link (KONZEPT.md, "Admin-Konsole – Entscheidungen", 36).
+     */
+    private static function linkFor(User $recipient, string $url): ?string
+    {
+        return $recipient->role === UserRole::Admin ? $url : null;
     }
 
     /**

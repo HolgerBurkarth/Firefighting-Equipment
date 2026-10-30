@@ -190,6 +190,19 @@ test.describe('Dashboard', () => {
         expect(new URL(events?.url ?? '').searchParams.get('limit')).toBe('8');
     });
 
+    test('Mail-Links auf Benutzer und Hinweis führen vorerst auf das Dashboard', async ({
+        page,
+    }) => {
+        // AppUrls::users und AppUrls::notice; die Seiten folgen in den Schritten 8 und 12.
+        for (const path of ['benutzer', 'protokoll/7']) {
+            await page.goto(`/firefighting/test/${path}`);
+            await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
+            await expect(page.getByTestId('tile-open')).toContainText(
+                '1 Hinweis · 2 Freischaltungen',
+            );
+        }
+    });
+
     test('Liste „Nicht einsatzbereit“ öffnet das Gerät', async ({ page }) => {
         await page.goto('/firefighting/test/dashboard');
         const list = page.getByTestId('not-ready-list');
