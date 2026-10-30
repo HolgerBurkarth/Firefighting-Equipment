@@ -179,6 +179,79 @@ export function parseDeviceEventPage(json: unknown): DeviceEventPage | null {
     return { events, total };
 }
 
+/** Eintrag von GET device-events: wie oben, dazu das Gerät (aktuelle Kennung und Typ). */
+export interface TenantEventEntry extends DeviceEventEntry {
+    readonly device: {
+        readonly id: number;
+        readonly identifier: string;
+        readonly deviceType: { readonly id: number; readonly name: string };
+    };
+}
+
+export interface TenantEventPage {
+    readonly events: readonly TenantEventEntry[];
+    readonly total: number;
+}
+
+function parseTenantEvent(json: unknown): TenantEventEntry | null {
+    const event = parseDeviceEvent(json);
+    if (event === null || !isRecord(json) || !isRecord(json['device'])) {
+        return null;
+    }
+    const device = json['device'];
+    const type = device['device_type'];
+    if (
+        !isId(device['id']) ||
+        typeof device['identifier'] !== 'string' ||
+        !isRecord(type) ||
+        !isId(type['id']) ||
+        typeof type['name'] !== 'string'
+    ) {
+        return null;
+    }
+    return {
+        ...event,
+        device: {
+            id: device['id'],
+            identifier: device['identifier'],
+            deviceType: { id: type['id'], name: type['name'] },
+        },
+    };
+}
+
+export function parseTenantEventPage(json: unknown): TenantEventPage | null {
+    if (!isRecord(json) || !Array.isArray(json['events'])) {
+        return null;
+    }
+    const total = json['total'];
+    if (typeof total !== 'number' || !Number.isSafeInteger(total) || total < 0) {
+        return null;
+    }
+    const events: TenantEventEntry[] = [];
+    for (const entry of json['events']) {
+        const event = parseTenantEvent(entry);
+        if (event === null) {
+            return null;
+        }
+        events.push(event);
+    }
+    return { events, total };
+}
+
+/** GET device-events (Admin): Verlauf der ganzen Stadt, neueste zuerst. */
+export function fetchTenantEvents(
+    query: { readonly limit: number; readonly offset: number },
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<TenantEventPage>> {
+    const params = new URLSearchParams({
+        limit: String(query.limit),
+        offset: String(query.offset),
+    });
+    return apiRequest(`device-events?${params.toString()}`, parseTenantEventPage, {
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
 /** GET devices/{id}/events: neueste zuerst (nach Eingang), auch ausgesonderte Geräte. */
 export function fetchDeviceEvents(
     id: number,

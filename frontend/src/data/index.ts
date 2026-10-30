@@ -2,6 +2,7 @@ import type { ApiResult } from '../api/client';
 import { fetchInspectionOverview, type InspectionOverview } from '../api/inspections';
 import { onSessionEnded, session } from '../auth/session';
 import { browserStorage } from '../runtime/theme';
+import { AdminOverviewStore } from './adminOverview';
 import { DeviceHistory } from './deviceHistory';
 import { DeviceStore } from './deviceStore';
 import { INSPECTION_WINDOW_DAYS, SERVER_INSPECTION_LIMIT } from './inspections';
@@ -16,6 +17,8 @@ import { recentLocations } from './recentLocations';
  */
 export const deviceStore = new DeviceStore();
 export const locationStore = new LocationStore();
+/** Dashboard und Zähler im Menü der Admin-Konsole. */
+export const adminOverview = new AdminOverviewStore();
 
 /** Verlauf eines Geräts („Details und Verlauf“), je Ansicht neu. */
 export function deviceHistory(id: number): DeviceHistory {
@@ -69,7 +72,7 @@ interface DataStore {
  */
 export function installDataLayer(
     doc: Document = document,
-    stores: readonly DataStore[] = [deviceStore, locationStore],
+    stores: readonly DataStore[] = [deviceStore, locationStore, adminOverview],
     storage = browserStorage(),
 ): () => void {
     const stopSession = onSessionEnded((ended, reason) => {

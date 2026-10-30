@@ -1,18 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { userLabel } from './api/auth';
-import { errorMessage } from './auth/errorMessages';
-import { session, sessionCheckError } from './auth/session';
-import ConfirmDialog from './components/ConfirmDialog.vue';
+import { session } from './auth/session';
+import AdminMenu from './components/AdminMenu.vue';
+import AppNotices from './components/AppNotices.vue';
 import UserTabBar from './components/UserTabBar.vue';
 import type { AppBase } from './runtime/appBase';
-import { updateNotice, type AppUpdater } from './runtime/appUpdate';
+import type { AppUpdater } from './runtime/appUpdate';
 import { loadTenant, tenantState } from './runtime/tenantState';
 
 const props = defineProps<{ base: AppBase; updater: AppUpdater }>();
-
-const notice = computed(() => updateNotice(props.updater));
 
 const route = useRoute();
 /** Darstellung der Seite (RouteMeta.layout in src/router/index.ts). */
@@ -24,122 +22,72 @@ const subtitle = computed(() =>
         : 'Geräteverwaltung',
 );
 
-const confirmOpen = ref(false);
-
-/** Mit ungespeicherten Eingaben erst nachfragen (sie gingen beim Neuladen verloren). */
-function updateNow(): void {
-    if (notice.value === 'unsaved') {
-        confirmOpen.value = true;
-        return;
-    }
-    applyUpdate();
-}
-
-function applyUpdate(): void {
-    void props.updater.apply(window.location.href);
-}
-
-/** Neue Version ließ sich beim Start nicht laden: vom Server neu laden, samt #token bzw. #code. */
-function reloadFromServer(): void {
-    void props.updater.reloadFromServer(window.location.href);
-}
-
 onMounted(() => {
     void loadTenant(props.base);
 });
 </script>
 
 <template>
-    <!-- Bildschirmfüllende Seiten (focus) zeigen ihre eigene Kopfzeile mit Zurück-Knopf. -->
-    <header v-if="layout !== 'focus'" class="app-header">
-        <div class="app-header-icon">
-            <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linejoin="round"
-                aria-hidden="true"
+    <!-- Admin-Konsole: Menü links (am Handy Kopfleiste mit ☰), Inhalt rechts. -->
+    <div v-if="layout === 'admin'" class="admin-shell">
+        <AdminMenu />
+        <div class="admin-column">
+            <AppNotices :updater="updater" />
+            <main class="app-main app-main-admin">
+                <p
+                    v-if="updater.loadingPage.value"
+                    class="hint"
+                    role="status"
+                    data-testid="update-loading"
+                >
+                    Seite wird geladen …
+                </p>
+                <RouterView />
+            </main>
+        </div>
+    </div>
+
+    <template v-else>
+        <!-- Bildschirmfüllende Seiten (focus) zeigen ihre eigene Kopfzeile mit Zurück-Knopf. -->
+        <header v-if="layout !== 'focus'" class="app-header">
+            <div class="app-header-icon">
+                <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                >
+                    <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />
+                </svg>
+            </div>
+            <div class="app-header-text">
+                <span class="app-header-title" data-testid="app-title">
+                    {{ base.isService ? 'Super-Admin' : (tenantState.tenant?.name ?? 'Feuerwehr') }}
+                </span>
+                <span class="app-header-subtitle" data-testid="app-subtitle">{{ subtitle }}</span>
+            </div>
+        </header>
+
+        <AppNotices :updater="updater" />
+
+        <main class="app-main" :class="`app-main-${layout}`">
+            <!-- Start mit veralteter Version: Die erste Seite wartet auf die neue. -->
+            <p
+                v-if="updater.loadingPage.value"
+                class="hint"
+                role="status"
+                data-testid="update-loading"
             >
-                <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />
-            </svg>
-        </div>
-        <div class="app-header-text">
-            <span class="app-header-title" data-testid="app-title">
-                {{ base.isService ? 'Super-Admin' : (tenantState.tenant?.name ?? 'Feuerwehr') }}
-            </span>
-            <span class="app-header-subtitle" data-testid="app-subtitle">{{ subtitle }}</span>
-        </div>
-    </header>
-
-    <p v-if="tenantState.error !== null" class="app-error" role="alert">
-        {{ errorMessage(tenantState.error) }}
-        <small>({{ tenantState.error.code }})</small>
-    </p>
-
-    <!-- Sitzungsprüfung gestört (keine Verbindung, 5xx): nie zur Anmeldung, sondern erneut versuchen. -->
-    <p
-        v-if="sessionCheckError !== null"
-        class="app-error app-offline"
-        role="status"
-        data-testid="connection-notice"
-    >
-        Keine Verbindung zum Server, neuer Versuch läuft automatisch.
-        <small>({{ sessionCheckError.code }})</small>
-    </p>
-
-    <div
-        v-if="updater.reloadNeeded.value"
-        class="app-update"
-        role="status"
-        data-testid="update-reload-needed"
-    >
-        <span>Die neue Version konnte nicht geladen werden.</span>
-        <button class="btn app-update-button" type="button" @click="reloadFromServer">
-            Neu laden
-        </button>
-    </div>
-
-    <p
-        v-else-if="updater.switching.value"
-        class="app-update"
-        role="status"
-        data-testid="update-switching"
-    >
-        Neue Version wird geladen …
-    </p>
-
-    <!-- Neue Version, aber gerade nicht automatisch: Formular angefangen oder kurz zuvor neu geladen. -->
-    <div v-else-if="notice !== null" class="app-update" role="status" data-testid="update-notice">
-        <span>
-            {{
-                notice === 'unsaved'
-                    ? 'Neue Version verfügbar – nach dem Speichern wird aktualisiert.'
-                    : 'Neue Version verfügbar.'
-            }}
-        </span>
-        <button class="btn app-update-button" type="button" @click="updateNow">
-            Jetzt aktualisieren
-        </button>
-    </div>
-    <ConfirmDialog
-        v-model:open="confirmOpen"
-        title="Jetzt aktualisieren?"
-        description="Ihre Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?"
-        confirm-label="Aktualisieren"
-        @confirm="applyUpdate"
-    />
-
-    <main class="app-main" :class="`app-main-${layout}`">
-        <!-- Start mit veralteter Version: Die erste Seite wartet auf die neue. -->
-        <p v-if="updater.loadingPage.value" class="hint" role="status" data-testid="update-loading">
-            Seite wird geladen …
-        </p>
-        <RouterView />
-    </main>
-    <UserTabBar v-if="layout === 'user' || route.meta.tabBar === true" />
+                Seite wird geladen …
+            </p>
+            <RouterView />
+        </main>
+        <UserTabBar v-if="layout === 'user'" />
+    </template>
 </template>
 
 <style scoped>
@@ -177,40 +125,6 @@ onMounted(() => {
     opacity: 0.85;
 }
 
-.app-error {
-    margin: 0;
-    padding: 10px 16px;
-    background: var(--status-defective-bg);
-    color: var(--status-defective-fg);
-    font-weight: var(--font-weight-semibold);
-}
-
-.app-offline {
-    background: var(--offline-bg);
-    color: var(--offline-text);
-}
-
-.app-update {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px 16px;
-    padding: 8px 16px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    font-weight: var(--font-weight-semibold);
-}
-
-.app-update-button {
-    flex: none;
-}
-
-.app-error small {
-    font-weight: var(--font-weight-normal);
-    opacity: 0.8;
-}
-
 .hint {
     margin: 0;
     color: var(--muted);
@@ -239,9 +153,35 @@ onMounted(() => {
     padding: 0;
 }
 
+/* Admin-Konsole: am Handy untereinander, ab 768 px Menü links und Inhalt rechts. */
+.admin-shell {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+}
+
+.admin-column {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.app-main-admin {
+    gap: 24px;
+    width: 100%;
+    max-width: 1280px;
+}
+
 @media (min-width: 768px) {
-    .app-main-standard {
+    .app-main-standard,
+    .app-main-admin {
         padding: 28px 32px;
+    }
+
+    .admin-shell {
+        flex-direction: row;
+        align-items: flex-start;
     }
 }
 </style>

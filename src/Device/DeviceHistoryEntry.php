@@ -15,6 +15,7 @@ final readonly class DeviceHistoryEntry
         public DeviceEvent $event,
         public int $deviceId,
         public string $identifier,
+        public int $deviceTypeId,
         public string $deviceTypeName,
     ) {
     }

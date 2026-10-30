@@ -55,7 +55,7 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `prueffristen` | nur Stadt | Prüffristen am Handy: überfällig und in den nächsten 30 Tagen fällig |
 | `profil` | nur Stadt | Profil am Handy: Konto mit Abmelden, Anzeigemodus, Passwort ändern, angemeldete Geräte |
 | `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts; `?standortwahl=1` öffnet die Standortwahl, `?details=1` „Details und Verlauf“ |
-| `dashboard` | Stadt und `service` | Startseite von Admin bzw. Super-Admin (vorerst Platzhalter) |
+| `dashboard` | Stadt und `service` | Startseite der Admin-Konsole bzw. des Super-Admins (unter `service` vorerst Platzhalter) |
 
 `/` ist nur eine Weiche: ohne Sitzung zur Anmeldung, sonst zur Startseite der Rolle.
 
@@ -268,11 +268,14 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
 ## Admin-Konsole
 Super-Admin und Admin: Menü links, Inhalt rechts; links unten Einstellungen, Profil, Abmelden.
 Startseite ist ein Dashboard mit großen, antippbaren Kacheln, die zur gefilterten Liste führen.
-Das Menü des Admins enthält „Suchen“ (die Handy-Seite `suchen`, Entscheidung 19). Bis die
-Admin-Konsole ihr eigenes Menü hat, zeigt das Dashboard (Platzhalter) in jeder Breite dieselbe
-Leiste unten wie die Handy-Seiten (Dashboard | Suchen | Prüffristen | Profil); Befunde aus den
-Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu „Suchen“ außer
-über die Adresszeile).
+Das Menü des Admins enthält „Suchen“ (die Handy-Seite `suchen`, Entscheidung 19). Umgesetzt
+(Schritt 1 der Admin-Konsole): Menü in drei Breiten (Entscheidung 34) statt der früheren
+Übergangsleiste auf dem Dashboard; Dashboard mit den Kacheln Einsatzbereitschaft, nicht
+einsatzbereit, Prüffristen und offene Hinweise (Hinweise im Protokoll plus wartende
+Freischaltungen), darunter „Nicht einsatzbereit“ (defekte zuerst, höchstens 10) und „Letzte
+Aktivitäten“ (die letzten 8 Einträge des Verlaufs der Stadt mit Zeit, Gerät, Wer und Von/Nach). Die
+Kachel „Prüffristen“ führt zu `prueffristen`; die anderen Kacheln führen zur gefilterten Liste,
+sobald es sie gibt.
 
 | | Admin | Super-Admin |
 |---|---|---|
@@ -304,6 +307,62 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
 - **Protokoll:** Hinweise zu Konflikten (siehe oben).
 - **Einstellungen:** Anzeigemodus, Erscheinungsbild der Feuerwehr mit Vorschau, Mail-Benachrichtigung,
   Passwort und angemeldete Geräte.
+
+### Admin-Konsole – Entscheidungen
+29. **Reihenfolge:** Die Admin-Konsole kommt vor dem Offline-Modus, damit Immendingen starten kann.
+    Schritte: Gerüst und Dashboard, Standorte und Gerätetypen, Geräteliste, Gerätedetail, Links in
+    den Log-Mails (T6), Gerät anlegen, CSV-Import, Benutzer, Einladungscodes, Sammelaktionen,
+    Protokoll, Einstellungen, Abschluss mit Live-Test.
+30. **Einladungscodes:** Nach dem Erzeugen (der Code ist nur einmal sichtbar, groß, mit Kopieren und
+    QR-Code) zusätzlich „Aushang drucken“: A4-Druckseite mit Name und Logo der Feuerwehr, großem
+    QR-Code mit dem Link `registrieren#code=…`, dem Code in Klarschrift, der Adresse, drei Schritten
+    „QR-Code mit der Handy-Kamera scannen – Formular ausfüllen – E-Mail bestätigen“, „gültig bis“ und
+    Spam-Hinweis; gedruckt über die Druckfunktion des Browsers mit eigenem Druck-CSS. Dazu „Link
+    teilen“ (Web Share API, sonst Kopieren). Der QR-Code entsteht in der App (Bibliothek `uqr`: nur
+    das Raster, Vue zeichnet daraus ein SVG; die CSP bleibt unverändert). Der Code steht nie in der
+    Adresse; ein späterer Nachdruck braucht einen neuen Code (bewusst, der Server kennt nur den Hash).
+31. **Mehrfachauswahl** in der Geräteliste (auch „alle auswählen“ der gefilterten Liste) mit zwei
+    Sammelaktionen: „Prüfdatum setzen“ und „Umbuchen / Status ändern“, jeweils mit gemeinsamem
+    Kommentar. Aussondern ist keine Sammelaktion. Das Backend bekommt dafür Sammel-Endpunkte
+    (`POST devices/bulk/inspection-due`, `POST devices/bulk/state`; je Gerät `id`, `version`,
+    Zielwerte und eigene `client_ref`). Jedes Gerät wird einzeln geprüft und in eigener Transaktion
+    gebucht, mit eigenem Verlaufseintrag; die Antwort nennt das Ergebnis je Gerät (übernommen,
+    `version_conflict` mit aktuellem Stand, `rule_violation` …), Teilerfolg ist erlaubt. Die Höchstzahl
+    je Anfrage legt das Backend fest; die App teilt größere Auswahlen in Blöcke und zeigt den
+    Fortschritt („8 von 12“) und eine Ergebnisliste. Log-Mail: EINE Sammelmail je Empfänger und
+    Anfrage („Log – <Stadt> – 12 Geräte: Prüfdatum gesetzt“ mit Liste), nicht je Gerät.
+32. **Geräte erfassen:** CSV-Vorlage zum Herunterladen (Spalten wie der Import, Semikolon, UTF-8 mit
+    BOM für Excel, zwei Beispielzeilen mit den Kennungen `BEISPIEL-1` und `BEISPIEL-2`; die Vorschau
+    warnt, solange sie noch in der Datei stehen) und eine zweite Datei „Gültige Werte“ mit den
+    vorhandenen Gerätetypen und Standorten (in der Vorlage selbst würden sie den Import stören). Import
+    mit Vorschau und Fehlern je Zeile, mit Vorschlag bei Tippfehlern („Meinten Sie ‚HLF 20‘?“).
+    Einzelformular mit „Speichern und nächstes“: Typ, Standort und Prüfdatum bleiben, die Kennung zählt
+    weiter (M24 → M25); der Scan-Code lässt sich am Handy mit der Kamera einlesen (vorhandener
+    Scanner).
+33. **Adressen:** Die Detailseite eines Geräts für Admins ist `geraete/<id>/details`;
+    `geraete/<id>` bleibt das Umbuchen (Entscheidung 15). Die Geräteliste der Konsole (`geraete`) hat
+    den Filter „Ausgesonderte anzeigen“; von dort öffnet der Admin die Details und nimmt das Gerät
+    wieder auf.
+34. **Menü:** am PC links mit Text, am Tablet eingeklappt auf Symbole, am Handy über ☰ ausklappbar;
+    Einträge Dashboard, Suchen, Geräte, Standorte, Gerätetypen, Benutzer, Protokoll; unten
+    „Einstellungen“ und „Abmelden“, der Name des Kontos nur als Text (kein eigenes Profil in der
+    Konsole: Passwort und angemeldete Geräte stehen in den Einstellungen). Das Menü ersetzt die
+    Übergangsleiste auf dem Dashboard; auf den Handy-Seiten behält der Admin die Leiste unten mit
+    „Dashboard“.
+35. **„Letzte Aktivitäten“** auf dem Dashboard kommen aus einem eigenen lesenden Endpunkt: dem
+    Verlauf der ganzen Stadt als JSON (`GET device-events`, neueste zuerst, mit Gerät, Konto, Zeit,
+    Von/Nach und Kommentar; nur Admins).
+36. **Links in Mails** (T6): Log-Mails verlinken für Admins direkt auf `geraete/<id>/details`,
+    Hinweis-Mails auf `protokoll/<id>`; Super-Admins erhalten keinen Link auf ein Gerät (sie sehen
+    keine Geräte). Die Mail „Neue Registrierung wartet auf Freischaltung“ verlinkt auf `benutzer`.
+37. **Logo:** Die App bringt jedes Bild (PNG, JPG, SVG …) selbst auf 512 × 512 PNG (quadratisch, mit
+    Rand) und zeigt die Vorschau per Canvas; der Server prüft weiter genau 512 × 512.
+38. **Live-Test der Benutzerverwaltung** (Test-Stadt): „Freischalten“ mit dem vorhandenen Konto
+    `holger.burkarth@live.de` (wartet auf Freischaltung); die Registrierung über den Aushang mit
+    `holger.burkarth+user1@live.de`.
+
+Später, nicht in diesem Abschnitt: Nachdruck eines Aushangs ohne neuen Code, Sammelauswahl bei mehr
+als 2.000 Geräten.
 
 ### Bereiche des Super-Admins
 - **Städte:** Liste mit Name, Adresse, Status, Zahl der Admins und Benutzer. „Neue Stadt“: Name,
