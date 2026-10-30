@@ -10,10 +10,12 @@ use FirefightingEquipment\Device\Import\ImportChange;
 use FirefightingEquipment\Device\Import\ImportColumn;
 use FirefightingEquipment\Device\Import\ImportResult;
 use FirefightingEquipment\Device\Import\ImportRowPlan;
+use FirefightingEquipment\Device\Import\UnknownImportValue;
 
 /**
  * JSON des CSV-Imports. Werte der Änderungen in der Schreibweise der Datei (Namen, Pfade, deutsche
- * Statusbezeichnungen, Datum TT.MM.JJJJ).
+ * Statusbezeichnungen, Datum TT.MM.JJJJ). "unknown" nennt unbekannte Gerätetypen und Standorte,
+ * "suggestions" zu denen mit ähnlichen gültigen Werten die Vorschläge („Meinten Sie …?“).
  */
 final class DeviceImportJson
 {
@@ -37,7 +39,14 @@ final class DeviceImportJson
             },
             'columns' => array_map(static fn (ImportColumn $c): string => $c->label(), $file->columns),
             'summary' => self::summary($plan),
-            'unknown' => ['device_types' => $plan->unknownDeviceTypes, 'locations' => $plan->unknownLocations],
+            'unknown' => [
+                'device_types' => self::values($plan->unknownDeviceTypes),
+                'locations' => self::values($plan->unknownLocations),
+            ],
+            'suggestions' => [
+                'device_types' => self::suggestions($plan->unknownDeviceTypes),
+                'locations' => self::suggestions($plan->unknownLocations),
+            ],
             'rows' => array_map(self::row(...), $plan->rows),
         ];
     }
@@ -56,6 +65,31 @@ final class DeviceImportJson
             'errors' => $plan->count(ImportResult::Error),
             'warnings' => $plan->warningCount(),
         ];
+    }
+
+    /**
+     * @param list<UnknownImportValue> $unknown
+     *
+     * @return list<string>
+     */
+    private static function values(array $unknown): array
+    {
+        return array_map(static fn (UnknownImportValue $u): string => $u->value, $unknown);
+    }
+
+    /**
+     * Nur unbekannte Werte mit Vorschlag („Meinten Sie …?“), in derselben Reihenfolge.
+     *
+     * @param list<UnknownImportValue> $unknown
+     *
+     * @return list<array{value: string, suggestions: list<string>}>
+     */
+    private static function suggestions(array $unknown): array
+    {
+        return array_values(array_map(
+            static fn (UnknownImportValue $u): array => ['value' => $u->value, 'suggestions' => $u->suggestions],
+            array_filter($unknown, static fn (UnknownImportValue $u): bool => $u->suggestions !== []),
+        ));
     }
 
     /**

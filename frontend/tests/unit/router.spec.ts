@@ -120,6 +120,7 @@ describe('Wächter', () => {
         ['/geraete', 'devices'],
         ['/geraete/12/details', 'device-details'],
         ['/geraete/neu', 'device-new'],
+        ['/geraete/import', 'device-import'],
     ] as const)('Seite %s der Admin-Konsole nur für Admins', async (path, name) => {
         setSession(state('admin'));
         const route = (await routerAt(path)).currentRoute.value;

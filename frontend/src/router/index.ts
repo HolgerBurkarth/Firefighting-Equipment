@@ -131,6 +131,13 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { roles: ['admin'], layout: 'admin' },
         });
         routes.push({
+            // CSV-Import mit Vorlage und Vorschau (KONZEPT.md, Entscheidung 32).
+            path: '/geraete/import',
+            name: 'device-import',
+            component: () => import('../pages/DeviceImportPage.vue'),
+            meta: { roles: ['admin'], layout: 'admin' },
+        });
+        routes.push({
             path: '/standorte',
             name: 'locations',
             component: () => import('../pages/LocationsPage.vue'),

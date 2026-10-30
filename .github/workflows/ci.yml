@@ -3,7 +3,7 @@
 # der Stand weiterhin von Hand (scripts/deploy.sh).
 #
 # Ablauf (parallel, README "GitHub Actions und Branch deploy"): PHP-Tests, Lint und Vitest, Build;
-# die Browser-Tests laufen nach dem Build in vier Teilen (Matrix "shard") über alle fünf Profile
+# die Browser-Tests laufen nach dem Build in acht Teilen (Matrix "shard") über alle fünf Profile
 # gegen genau diesen Build (Artefakt frontend-dist), ihre Berichte führt "e2e-report" zusammen.
 name: CI
 
@@ -162,7 +162,7 @@ jobs:
       fail-fast: false
       matrix:
         # Mehr Teile: nur diese Liste verlängern ("--shard" liest die Anzahl aus job-total).
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v7
 

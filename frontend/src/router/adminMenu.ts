@@ -28,7 +28,7 @@ export const ADMIN_MENU: readonly AdminMenuEntry[] = [
         route: 'devices',
         label: 'Geräte',
         icon: 'devices',
-        sections: ['device-details', 'device-new'],
+        sections: ['device-details', 'device-new', 'device-import'],
     },
     { route: 'locations', label: 'Standorte', icon: 'location' },
     { route: 'device-types', label: 'Gerätetypen', icon: 'tag' },

@@ -7,6 +7,48 @@ Backend-Chat, was sich seit seinem letzten Stand geändert hat.
 Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff ein, den er für den Commit vorschlägt;
 der Nutzer verwendet ihn), was sich geändert hat, warum, Tests, Stelle in `CLAUDE.md`.
 
+## 2026-10-30 – „Admin-Konsole: CSV-Import mit Vorlage, Vorschau und Vorschlägen (Schritt 7); CI in acht Teilen“
+
+Zwei neue lesende Endpunkte (nur Admins der Stadt, `Access::Admin`, CSV-Download wie der Export
+über `CsvResponse`, Format `CsvFormat`; `DeviceImportTemplateHandler`, Query-Parameter ignoriert):
+
+- `GET api/v1/devices/import/template`: Vorlage mit den Spalten des Imports (= `DeviceCsv::DEVICE_HEADER`,
+  `DeviceImportTemplate::header()`, per Test) und zwei Beispielzeilen `BEISPIEL-1` (erster aktiver
+  Gerätetyp, erster aktiver Standort der Ebene 1, einsatzbereit, Prüfung heute + 365 Tage,
+  Seriennummer, Hersteller, Modell, Beschaffung heute, Notiz „Beispielzeile – vor dem Import
+  löschen“) und `BEISPIEL-2` (zweiter Gerätetyp, erstes aktives Fach, in Wartung). Ohne aktive Typen
+  bzw. Standorte bleiben die Zellen leer. Dateiname `geraete-vorlage-<kürzel>.csv`.
+- `GET api/v1/devices/import/values`: „Gültige Werte“, Spalten `Spalte;Gültiger Wert`: Kennung
+  (Regel), aktive Gerätetypen, aktive Standorte als Pfad wie im Import (Fächer nur unter aktiven
+  Standorten), die drei Status, Datumsformat für „Nächste Prüfung“ und „Beschaffungsdatum“.
+  Dateiname `gueltige-werte-<kürzel>-<JJJJ-MM-TT>.csv` (heute über `Clock`).
+
+Vorschau (`POST devices/import/preview`) und Übernehmen erweitert, bestehende Felder unverändert:
+
+- Neues Feld `suggestions {device_types: [{value, suggestions}], locations: [...]}`: zu unbekannten
+  Gerätetypen bzw. Standorten (`unknown`, unverändert) die ähnlichsten AKTIVEN Werte, nur Einträge
+  mit Vorschlag, Reihenfolge wie `unknown`. Die Meldung der Zeile endet dann mit „Meinten Sie
+  „HLF 20“?“ (bzw. „„LF 10“ oder „LF 16““). Ähnlichkeit (`ImportSuggestions`): Vergleichsform ohne
+  Leerraum und Groß-/Kleinschreibung, ä/ö/ü/ß = ae/oe/ue/ss, Levenshtein über Unicode-Zeichen, höchstens
+  ein Viertel der Länge (mindestens 1, höchstens 3), höchstens 3 Vorschläge (natürlich sortiert),
+  höchstens 100 gesuchte Werte je Art; Fächer auch über ihren eigenen Namen („G1“ → „HLF 20 / G1“).
+  Die Kandidaten werden nur gelesen, wenn es unbekannte Werte gibt.
+- Neue Warnung je Zeile (neu oder bestehend, nicht bei Fehlern): Kennung `BEISPIEL-1`/`BEISPIEL-2`
+  (ohne Groß-/Kleinschreibung, `DeviceImportTemplate::isExample`) „… gehört zu den Beispielzeilen der
+  Vorlage. Bitte die Zeile vor dem Import löschen.“ Zählt in `summary.warnings`, blockiert nicht.
+- Ein bisheriger Test erwartete für „HLF 20 / G9“ die Meldung ohne Vorschlag; jetzt mit
+  „Meinten Sie „HLF 20 / G1“?“.
+- Code: `src/Device/Import/DeviceImportTemplate.php`, `ImportSuggestions.php`,
+  `UnknownImportValue.php` (neu; `DeviceImportPlan::$unknownDeviceTypes`/`$unknownLocations` sind
+  jetzt `list<UnknownImportValue>`), `DeviceImportPlanner`, `DeviceImportJson`, Routen in `Routes::tenant`.
+- Tests: `tests/Integration/Import/DeviceImportTemplateTest` (Vorlage, leere Stadt, Vorlage als
+  Import mit Warnungen, Warnung bei bestehendem Gerät, gültige Werte nur aktive und eigene Stadt,
+  Vorschläge samt deaktiviertem Typ und Gleichstand), `tests/Unit/Device/Import/ImportSuggestionsTest`,
+  `DeviceImportPreviewTest` (angepasst), `AdminRoutesAccessTest` (zwei Einträge; liest Antworten
+  jetzt über `sendAny`, auch CSV).
+- CI: Browser-Tests in acht statt vier Teilen (`ci.yml`, Matrix `shard` 1–8); sonst unverändert.
+- Dokumentiert in `CLAUDE.md`, "CSV-Import (API)" und "Frontend" (Import-Seite), "GitHub Actions (CI)".
+
 ## 2026-10-30 – „Admin-Konsole: Menü und Dashboard, Verlauf der Stadt (Schritt 1)“
 
 Neuer lesender Endpunkt `GET api/v1/device-events` (nur Admins der Stadt, `Access::Admin`;

@@ -1,5 +1,12 @@
 import type { ApiResult } from '../api/client';
 import {
+    postImport,
+    postImportPreview,
+    type ImportPreview,
+    type ImportRequest,
+    type ImportSummary,
+} from '../api/deviceImport';
+import {
     conflictDevice,
     postDevice,
     postDeviceFields,
@@ -130,6 +137,12 @@ function afterDeviceChange(result: ApiResult<DeviceDetail>): ApiResult<DeviceDet
         return result;
     }
     deviceStore.upsert(result.data);
+    refreshDeviceLists();
+    return result;
+}
+
+/** Listen mit Geräten, Gerätezahlen und Prüffristen neu laden, sofern schon geladen. */
+function refreshDeviceLists(): void {
     if (deviceStore.state.mode !== null) {
         void deviceStore.refresh('changed');
     }
@@ -145,7 +158,6 @@ function afterDeviceChange(result: ApiResult<DeviceDetail>): ApiResult<DeviceDet
         void adminOverview.refresh('changed');
     }
     void adminDeviceList.refresh('changed');
-    return result;
 }
 
 /** Neues Gerät (Admin); die Listen laden danach neu wie bei jeder Änderung. */
@@ -183,6 +195,20 @@ export async function reinstateDevice(
     request: ReinstateRequest,
 ): Promise<ApiResult<DeviceDetail>> {
     return afterDeviceChange(await postReinstate(id, request));
+}
+
+/** CSV-Import prüfen (Admin; speichert nichts). */
+export function previewDeviceImport(file: string): Promise<ApiResult<ImportPreview>> {
+    return postImportPreview(file);
+}
+
+/** CSV-Import übernehmen (Admin; alles oder nichts), danach laden die Listen neu. */
+export async function applyDeviceImport(request: ImportRequest): Promise<ApiResult<ImportSummary>> {
+    const result = await postImport(request);
+    if (result.ok) {
+        refreshDeviceLists();
+    }
+    return result;
 }
 
 /** Verlauf eines Geräts („Details und Verlauf“), je Ansicht neu. */
