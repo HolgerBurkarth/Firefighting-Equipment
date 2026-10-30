@@ -1198,7 +1198,10 @@ Fürs Ansehen mit echter API: `npm run build`, dann im Hauptordner
 `http.allowed_origins` eintragen.
 
 Anmeldung: `/firefighting/<bereich>/` leitet ohne Sitzung zur Anmeldung, sonst zur Startseite der
-Rolle (User `suchen`, Admin und Super-Admin `dashboard`; beide vorerst Platzhalter). Registrieren
+Rolle (User `suchen`, Admin und Super-Admin `dashboard`, das Dashboard vorerst als Platzhalter).
+Die Handy-Seiten für User und Admins: `suchen` (Suche, „Code scannen“, „Zuletzt benutzt“),
+`prueffristen`, `profil` und `geraete/<id>` (Umbuchen und Status, Standortwahl, Details und Verlauf);
+Entscheidungen in `docs/frontend/KONZEPT.md`, "User am Handy". Registrieren
 unter `/firefighting/<stadt>/registrieren` (mit Code aus dem QR-Link `#code=…` oder von Hand),
 Bestätigungslink der Mail auf `email-bestaetigen` (Bestätigung per Knopf, dort auch neuer Link),
 neue Admins legen auf `einladung-annehmen` Name und Passwort fest. Abläufe und

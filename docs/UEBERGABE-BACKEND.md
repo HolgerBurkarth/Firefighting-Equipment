@@ -7,7 +7,7 @@ Backend-Chat, was sich seit seinem letzten Stand geändert hat.
 Eintrag: Datum, Commit-Betreff (bei noch nicht committeten Änderungen „noch nicht committet“, der
 Nutzer ergänzt den Betreff), was sich geändert hat, warum, Tests, Stelle in `CLAUDE.md`.
 
-## 2026-10-30 – noch nicht committet (Schritt 9: Code scannen)
+## 2026-10-30 – „Code scannen (Schritt 9)“
 
 Die REST-API ist unverändert; die App nutzt erstmals den vorhandenen Filter `GET devices?scan_code=…`
 (Modus `server`, mehr als 2000 Geräte). Geändert hat sich die Auslieferung des Frontends:
