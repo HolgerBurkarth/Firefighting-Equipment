@@ -1167,7 +1167,11 @@ Vue 3 mit Vite, TypeScript, Reka UI und Workbox (PWA) im Ordner `frontend/`; Kon
 in `docs/frontend/`. Node.js 24 LTS wird nur lokal und in GitHub Actions gebraucht, auf dem Server
 liegt nur der fertige Build (`frontend/dist/`, im Branch `deploy`). Ausgeliefert wird er von PHP:
 Alle GET-Adressen unter `/firefighting/<bereich>/` außerhalb von `api/` bekommen die App-Seite
-oder eine Datei des Builds (Regeln in `CLAUDE.md`, "Frontend ausliefern").
+oder eine Datei des Builds (Regeln in `CLAUDE.md`, "Frontend ausliefern"). Da STRATO die Ausgabe
+nicht komprimiert, legt der Build neben jedes Skript und jeden Stil eine Brotli- (`.br`) und eine
+gzip-Fassung (`.gz`); PHP sendet die passende laut `Accept-Encoding`. Prüfen auf dem Server:
+`curl -s -o /dev/null -D - -H 'Accept-Encoding: br' https://www.prodad.de/firefighting/test/sw.js` (GET; HEAD gibt 404) zeigt
+`content-encoding: br` und `vary: Accept-Encoding`.
 
 ```
 cd frontend

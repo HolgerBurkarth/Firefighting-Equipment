@@ -18,6 +18,8 @@ use FirefightingEquipment\Tenant\TenantSlug;
  * so funktioniert die Seite auch offline aus dem Service Worker.
  *
  * - assets/<datei>: Datei mit Hash im Namen, CachePolicy::Immutable; fehlt sie: 404.
+ * - Dateien mit vorkomprimierter Fassung (.br/.gz im Build) kommen komprimiert, wenn
+ *   Accept-Encoding es erlaubt (Content-Encoding, Vary: Accept-Encoding, ETag je Fassung).
  * - <datei> mit Dateiendung (sw.js, workbox-….js, build.json): CachePolicy::Revalidate; fehlt sie: 404
  *   (nie die App-Seite, sonst würde HTML als Skript geladen).
  * - alles andere (z. B. "", "geraete/12", "passwort-zuruecksetzen"): index.html mit Basispfad,
@@ -67,9 +69,17 @@ final readonly class FrontendHandler
 
     private function file(Request $request, string $rest, CachePolicy $policy): CacheableResponse
     {
-        $file = $this->assets->file($rest) ?? throw HttpException::notFound();
+        $file = $this->assets->file($rest, $request->header('Accept-Encoding')) ?? throw HttpException::notFound();
 
-        return new CacheableResponse($request, $file->contentType, $file->body, $file->etag(), $policy);
+        return new CacheableResponse(
+            $request,
+            $file->contentType,
+            $file->body,
+            $file->etag(),
+            $policy,
+            contentEncoding: $file->encoding,
+            varyAcceptEncoding: $file->varies,
+        );
     }
 
     private function indexHtml(Request $request, AppPath $path): CacheableResponse

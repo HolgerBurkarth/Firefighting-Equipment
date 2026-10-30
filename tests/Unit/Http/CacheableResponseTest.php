@@ -6,6 +6,7 @@ namespace FirefightingEquipment\Tests\Unit\Http;
 
 use FirefightingEquipment\Http\CacheableResponse;
 use FirefightingEquipment\Http\CachePolicy;
+use FirefightingEquipment\Http\ContentEncoding;
 use FirefightingEquipment\Http\Request;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -14,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 
 #[CoversClass(CacheableResponse::class)]
 #[CoversClass(CachePolicy::class)]
+#[UsesClass(ContentEncoding::class)]
 #[UsesClass(Request::class)]
 final class CacheableResponseTest extends TestCase
 {
@@ -122,6 +124,53 @@ final class CacheableResponseTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new CacheableResponse(new Request('GET', '/x'), CacheableResponse::HTML, 'x', self::ETAG, CachePolicy::Revalidate, $headers);
+    }
+
+    public function testCompressedVariant(): void
+    {
+        $response = new CacheableResponse(new Request('GET', '/x'), CacheableResponse::JAVASCRIPT, 'BR', self::ETAG, CachePolicy::Immutable, contentEncoding: ContentEncoding::Brotli, varyAcceptEncoding: true);
+
+        self::assertSame([
+            'Content-Type' => 'text/javascript; charset=utf-8',
+            'Content-Encoding' => 'br',
+            'Content-Length' => '2',
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+            'ETag' => self::ETAG,
+            'X-Content-Type-Options' => 'nosniff',
+            'Vary' => 'Accept-Encoding',
+        ], $response->headers());
+        self::assertSame('BR', $response->body());
+    }
+
+    public function testUncompressedWithVariantsVaries(): void
+    {
+        $headers = new CacheableResponse(new Request('GET', '/x'), CacheableResponse::CSS, 'x', self::ETAG, CachePolicy::Immutable, varyAcceptEncoding: true)->headers();
+
+        self::assertSame('Accept-Encoding', $headers['Vary']);
+        self::assertArrayNotHasKey('Content-Encoding', $headers);
+    }
+
+    public function testNotModifiedKeepsVaryWithoutContentEncoding(): void
+    {
+        $request = new Request('GET', '/x', ['if-none-match' => self::ETAG]);
+        $response = new CacheableResponse($request, CacheableResponse::JAVASCRIPT, 'GZ', self::ETAG, CachePolicy::Revalidate, contentEncoding: ContentEncoding::Gzip, varyAcceptEncoding: true);
+
+        self::assertSame(304, $response->statusCode());
+        self::assertSame('Accept-Encoding', $response->headers()['Vary']);
+        self::assertArrayNotHasKey('Content-Encoding', $response->headers());
+        self::assertArrayNotHasKey('Content-Length', $response->headers());
+        self::assertSame('', $response->body());
+    }
+
+    public function testWithoutVariantsNoVary(): void
+    {
+        self::assertArrayNotHasKey('Vary', new CacheableResponse(new Request('GET', '/x'), CacheableResponse::PNG, 'x', self::ETAG, CachePolicy::Immutable)->headers());
+    }
+
+    public function testContentEncodingRequiresVary(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new CacheableResponse(new Request('GET', '/x'), CacheableResponse::JAVASCRIPT, 'x', self::ETAG, CachePolicy::Immutable, contentEncoding: ContentEncoding::Gzip);
     }
 
     #[DataProvider('rejectedArguments')]

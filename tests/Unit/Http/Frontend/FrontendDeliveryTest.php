@@ -13,6 +13,7 @@ use FirefightingEquipment\Http\AppPath;
 use FirefightingEquipment\Http\Application;
 use FirefightingEquipment\Http\CacheableResponse;
 use FirefightingEquipment\Http\CachePolicy;
+use FirefightingEquipment\Http\ContentEncoding;
 use FirefightingEquipment\Http\ErrorReporter;
 use FirefightingEquipment\Http\Frontend\ContentSecurityPolicy;
 use FirefightingEquipment\Http\Frontend\FrontendAssets;
@@ -51,6 +52,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Access::class)]
 #[UsesClass(AppPath::class)]
 #[UsesClass(CachePolicy::class)]
+#[UsesClass(ContentEncoding::class)]
 #[UsesClass(DatabaseError::class)]
 #[UsesClass(ErrorReporter::class)]
 #[UsesClass(HealthHandler::class)]
@@ -173,6 +175,77 @@ final class FrontendDeliveryTest extends TestCase
     }
 
     /**
+     * Fassungen im Test-Build: index-abc123.js mit .br und .gz, sw.js nur mit .gz (Inhalt beliebig,
+     * PHP dekomprimiert nie).
+     *
+     * @return iterable<string, array{string, string, ?string}>
+     */
+    public static function compressedFiles(): iterable
+    {
+        yield 'Chrome: Brotli' => ['assets/index-abc123.js', 'gzip, deflate, br, zstd', 'br'];
+        yield 'nur gzip' => ['assets/index-abc123.js', 'gzip', 'gzip'];
+        yield 'Brotli ausgeschlossen' => ['assets/index-abc123.js', 'br;q=0, gzip', 'gzip'];
+        yield 'nichts Passendes' => ['assets/index-abc123.js', 'deflate', null];
+        yield 'ohne Header' => ['assets/index-abc123.js', '', null];
+        yield 'nur gzip vorhanden' => ['sw.js', 'gzip, deflate, br', 'gzip'];
+        yield 'nur gzip vorhanden, Brotli verlangt' => ['sw.js', 'br', null];
+    }
+
+    #[DataProvider('compressedFiles')]
+    public function testCompressedVariantByAcceptEncoding(string $file, string $acceptEncoding, ?string $encoding): void
+    {
+        $headers = $acceptEncoding === '' ? [] : ['accept-encoding' => $acceptEncoding];
+        $response = $this->app()->handle(new Request('GET', '/firefighting/test/' . $file, $headers));
+
+        self::assertInstanceOf(CacheableResponse::class, $response);
+        self::assertSame(200, $response->statusCode());
+        $suffix = match ($encoding) {
+            'br' => '.br',
+            'gzip' => '.gz',
+            default => '',
+        };
+        self::assertSame(file_get_contents(self::DIST . '/' . $file . $suffix), $response->body());
+        $headers = $response->headers();
+        self::assertSame('text/javascript; charset=utf-8', $headers['Content-Type']);
+        self::assertSame($encoding, $headers['Content-Encoding'] ?? null);
+        self::assertSame((string) strlen($response->body()), $headers['Content-Length']);
+        self::assertSame('Accept-Encoding', $headers['Vary']);
+        $etagSuffix = $encoding === null ? '' : '-' . substr($suffix, 1);
+        self::assertSame('"' . substr(hash('sha256', $response->body()), 0, 32) . $etagSuffix . '"', $headers['ETag']);
+        self::assertSame(0, $this->connectAttempts);
+    }
+
+    public function testWithoutVariantsNoVary(): void
+    {
+        foreach (['/firefighting/test/', '/firefighting/test/assets/index-abc123.css', '/firefighting/test/build.json'] as $uri) {
+            $headers = $this->app()->handle(new Request('GET', $uri, ['accept-encoding' => 'gzip, br']))->headers();
+
+            self::assertArrayNotHasKey('Vary', $headers, $uri);
+            self::assertArrayNotHasKey('Content-Encoding', $headers, $uri);
+        }
+    }
+
+    public function testEtagPerVariant(): void
+    {
+        $uri = '/firefighting/test/assets/index-abc123.js';
+        $etags = [];
+        foreach (['br', 'gzip', 'identity'] as $acceptEncoding) {
+            $etags[$acceptEncoding] = $this->app()->handle(new Request('GET', $uri, ['accept-encoding' => $acceptEncoding]))->headers()['ETag'];
+        }
+        self::assertCount(3, array_unique($etags));
+
+        // 304 nur für die Fassung, die der Browser hat; Vary bleibt, Content-Encoding fehlt.
+        $same = $this->app()->handle(new Request('GET', $uri, ['accept-encoding' => 'br', 'if-none-match' => $etags['br']]));
+        self::assertSame(304, $same->statusCode());
+        self::assertSame('Accept-Encoding', $same->headers()['Vary']);
+        self::assertArrayNotHasKey('Content-Encoding', $same->headers());
+
+        $other = $this->app()->handle(new Request('GET', $uri, ['accept-encoding' => 'gzip', 'if-none-match' => $etags['br']]));
+        self::assertSame(200, $other->statusCode());
+        self::assertSame('gzip', $other->headers()['Content-Encoding']);
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function missingOrForbiddenFiles(): iterable
@@ -195,6 +268,10 @@ final class FrontendDeliveryTest extends TestCase
         yield 'versteckte Datei' => ['/firefighting/test/assets/.index-abc123.js'];
         yield 'versteckte Datei im Build-Ordner' => ['/firefighting/test/.htaccess'];
         yield 'NUL' => ["/firefighting/test/assets/index-abc123.js\0.css"];
+        yield 'Brotli-Fassung direkt' => ['/firefighting/test/assets/index-abc123.js.br'];
+        yield 'gzip-Fassung direkt' => ['/firefighting/test/sw.js.gz'];
+        yield 'Fassung ohne Original' => ['/firefighting/test/assets/nur-komprimiert-abc123.js'];
+        yield 'Fassung einer nicht erlaubten Datei' => ['/firefighting/test/assets/notiz.txt'];
         yield 'ungültiges Kürzel' => ['/firefighting/-test/'];
         yield 'Kürzel zu lang' => ['/firefighting/' . str_repeat('a', 51) . '/'];
     }

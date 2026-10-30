@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from './fixtures';
@@ -65,19 +65,67 @@ test.describe('Symbole und Manifest durch PHP', () => {
     });
 });
 
+const DIST = fileURLToPath(new URL('../../dist/', import.meta.url));
+
+/** Alle Dateien des Builds, relativ zu dist/ mit "/". */
+function buildFiles(): string[] {
+    return readdirSync(DIST, { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => relative(DIST, join(entry.parentPath, entry.name)).replaceAll('\\', '/'));
+}
+
+const COMPRESSED = /\.(br|gz)$/;
+
+/** Fassung → Content-Encoding (wie ContentEncoding in PHP). */
+const ENCODINGS: Record<string, string> = { br: 'br', gz: 'gzip' };
+
+/** "assets/x.js.br" → Datei "assets/x.js" und Content-Encoding "br". */
+function splitVariant(variant: string): { file: string; encoding: string | undefined } {
+    const suffix = COMPRESSED.exec(variant)?.[1] ?? '';
+    return { file: variant.replace(COMPRESSED, ''), encoding: ENCODINGS[suffix] };
+}
+
 test.describe('Jede Datei des Builds', () => {
     test('liefert PHP aus (Namen passend zu FrontendAssets)', async ({ request }) => {
-        const dist = fileURLToPath(new URL('../../dist/', import.meta.url));
-        const files = readdirSync(dist, { recursive: true, withFileTypes: true })
-            .filter((entry) => entry.isFile())
-            .map((entry) =>
-                relative(dist, join(entry.parentPath, entry.name)).replaceAll('\\', '/'),
-            )
-            .filter((file) => file !== 'index.html');
+        const files = buildFiles().filter(
+            (file) => file !== 'index.html' && !COMPRESSED.test(file),
+        );
         expect(files.length).toBeGreaterThan(10);
         for (const file of files) {
             const response = await request.get(`/firefighting/test/${file}`);
             expect(response.status(), file).toBe(200);
         }
+    });
+
+    test('komprimierte Fassungen: passend zur Datei, nie direkt abrufbar', async ({ request }) => {
+        const variants = buildFiles().filter((file) => COMPRESSED.test(file));
+        // Auch sw.js: die Komprimierung läuft nach vite-plugin-pwa.
+        expect(variants).toEqual(expect.arrayContaining(['sw.js.br', 'sw.js.gz']));
+        for (const variant of variants) {
+            const { file, encoding } = splitVariant(variant);
+            expect(encoding, variant).toBeDefined();
+            const response = await request.get(`/firefighting/test/${file}`, {
+                headers: { 'accept-encoding': encoding ?? '' },
+            });
+            expect(response.status(), variant).toBe(200);
+            expect(response.headers()['content-encoding'], variant).toBe(encoding);
+            expect(response.headers()['vary'], variant).toBe('Accept-Encoding');
+            // Playwright dekomprimiert: der Inhalt muss genau die Datei sein.
+            expect((await response.body()).equals(readFileSync(join(DIST, file))), variant).toBe(
+                true,
+            );
+
+            const direct = await request.get(`/firefighting/test/${variant}`);
+            expect(direct.status(), variant).toBe(404);
+        }
+    });
+
+    test('ohne Accept-Encoding unkomprimiert', async ({ request }) => {
+        const response = await request.get('/firefighting/test/sw.js', {
+            headers: { 'accept-encoding': 'identity' },
+        });
+        expect(response.headers()['content-encoding']).toBeUndefined();
+        expect(response.headers()['vary']).toBe('Accept-Encoding');
+        expect((await response.body()).equals(readFileSync(join(DIST, 'sw.js')))).toBe(true);
     });
 });

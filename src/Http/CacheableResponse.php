@@ -9,7 +9,8 @@ namespace FirefightingEquipment\Http;
  * Web-App-Manifest oder eine Datei des Frontends (App-Seite, Skripte, Stile, Schriften).
  * Einzige Ausnahme von "Cache-Control: no-store" (siehe CachePolicy); nur diese Content-Types sind
  * möglich. Immer mit ETag; passt If-None-Match, antwortet sie mit 304 ohne Body. Fehler dieser
- * Routen bleiben JSON mit no-store.
+ * Routen bleiben JSON mit no-store. Dateien des Frontends können vorkomprimiert sein
+ * (Content-Encoding, dann immer mit Vary: Accept-Encoding).
  */
 final readonly class CacheableResponse implements Response
 {
@@ -32,7 +33,9 @@ final readonly class CacheableResponse implements Response
 
     /**
      * @param string                $etag            starker ETag mit Anführungszeichen, z. B. "\"3f2a…-512\""
-     * @param array<string, string> $securityHeaders nur Content-Security-Policy, Referrer-Policy, X-Frame-Options
+     * @param array<string, string> $securityHeaders    nur Content-Security-Policy, Referrer-Policy, X-Frame-Options
+     * @param ContentEncoding|null  $contentEncoding    Fassung des Bodys (vorkomprimiert), null = unkomprimiert
+     * @param bool                  $varyAcceptEncoding es gibt Fassungen je Accept-Encoding (Pflicht bei $contentEncoding)
      */
     public function __construct(
         Request $request,
@@ -41,7 +44,12 @@ final readonly class CacheableResponse implements Response
         private string $etag,
         private CachePolicy $policy,
         private array $securityHeaders = [],
+        private ?ContentEncoding $contentEncoding = null,
+        private bool $varyAcceptEncoding = false,
     ) {
+        if ($contentEncoding !== null && !$varyAcceptEncoding) {
+            throw new \InvalidArgumentException('Content-Encoding nur mit Vary: Accept-Encoding.');
+        }
         if (!in_array($contentType, self::CONTENT_TYPES, true)) {
             throw new \InvalidArgumentException(sprintf('Content-Type nicht zwischenspeicherbar: %s', $contentType));
         }
@@ -72,8 +80,16 @@ final readonly class CacheableResponse implements Response
             'X-Content-Type-Options' => JsonResponse::DEFAULT_HEADERS['X-Content-Type-Options'],
             ...$this->securityHeaders,
         ];
+        if ($this->varyAcceptEncoding) {
+            // Auch bei 304 (RFC 9110, 15.4.5), damit Caches die Fassungen auseinanderhalten.
+            $headers['Vary'] = 'Accept-Encoding';
+        }
         if (!$this->notModified) {
-            $headers = ['Content-Type' => $this->contentType, 'Content-Length' => (string) strlen($this->body), ...$headers];
+            $representation = ['Content-Type' => $this->contentType];
+            if ($this->contentEncoding !== null) {
+                $representation['Content-Encoding'] = $this->contentEncoding->value;
+            }
+            $headers = [...$representation, 'Content-Length' => (string) strlen($this->body), ...$headers];
         }
 
         return $headers;
