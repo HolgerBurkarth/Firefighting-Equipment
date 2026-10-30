@@ -25,6 +25,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Firefox und Handy-Breite) laufen lassen; `npm test` prüft lokal nur Chromium und WebKit in
   PC-Breite. Tests, deren Erwartung von der Breite abhängt, setzen sie ausdrücklich
   (`page.setViewportSize`).
+- Kann sich ein Browser-Test je Betriebssystem anders verhalten (z. B. Kamera und Medien,
+  Testattrappen mit Browser-Objekten, Dateien, Prozesse und Ports, Schriften; CI läuft unter Linux,
+  lokal Windows), vor „✅ FERTIG“ zusätzlich unter Linux (WSL) laufen lassen, mindestens die
+  betroffenen Dateien in allen fünf Profilen (README "Browser-Tests unter Linux (WSL)").
+  Attrappen und Testhilfen gehen in allen Browsern und Systemen denselben Weg der App, keine
+  Sonderwege je Betriebssystem.
 - Status von Nachrichten an den Nutzer – jede Nachricht beginnt mit genau einer Kennzeichnung:
   - "⏳ ZWISCHENSTAND – ich arbeite weiter": Es läuft noch etwas. Dazu: was gerade läuft, wie lange
     es voraussichtlich dauert und was danach kommt. Der Nutzer muss nichts tun.
@@ -372,9 +378,14 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `navigator.mediaDevices`, ohne „Erneut versuchen“), `denied`, `missing`, `busy`, `load` (Lesemodul
   nicht ladbar). Schließen, Zurück und Verlassen beenden die Kamera immer. Browser-Tests
   `tests/e2e/scanner.spec.ts` mit simulierter Kamera (`tests/e2e/support/camera.ts`: Codes mit dem
-  Schreibmodul von zxing-wasm in Node, Kamerabild als Canvas per `captureStream`; Playwright-WebKit
-  unter Windows hat kein `MediaStream`, dort ersetzt das Init-Skript zusätzlich `srcObject`, `play`,
-  Größe und `drawImage` des Videos), echt sind Lesemodul, WASM-Datei, CSP und PHP; Unit-Tests
+  Schreibmodul von zxing-wasm in Node, Kamerabild als Canvas; in ALLEN Browsern und Systemen derselbe
+  Weg: `getUserMedia` liefert einen Ersatz-Stream aus eigenen Klassen, das Init-Skript ersetzt für
+  ein Video damit `srcObject`, `play`, Größe und `drawImage`. Kein echter `MediaStream`:
+  Playwright-WebKit unter Windows hat keinen, und WebKit räumt das JS-Objekt einer echten Spur weg,
+  dann ginge ein Zähler an der Spur verloren (rote CI unter Linux). `cameraCounts`: `opened`,
+  `stopped` (Spuren je einmal), `attached` (Videos, die den Stream noch halten); nach jedem Ende
+  `cameraReleased(n)`, auch bei Fehlern wie „Lesemodul nicht ladbar“), echt sind Lesemodul,
+  WASM-Datei, CSP und PHP; Unit-Tests
   `camera.spec.ts`, `deviceSearch.spec.ts`, `deviceStore.spec.ts`. `devicesEndpoint` kennt dafür
   auch `scan_code`.
   „Zuletzt benutzt“ (`src/data/recentDevices.ts`, `recentDeviceIds`/`rememberDevice` aus
@@ -725,7 +736,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   die Zeitlimits gebraucht werden.
   Meldungen von `ConfigLoader` nennen nie Werte.
 - Tests: Testsuiten `unit` und `integration` (`composer test`, `composer test:unit`,
-  `composer test:integration`). Die ganze Suite dauert lokal unter einer Minute;
+  `composer test:integration`). Die ganze Suite dauert lokal rund 3 Minuten;
   `process-timeout` 900 in `composer.json` bleibt als Reserve. Integrationstests werden übersprungen, wenn
   `config/config.test.php` fehlt. Dauerhafte Tabellen legen sie nur mit Präfix `fe_test_`
   an und löschen sie wieder; aufgeräumt wird ausschließlich `fe_test_*` und nur in einer
@@ -1343,8 +1354,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Konten. Ohne `--execute` Probelauf. Schreibt NUR über die Repositorys (Ereignisse, Versionen,
   Sperren wie im Betrieb), nie per SQL; keine Mails; Zeitpunkte = Zeit des Aufrufs (die Historie
   wird nicht zurückdatiert, sie ist nur `INSERT`).
-- Inhalt: 15 Standorte, 60 ausgesuchte Geräte (`TestCityData::devices`) mit Scan-Codes (auch GS1
-  mit GS), Prüfdaten relativ zu heute (`Clock`, Europe/Berlin), Geräten auf dem ganzen Fahrzeug,
+- Inhalt: 15 Standorte, 60 ausgesuchte Geräte (`TestCityData::devices`) mit Scan-Codes (GS1 wie auf
+  echten Etiketten über `TestCityData::gs1`: `01<GTIN>21<Serie>` ohne GS nach der GTIN fester Länge,
+  einige `01<GTIN>10<Charge><GS>21<Serie>` mit GS nach der variablen Charge; `TestCityData::GTIN` mit
+  gültiger Prüfziffer, per Test), Prüfdaten relativ zu heute (`Clock`, Europe/Berlin), Geräten auf dem ganzen Fahrzeug,
   Verlauf an 7 Geräten, M24 ausgesondert; `--devices=1…5000`: Geräte T0001 …, Verlauf an
   T0001–T0006, T0007 ausgesondert. Gerätetypen aus den Start-Gerätetypen (fehlt einer oder ist er
   deaktiviert → Abbruch).
@@ -1918,7 +1931,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Anmeldung und Registrierung im Frontend (umgesetzt: anmelden, registrieren, email-bestaetigen,
   passwort-vergessen, passwort-zuruecksetzen, einladung-annehmen, Abmelden; Updates der App; siehe
   "Frontend" und KONZEPT.md "Anmeldung und Registrierung", "Updates der App").
-- Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
+- Nicht in Version 1: Mengenartikel, Etiketten mit QR-/Barcodes erzeugen oder drucken,
+  Prüfprotokolle.
 
 ## GitHub Actions (CI)
 - Workflow `.github/workflows/ci.yml` bei jedem Push auf `main`, bei Pull Requests und von Hand

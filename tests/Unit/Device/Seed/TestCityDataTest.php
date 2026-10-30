@@ -64,9 +64,83 @@ final class TestCityDataTest extends TestCase
         $statuses = array_unique(array_map(static fn (SeedDevice $d): string => $d->status->value, $devices));
         sort($statuses);
         self::assertSame(['defective', 'maintenance', 'ready'], $statuses);
-        // Scan-Codes: GS1 mit Trennzeichen, Geräte ohne Code.
-        self::assertNotEmpty(array_filter($devices, static fn (SeedDevice $d): bool => str_contains((string) $d->scanCode, "\x1D")));
+        // Scan-Codes: Geräte ohne Code (GS1 siehe testGs1CodesLikeRealLabels).
         self::assertNotEmpty(array_filter($devices, static fn (SeedDevice $d): bool => $d->scanCode === null));
+        self::assertSame('0104048675000013' . '21ARHL-2001', self::scanCode($devices, 'PA 1'));
+        self::assertSame('0104048675000013' . "10L30\x1D21ARHL-2010", self::scanCode($devices, 'PA 10'));
+    }
+
+    public function testGtinHasValidCheckDigit(): void
+    {
+        self::assertTrue(self::validGtin(TestCityData::GTIN));
+        // Gegenprobe: die frühere GTIN mit falscher Prüfziffer.
+        self::assertFalse(self::validGtin('04048675000017'));
+    }
+
+    /**
+     * GS1 wie auf echten Etiketten: nach 01 (GTIN, feste Länge) nie ein GS; ein GS nur nach der
+     * Charge (10, variable Länge) vor einem weiteren Element. Beide Formen kommen vor (mit einem
+     * Gerät gibt es keinen GS1-Code, daher nur diese beiden Fälle).
+     */
+    #[DataProvider('gs1Variants')]
+    public function testGs1CodesLikeRealLabels(?int $count): void
+    {
+        $plain = 0;
+        $withBatch = 0;
+        foreach (TestCityData::devices(self::TODAY, $count) as $device) {
+            $code = (string) $device->scanCode;
+            if (!str_starts_with($code, '01')) {
+                continue;
+            }
+            self::assertTrue(self::validGtin(substr($code, 2, 14)), $code);
+            self::assertNotSame("\x1D", substr($code, 16, 1), $code);
+            if (preg_match('/\A01\d{14}21[^\x1D]{1,20}\z/', $code) === 1) {
+                $plain++;
+            } elseif (preg_match('/\A01\d{14}10[^\x1D]{1,20}\x1D21[^\x1D]{1,20}\z/', $code) === 1) {
+                $withBatch++;
+            } else {
+                self::fail('Unerwarteter GS1-Code: ' . ScanCode::display($code));
+            }
+        }
+        self::assertGreaterThan(0, $plain);
+        self::assertGreaterThan(0, $withBatch);
+    }
+
+    /**
+     * @return iterable<string, array{?int}>
+     */
+    public static function gs1Variants(): iterable
+    {
+        yield 'ausgesuchte Geräte' => [null];
+        yield '2500 Geräte' => [2500];
+    }
+
+    /** Prüfziffer einer GTIN (Modulo 10, Gewichte 3 und 1 von rechts). */
+    private static function validGtin(string $gtin): bool
+    {
+        if (preg_match('/\A\d{8}(\d{4,6})?\z/', $gtin) !== 1) {
+            return false;
+        }
+        $sum = 0;
+        $digits = strrev(substr($gtin, 0, -1));
+        for ($i = 0; $i < strlen($digits); $i++) {
+            $sum += (int) $digits[$i] * ($i % 2 === 0 ? 3 : 1);
+        }
+
+        return (10 - $sum % 10) % 10 === (int) substr($gtin, -1);
+    }
+
+    /**
+     * @param list<SeedDevice> $devices
+     */
+    private static function scanCode(array $devices, string $identifier): ?string
+    {
+        foreach ($devices as $device) {
+            if ($device->identifier === $identifier) {
+                return $device->scanCode;
+            }
+        }
+        self::fail('Gerät fehlt: ' . $identifier);
     }
 
     #[DataProvider('variants')]

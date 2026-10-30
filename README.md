@@ -1234,6 +1234,38 @@ alle Profile. `npm test` dauerte vorher (alle Profile, ein gemeinsamer Server) i
 danach (Chromium und WebKit, 6 Worker) 85 s: Lint 15,5 s, Vitest 4,8 s, Build 6,7 s, Playwright
 58,0 s.
 
+### Browser-Tests unter Linux (WSL)
+
+GitHub Actions testet unter Linux, lokal läuft Windows. Manches verhält sich dort verschieden
+(z. B. hat Playwright-WebKit unter Windows kein `MediaStream`, unter Linux schon). Tests, deren
+Verhalten vom Betriebssystem abhängen kann, laufen daher vor dem Commit zusätzlich in WSL (Ubuntu).
+
+Einmalig einrichten (in PowerShell; `-u root`, weil `sudo` in WSL ein Passwort verlangt):
+
+```
+wsl -d Ubuntu -u root -- bash -c "apt-get update && apt-get install -y software-properties-common && add-apt-repository -y ppa:ondrej/php && apt-get install -y php8.5-cli php8.5-mbstring php8.5-gd"
+wsl -d Ubuntu -- bash -c "mkdir -p ~/node24 && curl -fsSL https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-x64.tar.xz | tar -xJ -C ~/node24 --strip-components=1"
+```
+
+Arbeitsstand (auch nicht committete Dateien) nach `~/ff` kopieren und prüfen, in WSL im
+Projektordner (`/mnt/d/…/Firefighting-Equipment`), `node_modules` bleibt in `~/ff` für Linux:
+
+```
+export PATH="$HOME/node24/bin:/usr/local/bin:/usr/bin:/bin"
+mkdir -p ~/ff && git ls-files -z -co --exclude-standard | tar --null -T - -cf - | tar -xf - -C ~/ff
+cp -r vendor ~/ff/
+cd ~/ff/frontend && npm ci
+npx playwright install firefox webkit chromium   # einmalig, Systempakete siehe unten
+npm run build
+npx playwright test --config=playwright.all.config.ts tests/e2e/scanner.spec.ts
+```
+
+Die Systempakete der Browser einmalig als root:
+`wsl -d Ubuntu -u root -- bash -c "cd /home/<benutzer>/ff/frontend && PATH=/home/<benutzer>/node24/bin:\$PATH npx playwright install-deps"`.
+Gelöschte Dateien bleiben in `~/ff` liegen; bei Zweifeln `~/ff` außer `frontend/node_modules`
+leeren und neu kopieren. Hält ein automatisches Update von Ubuntu die Paketverwaltung gesperrt
+(„Could not get lock … unattended-upgr“), dessen Ende abwarten.
+
 Updates nach einem Deploy (KONZEPT.md, "Updates der App"): Die App lädt eine neue Version selbst,
 beim nächsten Seitenwechsel bzw. nach dem Speichern eines angefangenen Formulars; Strg+F5 ist nicht
 nötig. Die Kennung des geladenen Builds steht an `<html data-build="…">` (in GitHub Actions der
@@ -1587,8 +1619,9 @@ wird vor dem Verbindungsaufbau abgelehnt (Exit-Code 2).
   Fahrerhaus, Lager Gerätehaus, Kleiderkammer, Atemschutzwerkstatt als Extern) und 60 Geräte
   (Atemschutzmasken M1–M24, Atemschutzgeräte PA 1–PA 12, Funkgeräte HRT 1–HRT 20, Wärmebildkameras
   WBK 1–WBK 4) mit Seriennummer, Hersteller, Modell, Beschaffungsdatum, gemischtem Status, Scan-Codes
-  (Masken: Seriennummer, Atemschutzgeräte: GS1 mit Trennzeichen GS, Funkgeräte: 13 Ziffern; einige
-  ohne Code) und Prüfdaten relativ zu heute (überfällig, in 30 Tagen fällig, später, ohne). Einige
+  (Masken: Seriennummer, Atemschutzgeräte: GS1 wie auf echten Etiketten, also GTIN und Seriennummer
+  ohne Trennzeichen, PA 10–PA 12 zusätzlich mit Charge und Trennzeichen GS danach; Funkgeräte:
+  13 Ziffern; einige ohne Code) und Prüfdaten relativ zu heute (überfällig, in 30 Tagen fällig, später, ohne). Einige
   Geräte liegen auf dem ganzen Fahrzeug (ohne Fach). Sieben Geräte haben einen Verlauf mit 2–3
   Umbuchungen bzw. Statuswechseln, eines (M24) wird ausgesondert.
 - `--devices=ANZAHL` (1–5000) legt stattdessen ANZAHL Geräte T0001 … an (z. B. 2500, um die Suche auf

@@ -1,5 +1,11 @@
 import { expect, meBody, test } from './fixtures';
-import { barcode, cameraCounts, fakeCamera, type BarcodeSymbol } from './support/camera';
+import {
+    barcode,
+    cameraCounts,
+    cameraReleased,
+    fakeCamera,
+    type BarcodeSymbol,
+} from './support/camera';
 import {
     deviceDetail,
     deviceJson,
@@ -16,7 +22,8 @@ import {
 
 const ME = { status: 200, body: meBody('user') } as const;
 const GS = String.fromCharCode(29);
-const GS1_CODE = `0104006381333931${GS}10ABC`;
+/** GS1 wie auf echten Etiketten: GTIN (01, feste Länge) ohne GS, Charge (10, variabel), GS, Serie (21). */
+const GS1_CODE = `010400638133393110ABC${GS}21SN7`;
 
 const DEVICES: Record<string, unknown>[] = [
     deviceJson(1, { identifier: 'M1' }),
@@ -64,7 +71,7 @@ test.describe('Code scannen (lokale Liste)', () => {
 
         await expect(page).toHaveURL(/\/geraete\/5$/);
         await expect(page.getByRole('dialog', { name: 'Code scannen' })).toHaveCount(0);
-        expect(await cameraCounts(page)).toEqual({ opened: 1, stopped: 1 });
+        expect(await cameraCounts(page)).toEqual(cameraReleased(1));
 
         // Der Scanner ersetzt sich durch das Gerät: Zurück führt zu „Suchen“ ohne Scanner.
         await page.getByRole('button', { name: 'Zurück' }).click();
@@ -92,7 +99,7 @@ test.describe('Code scannen (lokale Liste)', () => {
             'UNBEKANNT-9',
         );
         await expect(page.getByRole('button', { name: 'Code scannen' })).toBeFocused();
-        expect(await cameraCounts(page)).toEqual({ opened: 1, stopped: 1 });
+        expect(await cameraCounts(page)).toEqual(cameraReleased(1));
 
         // Tippen blendet den Hinweis aus.
         await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('M1');
@@ -113,7 +120,7 @@ test.describe('Code scannen (lokale Liste)', () => {
         await expect(page).toHaveURL(/\/suchen$/);
         await expect(page.getByRole('dialog', { name: 'Code scannen' })).toHaveCount(0);
         await expect(page.getByRole('searchbox', { name: 'Gerät suchen' })).toHaveValue('M');
-        expect(await cameraCounts(page)).toEqual({ opened: 1, stopped: 1 });
+        expect(await cameraCounts(page)).toEqual(cameraReleased(1));
     });
 
     test('Schließen und Escape; direkt geöffnete Adresse wird ersetzt', async ({ page }) => {
@@ -134,7 +141,7 @@ test.describe('Code scannen (lokale Liste)', () => {
         await page.getByRole('button', { name: 'Code scannen' }).click();
         await dialog.getByRole('button', { name: 'Abbrechen' }).click();
         await expect(dialog).toHaveCount(0);
-        await expect.poll(async () => cameraCounts(page)).toEqual({ opened: 3, stopped: 3 });
+        await expect.poll(async () => cameraCounts(page)).toEqual(cameraReleased(3));
     });
 
     test('Kamera nicht erlaubt: Meldung, erneut versuchen', async ({ page }) => {
@@ -145,6 +152,7 @@ test.describe('Code scannen (lokale Liste)', () => {
         await expect(error).toContainText('Der Zugriff auf die Kamera ist nicht erlaubt.');
         await error.getByRole('button', { name: 'Erneut versuchen' }).click();
         await expect(error).toContainText('Der Zugriff auf die Kamera ist nicht erlaubt.');
+        expect(await cameraCounts(page)).toEqual(cameraReleased(0));
     });
 
     test('ohne Kamera im Browser: Hinweis ohne erneuten Versuch', async ({ page }) => {
@@ -182,6 +190,25 @@ test.describe('Code scannen (lokale Liste)', () => {
                 );
             });
         expect(covers).toBe(true);
+    });
+});
+
+test.describe('Code scannen (Lesemodul nicht ladbar)', () => {
+    test.use({
+        api: { 'GET api/v1/auth/me': ME, 'GET api/v1/devices': devicesEndpoint(DEVICES) },
+        // Meldung zum abgebrochenen Teil des Builds (Firefox nennt das Modul).
+        allowedConsoleError: /Failed to load resource|Loading failed for the module/,
+    });
+
+    test('Kamera war schon offen: Meldung, Kamera aus und gelöst', async ({ page }) => {
+        await fakeCamera(page, { kind: 'blank' });
+        await page.route('**/assets/barcodeReader-*.js', (route) => route.abort());
+        await page.goto('/firefighting/test/suchen');
+        await page.getByRole('button', { name: 'Code scannen' }).click();
+        await expect(page.getByTestId('scanner-error')).toContainText(
+            'Der Scanner konnte nicht geladen werden.',
+        );
+        expect(await cameraCounts(page)).toEqual(cameraReleased(1));
     });
 });
 

@@ -117,9 +117,9 @@ describe('findByCode', () => {
     });
 
     it('GS-Trennzeichen bleiben Teil des Scan-Codes', () => {
-        const list = [device(1, { scan_code: '0104006381333931\u001d10ABC' })];
-        expect(findByCode(list, '0104006381333931\u001d10ABC')?.id).toBe(1);
-        expect(findByCode(list, '010400638133393110ABC')).toBeNull();
+        const list = [device(1, { scan_code: '010400638133393110ABC\u001d21SN7' })];
+        expect(findByCode(list, '010400638133393110ABC\u001d21SN7')?.id).toBe(1);
+        expect(findByCode(list, '010400638133393110ABC21SN7')).toBeNull();
     });
 });
 

@@ -22,7 +22,7 @@ const NOW = new Date('2026-10-29T13:30:00Z');
 
 /** M1 mit allen Stammdaten, Prüfdatum überfällig. */
 const M1 = deviceJson(1, {
-    scan_code: '0104006381333931\u001d21ABC',
+    scan_code: '010400638133393110L42\u001d21ABC',
     serial_number: 'SN-4711',
     manufacturer: 'Dräger',
     model: 'FPS 7000',
@@ -64,7 +64,7 @@ const EVENTS = [
             name: 'scan_code',
             label: 'Scan-Code',
             old: null,
-            new: '0104006381333931\u001d21ABC',
+            new: '010400638133393110L42\u001d21ABC',
         },
     }),
     eventJson(1, {
@@ -130,7 +130,7 @@ test.describe('Details und Verlauf', () => {
 
         await expect(page.getByTestId('master-data').locator('.master-row')).toHaveText([
             /Kennung\s*M1/,
-            /Scan-Code\s*0104006381333931\[GS\]21ABC/,
+            /Scan-Code\s*010400638133393110L42\[GS\]21ABC/,
             /Gerätetyp\s*Atemschutzmaske/,
             /Seriennummer\s*SN-4711/,
             /Hersteller\s*Dräger/,
@@ -159,7 +159,7 @@ test.describe('Details und Verlauf', () => {
         await expect(entries.nth(2)).toContainText('12.10.2026, 10:00');
         await expect(entries.nth(2)).toContainText(/Prüfdatum:\s*keins → 01\.10\.2026/);
         await expect(entries.nth(3)).toContainText(
-            /Scan-Code:\s*leer → 0104006381333931\[GS\]21ABC/,
+            /Scan-Code:\s*leer → 010400638133393110L42\[GS\]21ABC/,
         );
         await expect(entries.nth(4)).toContainText('Angelegt');
         await expect(entries.nth(4)).toContainText('von Gelöschter Benutzer #3');
