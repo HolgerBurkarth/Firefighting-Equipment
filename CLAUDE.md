@@ -612,9 +612,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Prüfung (überfällig rot, bis 30 Tage „bald fällig“ gelb, `dueState`; ausgesonderte nie), Spaltenköpfe
   mit `aria-sort`; unter 768 px Karten mit `AppSelect` „Sortieren nach“ und Knopf für die Richtung.
   „Export (CSV)“: `GET devices/export` mit denselben Filtern und derselben Sortierung
-  (`downloadDeviceExport`, `apiDownload`), Fehler als `ErrorNotice`. Kein Import und kein „Neues
-  Gerät“ (Schritte 6 und 7). Browser-Tests `tests/e2e/devices.spec.ts` (Server-Attrappe
-  `deviceServer` mit Status, Typ, Standort samt Fächern, `q` und Seiten; Download über
+  (`downloadDeviceExport`, `apiDownload`), Fehler als `ErrorNotice`. „Neues Gerät“ (Stadtfarbe)
+  führt zu `geraete/neu`; noch kein Import (Schritt 7). Browser-Tests `tests/e2e/devices.spec.ts`
+  (Server-Attrappe `deviceServer` mit Status, Typ, Standort samt Fächern, `q` und Seiten; Download über
   `MockResponse.text`/`contentType`); Unit-Tests `deviceList.spec.ts`, `adminDeviceList.spec.ts`,
   `client.spec.ts` (`apiDownload`).
 - Gerätedetail der Admin-Konsole (`DeviceDetailPage`, `geraete/<id>/details`, `<id>` wie die
@@ -652,6 +652,30 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   behalten“; gesendet nur Abweichungen (`reinstateRequest`). Browser-Tests
   `tests/e2e/deviceAdmin.spec.ts` (zustandsbehafteter Server je Test über `delegate`, Kamera über
   `fakeCamera`); Unit-Tests `deviceForm.spec.ts`, `deviceAdminApi.spec.ts`, `router.spec.ts`.
+- Neues Gerät der Admin-Konsole (`DeviceNewPage`, `geraete/neu`, Route `device-new`, nur `admin`,
+  `layout: 'admin'`, im Menü unter „Geräte“; KONZEPT.md Entscheidung 32): eine Seite statt eines
+  Fensters (Serienerfassung). Felder Kennung (Fokus beim Öffnen), Gerätetyp und Standort (`AppSelect`
+  mit `placeholder` „Bitte wählen“, nur aktive Typen bzw. aktive Standorte und Fächer unter aktiven
+  Standorten), Status (Radiogruppe, Standard einsatzbereit), Scan-Code (optional; Handscanner,
+  „Mit der Kamera scannen“ als Ansicht `?scannen=1` mit `CodeScanner`, Vorschau „Erkannt: …[GS]…“),
+  nächste Prüfung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz, Kommentar für den
+  Verlauf. Prüfung beim Tippen und Body in `src/data/deviceForm.ts` (`newDeviceProblems`,
+  `newDeviceRequest`: leere optionale Felder weggelassen; ein stehen gebliebener Typ bzw. Standort,
+  der inzwischen deaktiviert bzw. gesperrt ist, gilt als Problem). Anlegen über `createDevice`
+  (`src/data/index.ts`, `postDevice` → `POST devices`, danach Auffrischen wie bei jeder Änderung).
+  „Speichern und nächstes“ (erster Knopf, auch Enter in einem Feld): grüne Meldung „M24 angelegt.“ mit
+  Link „Gerät öffnen“, dann `nextNewDeviceForm`: Gerätetyp, Standort und nächste Prüfung bleiben, die
+  Kennung zählt weiter (`nextIdentifier`: Zahl am Ende + 1, führende Nullen bleiben, M99 → M100;
+  ohne Zahl am Ende leer), alles andere leer, Fokus und Auswahl auf der Kennung. „Speichern“:
+  Bestätigung per `setBookingNotice`, `router.replace` auf das Gerätedetail. Enter im Scan-Code
+  speichert nie (Handscanner senden Enter), sondern führt zum nächsten Feld. 409 `identifier_taken`
+  bzw. `scan_code_taken` am Feld, andere Fehler als `ErrorNotice` (bei `rule_violation` und
+  `invalid_request` laden Typen und Standorte neu); nach einem Fehler Fokus auf das erste Feld mit
+  `aria-invalid`. Ungespeichert (`useUnsavedInput`) = Formular anders als nach dem Öffnen bzw. nach
+  „Speichern und nächstes“. „Zurück“ oben (`.detail-nav`/`.back-link` in `base.css`, auch im
+  Gerätedetail) und „Abbrechen“ (`goBack`, sonst `geraete`). Unter 768 px eine Spalte, Knöpfe volle
+  Breite. Browser-Tests `tests/e2e/deviceNew.spec.ts` (simulierter `POST devices` ab ID 100);
+  Unit-Tests `deviceForm.spec.ts`, `deviceAdminApi.spec.ts`, `router.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und

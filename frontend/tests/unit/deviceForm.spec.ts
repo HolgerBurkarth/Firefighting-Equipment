@@ -4,14 +4,21 @@ import {
     editFormChanges,
     editFormFromDevice,
     editFormProblems,
+    emptyNewDeviceForm,
     identifierProblem,
+    newDeviceProblems,
+    newDeviceRequest,
+    nextIdentifier,
+    nextNewDeviceForm,
     parseDateInput,
     rebaseEditForm,
     reinstateFormFromDevice,
     reinstateRequest,
+    sameNewDeviceForm,
     scanCodeProblem,
     textProblem,
     textValue,
+    type NewDeviceForm,
 } from '../../src/data/deviceForm';
 import { detail } from './support/devices';
 
@@ -213,5 +220,133 @@ describe('Wieder aufnehmen', () => {
         const without = detail(6, { status: 'retired', status_label: 'ausgesondert' });
         const form = { ...reinstateFormFromDevice(without), keepScanCode: false };
         expect(reinstateRequest(without, form, '')).toEqual({ version: 1, status: 'ready' });
+    });
+});
+
+describe('Neues Gerät', () => {
+    function filled(overrides: Partial<NewDeviceForm> = {}): NewDeviceForm {
+        return {
+            ...emptyNewDeviceForm(),
+            identifier: 'M24',
+            deviceTypeId: 1,
+            locationId: 11,
+            ...overrides,
+        };
+    }
+
+    it('leeres Formular: Kennung, Gerätetyp und Standort fehlen, sonst nichts', () => {
+        expect(newDeviceProblems(emptyNewDeviceForm())).toEqual({
+            identifier: 'Bitte eine Kennung eingeben.',
+            deviceTypeId: 'Bitte einen Gerätetyp wählen.',
+            locationId: 'Bitte einen Standort wählen.',
+        });
+        expect(newDeviceProblems(filled())).toEqual({});
+    });
+
+    it('Scan-Code ist freiwillig, aber geprüft wie ScanCode', () => {
+        expect(newDeviceProblems(filled({ scanCode: '  \t' }))).toEqual({});
+        expect(newDeviceProblems(filled({ scanCode: `A${TAB}B` })).scanCode).toContain(
+            'Steuerzeichen',
+        );
+    });
+
+    it('prüft Texte und beide Daten', () => {
+        expect(
+            Object.keys(
+                newDeviceProblems(
+                    filled({
+                        serialNumber: 'x'.repeat(101),
+                        nextInspectionDue: '31.02.2027',
+                        procuredOn: '1949-12-31',
+                        note: `a${TAB}b`,
+                    }),
+                ),
+            ),
+        ).toEqual(['nextInspectionDue', 'serialNumber', 'procuredOn', 'note']);
+    });
+
+    it('Body nur mit Pflichtfeldern und Werten (leer = weggelassen)', () => {
+        expect(newDeviceRequest(filled({ identifier: '  M   24 ', serialNumber: '  ' }))).toEqual({
+            identifier: 'M 24',
+            deviceTypeId: 1,
+            locationId: 11,
+            status: 'ready',
+        });
+        expect(
+            newDeviceRequest(
+                filled({
+                    status: 'maintenance',
+                    scanCode: ` 0104006381333931${GS}21SN7\r\n`,
+                    serialNumber: ' SN-1 ',
+                    manufacturer: 'Dräger',
+                    model: 'FPS 7000',
+                    procuredOn: '01.03.2020',
+                    nextInspectionDue: '2027-03-01',
+                    note: 'Zeile 1\r\nZeile 2',
+                    comment: 'Erst-\nbefüllung',
+                }),
+            ),
+        ).toEqual({
+            identifier: 'M24',
+            deviceTypeId: 1,
+            locationId: 11,
+            status: 'maintenance',
+            scanCode: `0104006381333931${GS}21SN7`,
+            serialNumber: 'SN-1',
+            manufacturer: 'Dräger',
+            model: 'FPS 7000',
+            procuredOn: '2020-03-01',
+            nextInspectionDue: '2027-03-01',
+            note: 'Zeile 1\nZeile 2',
+            comment: 'Erst- befüllung',
+        });
+    });
+
+    it('ohne Gerätetyp oder Standort kein Body', () => {
+        expect(() => newDeviceRequest(filled({ locationId: null }))).toThrow();
+    });
+
+    it.each([
+        ['M24', 'M25'],
+        ['M9', 'M10'],
+        ['M99', 'M100'],
+        ['PA 009', 'PA 010'],
+        ['007', '008'],
+        ['HLF 20 / G1', 'HLF 20 / G2'],
+        ['2026-09', '2026-10'],
+        [' M   24 ', 'M 25'],
+        ['M', null],
+        ['M24a', null],
+        ['', null],
+        [`${'X'.repeat(28)}99`, null],
+    ])('nextIdentifier(„%s“) = %s', (identifier, next) => {
+        expect(nextIdentifier(identifier)).toBe(next);
+    });
+
+    it('Speichern und nächstes: Typ, Standort und Prüfdatum bleiben, Kennung zählt weiter', () => {
+        const saved = filled({
+            status: 'defective',
+            scanCode: 'ABC',
+            nextInspectionDue: '2027-03-01',
+            serialNumber: 'SN',
+            manufacturer: 'Dräger',
+            model: 'FPS',
+            procuredOn: '2020-01-01',
+            note: 'Notiz',
+            comment: 'Kommentar',
+        });
+        expect(nextNewDeviceForm(saved)).toEqual({
+            ...emptyNewDeviceForm(),
+            identifier: 'M25',
+            deviceTypeId: 1,
+            locationId: 11,
+            nextInspectionDue: '2027-03-01',
+        });
+        expect(nextNewDeviceForm(filled({ identifier: 'Reserve' })).identifier).toBe('');
+    });
+
+    it('sameNewDeviceForm vergleicht alle Felder', () => {
+        expect(sameNewDeviceForm(filled(), filled())).toBe(true);
+        expect(sameNewDeviceForm(filled(), filled({ comment: 'x' }))).toBe(false);
     });
 });

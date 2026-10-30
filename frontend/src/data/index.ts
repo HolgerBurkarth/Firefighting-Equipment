@@ -1,6 +1,7 @@
 import type { ApiResult } from '../api/client';
 import {
     conflictDevice,
+    postDevice,
     postDeviceFields,
     postInspectionDue,
     postReinstate,
@@ -8,6 +9,7 @@ import {
     type DeviceActionBase,
     type DeviceDetail,
     type DeviceFieldChanges,
+    type NewDeviceRequest,
     type ReinstateRequest,
 } from '../api/devices';
 import {
@@ -144,6 +146,11 @@ function afterDeviceChange(result: ApiResult<DeviceDetail>): ApiResult<DeviceDet
     }
     void adminDeviceList.refresh('changed');
     return result;
+}
+
+/** Neues Gerät (Admin); die Listen laden danach neu wie bei jeder Änderung. */
+export async function createDevice(request: NewDeviceRequest): Promise<ApiResult<DeviceDetail>> {
+    return afterDeviceChange(await postDevice(request));
 }
 
 /** Stammdaten ändern (Admin; nur die angegebenen Felder). */

@@ -254,6 +254,21 @@ onMounted(() => {
         <button class="btn" type="button" :disabled="exporting" @click="exportList">
             {{ exporting ? 'Export läuft …' : 'Export (CSV)' }}
         </button>
+        <RouterLink class="btn btn-accent" :to="{ name: 'device-new' }">
+            <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                aria-hidden="true"
+            >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+            </svg>
+            Neues Gerät
+        </RouterLink>
     </div>
 
     <BookingNoticeMessage v-if="bookingNotice !== null" :notice="bookingNotice" />

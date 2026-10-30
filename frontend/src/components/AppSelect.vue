@@ -32,6 +32,8 @@ defineProps<{
     options: readonly SelectOption[];
     /** Beschriftung nur für Bildschirmleser (z. B. „Sortieren“ neben einem sichtbaren Hinweis). */
     hideLabel?: boolean;
+    /** Text, solange nichts gewählt ist (Wert ''). */
+    placeholder?: string;
 }>();
 const value = defineModel<string>({ required: true });
 const labelId = useId();
@@ -44,7 +46,7 @@ const labelId = useId();
         }}</span>
         <SelectRoot v-model="value">
             <SelectTrigger class="select-trigger" :aria-labelledby="labelId">
-                <SelectValue class="select-value" />
+                <SelectValue class="select-value" :placeholder="placeholder ?? ''" />
                 <SelectIcon class="select-icon" aria-hidden="true">▾</SelectIcon>
             </SelectTrigger>
             <SelectPortal>
