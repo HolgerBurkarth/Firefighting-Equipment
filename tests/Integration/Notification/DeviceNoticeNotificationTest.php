@@ -54,7 +54,15 @@ final class DeviceNoticeNotificationTest extends DeviceApiTestCase
         self::assertStringContainsString("Gewünscht: Standort Lager, Status in Wartung\nKommentar: Ventil klemmt\n", $mail->text);
         self::assertStringContainsString("Überschriebener Stand:\nWer: Kommandant (admin@example.org)\nAktionszeit: ", $mail->text);
         self::assertStringContainsString("Stand: HLF 20 / G1, defekt\n", $mail->text);
-        self::assertStringContainsString("\n" . self::BASE_URL . "/firefighting/immendingen/\n", $mail->text);
+        self::assertStringContainsString(
+            "\nBitte prüfen und den Hinweis in der Anwendung erledigen:\n\n"
+            . self::BASE_URL . '/firefighting/immendingen/protokoll/' . $json['result']['notice_id'] . "\n\nSie erhalten",
+            $mail->text,
+            'Admins: Link auf den Hinweis',
+        );
+        $superAdminMail = $this->mailer->sent[2];
+        self::assertStringNotContainsString('http', $superAdminMail->text, 'Super-Admins: kein Link');
+        self::assertStringContainsString("\nDen Hinweis prüfen und erledigen die Admins der Stadt in der Anwendung.\n\nSie erhalten", $superAdminMail->text);
         self::assertStringNotContainsString('<', $mail->text);
         self::assertStringNotContainsString('Vorgang:', $mail->text);
         foreach (explode("\n", $mail->text) as $line) {

@@ -382,6 +382,9 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
 36. **Links in Mails** (T6): Log-Mails verlinken für Admins direkt auf `geraete/<id>/details`,
     Hinweis-Mails auf `protokoll/<id>`; Super-Admins erhalten keinen Link auf ein Gerät (sie sehen
     keine Geräte). Die Mail „Neue Registrierung wartet auf Freischaltung“ verlinkt auf `benutzer`.
+    Umgesetzt in Schritt 5: Super-Admins erhalten in Log- und Hinweis-Mails gar keinen Link, die
+    Sammelmail eines CSV-Imports verlinkt auf `geraete`. Bis die Seiten Benutzer und Protokoll da
+    sind, führen `benutzer` und `protokoll/<id>` auf das Dashboard.
 37. **Logo:** Die App bringt jedes Bild (PNG, JPG, SVG …) selbst auf 512 × 512 PNG (quadratisch, mit
     Rand) und zeigt die Vorschau per Canvas; der Server prüft weiter genau 512 × 512.
 38. **Live-Test der Benutzerverwaltung** (Test-Stadt): „Freischalten“ mit dem vorhandenen Konto

@@ -48,7 +48,7 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
 
     public function testCreateNotifiesAdminsOfTenantAndSuperAdminsButNotTheActor(): void
     {
-        $this->createViaApi('MA-01', ['comment' => 'Neu beschafft']);
+        $id = $this->createViaApi('MA-01', ['comment' => 'Neu beschafft'])['id'];
 
         self::assertSame(['log-admin@example.org', 'chef@example.org'], $this->recipients());
         self::assertSame([2], $this->mailer->batches, 'eine Sammlung, also eine SMTP-Verbindung');
@@ -56,8 +56,13 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         self::assertSame(self::SUBJECT_PREFIX . 'MA-01 angelegt', $mail->subject);
         self::assertStringContainsString("Vorgang: Angelegt\nGerät: MA-01 (Atemschutzmaske)\nWer: Kommandant\nWann: ", $mail->text);
         self::assertStringContainsString("Standort: HLF 20 / G1\nStatus: einsatzbereit\nKommentar: Neu beschafft\n", $mail->text);
-        self::assertStringContainsString("\n" . self::BASE_URL . "/firefighting/immendingen/\n", $mail->text);
+        self::assertStringContainsString(
+            "\nZum Gerät in der Anwendung:\n\n" . self::BASE_URL . "/firefighting/immendingen/geraete/{$id}/details\n\nSie erhalten",
+            $mail->text,
+            'Admins: Link auf das Gerätedetail',
+        );
         self::assertMatchesRegularExpression('/Wann: \d\d\.\d\d\.\d{4} um \d\d:\d\d Uhr/', $mail->text);
+        self::assertNoLink($this->mailer->sent[1]);
         self::assertSame([], $this->log);
     }
 
@@ -165,6 +170,11 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         self::assertStringContainsString('Zeile 2: MA-01 geändert: Standort HLF 20 / G1 → Lager, Status einsatzbereit → defekt', $mail->text);
         self::assertStringContainsString('Zeile 3: MA-02 neu: ', $mail->text);
         self::assertStringContainsString('Zeile 4: MA-03 neu: ', $mail->text);
+        self::assertStringContainsString(
+            "\nZur Geräteliste in der Anwendung:\n\n" . self::BASE_URL . "/firefighting/immendingen/geraete\n\nSie erhalten",
+            $mail->text,
+        );
+        self::assertNoLink($this->mailer->sent[1]);
     }
 
     public function testImportMailListsAtMostFiftyRows(): void
@@ -259,5 +269,16 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
     private function recipients(): array
     {
         return array_map(static fn (MailMessage $m): string => $m->to->value, $this->mailer->sent);
+    }
+
+    /**
+     * Super-Admins sehen keine Geräte: ihre Log-Mail hat keinen Link (die Fußzeile bleibt).
+     */
+    private static function assertNoLink(MailMessage $mail): void
+    {
+        self::assertSame('chef@example.org', $mail->to->value);
+        self::assertStringNotContainsString('http', $mail->text);
+        self::assertStringNotContainsString('in der Anwendung:', $mail->text);
+        self::assertMatchesRegularExpression('/\n\nSie erhalten diese E-Mail, weil/', $mail->text);
     }
 }

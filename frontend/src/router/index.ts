@@ -149,6 +149,16 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             component: () => import('../pages/DeviceDetailPage.vue'),
             meta: { roles: ['admin'], layout: 'admin' },
         });
+        // Ziele der Mail-Links (AppUrls::users, AppUrls::notice). Bis die Seiten Benutzer und
+        // Protokoll kommen (Admin-Konsole, Schritte 8 und 12), führen sie auf das Dashboard mit den
+        // Zählern für Freischaltungen und offene Hinweise, statt auf „Seite nicht gefunden“.
+        routes.push({ path: '/benutzer', name: 'users', redirect: { name: 'dashboard' } });
+        routes.push({ path: '/protokoll', name: 'notices', redirect: { name: 'dashboard' } });
+        routes.push({
+            path: '/protokoll/:id([1-9]\\d{0,17})',
+            name: 'notice',
+            redirect: { name: 'dashboard' },
+        });
     }
     routes.push({
         path: '/:pathMatch(.*)*',

@@ -1269,8 +1269,9 @@ eines abgebrochenen Laufs), scheitern die Tests mit „… is already used“; d
 beenden.
 
 Lokal prüfen `npm test` und `npm run test:e2e` nur Chromium und WebKit; Firefox und die
-Handy-Profile prüft vor allem GitHub Actions (dort immer alle fünf), lokal bei Bedarf
-`npm run test:e2e:all`. `npm run test:load` wiederholt Tests unter Last (Optionen `--runs=N`,
+Handy-Profile prüft vor allem GitHub Actions (dort immer alle fünf, aufgeteilt auf vier Jobs), lokal
+bei Bedarf `npm run test:e2e:all`. Einzelne Dateien: `npm run test:e2e -- tests/e2e/search.spec.ts`
+bzw. `npm run test:e2e:all -- tests/e2e/search.spec.ts`. `npm run test:load` wiederholt Tests unter Last (Optionen `--runs=N`,
 `--project=…`, `--repeat-each=N`) und legt jeden Durchgang in `test-results/load/<Zeit>-<n>` ab;
 der nächste normale Lauf leert `test-results/`.
 
@@ -1359,6 +1360,30 @@ und Frontend. Nur nach einem grünen Lauf auf `main` legt der Job `deploy` Code 
 `deploy` ab; auf den Server kommt er von Hand ("Deployment"). Die Versionen der Actions hält
 Dependabot aktuell (wöchentlicher Pull Request "CI: …", nach grünem Lauf mergen).
 
+Ändert ein Push nur `.md`-Dateien (README, CLAUDE.md, `docs/`), läuft der Workflow nicht und
+`deploy` bleibt, wie er ist; der nächste Push mit Code nimmt die Dokumentation mit.
+
+Die Jobs laufen parallel:
+
+| Job                    | Inhalt                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| PHP-Tests              | `composer test` mit MariaDB 10.11                                               |
+| Lint und Vitest        | `npm run lint`, `npm run test:unit`                                             |
+| Typprüfung und Build   | `npm run build`, Build als Artefakt `frontend-dist`                             |
+| Browser-Tests (Teil n) | nach dem Build: ein Viertel der Browser-Tests (alle fünf Profile, `--shard`)    |
+| Bericht                | nach den Browser-Tests: Teilberichte zu einem HTML-Bericht `playwright-report`  |
+| deploy                 | nur auf `main`, wenn alle Tests grün sind: Code plus genau den getesteten Build |
+
+Bei einem Fehler: Artefakt `playwright-report` herunterladen, entpacken und mit
+`npx playwright show-report <ordner>` öffnen (Traces der gescheiterten Tests sind darin); die
+Rohdaten je Teil stehen in `playwright-traces-<n>`. npm, Composer und die Playwright-Browser liegen
+im Cache von GitHub Actions.
+
+`composer test` läuft auch in CI in einem Prozess, nicht parallel (z. B. paratest): Getrennte
+Testdatenbanken je Prozess bräuchten das Recht `CREATE DATABASE` und für die Tests der
+Kommandozeile je Prozess eine Kopie der Zugangsdaten auf der Platte; der PHP-Job ist zudem nicht
+der längste.
+
 ### Branch deploy schützen
 
 Ruleset auf GitHub, damit `deploy` weder gelöscht noch per Force-Push überschrieben werden kann. Den
@@ -1403,9 +1428,9 @@ Auf dem Server immer `php85` statt `php` verwenden. Regeln für Migrationen steh
 
 Ablauf: `main` → GitHub Actions (alle Tests) → Branch `deploy` → Deploy von Hand.
 
-1. Lokal alle Tests grün (`composer test`, in `frontend/` `npm test`), committen, nach `main`
-   pushen.
-2. GitHub Actions (Workflow "CI") testet PHP und Frontend. Nur wenn alles grün ist, legt der Job
+1. Lokal die betroffenen Tests grün (Regeln in `CLAUDE.md`, "Arbeitsweise"), committen, nach
+   `main` pushen.
+2. GitHub Actions (Workflow "CI") testet PHP und Frontend vollständig. Nur wenn alles grün ist, legt der Job
    `deploy` Code plus Frontend-Build (`frontend/dist`) als neuen Commit im Branch `deploy` ab
    ("Deploy <commit>: <Betreff>"). Prüfen unter "Actions" auf GitHub.
 3. Auf dem Server per SSH:

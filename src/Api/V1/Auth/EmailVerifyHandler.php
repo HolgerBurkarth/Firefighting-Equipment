@@ -64,7 +64,7 @@ final readonly class EmailVerifyHandler implements RequestHandler
             $context->notifier()->send(
                 'registration_pending',
                 $admin->id,
-                static fn (): MailMessage => MailTemplates::registrationPending($admin, $tenant, $registered, $context->urls->area($tenant)),
+                static fn (): MailMessage => MailTemplates::registrationPending($admin, $tenant, $registered, $context->urls->users($tenant)),
             );
         }
 

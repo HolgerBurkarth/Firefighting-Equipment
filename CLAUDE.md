@@ -9,8 +9,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Alle Antworten an den Nutzer immer auf Deutsch, auch Zwischenstände und Rückfragen.
 - In kleinen Schritten arbeiten. Vor größeren Änderungen erst einen Plan vorlegen.
 - Wünsche für später stehen in `docs/TODO-SPAETER.md`; nicht vorziehen, neue Wünsche dort ergänzen.
-- Bestehende Funktionen dürfen nicht kaputtgehen: Jede Änderung bekommt Tests,
-  vor jedem Commit müssen alle Tests grün sein.
+- Bestehende Funktionen dürfen nicht kaputtgehen: Jede Änderung bekommt Tests, vor jedem Commit
+  müssen die Prüfungen der folgenden Regel grün sein; den vollständigen Lauf macht CI, deployt wird
+  nur nach grünem CI-Lauf.
 - Agenten committen und pushen nie; das macht der Nutzer.
 - Während Prüfläufe laufen (z. B. mehrere Testläufe im Hintergrund), keine Testdateien und keinen
   getesteten Code ändern oder anlegen: Die Läufe lesen sie neu ein, das Ergebnis wäre verfälscht.
@@ -22,15 +23,25 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Datum, Commit-Betreff, was und warum, Tests), damit der Backend-Chat sie kennt. Als Betreff trägt
   der Agent gleich den Commit-Betreff ein, den er in der „✅ FERTIG“-Nachricht vorschlägt (nicht
   „noch nicht committet“); der Nutzer verwendet ihn.
-- Hängt eine Änderung von Bildschirmbreite oder Browser ab (Layout, Leisten, Touch, Kamera, Service
-  Worker), vor „✅ FERTIG“ zusätzlich in `frontend/` `npm run test:e2e:all` (alle fünf Profile, auch
-  Firefox und Handy-Breite) laufen lassen; `npm test` prüft lokal nur Chromium und WebKit in
-  PC-Breite. Tests, deren Erwartung von der Breite abhängt, setzen sie ausdrücklich
-  (`page.setViewportSize`).
+- Prüfen vor „✅ FERTIG“ (lokal nur das Nötige, den vollständigen Lauf aller Tests in allen fünf
+  Profilen macht CI, siehe "GitHub Actions (CI)"):
+  - Frontend geändert: in `frontend/` `npm run lint`, `npm run typecheck`, `npm run test:unit` und
+    die betroffenen Browser-Testdateien in Chromium und WebKit (`npm run build`, dann
+    `npm run test:e2e -- tests/e2e/<datei>.spec.ts`; betroffen sind die Dateien der geänderten
+    Seiten, Bausteine und Testhilfen).
+  - Hängt eine Änderung von Bildschirmbreite oder Browser ab (Layout, Leisten, Touch, Kamera,
+    Service Worker), diese Dateien zusätzlich in allen fünf Profilen (`npm run test:e2e:all --
+    tests/e2e/<datei>.spec.ts`, auch Firefox und Handy-Breite). Tests, deren Erwartung von der
+    Breite abhängt, setzen sie ausdrücklich (`page.setViewportSize`).
+  - PHP geändert (`src/`, `bin/`, `tests/`, `migrations/`, `resources/`, `scripts/`, `composer.*`):
+    `composer test`. Sonst nicht nötig; Ausnahme: Wer die Regeln für Stadt-Kürzel in README oder
+    CLAUDE.md ändert, lässt `composer test -- --filter SlugRulesDocumentationTest` laufen (CI läuft
+    bei reinen `.md`-Änderungen nicht).
 - Kann sich ein Browser-Test je Betriebssystem anders verhalten (z. B. Kamera und Medien,
   Testattrappen mit Browser-Objekten, Dateien, Prozesse und Ports, Schriften; CI läuft unter Linux,
-  lokal Windows), vor „✅ FERTIG“ zusätzlich unter Linux (WSL) laufen lassen, mindestens die
-  betroffenen Dateien in allen fünf Profilen (README "Browser-Tests unter Linux (WSL)").
+  lokal Windows), vor „✅ FERTIG“ zusätzlich unter Linux (WSL) laufen lassen, nur die betroffenen
+  Dateien, in allen fünf Profilen (README "Browser-Tests unter Linux (WSL)"); bei anderen
+  Änderungen kein Lauf unter WSL.
   Attrappen und Testhilfen gehen in allen Browsern und Systemen denselben Weg der App, keine
   Sonderwege je Betriebssystem.
 - Status von Nachrichten an den Nutzer – jede Nachricht beginnt mit genau einer Kennzeichnung:
@@ -679,7 +690,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Ergebnis des Backends), geprüft von `InvitationCodeCasesTest` (PHPUnit) und `invitationCode.spec.ts`
   (Vitest, gleicht auch `ALPHABET`, `LENGTH`, `MAX_INPUT_LENGTH` ab); Änderungen an
   `InvitationCodeValue` daher immer mit dem Frontend und neuen Fällen. Seiten der Mail-Links
-  (`AppUrls::*_PAGE`) muss es im Router geben (`appUrlsPages.spec.ts`). `email-bestaetigen` sendet
+  (`AppUrls::*_PAGE`, auch `geraete/<id>/details` und `protokoll/<id>`) muss es im Router geben
+  (`appUrlsPages.spec.ts`). `benutzer`, `protokoll` und `protokoll/<id>` (Routen `users`, `notices`,
+  `notice`) leiten vorerst auf `dashboard` weiter (Zähler für Freischaltungen und offene Hinweise),
+  bis die Seiten Benutzer und Protokoll kommen (Admin-Konsole, Schritte 8 und 12); Tests in
+  `router.spec.ts` und `adminConsole.spec.ts`. `email-bestaetigen` sendet
   das Token erst per Knopf (Virenscanner öffnen Links vorab).
 - `einladung-annehmen` (`InvitationAcceptPage`, neue Admins): Name und Passwort (Live-Prüfung mit
   Name und Stadt, die E-Mail kennt nur der Server); danach keine Sitzung, sondern Anmeldung mit
@@ -765,8 +780,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   sonst `dev`; nur `A-Za-z0-9._-`, 1–40) an `<html data-build>`; derselbe Stand ergibt denselben
   Build.
 - Befehle (in `frontend/`): `npm ci`, einmalig `npx playwright install chromium firefox webkit`;
-  `npm test` (ESLint + Prettier, Vitest, `vue-tsc` + Build, Playwright) muss vor jedem Commit grün
-  sein. Einzeln: `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test:unit`,
+  `npm test` (ESLint + Prettier, Vitest, `vue-tsc` + Build, alle Browser-Tests in Chromium und
+  WebKit); was vor „✅ FERTIG“ lokal laufen muss, steht unter "Arbeitsweise". Einzeln: `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test:unit`,
   `npm run build`, `npm run test:e2e` (braucht den Build; lokal nur Chromium und WebKit),
   `npm run test:e2e:all` (alle fünf Profile, `playwright.all.config.ts`), `npm run test:load`
   (Lastläufe, siehe unten). Entwicklung: `npm run dev`
@@ -774,9 +789,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   ändernde Anfragen `http://localhost:5173` in `http.allowed_origins`).
 - Browser-Tests (Playwright: Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build,
   ausgeliefert von PHP (`php -q -S localhost:<port> public/index.php`), also mit echter CSP und
-  echtem Caching. Profile: in CI (`CI` gesetzt) alle fünf, lokal mit `npm test`/`npm run test:e2e`
-  nur `chromium` und `webkit` (`LOCAL_PROJECTS` in `playwright.config.ts`); Firefox und die
-  Handy-Profile prüft vor allem CI, lokal `npm run test:e2e:all`. Server: Jeder Playwright-Worker
+  echtem Caching. Profile: in CI (`CI` gesetzt) alle fünf, aufgeteilt auf vier Jobs (`--shard`,
+  Reporter `blob`, zusammengeführt mit `playwright merge-reports`; siehe "GitHub Actions (CI)"),
+  lokal mit `npm test`/`npm run test:e2e` nur `chromium` und `webkit` (`LOCAL_PROJECTS` in
+  `playwright.config.ts`, Reporter `list`); Firefox und die Handy-Profile prüft vor allem CI, lokal
+  `npm run test:e2e:all`. Server: Jeder Playwright-Worker
   startet eigene (Worker-Fixtures `appServer`, `updateServer` in `tests/e2e/fixtures.ts`,
   `tests/e2e/support/phpServer.ts`): Ports `4173 + 2 × parallelIndex` (App) und eins darüber
   (Update-Testserver, nur gestartet, wenn ein Test ihn braucht); `baseURL` kommt aus dem Fixture,
@@ -1295,7 +1312,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Konto nicht `unverified` oder gesperrt, andere Stadt) → 400 `invalid_token`, zählt in die Bremse.
   `UserRepository::verifyEmail` löst den Link ein und setzt `pending` (eine Transaktion). Danach
   Mail "Neue Registrierung wartet auf Freischaltung" an jeden aktiven, nicht gesperrten Admin der
-  Stadt (`listActiveAdmins`).
+  Stadt (`listActiveAdmins`) mit Link auf die Benutzerverwaltung (`AppUrls::users`, `benutzer`).
 - `POST auth/email/resend {email}`: immer 202 mit derselben Meldung (Mindestdauer 1,5 s); Mail nur an
   Konten der Stadt mit `unverified`, nicht gesperrt; neuer Link ersetzt den alten.
 - Bremse (`RegistrationThrottle`): `register` höchstens 10 ungültige Codes je IP-Präfix in 15 Minuten,
@@ -1771,6 +1788,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Vorgang (eine Mail je Anfrage). Betreff „Log <Stadt>: Hinweis – <Kennung> <Grund>“
   (`NoticeKind::subjectReason`). Text: Art, Gerät, Buchung (Wer mit E-Mail in Klammern, Aktionszeit,
   Eingang, Wunsch, Kommentar aus dem Ereignis), anderer Stand, ggf. „alte Buchung nach Rückfrage“.
+  Link für Admins auf den Hinweis (`AppUrls::notice`, `protokoll/<id>`); Super-Admins ohne Link,
+  stattdessen „Den Hinweis prüfen und erledigen die Admins der Stadt in der Anwendung.“
 
 ## Prüffristen und Zusammenfassung (API)
 - Nur unter Städten (unter `service` 404), beide `Access::Authenticated` (in
@@ -1969,9 +1988,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Geräte keine Mail).
 - Betreff „Log <Stadtname>: <Grund>“ (z. B. „MA-01 umgebucht, Status defekt“, „CSV-Import: 2 neu,
   1 geändert“, höchstens 200 Zeichen). Text: Vorgang, Gerät (Kennung, Typ), Wer (Anzeigename), Wann
-  (Europe/Berlin), Von/Nach je Ereignis, Kommentar, Link `AppUrls::area` (Startseite der Stadt; der
-  Link direkt auf `geraete/<id>` folgt mit der Admin-Konsole, `docs/TODO-SPAETER.md` T6). Werte einzeilig, höchstens 200 Zeichen, Trennzeichen eines
-  Scan-Codes sichtbar (`ScanCode::display`).
+  (Europe/Berlin), Von/Nach je Ereignis, Kommentar, Link (KONZEPT.md "Admin-Konsole –
+  Entscheidungen", 36; `DeviceLogNotifier::linkFor`): für Admins auf das Gerätedetail
+  (`AppUrls::deviceDetails`, `geraete/<id>/details`), beim CSV-Import auf die Geräteliste
+  (`AppUrls::devices`, `geraete`); Super-Admins sehen keine Geräte und erhalten keinen Link (der
+  Absatz entfällt, `MailTemplates` mit `null`). Werte einzeilig, höchstens 200 Zeichen, Trennzeichen
+  eines Scan-Codes sichtbar (`ScanCode::display`).
 - Versand über `Notifier::sendMany` (Zweck `device_log`; Fehler nur im Protokoll, der Vorgang ist
   bereits gespeichert; Hinweis-Mails mit Zweck `device_notice`, siehe "Hinweise (API)"). Begrenzung:
   höchstens `MAX_RECIPIENTS` = 25 Empfänger (zuerst Admins der
@@ -2099,24 +2121,49 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 ## GitHub Actions (CI)
 - Workflow `.github/workflows/ci.yml` bei jedem Push auf `main`, bei Pull Requests und von Hand
   (`workflow_dispatch`). Standardrecht `contents: read`; nur der Job `deploy` hat `contents: write`.
+- Ändert ein Push bzw. Pull Request nur `.md`-Dateien (`paths-ignore: '**/*.md'`), läuft kein
+  Workflow; `deploy` bleibt dann unverändert, der nächste Lauf mit Code nimmt die Dokumentation mit.
+  Tests, die `.md`-Dateien lesen (`SlugRulesDocumentationTest`), laufen daher erst mit dem nächsten
+  Code-Push (siehe "Arbeitsweise").
+- Jobs (parallel, Ziel unter 6 Minuten je Lauf): `php`, `frontend-checks` (Lint, Vitest),
+  `frontend-build` (Typprüfung und Build) und nach dem Build `e2e` (Browser-Tests in vier Teilen),
+  danach `e2e-report` (Bericht) und `deploy`.
 - Job `php`: Ubuntu 24.04, PHP 8.5 mit den Erweiterungen von STRATO (ohne intl/sodium),
   Service-Container `mariadb:10.11` mit Datenbank `firefighting_test`; die Workflow-Datei schreibt
   `config/config.test.php` mit Wegwerf-Zugangsdaten nur für diesen Container (keine echten
   Zugangsdaten, keine Secrets). `innodb_flush_log_at_trx_commit = 2` nur dort. `mariadb-client`
   (mysqldump wie auf dem Server), dann `composer validate --strict`, `composer install`,
   `composer test`. Unter Linux laufen auch die Tests der Unix-Dateirechte und mit mysqldump.
-- Job `frontend`: PHP (für `php -S` in den Browser-Tests) und Node aus `frontend/.nvmrc`; `npm ci`,
-  `npm run lint`, `npm run test:unit`, `npm run build`, Playwright mit Chromium, Firefox, WebKit
-  (alle fünf Profile, weil `CI` gesetzt ist).
-  Der getestete Build wird als Artefakt `frontend-dist` hochgeladen (bei Fehlern zusätzlich der
-  Playwright-Bericht mit `playwright-report/` und `test-results/`, darin die Traces gescheiterter
-  Tests: `trace: 'retain-on-failure'` in `playwright.config.ts`).
+  `composer test` läuft bewusst in EINEM Prozess (kein paratest): Getrennte Testdatenbanken je
+  Prozess bräuchten das Recht `CREATE DATABASE` und für die Tests der Kommandozeile (sie erhalten
+  den Pfad von `config/config.test.php`) je Prozess eine Kopie der Zugangsdaten auf der Platte; der
+  Job liegt zudem nicht auf dem längsten Weg des Laufs. Neu bewerten, wenn er der längste Job wird.
+- Job `frontend-checks`: Node aus `frontend/.nvmrc`, `npm ci`, `npm run lint`, `npm run test:unit`.
+- Job `frontend-build`: `npm ci`, `npm run build` (mit `vue-tsc`); lädt den Build als Artefakt
+  `frontend-dist` hoch. Genau dieser Build wird in `e2e` getestet und kommt nach `deploy`.
+- Job `e2e` (Matrix `shard` 1–4, `fail-fast: false`, braucht `frontend-build`): PHP (für `php -S`),
+  `composer install --no-dev`, `npm ci`, Artefakt `frontend-dist` nach `frontend/dist`, dann
+  `npm run test:e2e -- --shard=<n>/<anzahl>` (alle fünf Profile, weil `CI` gesetzt ist; Anzahl aus
+  `strategy.job-total`, mehr Teile nur über die Liste `shard`). `globalSetup` baut die zweite
+  Version für die Update-Tests in jedem Teil selbst (rund 7 s). Reporter in CI `github` und `blob`
+  (`playwright.config.ts`): Teilbericht als Artefakt `blob-report-<n>` (1 Tag), bei Fehlern
+  zusätzlich `test-results/` als `playwright-traces-<n>` (7 Tage, Traces gescheiterter Tests:
+  `trace: 'retain-on-failure'`).
+- Job `e2e-report` (nach `e2e`, auch wenn Tests scheitern, nicht nach Abbruch): führt die
+  Teilberichte mit `npx playwright merge-reports --reporter html` zu einem Bericht zusammen,
+  Artefakt `playwright-report` (7 Tage, mit Traces gescheiterter Tests).
+- Caches: npm über `actions/setup-node` (`cache: npm`); Composer-Downloads über `actions/cache`
+  (Schlüssel `composer.lock`, angelegt im Job `php`, `e2e` liest nur); Playwright-Browser
+  (`~/.cache/ms-playwright`, Schlüssel = Playwright-Version, gespeichert gleich nach dem
+  Installieren nur von Teil 1). Bei Treffer installiert `npx playwright install-deps` nur die
+  Systempakete.
 - Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Einzige Ausnahme: Ein Lauf, der
   ausschließlich am bekannten Firefox-Fehler beim Schließen des Browser-Kontexts scheitert
   (`_maybeDontRestoreTabs`, [microsoft/playwright#43413](https://github.com/microsoft/playwright/issues/43413),
   Playwright 1.64 mit Firefox 157, als „not planned“ geschlossen), darf EINMAL neu gestartet werden.
   Scheitert auch der neue Lauf, wird nicht noch einmal neu gestartet, sondern untersucht.
-- Job `deploy`: nur bei Push auf `main` und nur, wenn `php` und `frontend` grün sind; nie parallel
+- Job `deploy`: nur bei Push auf `main` und nur, wenn `php`, `frontend-checks`, `frontend-build`
+  und alle Teile von `e2e` grün sind; nie parallel
   (`concurrency: deploy-branch`). Lädt das Artefakt und ruft
   `bash scripts/publish-deploy-branch.sh <main-commit> <dist-ordner>` auf.
 - `scripts/publish-deploy-branch.sh`: baut mit eigenem temporärem Index den Baum von `main` plus den
@@ -2133,14 +2180,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   history" (die deploy-Commits haben zwei Eltern). Ein strengerer Schutz bräuchte eine eigene
   GitHub App mit Token im Workflow (bisher nicht vorgesehen).
 - Versionen der Actions (Stand: checkout v7, setup-node v7, upload-artifact v7, download-artifact v8,
-  setup-php v2; alle mit `node24`) hält Dependabot aktuell (`.github/dependabot.yml`, wöchentlich
+  cache v6 (auch `cache/restore`, `cache/save`), setup-php v2; alle mit `node24`) hält Dependabot aktuell (`.github/dependabot.yml`, wöchentlich
   montags, alle Actions in einem Pull Request mit Präfix `CI`). Neue Versionen vor dem Eintragen
   prüfen (Release und `runs.using` im `action.yml` des Tags), nie raten; upload- und
   download-artifact müssen zueinander passen.
 
 ## Deployment
-- Ablauf: lokal testen (alle Tests grün: `composer test` und in `frontend/` `npm test`),
-  committen, nach `main` pushen → GitHub Actions testet und legt Code plus Frontend-Build im Branch
+- Ablauf: lokal prüfen (siehe "Arbeitsweise"), committen, nach `main` pushen → GitHub Actions testet und legt Code plus Frontend-Build im Branch
   `deploy` ab (siehe "GitHub Actions (CI)") → von Hand auf dem Server per SSH:
   `cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh`. Erst deployen, wenn der
   CI-Lauf grün ist und `deploy` den gewünschten Stand hat.
