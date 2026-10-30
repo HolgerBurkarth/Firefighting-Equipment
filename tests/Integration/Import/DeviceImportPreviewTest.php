@@ -181,12 +181,13 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
         self::assertNull($preview['token']);
         self::assertSame(['rows' => 4, 'new' => 0, 'changed' => 0, 'unchanged' => 0, 'skipped' => 0, 'errors' => 4, 'warnings' => 0], $preview['summary']);
         self::assertSame(['device_types' => ['Funkgerät', '112'], 'locations' => ['LF 8', 'HLF 20 / G9']], $preview['unknown']);
+        self::assertSame(['device_types' => [], 'locations' => [['value' => 'HLF 20 / G9', 'suggestions' => ['HLF 20 / G1']]]], $preview['suggestions']);
         self::assertSame(['Der Gerätetyp „Funkgerät“ ist nicht bekannt.'], self::row($preview, 2)['messages']);
         self::assertSame(['Der Gerätetyp „Funkgerät“ ist nicht bekannt.', 'Der Standort „LF 8“ ist nicht bekannt.'], self::row($preview, 3)['messages']);
         $existing = self::row($preview, 4);
         self::assertSame('error', $existing['result']);
         self::assertSame('Fehler', $existing['result_label']);
-        self::assertSame(['Der Standort „HLF 20 / G9“ ist nicht bekannt.'], $existing['messages']);
+        self::assertSame(['Der Standort „HLF 20 / G9“ ist nicht bekannt. Meinten Sie „HLF 20 / G1“?'], $existing['messages']);
         self::assertSame([], $existing['changes']);
         self::assertSame(1, $existing['device']['version']);
     }

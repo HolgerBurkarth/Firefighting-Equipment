@@ -9,7 +9,10 @@ use FirefightingEquipment\Device\DeviceDate;
 use FirefightingEquipment\Device\DeviceField;
 use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\DeviceStatus;
+use FirefightingEquipment\Device\DeviceType;
 use FirefightingEquipment\Device\DeviceTypeName;
+use FirefightingEquipment\Device\DeviceTypeRepository;
+use FirefightingEquipment\Device\LocationRepository;
 use FirefightingEquipment\Device\NewDevice;
 use FirefightingEquipment\Device\ScanCode;
 use FirefightingEquipment\Tenant\Tenant;
@@ -35,6 +38,10 @@ use FirefightingEquipment\Time\GermanFormat;
  * (findByScanCodes), dann alle genannten Standorte und danach alle genannten Gerätetypen LOCK IN
  * SHARE MODE; geprüft wird active aus diesen gesperrten Zeilen. Reihenfolge wie bei Einzeländerungen:
  * Gerät, Standort, Gerätetyp.
+ *
+ * Zu unbekannten Gerätetypen und Standorten schlägt die Meldung ähnliche aktive Werte vor
+ * (ImportSuggestions, „Meinten Sie „HLF 20“?“); Kennungen der Beispielzeilen der Vorlage ergeben eine
+ * Warnung (DeviceImportTemplate::isExample).
  */
 final readonly class DeviceImportPlanner
 {
@@ -72,8 +79,12 @@ final readonly class DeviceImportPlanner
         $digitScanCodes = null;
 
         $rows = [];
+        /** @var array<string, list<string>> $unknownTypes Name => Vorschläge (Schlüssel mit „v:“) */
         $unknownTypes = [];
+        /** @var array<string, list<string>> $unknownLocations Pfad => Vorschläge (Schlüssel mit „v:“) */
         $unknownLocations = [];
+        $typeSuggestions = null;
+        $locationSuggestions = null;
         foreach ($file->rows as $row) {
             if ($row->retired) {
                 $rows[] = ImportRowPlan::skipped(
@@ -106,16 +117,23 @@ final readonly class DeviceImportPlanner
             if ($row->deviceType !== null) {
                 $type = $types[$row->deviceType] ?? null;
                 if ($type === null) {
-                    $errors[] = sprintf('Der Gerätetyp „%s“ ist nicht bekannt.', $row->deviceType);
-                    $unknownTypes[$row->deviceType] = true;
+                    $typeSuggestions ??= ImportSuggestions::forNames(array_map(
+                        static fn (DeviceType $t): string => $t->name->value,
+                        new DeviceTypeRepository($this->pdo)->listByTenant($tenant, false),
+                    ));
+                    $suggestions = $unknownTypes['v:' . $row->deviceType] ??= $typeSuggestions->suggest($row->deviceType);
+                    $errors[] = self::unknown(sprintf('Der Gerätetyp „%s“ ist nicht bekannt.', $row->deviceType), $suggestions);
                 }
             }
             $location = null;
             if ($row->location !== null) {
                 $candidates = $locations[$row->location] ?? [];
                 if ($candidates === []) {
-                    $errors[] = sprintf('Der Standort „%s“ ist nicht bekannt.', $row->location);
-                    $unknownLocations[$row->location] = true;
+                    $locationSuggestions ??= ImportSuggestions::forLocations(
+                        DeviceImportTemplate::paths(new LocationRepository($this->pdo)->tree($tenant, false)),
+                    );
+                    $suggestions = $unknownLocations['v:' . $row->location] ??= $locationSuggestions->suggest($row->location);
+                    $errors[] = self::unknown(sprintf('Der Standort „%s“ ist nicht bekannt.', $row->location), $suggestions);
                 } elseif (count($candidates) > 1) {
                     $errors[] = sprintf('Der Standort „%s“ ist nicht eindeutig (mehrere Standorte haben diesen Pfad).', $row->location);
                 } else {
@@ -150,8 +168,7 @@ final readonly class DeviceImportPlanner
             }
         }
 
-        // Schlüssel wie „112“ macht PHP zu Zahlen.
-        return new DeviceImportPlan($file->hash, $rows, array_map(strval(...), array_keys($unknownTypes)), array_map(strval(...), array_keys($unknownLocations)));
+        return new DeviceImportPlan($file->hash, $rows, self::unknownValues($unknownTypes), self::unknownValues($unknownLocations));
     }
 
     /**
@@ -209,7 +226,7 @@ final readonly class DeviceImportPlanner
             }
         }
 
-        $warnings = [];
+        $warnings = self::exampleWarnings($row->identifier->value);
         $digits = ImportWarnings::withoutLeadingZeros($row->identifier->value);
         if ($digits !== null && isset($digitIdentifiers[$digits])) {
             $warnings[] = sprintf(
@@ -240,7 +257,7 @@ final readonly class DeviceImportPlanner
         $changes = [];
         /** @var array<string, array{?string, ?string, int|string|null}> $fields */
         $fields = [];
-        $warnings = [];
+        $warnings = self::exampleWarnings($identifier->value);
 
         if ($identifier->value !== $device->identifier->value) {
             $fields[DeviceField::Identifier->value] = [$device->identifier->value, $identifier->value, $identifier->value];
@@ -557,6 +574,42 @@ final readonly class DeviceImportPlanner
     private static function order(ImportColumn $column): int
     {
         return (int) array_search($column, ImportColumn::cases(), true);
+    }
+
+    /**
+     * Meldung zu einem unbekannten Wert, ggf. mit „Meinten Sie …?“.
+     *
+     * @param list<string> $suggestions
+     */
+    private static function unknown(string $message, array $suggestions): string
+    {
+        return $suggestions === [] ? $message : $message . ' ' . ImportSuggestions::sentence($suggestions);
+    }
+
+    /**
+     * @param array<string, list<string>> $unknown Wert mit Präfix „v:“ (sonst macht PHP „112“ zur Zahl) => Vorschläge
+     *
+     * @return list<UnknownImportValue>
+     */
+    private static function unknownValues(array $unknown): array
+    {
+        $values = [];
+        foreach ($unknown as $key => $suggestions) {
+            $values[] = new UnknownImportValue(substr($key, 2), $suggestions);
+        }
+
+        return $values;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function exampleWarnings(string $identifier): array
+    {
+        return DeviceImportTemplate::isExample($identifier) ? [sprintf(
+            'Die Kennung „%s“ gehört zu den Beispielzeilen der Vorlage. Bitte die Zeile vor dem Import löschen.',
+            $identifier,
+        )] : [];
     }
 
     private static function typeInactive(string $name): string

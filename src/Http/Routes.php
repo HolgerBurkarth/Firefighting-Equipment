@@ -29,6 +29,7 @@ use FirefightingEquipment\Api\V1\Devices\DeviceExportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceHistoryExportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceHistoryListHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceImportHandler;
+use FirefightingEquipment\Api\V1\Devices\DeviceImportTemplateHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceListHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceStateHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceSummaryHandler;
@@ -157,6 +158,8 @@ final class Routes
             ->add('GET', 'api/v1/device-events/export', Access::Authenticated, new DeviceHistoryExportHandler($clock))
             ->add('GET', 'api/v1/device-events', Access::Admin, new DeviceHistoryListHandler())
             ->add('POST', 'api/v1/devices', Access::Admin, new DeviceActionHandler(DeviceAction::Create))
+            ->add('GET', 'api/v1/devices/import/template', Access::Admin, new DeviceImportTemplateHandler(validValues: false, clock: $clock))
+            ->add('GET', 'api/v1/devices/import/values', Access::Admin, new DeviceImportTemplateHandler(validValues: true, clock: $clock))
             ->add('POST', 'api/v1/devices/import/preview', Access::Admin, new DeviceImportHandler(apply: false, clock: $clock), DeviceImportHandler::MAX_BODY_BYTES)
             ->add('POST', 'api/v1/devices/import', Access::Admin, new DeviceImportHandler(apply: true, clock: $clock), DeviceImportHandler::MAX_BODY_BYTES)
             ->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceActionHandler(DeviceAction::Show))

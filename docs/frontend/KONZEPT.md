@@ -368,6 +368,15 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
     Scanner). Umgesetzt in Schritt 6 als eigene Seite `geraete/neu` (Knopf „Neues Gerät“ in der
     Geräteliste): „Speichern und nächstes“ ist der erste Knopf (auch Enter), „Speichern“ öffnet das
     neue Gerät; Enter im Feld Scan-Code speichert nicht (Handscanner), sondern führt weiter.
+    Der Import ist in Schritt 7 umgesetzt als Seite `geraete/import` (Knopf „Import (CSV)“ in der
+    Geräteliste): Vorlage und „Gültige Werte“ erzeugt der Server (Beispielzeilen mit Gerätetypen und
+    Standorten der Stadt, damit sie gültig aussehen; „Gültige Werte“ nur aktive). Die Datei wird
+    gewählt und sofort geprüft; die Vorschau zeigt Zusammenfassung, Filter (Fehler zuerst, sonst
+    Zeilen mit Warnung), je Zeile Änderungen alt → neu, Fehler und Warnungen sowie die unbekannten
+    Gerätetypen und Standorte gesammelt mit „Meinten Sie …?“ (Vorschläge rechnet der Server, nur
+    aktive Werte; ein Fach auch über seinen Namen: „G1“ → „HLF 20 / G1“). Übernehmen nur ohne Fehler,
+    mit Kommentar für den Verlauf; hat sich seither etwas geändert, prüft die Seite neu und sagt es.
+    Nach dem Bearbeiten in Excel wählt man die Datei erneut (die Seite liest sie nicht nach).
 33. **Adressen:** Die Detailseite eines Geräts für Admins ist `geraete/<id>/details`;
     `geraete/<id>` bleibt das Umbuchen (Entscheidung 15). Die Geräteliste der Konsole (`geraete`) hat
     den Filter „Ausgesonderte anzeigen“; von dort öffnet der Admin die Details und nimmt das Gerät

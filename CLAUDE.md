@@ -319,8 +319,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
-  `client.ts`; `devices.ts`, `deviceEvents.ts`, `deviceSummary.ts`, `deviceTypes.ts`,
-  `inspections.ts`, `locations.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
+  `client.ts`; `devices.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
+  `deviceTypes.ts`, `inspections.ts`, `locations.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
   Gerätetypen und das Dashboard),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
@@ -328,7 +328,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung,
   `appUpdate.ts` Updates, `unsavedInput.ts` ungespeicherte Eingaben, `build.ts` Build-Kennung,
   `now.ts` `useNow` für Zeitangaben: alle 30 s und bei `visibilitychange` neu, `countdown.ts`
-  `useCountdown` Sperre nach 429 bis `Retry-After`), `src/scanner/` (Kamera-Scanner:
+  `useCountdown` Sperre nach 429 bis `Retry-After`, `download.ts` `saveDownload`), `src/scanner/` (Kamera-Scanner:
   `barcodeReader.ts` Lesemodul, `camera.ts` Kamera und Meldungen), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
   `build/compress.ts` (Vite-Plugin: `.br`/`.gz` neben jede Datei, siehe "Frontend ausliefern"),
@@ -345,10 +345,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `invalid_response`). Jede Antwort prüft ein Parser. 401 einer nicht öffentlichen Anfrage ruft den
   Abmelde-Weg des Routers (Sitzung vergessen, Hinweis, `anmelden?weiter=<Seite>`); öffentliche
   Aufrufe (`public: true`, z. B. `auth/login`, `auth/me` im Wächter) behandeln 401 selbst.
-  Downloads (CSV-Export) über `apiDownload` (ebenda): GET mit Cookie und `X-Client-Api`, Ergebnis
-  `{blob, fileName}` (Name aus `Content-Disposition`, nur `a-z0-9.-`, sonst Ersatzname), Fehler wie
-  bei `apiRequest` als `ApiError` (401 meldet ab); die Seite speichert die Datei über eine
-  `blob:`-Adresse und `<a download>` (kein Link direkt auf die API: Fehler kämen sonst als Datei).
+  Downloads (CSV-Export, Vorlage des Imports) über `apiDownload` (ebenda): GET mit Cookie und
+  `X-Client-Api`, Ergebnis `{blob, fileName}` (Name aus `Content-Disposition`, nur `a-z0-9.-`, sonst
+  Ersatzname), Fehler wie bei `apiRequest` als `ApiError` (401 meldet ab); die Seite speichert die
+  Datei per `saveDownload` (`src/runtime/download.ts`: `blob:`-Adresse und `<a download>`; kein Link
+  direkt auf die API, Fehler kämen sonst als Datei).
 - Datenschicht `src/data/` (KONZEPT.md "User am Handy – Entscheidungen", 13 und 14): Geräte und
   Standorte lesen Seiten NUR hier (`deviceStore`, `locationStore` aus `src/data/index.ts`), nie direkt
   über `src/api/`; sie ist später die lokale Kopie für den Offline-Modus. `DeviceStore` lädt
@@ -613,7 +614,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   mit `aria-sort`; unter 768 px Karten mit `AppSelect` „Sortieren nach“ und Knopf für die Richtung.
   „Export (CSV)“: `GET devices/export` mit denselben Filtern und derselben Sortierung
   (`downloadDeviceExport`, `apiDownload`), Fehler als `ErrorNotice`. „Neues Gerät“ (Stadtfarbe)
-  führt zu `geraete/neu`; noch kein Import (Schritt 7). Browser-Tests `tests/e2e/devices.spec.ts`
+  führt zu `geraete/neu`, „Import (CSV)“ zu `geraete/import`. Browser-Tests `tests/e2e/devices.spec.ts`
   (Server-Attrappe `deviceServer` mit Status, Typ, Standort samt Fächern, `q` und Seiten; Download über
   `MockResponse.text`/`contentType`); Unit-Tests `deviceList.spec.ts`, `adminDeviceList.spec.ts`,
   `client.spec.ts` (`apiDownload`).
@@ -676,6 +677,29 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Gerätedetail) und „Abbrechen“ (`goBack`, sonst `geraete`). Unter 768 px eine Spalte, Knöpfe volle
   Breite. Browser-Tests `tests/e2e/deviceNew.spec.ts` (simulierter `POST devices` ab ID 100);
   Unit-Tests `deviceForm.spec.ts`, `deviceAdminApi.spec.ts`, `router.spec.ts`.
+- CSV-Import der Admin-Konsole (`DeviceImportPage`, `geraete/import`, Route `device-import`, nur
+  `admin`, `layout: 'admin'`, im Menü unter „Geräte“; KONZEPT.md Entscheidung 32): „1. Vorlage
+  ausfüllen“ mit „Vorlage herunterladen“ und „Gültige Werte herunterladen“ (`downloadImportTemplate`,
+  `downloadImportValues` in `src/api/deviceImport.ts`, `saveDownload`); „2. Datei prüfen“: Knopf
+  „CSV-Datei wählen …“ öffnet ein verstecktes `<input type="file">` (danach geleert, damit dieselbe
+  Datei nach dem Ändern erneut gewählt werden kann); leere bzw. Dateien über
+  `MAX_IMPORT_FILE_BYTES` (2 MiB = `DeviceImportFile::MAX_BYTES`) lehnt die App ohne Anfrage ab, sonst
+  sofort `previewDeviceImport` (`src/data/index.ts`, `POST devices/import/preview`, Datei per
+  `toBase64`), „Erneut prüfen“ sendet denselben Inhalt (z. B. nach dem Anlegen eines Standorts).
+  „3. Vorschau“ (Überschrift fokussiert): erkannte Kodierung und Trennzeichen, Zusammenfassung,
+  Fehlerhinweis, „Unbekannte Werte“ mit „Meinten Sie …?“ (Feld `suggestions`) und Links auf
+  Gerätetypen und Standorte, Filter als Knöpfe mit `aria-pressed` und Anzahl (`IMPORT_FILTERS`,
+  Standard `defaultFilter`: Fehler, sonst Warnungen, sonst alle), Zeilen mit Ergebnis, Änderungen
+  (`changeLines`: neu „Standort: …“ ohne Kennung, sonst „alt → neu“, leer = „leer“), Fehlern und
+  Warnungen, je `IMPORT_ROWS_STEP` (100) mit „Weitere anzeigen“. Übernehmen nur mit Kennzeichen und
+  etwas Neuem bzw. Geändertem (sonst „Die Datei ändert nichts“): Kommentar (`normalizeComment`),
+  „Import übernehmen (2 neu, 1 geändert)“ → `applyDeviceImport` (`POST devices/import`, danach laden
+  die schon geladenen Listen neu wie nach jeder Änderung); Erfolg grün „Import übernommen: …“ mit
+  „Zur Geräteliste“, Datei und Vorschau weg; 409 `import_outdated` → neu prüfen und Hinweis „Die
+  Vorschau ist neu erstellt“; andere Fehler als `ErrorNotice`. Ungespeichert (`useUnsavedInput`) =
+  Vorschau vorhanden oder Kommentar. Logik in `src/data/deviceImport.ts`. Browser-Tests
+  `tests/e2e/deviceImport.spec.ts` (Datei über das Ereignis `filechooser`, Vorschau-Server mit Liste
+  von Antworten je Aufruf); Unit-Tests `deviceImport.spec.ts`, `router.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
@@ -813,7 +837,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   ändernde Anfragen `http://localhost:5173` in `http.allowed_origins`).
 - Browser-Tests (Playwright: Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build,
   ausgeliefert von PHP (`php -q -S localhost:<port> public/index.php`), also mit echter CSP und
-  echtem Caching. Profile: in CI (`CI` gesetzt) alle fünf, aufgeteilt auf vier Jobs (`--shard`,
+  echtem Caching. Profile: in CI (`CI` gesetzt) alle fünf, aufgeteilt auf acht Jobs (`--shard`,
   Reporter `blob`, zusammengeführt mit `playwright merge-reports`; siehe "GitHub Actions (CI)"),
   lokal mit `npm test`/`npm run test:e2e` nur `chromium` und `webkit` (`LOCAL_PROJECTS` in
   `playwright.config.ts`, Reporter `list`); Firefox und die Handy-Profile prüft vor allem CI, lokal
@@ -1924,6 +1948,26 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `src/Api/V1/Devices/DeviceImportHandler.php` und `DeviceImportJson.php`. Tests in
   `tests/Integration/Import/` (`ImportApiTestCase`) sowie `tests/Unit/Csv/` und
   `tests/Unit/Device/Import/`.
+- Hilfen zum Erfassen (KONZEPT.md Entscheidung 32; `Access::Admin`, CSV wie der Export über
+  `CsvResponse`, `DeviceImportTemplateHandler`, Code `DeviceImportTemplate`, Tests
+  `DeviceImportTemplateTest`): `GET devices/import/template` → Vorlage `geraete-vorlage-<kürzel>.csv`
+  mit den Spalten des Imports (`DeviceImportTemplate::header()` = `DeviceCsv::DEVICE_HEADER`, per Test)
+  und zwei Beispielzeilen `BEISPIEL-1`/`BEISPIEL-2` (`EXAMPLE_IDENTIFIERS`; aktive Gerätetypen und
+  Standorte der Stadt, erster Standort der Ebene 1 bzw. erstes Fach, Prüfdatum heute + 365 Tage,
+  ohne aktive leer); `GET devices/import/values` → `gueltige-werte-<kürzel>-<JJJJ-MM-TT>.csv`
+  (`Spalte;Gültiger Wert`: Regel der Kennung, aktive Gerätetypen, aktive Standorte als Pfad, die drei
+  Status, Datumsformat). Die Beispielzeilen stehen nur in der Vorlage: Kennungen aus
+  `EXAMPLE_IDENTIFIERS` (ohne Groß-/Kleinschreibung, `isExample`) ergeben in der Vorschau bei neuen und
+  bestehenden Geräten eine Warnung („… gehört zu den Beispielzeilen der Vorlage …“), keinen Fehler.
+- „Meinten Sie …?“ (`ImportSuggestions`, `UnknownImportValue`): zu unbekannten Gerätetypen bzw.
+  Standorten die ähnlichsten AKTIVEN Werte (Kandidaten erst gelesen, wenn es unbekannte gibt), in der
+  Meldung der Zeile („Der Standort „HLF20“ ist nicht bekannt. Meinten Sie „HLF 20“?“) und im Feld
+  `suggestions {device_types, locations}` der Vorschau (je `{value, suggestions}`, nur mit Vorschlag,
+  Reihenfolge wie `unknown`). Vergleichsform `ImportSuggestions::key` (ohne Leerraum und Groß-/
+  Kleinschreibung, ä/ö/ü/ß = ae/oe/ue/ss), Levenshtein über Unicode-Zeichen bis zu einem Viertel der
+  Länge (mindestens 1, höchstens 3), kleinster Abstand gewinnt, höchstens `MAX_SUGGESTIONS` (3)
+  natürlich sortiert, höchstens `MAX_VALUES` (100) gesuchte Werte je Art; Fächer auch über ihren Namen
+  („G1“ → „HLF 20 / G1“). Nur ein Hinweis: verbindlich bleibt der Vergleich der Datenbank.
 - Entscheidungen: Der Import legt neue Geräte an UND ändert bestehende. Schlüssel ist die Kennung,
   ohne Groß-/Kleinschreibung, nur unter nicht ausgesonderten Geräten (wie der UNIQUE-Index; ß ≠ ss).
   Unbekannte Gerätetypen (über den Namen) und Standorte (über den vollständigen Pfad wie im Export)
@@ -2150,7 +2194,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Tests, die `.md`-Dateien lesen (`SlugRulesDocumentationTest`), laufen daher erst mit dem nächsten
   Code-Push (siehe "Arbeitsweise").
 - Jobs (parallel, Ziel unter 6 Minuten je Lauf): `php`, `frontend-checks` (Lint, Vitest),
-  `frontend-build` (Typprüfung und Build) und nach dem Build `e2e` (Browser-Tests in vier Teilen),
+  `frontend-build` (Typprüfung und Build) und nach dem Build `e2e` (Browser-Tests in acht Teilen),
   danach `e2e-report` (Bericht) und `deploy`.
 - Job `php`: Ubuntu 24.04, PHP 8.5 mit den Erweiterungen von STRATO (ohne intl/sodium),
   Service-Container `mariadb:10.11` mit Datenbank `firefighting_test`; die Workflow-Datei schreibt
@@ -2165,7 +2209,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Job `frontend-checks`: Node aus `frontend/.nvmrc`, `npm ci`, `npm run lint`, `npm run test:unit`.
 - Job `frontend-build`: `npm ci`, `npm run build` (mit `vue-tsc`); lädt den Build als Artefakt
   `frontend-dist` hoch. Genau dieser Build wird in `e2e` getestet und kommt nach `deploy`.
-- Job `e2e` (Matrix `shard` 1–4, `fail-fast: false`, braucht `frontend-build`): PHP (für `php -S`),
+- Job `e2e` (Matrix `shard` 1–8, `fail-fast: false`, braucht `frontend-build`): PHP (für `php -S`),
   `composer install --no-dev`, `npm ci`, Artefakt `frontend-dist` nach `frontend/dist`, dann
   `npm run test:e2e -- --shard=<n>/<anzahl>` (alle fünf Profile, weil `CI` gesetzt ist; Anzahl aus
   `strategy.job-total`, mehr Teile nur über die Liste `shard`). `globalSetup` baut die zweite

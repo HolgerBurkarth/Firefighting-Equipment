@@ -17,9 +17,9 @@ final readonly class DeviceImportPlan
     public ?string $token;
 
     /**
-     * @param list<ImportRowPlan> $rows
-     * @param list<string>        $unknownDeviceTypes Namen ohne passenden Gerätetyp
-     * @param list<string>        $unknownLocations   Pfade ohne passenden Standort
+     * @param list<ImportRowPlan>      $rows
+     * @param list<UnknownImportValue> $unknownDeviceTypes Namen ohne passenden Gerätetyp
+     * @param list<UnknownImportValue> $unknownLocations   Pfade ohne passenden Standort
      */
     public function __construct(
         string $fileHash,

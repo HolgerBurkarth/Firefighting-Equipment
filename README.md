@@ -861,6 +861,13 @@ aus noch nimmt er wieder auf. Ablauf in zwei Schritten:
 höchstens 16 KiB. Der Schutz gegen CSRF bleibt wie überall: nur `Content-Type: application/json`
 und erlaubter `Origin`.
 
+In der App: Geräteliste → „Import (CSV)“ (`geraete/import`). Dort gibt es eine Vorlage
+(`GET api/v1/devices/import/template`, Spalten des Imports und zwei Beispielzeilen `BEISPIEL-1` und
+`BEISPIEL-2`, vor dem Import löschen; die Vorschau warnt, solange sie in der Datei stehen) und die
+Datei „Gültige Werte“ (`GET api/v1/devices/import/values`, aktive Gerätetypen und Standorte, Status,
+Datumsformat). Zu unbekannten Gerätetypen und Standorten schlägt die Vorschau ähnliche vor
+(„Meinten Sie „HLF 20“?“).
+
 **Datei**
 
 - Spalten wie im Export (Kennung, Scan-Code, Gerätetyp, Standort, Status, Nächste Prüfung,
@@ -1269,7 +1276,7 @@ eines abgebrochenen Laufs), scheitern die Tests mit „… is already used“; d
 beenden.
 
 Lokal prüfen `npm test` und `npm run test:e2e` nur Chromium und WebKit; Firefox und die
-Handy-Profile prüft vor allem GitHub Actions (dort immer alle fünf, aufgeteilt auf vier Jobs), lokal
+Handy-Profile prüft vor allem GitHub Actions (dort immer alle fünf, aufgeteilt auf acht Jobs), lokal
 bei Bedarf `npm run test:e2e:all`. Einzelne Dateien: `npm run test:e2e -- tests/e2e/search.spec.ts`
 bzw. `npm run test:e2e:all -- tests/e2e/search.spec.ts`. `npm run test:load` wiederholt Tests unter Last (Optionen `--runs=N`,
 `--project=…`, `--repeat-each=N`) und legt jeden Durchgang in `test-results/load/<Zeit>-<n>` ab;
@@ -1370,7 +1377,7 @@ Die Jobs laufen parallel:
 | PHP-Tests              | `composer test` mit MariaDB 10.11                                               |
 | Lint und Vitest        | `npm run lint`, `npm run test:unit`                                             |
 | Typprüfung und Build   | `npm run build`, Build als Artefakt `frontend-dist`                             |
-| Browser-Tests (Teil n) | nach dem Build: ein Viertel der Browser-Tests (alle fünf Profile, `--shard`)    |
+| Browser-Tests (Teil n) | nach dem Build: ein Achtel der Browser-Tests (alle fünf Profile, `--shard`)     |
 | Bericht                | nach den Browser-Tests: Teilberichte zu einem HTML-Bericht `playwright-report`  |
 | deploy                 | nur auf `main`, wenn alle Tests grün sind: Code plus genau den getesteten Build |
 

@@ -25,12 +25,13 @@ import {
     type DeviceListFilter,
 } from '../data/deviceList';
 import { compareNames } from '../data/masterData';
+import { saveDownload } from '../runtime/download';
 import { useNow } from '../runtime/now';
 
 /**
  * Geräteliste der Admin-Konsole (Mockups „Geraete“ und „AdminHandy“): Suche, Filter nach Typ,
  * Standort (mit Fächern) und Status, „Ausgesonderte anzeigen“, Sortierung wie im Explorer, Export
- * der gefilterten Liste als CSV. Die Filter stehen in der Adresse (`geraete?status=defective`), so
+ * der gefilterten Liste als CSV, „Import (CSV)“ (Seite `geraete/import`). Die Filter stehen in der Adresse (`geraete?status=defective`), so
  * führen Kacheln und Links direkt zur gefilterten Liste; der Server filtert und sortiert.
  */
 const route = useRoute();
@@ -231,15 +232,7 @@ async function exportList(): Promise<void> {
         exportError.value = result.error;
         return;
     }
-    const url = URL.createObjectURL(result.data.blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = result.data.fileName;
-    link.click();
-    // Erst nach dem Start des Downloads freigeben (Firefox braucht die Adresse noch kurz).
-    setTimeout(() => {
-        URL.revokeObjectURL(url);
-    }, 10_000);
+    saveDownload(result.data);
 }
 
 onMounted(() => {
@@ -254,6 +247,7 @@ onMounted(() => {
         <button class="btn" type="button" :disabled="exporting" @click="exportList">
             {{ exporting ? 'Export läuft …' : 'Export (CSV)' }}
         </button>
+        <RouterLink class="btn" :to="{ name: 'device-import' }">Import (CSV)</RouterLink>
         <RouterLink class="btn btn-accent" :to="{ name: 'device-new' }">
             <svg
                 width="18"

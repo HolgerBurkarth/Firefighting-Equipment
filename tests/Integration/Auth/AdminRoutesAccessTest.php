@@ -57,6 +57,8 @@ MA-01;defekt
         yield 'Prüfdatum setzen' => ['POST', 'devices/{device}/inspection-due', ['version' => 1, 'next_inspection_due' => '2027-03-01']];
         yield 'Gerät aussondern' => ['POST', 'devices/{device}/retire', ['version' => 1]];
         yield 'Gerät wieder aufnehmen' => ['POST', 'devices/{retired}/reinstate', ['version' => 1, 'status' => 'ready']];
+        yield 'Import-Vorlage' => ['GET', 'devices/import/template', null];
+        yield 'Gültige Werte des Imports' => ['GET', 'devices/import/values', null];
         yield 'Import prüfen' => ['POST', 'devices/import/preview', ['file' => '{import_file}']];
         yield 'Import übernehmen' => ['POST', 'devices/import', ['file' => '{import_file}', 'token' => '{import_token}']];
         yield 'Akzentfarbe setzen' => ['POST', 'tenant/appearance', ['accent_color' => '#1a237e']];
@@ -112,8 +114,8 @@ MA-01;defekt
         self::assertError(404, 'not_found', $this->send($method, self::url(null, $path), $body, $superAdmin));
         self::assertSame($before, $this->snapshot(), 'nichts geändert');
 
-        $response = $this->send($method, $url, $body, $this->loginCookie('immendingen', 'admin@example.org'));
-        self::assertContains($response->statusCode(), [200, 201], $response->body());
+        $response = $this->sendAny($method, $url, $body, $this->loginCookie('immendingen', 'admin@example.org'));
+        self::assertContains($response->statusCode(), [200, 201], self::responseBody($response));
     }
 
     /**
