@@ -4,7 +4,10 @@ import { fetchLocations, type Location } from '../api/locations';
 import { Refresher, type RefreshReason } from './refresher';
 
 export interface LocationListState {
-    /** Standortbaum ohne gesperrte Standorte; null, solange er noch nie geladen wurde. */
+    /**
+     * Standortbaum (`locationStore` ohne gesperrte Standorte, `adminLocationStore` mit); null,
+     * solange er noch nie geladen wurde.
+     */
     readonly locations: readonly Location[] | null;
     readonly loading: boolean;
     /** Fehler der letzten Auffrischung; der bisherige Baum bleibt dann stehen. */
@@ -13,7 +16,10 @@ export interface LocationListState {
 
 const EMPTY: LocationListState = { locations: null, loading: false, error: null };
 
-/** Standorte der Stadt (GET locations) für Umbuchen und Standortwahl. */
+/**
+ * Standorte der Stadt (GET locations) für Umbuchen und Standortwahl; mit eigener Abfrage auch der
+ * ganze Baum für die Verwaltung des Admins.
+ */
 export class LocationStore {
     private readonly current = shallowRef<LocationListState>(EMPTY);
     private readonly refresher: Refresher;

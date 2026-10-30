@@ -117,6 +117,18 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { roles: DEVICE_ROLES, layout: 'user' },
         });
         routes.push({
+            path: '/standorte',
+            name: 'locations',
+            component: () => import('../pages/LocationsPage.vue'),
+            meta: { roles: ['admin'], layout: 'admin' },
+        });
+        routes.push({
+            path: '/geraetetypen',
+            name: 'device-types',
+            component: () => import('../pages/DeviceTypesPage.vue'),
+            meta: { roles: ['admin'], layout: 'admin' },
+        });
+        routes.push({
             // Nur positive Ganzzahlen ohne führende Null (wie die Platzhalter im Backend).
             path: '/geraete/:id([1-9]\\d{0,17})',
             name: 'device',

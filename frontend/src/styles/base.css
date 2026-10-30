@@ -107,6 +107,52 @@ h2 {
     filter: brightness(1.12);
 }
 
+/* Hauptaktion einer Seite oder eines Fensters in der Stadtfarbe (z. B. „Neuer Standort“). */
+.btn-accent {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.btn-accent:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--accent);
+    filter: brightness(1.12);
+}
+
+/* Aktion mit Folgen (Sperren, Deaktivieren): rot umrandet, abseits der Hauptaktion. */
+.btn-danger {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+    border-color: var(--danger);
+    background: var(--status-defective-bg);
+    color: var(--danger);
+}
+
+/* Quadratischer Knopf mit Symbol (Stift zum Bearbeiten, Plus), Beschriftung per aria-label. */
+.icon-btn {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    border: 1px solid var(--input-border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.icon-btn:hover {
+    border-color: var(--line);
+    background: var(--line);
+    color: var(--on-accent);
+}
+
 .btn:disabled {
     cursor: not-allowed;
     opacity: 0.6;
@@ -225,4 +271,66 @@ h2 {
     font: inherit;
     text-decoration: underline;
     cursor: pointer;
+}
+
+/* Listen der Admin-Konsole (KONZEPT.md, "Listen"): Kopf mit Titel und „Neu“, darunter Filter. */
+.page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.page-head h1 {
+    flex-grow: 1;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+}
+
+.filter-field {
+    display: flex;
+    flex: 0 1 360px;
+    align-items: center;
+    gap: 8px;
+    min-width: min(240px, 100%);
+    min-height: var(--touch-min);
+    padding: 0 12px;
+    border: 1px solid var(--input-border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--muted);
+}
+
+.filter-field:focus-within {
+    border-color: var(--line);
+}
+
+.filter-field input {
+    flex-grow: 1;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+}
+
+.check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--touch-min);
+    cursor: pointer;
+}
+
+.check input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--accent);
 }

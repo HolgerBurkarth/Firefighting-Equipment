@@ -275,7 +275,13 @@ einsatzbereit, Prüffristen und offene Hinweise (Hinweise im Protokoll plus wart
 Freischaltungen), darunter „Nicht einsatzbereit“ (defekte zuerst, höchstens 10) und „Letzte
 Aktivitäten“ (die letzten 8 Einträge des Verlaufs der Stadt mit Zeit, Gerät, Wer und Von/Nach). Die
 Kachel „Prüffristen“ führt zu `prueffristen`; die anderen Kacheln führen zur gefilterten Liste,
-sobald es sie gibt.
+sobald es sie gibt. Schritt 2: `standorte` als Baum (Fahrzeug, Raum oder Extern mit seinen Fächern,
+Symbol, Gerätezahl, Filter, gesperrte nur auf Wunsch) mit „Neuer Standort“ (Name und Art), „Fach
+anlegen“, Umbenennen, Sperren (nur leer: der Knopf nennt vorher, was noch dort liegt, dann
+Rückfrage) und Entsperren in kleinen Fenstern; `geraetetypen` als Liste mit Name und Gerätezahl
+(Spaltenköpfe sortieren, am Handy Karten mit Sortier-Knöpfen), Anlegen, Umbenennen, Deaktivieren
+mit Rückfrage und Aktivieren. Gleiche Namen fallen schon beim Tippen auf. „Klick zeigt die Geräte
+dort“ kommt mit der Geräteliste (Schritt 3).
 
 | | Admin | Super-Admin |
 |---|---|---|
@@ -286,7 +292,8 @@ sobald es sie gibt.
 - Suchfeld oben rechts, filtert schon beim Tippen nach Teiltext; daneben „Neu“.
 - Spaltenköpfe sortieren wie im Windows-Explorer (Klick auf-, zweiter Klick absteigend, Pfeil).
 - Stift-Symbol zum Bearbeiten in jeder Zeile; Klick auf die Zeile öffnet die Details.
-- Am Handy werden Zeilen zu Karten, Sortierung über ein Auswahlfeld oben.
+- Am Handy werden Zeilen zu Karten, Sortierung über Knöpfe oben (wie die Spaltenköpfe; kein
+  `<select>`, siehe CLAUDE.md, CSP).
 - Geräte werden nie gelöscht, sondern ausgesondert (rot, abseits, Sicherheitsrückfrage mit Namen).
   Typen werden deaktiviert, Standorte gesperrt (nur wenn leer, sonst freundlicher Hinweis wie
   „Hier liegen noch 3 Geräte“), Benutzer anonymisiert.

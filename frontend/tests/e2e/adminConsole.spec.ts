@@ -46,6 +46,9 @@ const OVERVIEW = adminOverview({
     ],
 });
 
+/** Einträge des Menüs (ADMIN_MENU in src/router/adminMenu.ts), ohne Abmelden. */
+const MENU_LABELS = ['Dashboard', 'Suchen', 'Standorte', 'Gerätetypen'];
+
 function menu(page: Page): Locator {
     return page.getByRole('navigation', { name: 'Hauptmenü' });
 }
@@ -65,7 +68,7 @@ test.describe('Admin-Konsole', () => {
         const nav = menu(page);
         await expect(nav).toBeVisible();
         await expect(nav.getByTestId('menu-tenant')).toHaveText('Feuerwehr Test');
-        await expect(nav.getByRole('link')).toHaveText(['Dashboard', 'Suchen']);
+        await expect(nav.getByRole('link')).toHaveText(MENU_LABELS);
         await expect(nav.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
             'aria-current',
             'page',
@@ -91,7 +94,7 @@ test.describe('Admin-Konsole', () => {
         const nav = menu(page);
         await expect(nav).toBeVisible();
         expect((await size(nav)).width).toBeLessThanOrEqual(80);
-        await expect(nav.getByRole('link')).toHaveText(['Dashboard', 'Suchen']);
+        await expect(nav.getByRole('link')).toHaveText(MENU_LABELS);
         const search = nav.getByRole('link', { name: 'Suchen' });
         await expect(search).toHaveAttribute('title', 'Suchen');
         // Nur das Symbol: Der Text ist unsichtbar (1 px), der Name bleibt für Bildschirmleser.
@@ -115,7 +118,7 @@ test.describe('Admin-Konsole', () => {
         await open.click();
         const drawer = page.getByRole('dialog', { name: 'Menü' });
         await expect(drawer).toBeVisible();
-        await expect(menu(page).getByRole('link')).toHaveText(['Dashboard', 'Suchen']);
+        await expect(menu(page).getByRole('link')).toHaveText(MENU_LABELS);
         await page.keyboard.press('Escape');
         await expect(drawer).toBeHidden();
         await expect(open).toBeFocused();
