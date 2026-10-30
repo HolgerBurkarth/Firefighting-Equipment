@@ -1,6 +1,6 @@
 # Frontend-Konzept Feuerwehr-Geräteverwaltung
 
-Stand: 27.10.2026. Quelle: Frontend-Brainstorming (claude.ai-Doc) und Entscheidungen im
+Stand: 30.10.2026. Quelle: Frontend-Brainstorming (claude.ai-Doc) und Entscheidungen im
 Frontend-Chat. Verbindlich für alle Agenten, die am Frontend arbeiten. Das Backend ist in
 `CLAUDE.md` und `README.md` beschrieben; die REST-API v1 ist vollständig und live.
 
@@ -51,7 +51,7 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `passwort-vergessen` | Stadt und `service` | Link zum Zurücksetzen anfordern |
 | `passwort-zuruecksetzen` | Stadt und `service` | Mail-Link, neues Passwort setzen (Link 1 Stunde gültig; abgelaufen → „Neuen Link anfordern“) |
 | `einladung-annehmen` | nur Stadt | Mail-Link für neue Admins: Name und Passwort |
-| `suchen` | nur Stadt | Startseite des Users am Handy: Suche, „Zuletzt benutzt“ |
+| `suchen` | nur Stadt | Startseite des Users am Handy: Suche, „Code scannen“ (`?scannen=1` öffnet den Scanner), „Zuletzt benutzt“ |
 | `prueffristen` | nur Stadt | Prüffristen am Handy: überfällig und in den nächsten 30 Tagen fällig |
 | `profil` | nur Stadt | Profil am Handy: Konto mit Abmelden, Anzeigemodus, Passwort ändern, angemeldete Geräte |
 | `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts; `?standortwahl=1` öffnet die Standortwahl, `?details=1` „Details und Verlauf“ |
@@ -312,6 +312,9 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
 - **Super-Admins:** Liste mit Sperren und Entsperren; das geschützte Konto ohne Button.
 
 ## User am Handy
+Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Live-Tests stehen in
+`docs/TODO-SPAETER.md` und werden erst nach den Hauptabschnitten geplant.
+
 - **Start:** großes Suchfeld, Button „Code scannen“, darunter „Zuletzt benutzt“. Leiste unten:
   Suchen, Prüffristen, Profil.
 - **Umbuchen:** oben Gerät mit aktuellem Standort und Status. Standort: aktueller und zuletzt
@@ -393,10 +396,14 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
     eine Ansicht von „Suchen“: Der Zurück-Knopf des Handys, „Abbrechen“ und der Pfeil oben schließen
     ihn, die Kamera geht dabei immer aus. Beim ersten erkannten Code geht die Kamera aus und das
     Gerät öffnet sich; Zurück führt dann zu „Suchen“. Ohne Treffer steht der Code im Suchfeld mit dem
-    Hinweis. Ist die Kamera nicht erlaubt, nicht vorhanden oder belegt, erscheint eine Meldung mit
-    „Erneut versuchen“. Die Kennung wird dabei genau wie im Backend kleingeschrieben (auch bei
+    Hinweis. Ist die Kamera nicht erlaubt, nicht vorhanden oder belegt oder lässt sich das
+    Lesemodul nicht laden, erscheint eine Meldung mit „Erneut versuchen“; kann der Browser die
+    Kamera gar nicht verwenden (z. B. ohne HTTPS), nur der Hinweis, den Code ins Suchfeld zu tippen.
+    Die Kennung wird dabei genau wie im Backend kleingeschrieben (auch bei
     seltenen Buchstaben, gemeinsame Testfälle mit der Datenbank). Bei mehr als 2.000 Geräten fragt
-    die App den Server (`scan_code`, dann die Kennung).
+    die App den Server (`scan_code`, dann die Kennung). Live auf dem iPhone 16 Pro geprüft
+    (30.10.2026): alle 8 Testcodes (QR, GS1-DataMatrix mit und ohne GS, Code 128, unbekannter Code)
+    wie erwartet, die Kamera geht beim Schließen aus.
 18. **Kommentar:** Bei „defekt“ Pflicht, mindestens 5 Zeichen (prüft nur die Oberfläche). Bei
     „einsatzbereit“ und „in Wartung“ freiwillig. Umgesetzt: Pflicht nur, wenn der Status auf
     „defekt“ wechselt (ein neuer Defekt); ein schon defektes Gerät z. B. in die Werkstatt umbuchen
@@ -453,7 +460,8 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
     `ids=` in `GET devices`, Laden „geändert seit“ statt über `offset`.
 
 ## Noch offen (Praxis, vor dem Livegang)
-- Was steht auf den Hersteller-Barcodes?
+- Was steht auf den Hersteller-Barcodes? (Dazu T7 in `docs/TODO-SPAETER.md`: GS1 mit und ohne
+  überflüssiges GS gleich behandeln.)
 - Handy-Ansichten auch im Dunkelmodus entwerfen (Farben für Dunkel: siehe Mockup „Einstellungen“).
 
 ## Später (nicht Version 1)

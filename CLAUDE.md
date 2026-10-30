@@ -1811,8 +1811,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Geräte keine Mail).
 - Betreff „Log <Stadtname>: <Grund>“ (z. B. „MA-01 umgebucht, Status defekt“, „CSV-Import: 2 neu,
   1 geändert“, höchstens 200 Zeichen). Text: Vorgang, Gerät (Kennung, Typ), Wer (Anzeigename), Wann
-  (Europe/Berlin), Von/Nach je Ereignis, Kommentar, Link `AppUrls::area` (Startseite der Stadt, bis
-  das Frontend Geräteseiten hat). Werte einzeilig, höchstens 200 Zeichen, Trennzeichen eines
+  (Europe/Berlin), Von/Nach je Ereignis, Kommentar, Link `AppUrls::area` (Startseite der Stadt; der
+  Link direkt auf `geraete/<id>` folgt mit der Admin-Konsole, `docs/TODO-SPAETER.md` T6). Werte einzeilig, höchstens 200 Zeichen, Trennzeichen eines
   Scan-Codes sichtbar (`ScanCode::display`).
 - Versand über `Notifier::sendMany` (Zweck `device_log`; Fehler nur im Protokoll, der Vorgang ist
   bereits gespeichert; Hinweis-Mails mit Zweck `device_notice`, siehe "Hinweise (API)"). Begrenzung:
@@ -1931,6 +1931,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Anmeldung und Registrierung im Frontend (umgesetzt: anmelden, registrieren, email-bestaetigen,
   passwort-vergessen, passwort-zuruecksetzen, einladung-annehmen, Abmelden; Updates der App; siehe
   "Frontend" und KONZEPT.md "Anmeldung und Registrierung", "Updates der App").
+- User am Handy (abgeschlossen am 30.10.2026: suchen mit Code scannen und „Zuletzt benutzt“,
+  Umbuchen und Status, Standortwahl, Details und Verlauf, Prüffristen, Profil, komprimierte
+  Auslieferung; siehe "Frontend" und KONZEPT.md "User am Handy"). Wünsche für später in
+  `docs/TODO-SPAETER.md`.
 - Nicht in Version 1: Mengenartikel, Etiketten mit QR-/Barcodes erzeugen oder drucken,
   Prüfprotokolle.
 
