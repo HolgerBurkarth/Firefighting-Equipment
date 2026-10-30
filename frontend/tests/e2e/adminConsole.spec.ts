@@ -47,7 +47,7 @@ const OVERVIEW = adminOverview({
 });
 
 /** Einträge des Menüs (ADMIN_MENU in src/router/adminMenu.ts), ohne Abmelden. */
-const MENU_LABELS = ['Dashboard', 'Suchen', 'Standorte', 'Gerätetypen'];
+const MENU_LABELS = ['Dashboard', 'Suchen', 'Geräte', 'Standorte', 'Gerätetypen'];
 
 function menu(page: Page): Locator {
     return page.getByRole('navigation', { name: 'Hauptmenü' });

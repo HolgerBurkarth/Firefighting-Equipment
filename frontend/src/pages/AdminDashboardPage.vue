@@ -16,7 +16,7 @@ import { useNow } from '../runtime/now';
 /**
  * Startseite des Admins (Mockup „Main“): Kacheln Einsatzbereitschaft, nicht einsatzbereit,
  * Prüffristen und offene Hinweise, darunter „Nicht einsatzbereit“ und „Letzte Aktivitäten“
- * (GET device-events). Die Kacheln führen zur gefilterten Liste, sobald es die Seite gibt.
+ * (GET device-events). Die Kacheln führen zur gefilterten Geräteliste bzw. zu den Prüffristen.
  */
 const now = useNow();
 const state = computed(() => adminOverview.state);
@@ -76,7 +76,11 @@ onMounted(() => {
 
     <template v-if="tiles !== null && overview !== null">
         <div class="tiles">
-            <div class="tile tile-ready" data-testid="tile-readiness">
+            <RouterLink
+                class="tile tile-link tile-ready"
+                :to="{ name: 'devices' }"
+                data-testid="tile-readiness"
+            >
                 <span class="tile-label">Einsatzbereitschaft</span>
                 <span class="tile-value">{{ tiles.readiness.value }}</span>
                 <span class="tile-detail">{{ tiles.readiness.detail }}</span>
@@ -86,12 +90,16 @@ onMounted(() => {
                     :value="tiles.readiness.percent"
                     aria-label="Anteil einsatzbereit"
                 />
-            </div>
-            <div class="tile tile-defective" data-testid="tile-not-ready">
+            </RouterLink>
+            <RouterLink
+                class="tile tile-link tile-defective"
+                :to="{ name: 'devices', query: { status: 'maintenance,defective' } }"
+                data-testid="tile-not-ready"
+            >
                 <span class="tile-label">Nicht einsatzbereit</span>
                 <span class="tile-value tile-value-defective">{{ tiles.notReady.value }}</span>
                 <span class="tile-detail">{{ tiles.notReady.detail }}</span>
-            </div>
+            </RouterLink>
             <RouterLink
                 class="tile tile-link tile-maintenance"
                 :to="{ name: 'inspections' }"
@@ -128,9 +136,14 @@ onMounted(() => {
                         </RouterLink>
                     </li>
                 </ul>
-                <p v-if="moreNotReady > 0" class="hint" data-testid="not-ready-more">
+                <RouterLink
+                    v-if="moreNotReady > 0"
+                    class="more-link"
+                    :to="{ name: 'devices', query: { status: 'maintenance,defective' } }"
+                    data-testid="not-ready-more"
+                >
                     … und {{ moreNotReady }} weitere
-                </p>
+                </RouterLink>
             </section>
 
             <section class="card list" aria-labelledby="activity-title">
@@ -191,6 +204,11 @@ onMounted(() => {
 
 .retry {
     align-self: flex-start;
+}
+
+.more-link {
+    align-self: flex-start;
+    padding: 10px 0;
 }
 
 .tiles {

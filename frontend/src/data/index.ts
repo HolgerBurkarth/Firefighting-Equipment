@@ -16,6 +16,7 @@ import {
 } from '../api/locations';
 import { onSessionEnded, session } from '../auth/session';
 import { browserStorage } from '../runtime/theme';
+import { AdminDeviceList } from './adminDeviceList';
 import { AdminOverviewStore } from './adminOverview';
 import { DeviceHistory } from './deviceHistory';
 import { DeviceStore } from './deviceStore';
@@ -37,6 +38,8 @@ export const adminOverview = new AdminOverviewStore();
 /** Verwaltung des Admins: Standortbaum mit gesperrten Standorten, alle Gerätetypen. */
 export const adminLocationStore = new LocationStore(() => fetchAllLocations());
 export const deviceTypeStore = new DeviceTypeStore();
+/** Geräteliste der Admin-Konsole (Filter und Seiten vom Server, auch ausgesonderte). */
+export const adminDeviceList = new AdminDeviceList();
 
 /**
  * Nach einer Änderung an Standorten oder Gerätetypen lädt die Verwaltung neu (abgewartet), andere
@@ -57,6 +60,7 @@ async function afterMasterDataChange<T>(
         if (adminOverview.state.overview !== null) {
             void adminOverview.refresh('changed');
         }
+        void adminDeviceList.refresh('changed');
         // Die Seite schließt ihr Fenster erst mit dem neuen Stand (ein Fehler dabei bleibt im
         // Zustand der Liste).
         await admin.refresh('changed');
@@ -155,6 +159,7 @@ export function installDataLayer(
         adminOverview,
         adminLocationStore,
         deviceTypeStore,
+        adminDeviceList,
     ],
     storage = browserStorage(),
 ): () => void {

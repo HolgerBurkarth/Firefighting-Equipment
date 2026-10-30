@@ -21,7 +21,8 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
 /**
  * Standorte der Stadt als Baum (KONZEPT.md, "Bereiche des Admins"): Fahrzeuge, Räume und Externe
  * mit ihren Fächern, Symbol je Art und Zahl der Geräte. Anlegen, Fach hinzufügen, Umbenennen,
- * Sperren (nur leer) und Entsperren in kleinen Fenstern; gesperrte nur auf Wunsch.
+ * Sperren (nur leer) und Entsperren in kleinen Fenstern; gesperrte nur auf Wunsch. Der Name führt
+ * zur Geräteliste mit diesem Standort (samt Fächern).
  */
 const state = computed(() => adminLocationStore.state);
 const tree = computed(() => state.value.locations ?? []);
@@ -330,7 +331,12 @@ onMounted(() => {
                     <path v-for="d in KIND_ICONS[group.location.kind]" :key="d" :d="d" />
                 </svg>
                 <span class="node-text">
-                    <span class="node-name">{{ group.location.name }}</span>
+                    <RouterLink
+                        class="node-name"
+                        :to="{ name: 'devices', query: { standort: String(group.location.id) } }"
+                        :title="`Geräte in ${group.location.name}`"
+                        >{{ group.location.name }}</RouterLink
+                    >
                     <span class="node-meta">
                         {{ group.location.kindLabel }} ·
                         {{ deviceCountText(group.location.deviceCountTotal) }}
@@ -400,7 +406,12 @@ onMounted(() => {
                         <path v-for="d in SUB_ICON" :key="d" :d="d" />
                     </svg>
                     <span class="node-text">
-                        <span class="node-name">{{ child.name }}</span>
+                        <RouterLink
+                            class="node-name"
+                            :to="{ name: 'devices', query: { standort: String(child.id) } }"
+                            :title="`Geräte in ${group.location.name} / ${child.name}`"
+                            >{{ child.name }}</RouterLink
+                        >
                         <span class="node-meta">{{ deviceCountText(child.deviceCount) }}</span>
                     </span>
                     <span v-if="!child.active" class="badge badge-retired">gesperrt</span>
@@ -572,8 +583,17 @@ onMounted(() => {
 }
 
 .node-name {
+    align-self: flex-start;
+    color: var(--text);
     font-weight: var(--font-weight-bold);
+    text-decoration: none;
     overflow-wrap: anywhere;
+}
+
+/* Klick auf den Namen zeigt die Geräte dort (Geräteliste mit Filter, KONZEPT.md). */
+.node-name:hover {
+    color: var(--line);
+    text-decoration: underline;
 }
 
 .node-child .node-name {

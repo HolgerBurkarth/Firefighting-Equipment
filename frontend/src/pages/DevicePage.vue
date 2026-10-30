@@ -15,6 +15,7 @@ import ErrorNotice from '../components/ErrorNotice.vue';
 import FocusHeader from '../components/FocusHeader.vue';
 import LocationPicker from '../components/LocationPicker.vue';
 import {
+    adminDeviceList,
     deviceStore,
     locationStore,
     recentLocationIds,
@@ -287,10 +288,13 @@ async function save(): Promise<void> {
     rememberDevice(deviceId);
     // Gerätezahlen der Standortwahl stimmen danach nicht mehr.
     void locationStore.refresh('changed');
+    // Geräteliste der Admin-Konsole, falls schon geöffnet (sonst nichts).
+    void adminDeviceList.refresh('changed');
     setBookingNotice(bookingNotice(result.data));
     saved.value = true;
-    // Zurück, woher man kam (Suchen oder Prüffristen), sonst zu „Suchen“ (Entscheidung 22).
-    await returnTo(router, ['search', 'inspections']);
+    // Zurück, woher man kam (Suchen, Prüffristen oder die Geräteliste der Admin-Konsole), sonst zu
+    // „Suchen“ (Entscheidung 22).
+    await returnTo(router, ['search', 'inspections', 'devices']);
 }
 </script>
 

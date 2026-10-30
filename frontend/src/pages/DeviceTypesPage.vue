@@ -20,7 +20,7 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
 /**
  * Gerätetypen der Stadt (KONZEPT.md, "Bereiche des Admins"): Liste mit Name und Gerätezahl,
  * sortierbar wie im Explorer (am Handy Karten mit Sortier-Knöpfen), Anlegen, Umbenennen, Deaktivieren
- * und Aktivieren. Deaktivierte nur auf Wunsch.
+ * und Aktivieren. Deaktivierte nur auf Wunsch. Der Name führt zur Geräteliste mit diesem Typ.
  */
 const state = computed(() => deviceTypeStore.state);
 const types = computed(() => state.value.types ?? []);
@@ -302,7 +302,12 @@ onMounted(() => {
                 >
                     <td>
                         <div class="cell-name">
-                            <span class="type-name">{{ type.name }}</span>
+                            <RouterLink
+                                class="type-name"
+                                :to="{ name: 'devices', query: { typ: String(type.id) } }"
+                                :title="`Geräte vom Typ ${type.name}`"
+                                >{{ type.name }}</RouterLink
+                            >
                             <span v-if="!type.active" class="badge badge-retired">
                                 deaktiviert
                             </span>
@@ -468,8 +473,16 @@ onMounted(() => {
 }
 
 .type-name {
+    color: var(--text);
     font-weight: var(--font-weight-bold);
+    text-decoration: none;
     overflow-wrap: anywhere;
+}
+
+/* Klick auf den Namen zeigt die Geräte dieses Typs (Geräteliste mit Filter). */
+.type-name:hover {
+    color: var(--line);
+    text-decoration: underline;
 }
 
 .row-inactive .type-name {

@@ -126,3 +126,62 @@ export async function apiRequest<T>(
         ? { ok: false, error: apiError('invalid_response', response.status) }
         : { ok: true, status: response.status, data };
 }
+
+/** Heruntergeladene Datei (CSV-Export): Inhalt und Name aus `Content-Disposition`. */
+export interface DownloadedFile {
+    readonly blob: Blob;
+    readonly fileName: string;
+}
+
+/**
+ * Dateiname aus `Content-Disposition: attachment; filename="…"` (CsvResponse: nur `a-z0-9.-`);
+ * andere Namen oder ohne Angabe `fallback`.
+ */
+export function downloadFileName(header: string | null, fallback: string): string {
+    const match = header === null ? null : /filename="([a-z0-9.-]{1,120})"/.exec(header);
+    return match?.[1] ?? fallback;
+}
+
+/**
+ * Datei von api/v1/<path> laden (GET, wie apiRequest mit Sitzungs-Cookie und X-Client-Api).
+ * Fehler kommen wie bei apiRequest als ApiError (das Backend antwortet dann mit JSON); 401 ruft den
+ * Abmelde-Weg. Wirft nie.
+ */
+export async function apiDownload(
+    path: string,
+    fallbackName: string,
+    fetchFn: typeof fetch = fetch,
+): Promise<ApiResult<DownloadedFile>> {
+    let response: Response;
+    try {
+        response = await fetchFn(apiUrl(path), {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { [CLIENT_API_HEADER]: String(CLIENT_API_VERSION) },
+        });
+    } catch {
+        return { ok: false, error: apiError('network', null) };
+    }
+    if (!response.ok) {
+        let json: unknown;
+        try {
+            json = await response.json();
+        } catch {
+            json = undefined;
+        }
+        if (response.status === 401) {
+            unauthorizedHandler?.();
+        }
+        return { ok: false, error: errorFromResponse(response, json) };
+    }
+    try {
+        const blob = await response.blob();
+        const fileName = downloadFileName(
+            response.headers.get('Content-Disposition'),
+            fallbackName,
+        );
+        return { ok: true, status: response.status, data: { blob, fileName } };
+    } catch {
+        return { ok: false, error: apiError('network', response.status) };
+    }
+}

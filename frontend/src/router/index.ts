@@ -117,6 +117,13 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { roles: DEVICE_ROLES, layout: 'user' },
         });
         routes.push({
+            // Filter in der Adresse (src/data/deviceList.ts), z. B. geraete?status=defective.
+            path: '/geraete',
+            name: 'devices',
+            component: () => import('../pages/DevicesPage.vue'),
+            meta: { roles: ['admin'], layout: 'admin' },
+        });
+        routes.push({
             path: '/standorte',
             name: 'locations',
             component: () => import('../pages/LocationsPage.vue'),

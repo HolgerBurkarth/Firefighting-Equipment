@@ -274,14 +274,19 @@ Das Menü des Admins enthält „Suchen“ (die Handy-Seite `suchen`, Entscheidu
 einsatzbereit, Prüffristen und offene Hinweise (Hinweise im Protokoll plus wartende
 Freischaltungen), darunter „Nicht einsatzbereit“ (defekte zuerst, höchstens 10) und „Letzte
 Aktivitäten“ (die letzten 8 Einträge des Verlaufs der Stadt mit Zeit, Gerät, Wer und Von/Nach). Die
-Kachel „Prüffristen“ führt zu `prueffristen`; die anderen Kacheln führen zur gefilterten Liste,
+Kachel „Prüffristen“ führt zu `prueffristen`; „Offene Hinweise“ führt zu Protokoll und Benutzern,
 sobald es sie gibt. Schritt 2: `standorte` als Baum (Fahrzeug, Raum oder Extern mit seinen Fächern,
 Symbol, Gerätezahl, Filter, gesperrte nur auf Wunsch) mit „Neuer Standort“ (Name und Art), „Fach
 anlegen“, Umbenennen, Sperren (nur leer: der Knopf nennt vorher, was noch dort liegt, dann
 Rückfrage) und Entsperren in kleinen Fenstern; `geraetetypen` als Liste mit Name und Gerätezahl
 (Spaltenköpfe sortieren, am Handy Karten mit Sortier-Knöpfen), Anlegen, Umbenennen, Deaktivieren
 mit Rückfrage und Aktivieren. Gleiche Namen fallen schon beim Tippen auf. „Klick zeigt die Geräte
-dort“ kommt mit der Geräteliste (Schritt 3).
+dort“: Der Name führt zur Geräteliste mit diesem Standort bzw. Typ. Schritt 3: `geraete` mit Suche,
+Filtern nach Gerätetyp, Standort (samt Fächern) und Status, „Ausgesonderte anzeigen“, Sortierung
+über die Spaltenköpfe (am Handy Karten mit Auswahl und Richtung), „Weitere laden“ in Blöcken zu 50
+und „Export (CSV)“ mit denselben Filtern. Filter und Sortierung rechnet der Server, sie stehen in der
+Adresse; die Kacheln „Einsatzbereitschaft“ und „Nicht einsatzbereit“ führen dorthin. Die Kennung
+öffnet bis zur Detailseite (Schritt 4) das Umbuchen; nach dem Speichern geht es zur Liste zurück.
 
 | | Admin | Super-Admin |
 |---|---|---|
@@ -292,8 +297,9 @@ dort“ kommt mit der Geräteliste (Schritt 3).
 - Suchfeld oben rechts, filtert schon beim Tippen nach Teiltext; daneben „Neu“.
 - Spaltenköpfe sortieren wie im Windows-Explorer (Klick auf-, zweiter Klick absteigend, Pfeil).
 - Stift-Symbol zum Bearbeiten in jeder Zeile; Klick auf die Zeile öffnet die Details.
-- Am Handy werden Zeilen zu Karten, Sortierung über Knöpfe oben (wie die Spaltenköpfe; kein
-  `<select>`, siehe CLAUDE.md, CSP).
+- Am Handy werden Zeilen zu Karten, Sortierung über Knöpfe oben (wie die Spaltenköpfe).
+  Auswahllisten (Gerätetyp, Standort, Rolle …) mit Select bzw. Combobox von Reka UI, kein natives
+  `<select>` (siehe CLAUDE.md, CSP; TODO-SPAETER.md T8).
 - Geräte werden nie gelöscht, sondern ausgesondert (rot, abseits, Sicherheitsrückfrage mit Namen).
   Typen werden deaktiviert, Standorte gesperrt (nur wenn leer, sonst freundlicher Hinweis wie
   „Hier liegen noch 3 Geräte“), Benutzer anonymisiert.

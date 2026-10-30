@@ -1,5 +1,6 @@
 /** Symbole des Menüs (src/components/AdminMenuIcon.vue). */
-export type AdminMenuIconName = 'dashboard' | 'search' | 'location' | 'tag' | 'account' | 'logout';
+export type AdminMenuIconName =
+    'dashboard' | 'search' | 'devices' | 'location' | 'tag' | 'account' | 'logout';
 
 /** Zähler an einem Eintrag (aus dem Dashboard-Stand, src/data/adminOverview.ts). */
 export type AdminMenuBadge = 'pendingUsers' | 'openNotices';
@@ -21,6 +22,7 @@ export interface AdminMenuEntry {
 export const ADMIN_MENU: readonly AdminMenuEntry[] = [
     { route: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { route: 'search', label: 'Suchen', icon: 'search' },
+    { route: 'devices', label: 'Geräte', icon: 'devices' },
     { route: 'locations', label: 'Standorte', icon: 'location' },
     { route: 'device-types', label: 'Gerätetypen', icon: 'tag' },
 ];
