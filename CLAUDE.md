@@ -286,7 +286,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   per Test genau so). Spätere Bausteine ergänzen gezielt nur, was sie brauchen, mit Begründung im
   Kommentar (z. B. QR-Code/Logo-Vorschau: `img-src data: blob:`).
   Daher im Frontend keine Inline-Skripte, keine `<style>`-Elemente und kein `style=""` im HTML;
-  Schriften liegen im Build (kein Google Fonts).
+  Schriften liegen im Build (kein Google Fonts). Auch kein `<select>`: Playwright-WebKit meldet dafür
+  eine CSP-Verletzung (`style-src`), obwohl die Seite keinen Inline-Stil setzt (geprüft 30.10.2026);
+  stattdessen Knöpfe mit `aria-pressed` oder Radiogruppen.
 - Build fehlt oder `index.html` ohne Platzhalter → 503 `frontend_unavailable` (Einzelheiten nur im
   Protokoll); die API läuft weiter.
 
@@ -297,8 +299,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
-  `client.ts`; `devices.ts`, `deviceEvents.ts`, `deviceSummary.ts`, `inspections.ts`, `locations.ts`,
-  `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte und das Dashboard),
+  `client.ts`; `devices.ts`, `deviceEvents.ts`, `deviceSummary.ts`, `deviceTypes.ts`,
+  `inspections.ts`, `locations.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
+  Gerätetypen und das Dashboard),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
@@ -522,6 +525,38 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   dort auch `adminOverview`, `summaryJson`, `userJson`, `tenantEventJson`); Tests in
   `tests/e2e/adminConsole.spec.ts` (Menü in drei Breiten, Dashboard) und
   `tests/unit/adminOverview.spec.ts`.
+- Standorte und Gerätetypen der Admin-Konsole (`LocationsPage`, `standorte`; `DeviceTypesPage`,
+  `geraetetypen`; nur `admin`, `layout: 'admin'`, Menü „Standorte“ und „Gerätetypen“ nach „Suchen“):
+  Lesen über eigene Stores (`adminLocationStore` = `LocationStore` mit `GET
+  locations?include_inactive=1`, `deviceTypeStore` = `DeviceTypeStore` mit `GET
+  device-types?include_inactive=1`, beide in `installDataLayer`), Ändern nur über `src/data/index.ts`
+  (`addLocation`, `renameLocation`, `setLocationActive`, `addDeviceType`, `renameDeviceType`,
+  `setDeviceTypeActive`; API in `src/api/locations.ts` und `src/api/deviceTypes.ts`): nach Erfolg lädt
+  die Verwaltung neu (abgewartet), `locationStore`, `deviceStore` und `adminOverview` nur, wenn sie
+  schon geladen sind. Prüfung beim Tippen (`src/data/masterData.ts`): `nameProblem` wie
+  `DeviceNameRules` (Rand wie PHP `trim()`, Länge in Unicode-Zeichen, 100 bzw. 50, keine `\p{Cc}`),
+  gleicher Name unter den Geschwistern (auch gesperrten/deaktivierten) per `sameName` (`searchKey`);
+  verbindlich bleibt der Server (409 `name_taken` am Feld). Standorte als Baum (`filterLocationTree`:
+  Wörter mit UND im Namen bzw. Pfad, gesperrte nur mit „Gesperrte anzeigen (N)“), Symbol je Art
+  (`src/components/locationIcons.ts`, auch in `LocationPicker`), Gerätezahl (Ebene 1
+  `device_count_total`); Knöpfe „Fach in … anlegen“ (nur aktive Ebene 1) und „… bearbeiten“
+  (Stift). Fenster `FormDialog` (Reka UI `Dialog`, Slot `extra` für Sperren/Deaktivieren abseits,
+  `returnFocus` = öffnender Knopf, da WebKit beim Klick nicht fokussiert). Sperren nur leer
+  (`lockBlocker` aus dem Baum: Geräte direkt dort und aktive Fächer; Knopf gesperrt mit Hinweis), dann
+  `ConfirmDialog`; 409 des Servers als Meldung auf der Seite. Entsperren eines Fachs erst nach dem
+  übergeordneten Standort. Gerätetypen als Tabelle (`deviceTypeRows`: Name natürlich per
+  `Intl.Collator` mit `numeric`, Gerätezahl, Gleichstand nach Name; Spaltenköpfe mit `aria-sort`, am
+  Handy Karten und Knöpfe „Sortieren“ statt `<select>`, siehe CSP), Deaktivieren mit Rückfrage
+  (vorhandene Geräte behalten den Typ). Erfolg als `success-notice`. Klick auf einen Standort bzw.
+  Typ zeigt die Geräte dort erst mit der Geräteliste. Browser-Tests `tests/e2e/locations.spec.ts`,
+  `tests/e2e/deviceTypes.spec.ts` mit zustandsbehafteten Servern (`locationServer`,
+  `deviceTypeServer`, je Test neu über `delegate` und `test.beforeEach`;
+  `tests/e2e/support/masterData.ts`), waagerechter Überstand am Handy über `horizontalOverflow`
+  (`tests/e2e/support/layout.ts`: `scrollWidth` gegen die Breite von `body`, nicht `clientWidth`, das
+  Playwright-WebKit unter Windows im Handy-Profil um eine 20 px breite Bildlaufleiste kürzt);
+  Unit-Tests `masterData.spec.ts`, `deviceTypesApi.spec.ts`,
+  `deviceTypeStore.spec.ts`, `locationsApi.spec.ts`, `router.spec.ts` (jeder Menüeintrag hat eine
+  Seite).
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und

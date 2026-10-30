@@ -1,10 +1,25 @@
 import type { ApiResult } from '../api/client';
+import {
+    createDeviceType,
+    renameDeviceType as postDeviceTypeName,
+    setDeviceTypeActive as postDeviceTypeActive,
+    type DeviceType,
+} from '../api/deviceTypes';
 import { fetchInspectionOverview, type InspectionOverview } from '../api/inspections';
+import {
+    createLocation,
+    fetchAllLocations,
+    renameLocation as postLocationName,
+    setLocationActive as postLocationActive,
+    type NewLocation,
+    type SavedLocation,
+} from '../api/locations';
 import { onSessionEnded, session } from '../auth/session';
 import { browserStorage } from '../runtime/theme';
 import { AdminOverviewStore } from './adminOverview';
 import { DeviceHistory } from './deviceHistory';
 import { DeviceStore } from './deviceStore';
+import { DeviceTypeStore } from './deviceTypeStore';
 import { INSPECTION_WINDOW_DAYS, SERVER_INSPECTION_LIMIT } from './inspections';
 import { LocationStore } from './locationStore';
 import { setBookingNotice } from './booking';
@@ -19,6 +34,68 @@ export const deviceStore = new DeviceStore();
 export const locationStore = new LocationStore();
 /** Dashboard und Zähler im Menü der Admin-Konsole. */
 export const adminOverview = new AdminOverviewStore();
+/** Verwaltung des Admins: Standortbaum mit gesperrten Standorten, alle Gerätetypen. */
+export const adminLocationStore = new LocationStore(() => fetchAllLocations());
+export const deviceTypeStore = new DeviceTypeStore();
+
+/**
+ * Nach einer Änderung an Standorten oder Gerätetypen lädt die Verwaltung neu (abgewartet), andere
+ * Listen nur, wenn sie schon geladen sind (Namen und Pfade in der Geräteliste, gesperrte Standorte
+ * in der Standortwahl), damit z. B. die Seite „Standorte“ nicht alle Geräte holt.
+ */
+async function afterMasterDataChange<T>(
+    result: ApiResult<T>,
+    admin: { refresh(reason: 'changed'): Promise<void> },
+): Promise<ApiResult<T>> {
+    if (result.ok) {
+        if (locationStore.state.locations !== null) {
+            void locationStore.refresh('changed');
+        }
+        if (deviceStore.state.mode !== null) {
+            void deviceStore.refresh('changed');
+        }
+        if (adminOverview.state.overview !== null) {
+            void adminOverview.refresh('changed');
+        }
+        // Die Seite schließt ihr Fenster erst mit dem neuen Stand (ein Fehler dabei bleibt im
+        // Zustand der Liste).
+        await admin.refresh('changed');
+    }
+    return result;
+}
+
+/** Neuer Standort oder neues Fach (Admin). */
+export async function addLocation(location: NewLocation): Promise<ApiResult<SavedLocation>> {
+    return afterMasterDataChange(await createLocation(location), adminLocationStore);
+}
+
+export async function renameLocation(id: number, name: string): Promise<ApiResult<SavedLocation>> {
+    return afterMasterDataChange(await postLocationName(id, name), adminLocationStore);
+}
+
+/** Sperren (nur leer) bzw. entsperren. */
+export async function setLocationActive(
+    id: number,
+    active: boolean,
+): Promise<ApiResult<SavedLocation>> {
+    return afterMasterDataChange(await postLocationActive(id, active), adminLocationStore);
+}
+
+export async function addDeviceType(name: string): Promise<ApiResult<DeviceType>> {
+    return afterMasterDataChange(await createDeviceType(name), deviceTypeStore);
+}
+
+export async function renameDeviceType(id: number, name: string): Promise<ApiResult<DeviceType>> {
+    return afterMasterDataChange(await postDeviceTypeName(id, name), deviceTypeStore);
+}
+
+/** Aktivieren bzw. deaktivieren (vorhandene Geräte behalten den Typ). */
+export async function setDeviceTypeActive(
+    id: number,
+    active: boolean,
+): Promise<ApiResult<DeviceType>> {
+    return afterMasterDataChange(await postDeviceTypeActive(id, active), deviceTypeStore);
+}
 
 /** Verlauf eines Geräts („Details und Verlauf“), je Ansicht neu. */
 export function deviceHistory(id: number): DeviceHistory {
@@ -72,7 +149,13 @@ interface DataStore {
  */
 export function installDataLayer(
     doc: Document = document,
-    stores: readonly DataStore[] = [deviceStore, locationStore, adminOverview],
+    stores: readonly DataStore[] = [
+        deviceStore,
+        locationStore,
+        adminOverview,
+        adminLocationStore,
+        deviceTypeStore,
+    ],
     storage = browserStorage(),
 ): () => void {
     const stopSession = onSessionEnded((ended, reason) => {
