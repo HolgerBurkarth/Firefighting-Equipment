@@ -2,7 +2,7 @@
 import AccountPanel from '../components/AccountPanel.vue';
 </script>
 
-<!-- Platzhalter: Dashboard des Admins (Stadt) bzw. des Super-Admins (service). -->
+<!-- Platzhalter: Dashboard des Super-Admins (service); unter Städten AdminDashboardPage. -->
 <template>
     <h1>Dashboard</h1>
     <p class="placeholder">Hier entsteht das Dashboard.</p>

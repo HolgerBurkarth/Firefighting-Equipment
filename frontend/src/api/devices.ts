@@ -152,9 +152,14 @@ export interface DevicePageQuery {
     readonly q?: string;
     /** Scan-Code genau (`scan_code`; Regeln wie `ScanCode`, sonst 400). */
     readonly scanCode?: string;
+    /** Nur diese Status (`status`, kommagetrennt; mit `retired` auch ausgesonderte). */
+    readonly status?: readonly DeviceStatus[];
+    /** Sortierung wie DeviceSort/SortDirection (Standard Kennung aufsteigend). */
+    readonly sort?: 'identifier' | 'device_type' | 'location' | 'status' | 'next_inspection_due';
+    readonly dir?: 'asc' | 'desc';
 }
 
-/** GET devices (ohne ausgesonderte Geräte, sortiert nach Kennung). */
+/** GET devices (ohne Angabe von `status` ohne ausgesonderte Geräte, sortiert nach Kennung). */
 export function fetchDevicePage(
     query: DevicePageQuery,
     fetchFn?: typeof fetch,
@@ -168,6 +173,15 @@ export function fetchDevicePage(
     }
     if (query.scanCode !== undefined) {
         params.set('scan_code', query.scanCode);
+    }
+    if (query.status !== undefined) {
+        params.set('status', query.status.join(','));
+    }
+    if (query.sort !== undefined) {
+        params.set('sort', query.sort);
+    }
+    if (query.dir !== undefined) {
+        params.set('dir', query.dir);
     }
     return apiRequest(`devices?${params.toString()}`, parseDevicePage, {
         ...(fetchFn && { fetchFn }),

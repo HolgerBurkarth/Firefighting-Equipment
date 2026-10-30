@@ -24,18 +24,14 @@ declare module 'vue-router' {
         /**
          * Darstellung (App.vue): ohne Angabe Kopfleiste und Inhalt; `user` Handy-Seiten mit Leiste
          * unten (Suchen, Prüffristen, Profil); `focus` bildschirmfüllend ohne Kopfleiste der App
-         * und ohne Leiste, die Seite zeigt ihre eigene Kopfzeile mit Zurück-Knopf.
+         * und ohne Leiste, die Seite zeigt ihre eigene Kopfzeile mit Zurück-Knopf; `admin` Seiten
+         * der Admin-Konsole mit deren Menü (src/components/AdminMenu.vue).
          */
         layout?: PageLayout;
-        /**
-         * Ohne `layout`: trotzdem die Leiste unten, in jeder Breite (Dashboard des Admins, bis die
-         * Admin-Konsole ihr eigenes Menü hat; KONZEPT.md, "Admin-Konsole").
-         */
-        tabBar?: boolean;
     }
 }
 
-export type PageLayout = 'user' | 'focus';
+export type PageLayout = 'user' | 'focus' | 'admin';
 
 /** Handy-Seiten: User und Admin (KONZEPT.md, "User am Handy – Entscheidungen", 19). */
 const DEVICE_ROLES: readonly UserRole[] = ['user', 'admin'];
@@ -71,8 +67,13 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
         {
             path: '/dashboard',
             name: 'dashboard',
-            component: () => import('../pages/DashboardPage.vue'),
-            meta: base.isService ? { roles: ['superadmin'] } : { roles: ['admin'], tabBar: true },
+            // Unter einer Stadt die Startseite der Admin-Konsole, unter service vorerst ein Platzhalter.
+            component: base.isService
+                ? () => import('../pages/DashboardPage.vue')
+                : () => import('../pages/AdminDashboardPage.vue'),
+            meta: base.isService
+                ? { roles: ['superadmin'] }
+                : { roles: ['admin'], layout: 'admin' },
         },
     ];
     if (!base.isService) {

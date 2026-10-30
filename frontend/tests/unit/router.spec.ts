@@ -101,18 +101,16 @@ describe('Wächter', () => {
         );
     });
 
-    it('Dashboard des Admins mit Leiste (jede Breite), des Super-Admins ohne', async () => {
+    it('Dashboard des Admins in der Admin-Konsole, des Super-Admins ohne eigene Darstellung', async () => {
         setSession(state('admin'));
-        expect((await routerAt('/dashboard')).currentRoute.value.meta.tabBar).toBe(true);
+        expect((await routerAt('/dashboard')).currentRoute.value.meta.layout).toBe('admin');
         setSession(state('superadmin'));
         expect(
-            (await routerAt('/dashboard', SERVICE)).currentRoute.value.meta.tabBar,
+            (await routerAt('/dashboard', SERVICE)).currentRoute.value.meta.layout,
         ).toBeUndefined();
     });
 
     it('Seiten ohne eigene Darstellung haben kein layout', async () => {
-        setSession(state('admin'));
-        expect((await routerAt('/dashboard')).currentRoute.value.meta.layout).toBeUndefined();
         expect((await routerAt('/anmelden')).currentRoute.value.meta.layout).toBeUndefined();
     });
 

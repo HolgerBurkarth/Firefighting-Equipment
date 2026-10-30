@@ -4,8 +4,29 @@ Jede Änderung an der REST-API (auch neue Felder) wird hier zusätzlich eingetra
 mit Datum und Betreff des Commits. Verbindlich bleibt `CLAUDE.md`; diese Datei sagt dem
 Backend-Chat, was sich seit seinem letzten Stand geändert hat.
 
-Eintrag: Datum, Commit-Betreff (bei noch nicht committeten Änderungen „noch nicht committet“, der
-Nutzer ergänzt den Betreff), was sich geändert hat, warum, Tests, Stelle in `CLAUDE.md`.
+Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff ein, den er für den Commit vorschlägt;
+der Nutzer verwendet ihn), was sich geändert hat, warum, Tests, Stelle in `CLAUDE.md`.
+
+## 2026-10-30 – „Admin-Konsole: Menü und Dashboard, Verlauf der Stadt (Schritt 1)“
+
+Neuer lesender Endpunkt `GET api/v1/device-events` (nur Admins der Stadt, `Access::Admin`;
+`DeviceHistoryListHandler`): die Historie der ganzen Stadt als JSON, alle Geräte (auch
+ausgesonderte), neueste zuerst nach `created_at`, dann `id` (wie der CSV-Export mit
+`order=newest`, nutzt `idx_fe_device_events_tenant`). Parameter `limit` 1–200 (Standard 50) und
+`offset` 0–1000000 wie bei `GET devices/{id}/events`; keine Filter. Antwort `{events, total, limit,
+offset}`, je Eintrag genau die Felder von `DeviceEventJson::event` plus `device {id, identifier,
+device_type {id, name}}` mit dem aktuellen Stand des Geräts. Bestehende Antworten sind unverändert.
+
+- Zweck: „Letzte Aktivitäten“ auf dem Dashboard der Admin-Konsole (KONZEPT.md, "Admin-Konsole –
+  Entscheidungen", 35).
+- Code: `DeviceEventRepository::listForTenant` (neu, nur lesend), `DeviceHistoryPage` (neu);
+  `DeviceHistoryEntry` hat zusätzlich `deviceTypeId` (der Export liest dafür `t.id` mit, sonst
+  unverändert).
+- Tests: `DeviceHistoryListTest` (alle Geräte der Stadt, keine fremden, Reihenfolge bei gleicher
+  Sekunde nach ID, aktuelle Kennung und aktueller Typ, gleiche Felder wie
+  `devices/{id}/events`, Seiten, anonymisierte Konten, ungültige Parameter);
+  `AdminRoutesAccessTest` (Eintrag „Verlauf der Stadt“).
+- Dokumentiert in `CLAUDE.md`, "Geräte (API)".
 
 ## 2026-10-30 – „Code scannen (Schritt 9)“
 

@@ -1,5 +1,6 @@
 import type { Locator } from '@playwright/test';
 import { expect, meBody, test } from './fixtures';
+import { ADMIN_OVERVIEW } from './support/admin';
 import { deviceDetail, deviceJson, LOCATIONS, NO_DEVICES } from './support/devices';
 import { CURRENT_SESSION_ONLY } from './support/profile';
 
@@ -103,58 +104,36 @@ test.describe('Handy-Seiten als Admin', () => {
         api: {
             'GET api/v1/auth/me': { status: 200, body: meBody('admin') },
             ...NO_DEVICES,
+            ...ADMIN_OVERVIEW,
             ...deviceDetail(deviceJson(5)),
             ...LOCATIONS,
         },
     });
 
-    // Breite ausdrücklich gesetzt: Die Leiste steht in jeder Breite (auch am PC, bis die
-    // Admin-Konsole ihr Menü hat); die Profile laufen in PC- und Handy-Breite.
-    test('Handy-Breite: Leiste mit Dashboard, auch auf dem Dashboard', async ({ page }) => {
-        await page.setViewportSize({ width: 390, height: 844 });
-        await page.goto('/firefighting/test/suchen');
-        await expect(page.getByRole('heading', { level: 1, name: 'Suchen' })).toBeVisible();
-        const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
-        await expect(nav.getByRole('link')).toHaveText([
-            'Dashboard',
-            'Suchen',
-            'Prüffristen',
-            'Profil',
-        ]);
-        await nav.getByRole('link', { name: 'Dashboard' }).click();
-        await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
-        // Das Dashboard hat die Kopfleiste der Admin-Konsole und bei Handy-Breite dieselbe Leiste.
-        await expect(page.getByTestId('app-subtitle')).toHaveText('Geräteverwaltung');
-        await expect(nav.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
-            'aria-current',
-            'page',
-        );
-        await nav.getByRole('link', { name: 'Suchen' }).click();
-        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
-    });
-
-    test('PC-Breite: Leiste auf den Handy-Seiten und auf dem Dashboard', async ({ page }) => {
-        await page.setViewportSize({ width: 1280, height: 800 });
-        await page.goto('/firefighting/test/suchen');
-        const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
-        await expect(nav.getByRole('link')).toHaveText([
-            'Dashboard',
-            'Suchen',
-            'Prüffristen',
-            'Profil',
-        ]);
-        await nav.getByRole('link', { name: 'Dashboard' }).click();
-        await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
-        await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
-        await expect(nav).toBeVisible();
-        await expect(nav.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
-            'aria-current',
-            'page',
-        );
-        // Am PC der einzige Weg zu „Suchen“ ohne Adresszeile.
-        await nav.getByRole('link', { name: 'Suchen' }).click();
-        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
-    });
+    // Breite ausdrücklich gesetzt: Die Leiste unten steht auf den Handy-Seiten in jeder Breite;
+    // das Dashboard hat das Menü der Admin-Konsole (adminConsole.spec.ts).
+    for (const [label, width, height] of [
+        ['Handy-Breite', 390, 844],
+        ['PC-Breite', 1280, 800],
+    ] as const) {
+        test(`${label}: Leiste mit Dashboard, zurück in die Admin-Konsole`, async ({ page }) => {
+            await page.setViewportSize({ width, height });
+            await page.goto('/firefighting/test/suchen');
+            await expect(page.getByRole('heading', { level: 1, name: 'Suchen' })).toBeVisible();
+            const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
+            await expect(nav.getByRole('link')).toHaveText([
+                'Dashboard',
+                'Suchen',
+                'Prüffristen',
+                'Profil',
+            ]);
+            await nav.getByRole('link', { name: 'Dashboard' }).click();
+            await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
+            await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
+            // Auf dem Dashboard keine Leiste unten mehr, sondern das Menü der Konsole.
+            await expect(page.locator('.tab-bar')).toHaveCount(0);
+        });
+    }
 
     test('Geräteseite öffnen', async ({ page }) => {
         await page.goto('/firefighting/test/geraete/5');

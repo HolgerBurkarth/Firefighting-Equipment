@@ -62,6 +62,7 @@ MA-01;defekt
         yield 'Akzentfarbe setzen' => ['POST', 'tenant/appearance', ['accent_color' => '#1a237e']];
         yield 'Logo hochladen' => ['POST', 'tenant/logo', ['file' => '{logo_file}']];
         yield 'Logo entfernen' => ['DELETE', 'tenant/logo', []];
+        yield 'Verlauf der Stadt' => ['GET', 'device-events', null];
         yield 'Hinweise auflisten' => ['GET', 'notices?status=all', null];
         yield 'Hinweis anzeigen' => ['GET', 'notices/{notice}', null];
         yield 'Hinweis erledigen' => ['POST', 'notices/{notice}/resolve', ['note' => 'Geklärt']];

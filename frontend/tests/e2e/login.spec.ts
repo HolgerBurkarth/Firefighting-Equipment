@@ -9,6 +9,7 @@ import {
     test,
     type MockResponse,
 } from './fixtures';
+import { ADMIN_OVERVIEW } from './support/admin';
 import { NO_DEVICES } from './support/devices';
 
 const LOGIN = 'POST api/v1/auth/login';
@@ -152,7 +153,13 @@ test.describe('Erfolgreiche Anmeldung', () => {
         ['superadmin', 'service', 'dashboard'],
     ] as const) {
         test.describe(role, () => {
-            test.use({ api: { [LOGIN]: { status: 200, body: meBody(role) }, ...NO_DEVICES } });
+            test.use({
+                api: {
+                    [LOGIN]: { status: 200, body: meBody(role) },
+                    ...NO_DEVICES,
+                    ...ADMIN_OVERVIEW,
+                },
+            });
 
             test(`führt zu ${target}`, async ({ page, apiRequests }) => {
                 await page.goto(`/firefighting/${area}/anmelden`);
@@ -168,7 +175,7 @@ test.describe('Erfolgreiche Anmeldung', () => {
     }
 
     test.describe('mit Rückkehradresse', () => {
-        test.use({ api: { [LOGIN]: { status: 200, body: meBody('admin') } } });
+        test.use({ api: { [LOGIN]: { status: 200, body: meBody('admin') }, ...ADMIN_OVERVIEW } });
 
         test('kehrt zur vorherigen Seite zurück', async ({ page }) => {
             await page.goto('/firefighting/test/anmelden?weiter=%2Fdashboard');
@@ -311,6 +318,7 @@ test.describe('Rückkehr nach Ablauf der Sitzung', () => {
                 body: { error: 'not_authenticated', message: 'x' },
             },
             [LOGIN]: { status: 200, body: meBody('admin') },
+            ...ADMIN_OVERVIEW,
         },
         allowedConsoleError: HTTP_ERROR_CONSOLE,
     });

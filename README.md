@@ -10,7 +10,7 @@ https://www.prodad.de/firefighting/service/<pfad>     # Super-Admin
 ```
 
 | Methode | Pfad                                  | Zugriff    | Antwort                                        |
-|---------|---------------------------------------|------------|------------------------------------------------|
+| ------- | ------------------------------------- | ---------- | ---------------------------------------------- |
 | GET     | `api/v1/health`                       | öffentlich | `{"status":"ok","database":"ok"}`              |
 | GET     | `api/v1/tenant`                       | öffentlich | `{"slug":…,"name":…,"accent_color":…,…}`       |
 | POST    | `api/v1/tenant/appearance`            | Admin      | wie `api/v1/tenant`                            |
@@ -46,17 +46,17 @@ https://www.prodad.de/firefighting/service/<pfad>     # Super-Admin
 
 Nur unter `service` (Super-Admin, siehe "Städte verwalten und Admins einladen"):
 
-| Methode | Pfad                                                   | Antwort                                   |
-|---------|--------------------------------------------------------|-------------------------------------------|
-| GET     | `api/v1/tenants`                                       | `{"tenants":[…]}` mit Status und Zahlen   |
-| GET     | `api/v1/tenants/slug-available?slug=…`                 | `{"slug":…,"valid":…,"available":…,…}`    |
-| POST    | `api/v1/tenants`                                       | 201 `{"tenant":…,"user":…,"mail_sent":…}` |
-| GET     | `api/v1/tenants/{id}`                                  | `{"tenant":…}`                            |
-| POST    | `api/v1/tenants/{id}/rename`                           | `{"tenant":…}`                            |
-| POST    | `api/v1/tenants/{id}/lock`, `…/unlock`                 | `{"tenant":…}`                            |
-| POST    | `api/v1/tenants/{id}/admins`                           | 201 `{"user":…,"mail_sent":…}`            |
-| POST    | `api/v1/tenants/{id}/users/{user}/resend-invitation`   | `{"user":…,"mail_sent":…}`                |
-| GET     | `api/v1/tenants/{id}/users[?status=…]`                 | `{"users":[…]}` (nur lesend)              |
+| Methode | Pfad                                                 | Antwort                                   |
+| ------- | ---------------------------------------------------- | ----------------------------------------- |
+| GET     | `api/v1/tenants`                                     | `{"tenants":[…]}` mit Status und Zahlen   |
+| GET     | `api/v1/tenants/slug-available?slug=…`               | `{"slug":…,"valid":…,"available":…,…}`    |
+| POST    | `api/v1/tenants`                                     | 201 `{"tenant":…,"user":…,"mail_sent":…}` |
+| GET     | `api/v1/tenants/{id}`                                | `{"tenant":…}`                            |
+| POST    | `api/v1/tenants/{id}/rename`                         | `{"tenant":…}`                            |
+| POST    | `api/v1/tenants/{id}/lock`, `…/unlock`               | `{"tenant":…}`                            |
+| POST    | `api/v1/tenants/{id}/admins`                         | 201 `{"user":…,"mail_sent":…}`            |
+| POST    | `api/v1/tenants/{id}/users/{user}/resend-invitation` | `{"user":…,"mail_sent":…}`                |
+| GET     | `api/v1/tenants/{id}/users[?status=…]`               | `{"users":[…]}` (nur lesend)              |
 
 `api/v1/tenant`, das Erscheinungsbild (Logo, Manifest; das Standard-Symbol gibt es auch unter `service`), Registrierung, E-Mail-Bestätigung, Einladung annehmen, Einladungscodes und
 Benutzerverwaltung gibt es nur unter einer Stadt (unter `service`: 404), die Städteverwaltung nur
@@ -87,14 +87,14 @@ Reihenfolge der Prüfungen (die erste verletzte Regel bestimmt die Meldung): lee
 50 Zeichen → reserviert (in Kleinbuchstaben verglichen) → Großbuchstaben, deren Kleinschreibung
 gültig wäre (mit Vorschlag) → Format.
 
-| Eingabe          | Ergebnis                                                         |
-|------------------|------------------------------------------------------------------|
-| `bad-duerrheim`  | gültig                                                           |
-| `stadt-2`, `123` | gültig                                                           |
-| `Bad-Duerrheim`  | ungültig, Vorschlag `bad-duerrheim`                              |
-| `Service`        | ungültig: reserviert                                             |
-| `tübingen`       | ungültig: Format (Umlaut)                                        |
-| `bad--duerrheim` | ungültig: Format (doppelter Bindestrich)                         |
+| Eingabe          | Ergebnis                                 |
+| ---------------- | ---------------------------------------- |
+| `bad-duerrheim`  | gültig                                   |
+| `stadt-2`, `123` | gültig                                   |
+| `Bad-Duerrheim`  | ungültig, Vorschlag `bad-duerrheim`      |
+| `Service`        | ungültig: reserviert                     |
+| `tübingen`       | ungültig: Format (Umlaut)                |
+| `bad--duerrheim` | ungültig: Format (doppelter Bindestrich) |
 
 Vor dem Anlegen kann das Frontend `GET api/v1/tenants/slug-available?slug=…` (nur Super-Admin)
 fragen, siehe "Städte verwalten und Admins einladen".
@@ -105,39 +105,39 @@ Alle Fehler haben das Format `{"error":"code","message":"deutscher Text"}`. Manc
 zusätzlich ein Objekt `details` mit maschinenlesbaren Angaben, z. B. beim Sperren eines Standorts, der
 nicht leer ist: `{"error":"rule_violation","message":"…","details":{"devices":2,"sublocations":1}}`.
 
-| HTTP | `error`                    | Bedeutung                                                  |
-|------|----------------------------|------------------------------------------------------------|
+| HTTP | `error`                    | Bedeutung                                                                                      |
+| ---- | -------------------------- | ---------------------------------------------------------------------------------------------- |
 | 400  | `invalid_request`          | Body kein JSON-Objekt, zu groß (> 16 KiB, CSV-Import 3 MiB), Feld fehlt, Import-Datei unlesbar |
-| 400  | `invalid_token`            | Link (Zurücksetzen, Bestätigen, Einladung) ungültig, abgelaufen, benutzt |
-| 400  | `invalid_invitation_code`  | Einladungscode ungültig, abgelaufen, aufgebraucht, widerrufen |
-| 401  | `not_authenticated`        | keine oder abgelaufene Sitzung                             |
-| 401  | `invalid_credentials`      | E-Mail oder Passwort falsch (bewusst nicht unterschieden)  |
-| 403  | `forbidden`                | angemeldet, aber die Rolle reicht nicht                    |
-| 403  | `origin_not_allowed`       | Header `Origin` nicht erlaubt (Schutz gegen CSRF)          |
-| 403  | `account_locked`           | Passwort richtig, Konto gesperrt                           |
-| 403  | `email_not_verified`       | Passwort richtig, E-Mail-Adresse noch nicht bestätigt      |
-| 403  | `pending_approval`         | Passwort richtig, Freischaltung durch Admin steht aus      |
-| 403  | `invalid_current_password` | Passwort ändern: aktuelles Passwort falsch                 |
-| 403  | `tenant_inactive`          | Stadt gesperrt                                             |
-| 404  | `not_found`                | Adresse oder Kürzel ungültig, Pfad unbekannt               |
-| 404  | `tenant_not_found`         | Kürzel gültig, aber keine Stadt dazu                       |
-| 405  | `method_not_allowed`       | Methode nicht erlaubt (erlaubte im Header `Allow`)         |
-| 409  | `rule_violation`           | Regel verletzt (letzter Admin, sich selbst sperren, …)     |
-| 409  | `slug_taken`               | Super-Admin: Kürzel einer neuen Stadt schon vergeben       |
-| 409  | `email_taken`              | Super-Admin: Adresse hat in der Stadt schon ein Konto      |
-| 409  | `name_taken`               | Name eines Gerätetyps bzw. Standorts schon vergeben        |
-| 409  | `identifier_taken`         | Kennung eines Geräts schon vergeben (ohne Groß-/Kleinschreibung) |
-| 409  | `scan_code_taken`          | Scan-Code eines Geräts schon vergeben (exakter Vergleich)  |
-| 409  | `version_conflict`         | Gerät inzwischen geändert; aktueller Stand in `details.device` |
-| 409  | `import_outdated`          | CSV-Import: seit der Vorschau geändert oder Datei fehlerhaft; Vorschau neu erstellen |
-| 409  | `client_ref_conflict`      | Buchung: dieselbe `client_ref` schon für eine andere Buchung verwendet |
-| 409  | `stale_action`             | Offline-Buchung zu alt; nach Rückfrage mit `confirmed_stale` senden |
-| 415  | `unsupported_media_type`   | ändernde Anfrage ohne `Content-Type: application/json`     |
-| 422  | `weak_password`            | neues Passwort verletzt die Passwortregeln                 |
-| 422  | `clock_implausible`        | Offline-Buchung: Aktionszeit mehr als 5 Minuten in der Zukunft |
-| 429  | `too_many_attempts`        | zu viele Fehlversuche (Wartezeit im Header `Retry-After`)  |
-| 503  | `database_unavailable`     | Datenbank nicht erreichbar                                 |
-| 500  | `internal_error`           | unerwarteter Fehler; Details nur im Server-Log             |
+| 400  | `invalid_token`            | Link (Zurücksetzen, Bestätigen, Einladung) ungültig, abgelaufen, benutzt                       |
+| 400  | `invalid_invitation_code`  | Einladungscode ungültig, abgelaufen, aufgebraucht, widerrufen                                  |
+| 401  | `not_authenticated`        | keine oder abgelaufene Sitzung                                                                 |
+| 401  | `invalid_credentials`      | E-Mail oder Passwort falsch (bewusst nicht unterschieden)                                      |
+| 403  | `forbidden`                | angemeldet, aber die Rolle reicht nicht                                                        |
+| 403  | `origin_not_allowed`       | Header `Origin` nicht erlaubt (Schutz gegen CSRF)                                              |
+| 403  | `account_locked`           | Passwort richtig, Konto gesperrt                                                               |
+| 403  | `email_not_verified`       | Passwort richtig, E-Mail-Adresse noch nicht bestätigt                                          |
+| 403  | `pending_approval`         | Passwort richtig, Freischaltung durch Admin steht aus                                          |
+| 403  | `invalid_current_password` | Passwort ändern: aktuelles Passwort falsch                                                     |
+| 403  | `tenant_inactive`          | Stadt gesperrt                                                                                 |
+| 404  | `not_found`                | Adresse oder Kürzel ungültig, Pfad unbekannt                                                   |
+| 404  | `tenant_not_found`         | Kürzel gültig, aber keine Stadt dazu                                                           |
+| 405  | `method_not_allowed`       | Methode nicht erlaubt (erlaubte im Header `Allow`)                                             |
+| 409  | `rule_violation`           | Regel verletzt (letzter Admin, sich selbst sperren, …)                                         |
+| 409  | `slug_taken`               | Super-Admin: Kürzel einer neuen Stadt schon vergeben                                           |
+| 409  | `email_taken`              | Super-Admin: Adresse hat in der Stadt schon ein Konto                                          |
+| 409  | `name_taken`               | Name eines Gerätetyps bzw. Standorts schon vergeben                                            |
+| 409  | `identifier_taken`         | Kennung eines Geräts schon vergeben (ohne Groß-/Kleinschreibung)                               |
+| 409  | `scan_code_taken`          | Scan-Code eines Geräts schon vergeben (exakter Vergleich)                                      |
+| 409  | `version_conflict`         | Gerät inzwischen geändert; aktueller Stand in `details.device`                                 |
+| 409  | `import_outdated`          | CSV-Import: seit der Vorschau geändert oder Datei fehlerhaft; Vorschau neu erstellen           |
+| 409  | `client_ref_conflict`      | Buchung: dieselbe `client_ref` schon für eine andere Buchung verwendet                         |
+| 409  | `stale_action`             | Offline-Buchung zu alt; nach Rückfrage mit `confirmed_stale` senden                            |
+| 415  | `unsupported_media_type`   | ändernde Anfrage ohne `Content-Type: application/json`                                         |
+| 422  | `weak_password`            | neues Passwort verletzt die Passwortregeln                                                     |
+| 422  | `clock_implausible`        | Offline-Buchung: Aktionszeit mehr als 5 Minuten in der Zukunft                                 |
+| 429  | `too_many_attempts`        | zu viele Fehlversuche (Wartezeit im Header `Retry-After`)                                      |
+| 503  | `database_unavailable`     | Datenbank nicht erreichbar                                                                     |
+| 500  | `internal_error`           | unerwarteter Fehler; Details nur im Server-Log                                                 |
 
 Alle Antworten tragen `Cache-Control: no-store` und `X-Content-Type-Options: nosniff`.
 
@@ -199,7 +199,7 @@ als `mail_failed (device_notice, Konto #ID)` im Log.
    alle Sitzungen beendet; man meldet sich mit dem neuen Passwort an.
 
 | Fall                                                        | Antwort                 |
-|-------------------------------------------------------------|-------------------------|
+| ----------------------------------------------------------- | ----------------------- |
 | Link unbekannt, abgelaufen, benutzt, falscher Bereich       | 400 `invalid_token`     |
 | Konto inzwischen gesperrt oder nicht mehr aktiv             | 400 `invalid_token`     |
 | neues Passwort verletzt die Regeln (Link bleibt gültig)     | 422 `weak_password`     |
@@ -248,7 +248,7 @@ Aufruf von Registrierung, Bestätigung, Neu-Anfordern oder Benutzerliste der Sta
 Die Nutzung des Einladungscodes wird dabei nicht zurückgegeben.
 
 | Fall                                                                       | Antwort                       |
-|----------------------------------------------------------------------------|-------------------------------|
+| -------------------------------------------------------------------------- | ----------------------------- |
 | Code falsch, aus einer anderen Stadt, abgelaufen, aufgebraucht, widerrufen | 400 `invalid_invitation_code` |
 | Passwort verletzt die Regeln (Code wird nicht verbraucht)                  | 422 `weak_password`           |
 | > 10 ungültige Codes je IP-Bereich in 15 Minuten                           | 429 `too_many_attempts`       |
@@ -304,7 +304,7 @@ Nur Super-Admins, nur unter `/firefighting/service/` (Admins und Benutzer einer 
 werden über ihre ID angesprochen (siehe `GET api/v1/tenants`).
 
 1. Neue Stadt: `POST api/v1/tenants` mit `{"slug":"geisingen","name":"Feuerwehr Geisingen",
-   "admin_email":"kommandant@example.org"}`. In einer Transaktion entstehen die Stadt (aktiv), das
+"admin_email":"kommandant@example.org"}`. In einer Transaktion entstehen die Stadt (aktiv), das
    Konto des ersten Admins (Status `invited`, noch ohne Name und Passwort) und ein Einmal-Link. Der
    Admin bekommt eine Mail mit `<base_url>/firefighting/<kürzel>/einladung-annehmen#token=…`
    (24 Stunden gültig, nur einmal nutzbar). `mail_sent: false` heißt: Versand gescheitert, Einladung
@@ -333,18 +333,18 @@ Außerdem: `…/rename` mit `{"name":"…"}` ändert nur den Namen (das Kürzel 
 keine alten Sitzungen); `…/unlock` entsperrt. `GET api/v1/tenants/{id}/users` zeigt die Konten einer
 Stadt nur lesend (Filter `?status=` wie bei `GET users`).
 
-| Fall                                                                 | Antwort                   |
-|----------------------------------------------------------------------|---------------------------|
-| Kürzel/Name/E-Mail ungültig (z. B. Großbuchstaben, `service`)         | 400 `invalid_request`     |
-| Kürzel schon vergeben                                                | 409 `slug_taken`          |
-| Adresse hat in der Stadt schon ein Konto (auch offene Einladung)     | 409 `email_taken`         |
-| Einladen oder erneut senden bei gesperrter Stadt                     | 409 `rule_violation`      |
-| Erneut senden für ein Konto, das nicht (mehr) `invited` ist oder gesperrt | 409 `rule_violation` |
-| Stadt oder Konto (der Stadt) unbekannt                               | 404 `not_found`           |
-| Link ungültig, abgelaufen, benutzt, andere Stadt, Konto gesperrt     | 400 `invalid_token`       |
-| Einladung annehmen bei gesperrter Stadt                              | 403 `tenant_inactive`     |
-| Passwort verletzt die Regeln (Link bleibt gültig)                    | 422 `weak_password`       |
-| > 10 ungültige Einladungslinks je IP-Bereich in 15 Minuten           | 429 `too_many_attempts`   |
+| Fall                                                                      | Antwort                 |
+| ------------------------------------------------------------------------- | ----------------------- |
+| Kürzel/Name/E-Mail ungültig (z. B. Großbuchstaben, `service`)             | 400 `invalid_request`   |
+| Kürzel schon vergeben                                                     | 409 `slug_taken`        |
+| Adresse hat in der Stadt schon ein Konto (auch offene Einladung)          | 409 `email_taken`       |
+| Einladen oder erneut senden bei gesperrter Stadt                          | 409 `rule_violation`    |
+| Erneut senden für ein Konto, das nicht (mehr) `invited` ist oder gesperrt | 409 `rule_violation`    |
+| Stadt oder Konto (der Stadt) unbekannt                                    | 404 `not_found`         |
+| Link ungültig, abgelaufen, benutzt, andere Stadt, Konto gesperrt          | 400 `invalid_token`     |
+| Einladung annehmen bei gesperrter Stadt                                   | 403 `tenant_inactive`   |
+| Passwort verletzt die Regeln (Link bleibt gültig)                         | 422 `weak_password`     |
+| > 10 ungültige Einladungslinks je IP-Bereich in 15 Minuten                | 429 `too_many_attempts` |
 
 Lokal ausprobieren (Super-Admin per `bin/user.php superadmin:create` anlegen, Mails in `var/mail/`):
 
@@ -411,17 +411,17 @@ nicht ausgesonderte Geräte.
   Unterstandorte. Entsperren (`…/{id}/unlock`) eines Unterstandorts nur, wenn der übergeordnete
   Standort aktiv ist. Beides ist wiederholbar.
 
-| Fall                                                                 | Antwort                   |
-|----------------------------------------------------------------------|---------------------------|
-| Name leer, zu lang (Typ 50, Standort 100 Zeichen), mit Zeilenumbruch | 400 `invalid_request`     |
-| Oberste Ebene ohne `kind`, unbekannte Art                            | 400 `invalid_request`     |
-| `parent_id` keine Zahl, unbekannt oder aus einer anderen Stadt       | 400 `invalid_request`     |
-| `?include_inactive=` mit anderem Wert als `0`/`1`                    | 400 `invalid_request`     |
-| Name schon vergeben (Typ je Stadt, Standort je Ebene bzw. übergeordnetem Standort; ohne Groß-/Kleinschreibung, „Straße“ = „Strasse“, auch gesperrte) | 409 `name_taken` |
-| Unterstandort unter einem Unterstandort                              | 409 `rule_violation`      |
-| Unterstandort unter gesperrtem Standort oder mit anderer Art         | 409 `rule_violation`      |
-| Sperren, obwohl Geräte oder aktive Unterstandorte da sind            | 409 `rule_violation` mit `details` |
-| Unterstandort entsperren, übergeordneter Standort gesperrt           | 409 `rule_violation`      |
+| Fall                                                                                                                                                 | Antwort                            |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Name leer, zu lang (Typ 50, Standort 100 Zeichen), mit Zeilenumbruch                                                                                 | 400 `invalid_request`              |
+| Oberste Ebene ohne `kind`, unbekannte Art                                                                                                            | 400 `invalid_request`              |
+| `parent_id` keine Zahl, unbekannt oder aus einer anderen Stadt                                                                                       | 400 `invalid_request`              |
+| `?include_inactive=` mit anderem Wert als `0`/`1`                                                                                                    | 400 `invalid_request`              |
+| Name schon vergeben (Typ je Stadt, Standort je Ebene bzw. übergeordnetem Standort; ohne Groß-/Kleinschreibung, „Straße“ = „Strasse“, auch gesperrte) | 409 `name_taken`                   |
+| Unterstandort unter einem Unterstandort                                                                                                              | 409 `rule_violation`               |
+| Unterstandort unter gesperrtem Standort oder mit anderer Art                                                                                         | 409 `rule_violation`               |
+| Sperren, obwohl Geräte oder aktive Unterstandorte da sind                                                                                            | 409 `rule_violation` mit `details` |
+| Unterstandort entsperren, übergeordneter Standort gesperrt                                                                                           | 409 `rule_violation`               |
 
 Lokal ausprobieren (Admin angemeldet wie unter "Lokal starten"):
 
@@ -454,82 +454,82 @@ Nur unter einer Stadt. Ansehen, umbuchen und den Status setzen dürfen alle ange
 Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehmen nur Admins
 (`user`: 403). Fremde oder unbekannte IDs im Pfad: 404.
 
-| Methode | Pfad                                  | Zugriff    | Antwort                                     |
-|---------|---------------------------------------|------------|---------------------------------------------|
-| GET     | `api/v1/devices`                      | angemeldet | `{"devices":[…],"total":…,"limit":…,"offset":…}` |
-| GET     | `api/v1/devices/{id}`                 | angemeldet | `{"device":…}` mit allen Feldern            |
-| POST    | `api/v1/devices`                      | Admin      | 201 `{"device":…}`                          |
-| POST    | `api/v1/devices/{id}/fields`          | Admin      | `{"device":…}`                              |
-| POST    | `api/v1/devices/{id}/inspection-due`  | Admin      | `{"device":…}`                              |
-| POST    | `api/v1/devices/{id}/state`           | angemeldet | `{"device":…,"result":…}` (siehe "Offline-Buchungen") |
-| POST    | `api/v1/devices/{id}/retire`          | Admin      | `{"device":…}`                              |
-| POST    | `api/v1/devices/{id}/reinstate`       | Admin      | `{"device":…}`                              |
-| GET     | `api/v1/devices/{id}/events`          | angemeldet | `{"events":[…],"total":…,"limit":…,"offset":…}` |
-| GET     | `api/v1/devices/export`               | angemeldet | CSV-Download (siehe "CSV-Export")           |
-| GET     | `api/v1/device-events/export`         | angemeldet | CSV-Download (siehe "CSV-Export")           |
+| Methode | Pfad                                 | Zugriff    | Antwort                                               |
+| ------- | ------------------------------------ | ---------- | ----------------------------------------------------- |
+| GET     | `api/v1/devices`                     | angemeldet | `{"devices":[…],"total":…,"limit":…,"offset":…}`      |
+| GET     | `api/v1/devices/{id}`                | angemeldet | `{"device":…}` mit allen Feldern                      |
+| POST    | `api/v1/devices`                     | Admin      | 201 `{"device":…}`                                    |
+| POST    | `api/v1/devices/{id}/fields`         | Admin      | `{"device":…}`                                        |
+| POST    | `api/v1/devices/{id}/inspection-due` | Admin      | `{"device":…}`                                        |
+| POST    | `api/v1/devices/{id}/state`          | angemeldet | `{"device":…,"result":…}` (siehe "Offline-Buchungen") |
+| POST    | `api/v1/devices/{id}/retire`         | Admin      | `{"device":…}`                                        |
+| POST    | `api/v1/devices/{id}/reinstate`      | Admin      | `{"device":…}`                                        |
+| GET     | `api/v1/devices/{id}/events`         | angemeldet | `{"events":[…],"total":…,"limit":…,"offset":…}`       |
+| GET     | `api/v1/devices/export`              | angemeldet | CSV-Download (siehe "CSV-Export")                     |
+| GET     | `api/v1/device-events/export`        | angemeldet | CSV-Download (siehe "CSV-Export")                     |
 
 - Liste: je Gerät `id`, `identifier`, `scan_code`, `device_type` (`id`, `name`), `location` (`id`, `name`,
   `path` wie „HLF 20 / G1“), `status` mit `status_label` (einsatzbereit, in Wartung, defekt,
   ausgesondert), `next_inspection_due`, `version`. Die Einzelansicht zeigt zusätzlich
   `serial_number`, `manufacturer`, `model`, `procured_on`, `note`, `created_at`, `updated_at`.
 - Parameter der Liste (alle optional):
-  - `device_type_id`, `location_id`; `include_sublocations=1` (nur mit `location_id`) schließt die
-    Geräte der Unterstandorte ein. Unbekannte oder fremde IDs ergeben eine leere Liste.
-  - `status=ready,defective` (kommagetrennt). Ausgesonderte Geräte (`retired`) erscheinen nur, wenn
-    `retired` angegeben ist oder (ohne `status`) mit `include_retired=1`.
-  - `q`: Teil von Kennung, Scan-Code, Seriennummer, Hersteller oder Modell, ohne
-    Groß-/Kleinschreibung (höchstens 100 Zeichen; `%` und `_` sind keine Platzhalter).
-  - `scan_code`: genau dieser Scan-Code (exakt, mit Groß-/Kleinschreibung; Leerraum am Rand wird wie
-    beim Speichern entfernt, ein mitgescanntes CR/LF stört also nicht). Mit allen anderen Parametern
-    kombinierbar; leer oder ungültig: 400. Im URL kodiert, z. B. GS als `%1D`, `+` als `%2B`.
-  - `sort`: `identifier` (Standard, Kennung natürlich: „M2“ vor „M10“), `device_type` (Name des
-    Gerätetyps), `location` (angezeigter Pfad „HLF 20 / G1“), `status` (fachlich: einsatzbereit, in
-    Wartung, defekt, ausgesondert) oder `next_inspection_due` (Geräte ohne Datum immer am Ende,
-    in beiden Richtungen). Texte natürlich und ohne Groß-/Kleinschreibung („LF 8“ vor „LF 10“).
-  - `dir=asc` (Standard) oder `dir=desc`. Bei Gleichstand immer natürlich nach Kennung, dann nach
-    ID (beides aufsteigend), damit Seiten stabil sind. Ungültige Werte für `sort` oder `dir`: 400.
-  - `limit` 1–200 (Standard 50), `offset` 0–1000000 (Standard 0); `total` zählt alle Treffer.
+    - `device_type_id`, `location_id`; `include_sublocations=1` (nur mit `location_id`) schließt die
+      Geräte der Unterstandorte ein. Unbekannte oder fremde IDs ergeben eine leere Liste.
+    - `status=ready,defective` (kommagetrennt). Ausgesonderte Geräte (`retired`) erscheinen nur, wenn
+      `retired` angegeben ist oder (ohne `status`) mit `include_retired=1`.
+    - `q`: Teil von Kennung, Scan-Code, Seriennummer, Hersteller oder Modell, ohne
+      Groß-/Kleinschreibung (höchstens 100 Zeichen; `%` und `_` sind keine Platzhalter).
+    - `scan_code`: genau dieser Scan-Code (exakt, mit Groß-/Kleinschreibung; Leerraum am Rand wird wie
+      beim Speichern entfernt, ein mitgescanntes CR/LF stört also nicht). Mit allen anderen Parametern
+      kombinierbar; leer oder ungültig: 400. Im URL kodiert, z. B. GS als `%1D`, `+` als `%2B`.
+    - `sort`: `identifier` (Standard, Kennung natürlich: „M2“ vor „M10“), `device_type` (Name des
+      Gerätetyps), `location` (angezeigter Pfad „HLF 20 / G1“), `status` (fachlich: einsatzbereit, in
+      Wartung, defekt, ausgesondert) oder `next_inspection_due` (Geräte ohne Datum immer am Ende,
+      in beiden Richtungen). Texte natürlich und ohne Groß-/Kleinschreibung („LF 8“ vor „LF 10“).
+    - `dir=asc` (Standard) oder `dir=desc`. Bei Gleichstand immer natürlich nach Kennung, dann nach
+      ID (beides aufsteigend), damit Seiten stabil sind. Ungültige Werte für `sort` oder `dir`: 400.
+    - `limit` 1–200 (Standard 50), `offset` 0–1000000 (Standard 0); `total` zählt alle Treffer.
 - Kennung: höchstens 30 Zeichen aus Buchstaben, Ziffern, Leerzeichen, `-`, `/`, `.`; Leerraum am
   Rand wird entfernt, mehrere Leerzeichen werden zu einem. Eindeutig je Stadt unter nicht
   ausgesonderten Geräten, ohne Groß-/Kleinschreibung („MA-01“ = „ma-01“), aber „ß“ ≠ „ss“ und
   „é“ ≠ „e“. Nach dem Aussondern ist die Kennung wieder frei.
 - Scan-Code (`scan_code`, optional): Inhalt eines Barcodes, QR-Codes oder einer GS1-DataMatrix,
   höchstens 200 Zeichen, gespeichert wie gescannt und exakt verglichen („abc“ ≠ „ABC“, „ß“ ≠ „ss“).
-  - Leerzeichen, Tab, CR und LF am Rand werden entfernt (Handscanner hängen oft CR/LF oder Tab an);
-    danach leer bzw. `null` = kein Scan-Code.
-  - Erlaubt sind die Trennzeichen GS (0x1D, GS1), RS (0x1E) und EOT (0x04) aus ISO/IEC 15434, in
-    JSON als `\u001d` usw. Andere Steuerzeichen (auch Tab oder Zeilenumbruch mitten im Code, meist
-    zwei zusammengefügte Scans) und unsichtbare Formatzeichen (z. B. Zero-Width-Space) werden
-    abgelehnt. In Meldungen und Mails erscheinen die Trennzeichen als `[GS]`, `[RS]`, `[EOT]`.
-  - Eindeutig je Stadt unter nicht ausgesonderten Geräten; nach dem Aussondern frei (bleibt aber am
-    ausgesonderten Gerät gespeichert).- Datumsfelder (`procured_on`, `next_inspection_due`) im Format `JJJJ-MM-TT` zwischen 1950-01-01
-  und 2099-12-31. Leere Texte werden zu `null`. Nur die Notiz darf Zeilenumbrüche enthalten.
+    - Leerzeichen, Tab, CR und LF am Rand werden entfernt (Handscanner hängen oft CR/LF oder Tab an);
+      danach leer bzw. `null` = kein Scan-Code.
+    - Erlaubt sind die Trennzeichen GS (0x1D, GS1), RS (0x1E) und EOT (0x04) aus ISO/IEC 15434, in
+      JSON als `\u001d` usw. Andere Steuerzeichen (auch Tab oder Zeilenumbruch mitten im Code, meist
+      zwei zusammengefügte Scans) und unsichtbare Formatzeichen (z. B. Zero-Width-Space) werden
+      abgelehnt. In Meldungen und Mails erscheinen die Trennzeichen als `[GS]`, `[RS]`, `[EOT]`.
+    - Eindeutig je Stadt unter nicht ausgesonderten Geräten; nach dem Aussondern frei (bleibt aber am
+      ausgesonderten Gerät gespeichert).- Datumsfelder (`procured_on`, `next_inspection_due`) im Format `JJJJ-MM-TT` zwischen 1950-01-01
+      und 2099-12-31. Leere Texte werden zu `null`. Nur die Notiz darf Zeilenumbrüche enthalten.
 - Anlegen: Pflicht `identifier`, `device_type_id` (aktiver Typ), `location_id` (aktiver Standort);
   optional `scan_code`, `status` (`ready` Standard, `maintenance`, `defective`), `serial_number`, `manufacturer`,
   `model` (je 100 Zeichen), `procured_on`, `next_inspection_due`, `note` (1000 Zeichen) und
   `comment` (500 Zeichen, einzeilig) für die Historie.
 - Ändern mit erwarteter `version` (aus der letzten Antwort):
-  - `…/fields`: nur die mitgesendeten Stammdaten (`identifier`, `scan_code`, `device_type_id`,
-    `serial_number`, `manufacturer`, `model`, `procured_on`, `note`; `null` leert ein optionales Feld) und optional
-    `comment`. Je geändertem Feld ein Eintrag in der Historie mit demselben Kommentar.
-  - `…/inspection-due`: `next_inspection_due` (Datum oder `null` zum Entfernen), optional `comment`.
-  - `…/state` (auch `user`): `location_id` (neuer Standort) und/oder `status` (`ready`,
-    `maintenance`, `defective`), optional `comment`. Umbuchung und Statusänderung ergeben EINEN
-    Eintrag in der Historie. Der neue Standort muss aktiv sein. Optional `client_ref`,
-    `occurred_at`, `confirmed_stale` (siehe "Offline-Buchungen"); die Antwort enthält zusätzlich
-    `result` mit dem Ergebnis für den Kameraden.
-  - `…/retire` (Admin): nur `version` und optional `comment`. Das Gerät ist danach ausgesondert,
-    erscheint nicht mehr in normalen Listen, und seine Kennung ist frei.
-  - `…/reinstate` (Admin): `status` (Pflicht, nicht `retired`), optional `location_id` (sonst der
-    bisherige Standort), `identifier` (neue Kennung, falls die alte inzwischen vergeben ist),
-    `scan_code` (neuer Scan-Code oder `null` zum Entfernen, falls der alte inzwischen vergeben ist),
-    `device_type_id` (falls der bisherige Typ deaktiviert ist) und `comment`. Standort und Typ
-    müssen aktiv sein.
-  - Jede Änderung erhöht `version` um 1. Ändert sich nichts (gleiche Werte), bleibt alles wie es
-    ist, auch die Version. Bei `…/state` und `…/reinstate` werden gleiche Teile (z. B. der aktuelle
-    Standort) einfach übergangen.
-  - Ist die Version veraltet: 409 `version_conflict`, `details.device` enthält den aktuellen Stand.
-  - Ausgesonderte Geräte lassen sich nur wieder aufnehmen (alles andere 409 `rule_violation`).
+    - `…/fields`: nur die mitgesendeten Stammdaten (`identifier`, `scan_code`, `device_type_id`,
+      `serial_number`, `manufacturer`, `model`, `procured_on`, `note`; `null` leert ein optionales Feld) und optional
+      `comment`. Je geändertem Feld ein Eintrag in der Historie mit demselben Kommentar.
+    - `…/inspection-due`: `next_inspection_due` (Datum oder `null` zum Entfernen), optional `comment`.
+    - `…/state` (auch `user`): `location_id` (neuer Standort) und/oder `status` (`ready`,
+      `maintenance`, `defective`), optional `comment`. Umbuchung und Statusänderung ergeben EINEN
+      Eintrag in der Historie. Der neue Standort muss aktiv sein. Optional `client_ref`,
+      `occurred_at`, `confirmed_stale` (siehe "Offline-Buchungen"); die Antwort enthält zusätzlich
+      `result` mit dem Ergebnis für den Kameraden.
+    - `…/retire` (Admin): nur `version` und optional `comment`. Das Gerät ist danach ausgesondert,
+      erscheint nicht mehr in normalen Listen, und seine Kennung ist frei.
+    - `…/reinstate` (Admin): `status` (Pflicht, nicht `retired`), optional `location_id` (sonst der
+      bisherige Standort), `identifier` (neue Kennung, falls die alte inzwischen vergeben ist),
+      `scan_code` (neuer Scan-Code oder `null` zum Entfernen, falls der alte inzwischen vergeben ist),
+      `device_type_id` (falls der bisherige Typ deaktiviert ist) und `comment`. Standort und Typ
+      müssen aktiv sein.
+    - Jede Änderung erhöht `version` um 1. Ändert sich nichts (gleiche Werte), bleibt alles wie es
+      ist, auch die Version. Bei `…/state` und `…/reinstate` werden gleiche Teile (z. B. der aktuelle
+      Standort) einfach übergangen.
+    - Ist die Version veraltet: 409 `version_conflict`, `details.device` enthält den aktuellen Stand.
+    - Ausgesonderte Geräte lassen sich nur wieder aufnehmen (alles andere 409 `rule_violation`).
 - Historie (`…/events`, auch für ausgesonderte Geräte): neueste zuerst, `limit`/`offset` wie bei der
   Liste. Je Eintrag `type` mit `type_label` (z. B. „Umgebucht“, „Status geändert“, „Ausgesondert“,
   „Wieder aufgenommen“, „Prüfdatum geändert“, „Stammdaten geändert“, „Umbuchung nicht übernommen“),
@@ -544,18 +544,18 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
   also mit dem neuen). Reihenfolge nach Eingang beim Server (so, wie der Server die Buchungen
   verarbeitet hat); die Aktionszeit steht daneben.
 
-| Fall                                                                    | Antwort                |
-|-------------------------------------------------------------------------|------------------------|
-| Feld fehlt, falscher Typ, unbekanntes Feld, Wert verletzt die Regeln    | 400 `invalid_request`  |
-| `device_type_id`/`location_id` im Body unbekannt oder aus anderer Stadt | 400 `invalid_request`  |
-| `…/fields` ohne Stammdaten, `status` oder `location_id` mitgesendet     | 400 `invalid_request`  |
-| `…/state` ohne `location_id` und `status`; `status` = `retired`         | 400 `invalid_request`  |
-| Parameter der Liste ungültig (z. B. `limit=500`, `status=kaputt`)       | 400 `invalid_request`  |
-| Kennung schon vergeben (auch beim Wiederaufnehmen)                      | 409 `identifier_taken` |
-| Scan-Code schon vergeben (auch beim Wiederaufnehmen)                    | 409 `scan_code_taken`  |
-| Version veraltet                                                        | 409 `version_conflict` |
-| Standort gesperrt, Gerätetyp deaktiviert, Gerät ausgesondert            | 409 `rule_violation`   |
-| Aussondern eines ausgesonderten, Wiederaufnahme eines nicht ausgesonderten Geräts | 409 `rule_violation` |
+| Fall                                                                              | Antwort                |
+| --------------------------------------------------------------------------------- | ---------------------- |
+| Feld fehlt, falscher Typ, unbekanntes Feld, Wert verletzt die Regeln              | 400 `invalid_request`  |
+| `device_type_id`/`location_id` im Body unbekannt oder aus anderer Stadt           | 400 `invalid_request`  |
+| `…/fields` ohne Stammdaten, `status` oder `location_id` mitgesendet               | 400 `invalid_request`  |
+| `…/state` ohne `location_id` und `status`; `status` = `retired`                   | 400 `invalid_request`  |
+| Parameter der Liste ungültig (z. B. `limit=500`, `status=kaputt`)                 | 400 `invalid_request`  |
+| Kennung schon vergeben (auch beim Wiederaufnehmen)                                | 409 `identifier_taken` |
+| Scan-Code schon vergeben (auch beim Wiederaufnehmen)                              | 409 `scan_code_taken`  |
+| Version veraltet                                                                  | 409 `version_conflict` |
+| Standort gesperrt, Gerätetyp deaktiviert, Gerät ausgesondert                      | 409 `rule_violation`   |
+| Aussondern eines ausgesonderten, Wiederaufnahme eines nicht ausgesonderten Geräts | 409 `rule_violation`   |
 
 Lokal ausprobieren (Admin angemeldet wie unter "Lokal starten"):
 
@@ -597,11 +597,11 @@ Umbuchen und Status setzen (`POST api/v1/devices/{id}/state`) geht auch ohne Net
 sich die Buchung und sendet sie später. Andere Aktionen (Admin) gibt es offline nicht. Zusätzliche
 Felder (alle optional):
 
-| Feld              | Format                                         | Bedeutung |
-|-------------------|------------------------------------------------|-----------|
-| `client_ref`      | UUID Version 4 (z. B. `crypto.randomUUID()`)    | Kennung der Buchung; dieselbe Buchung erneut gesendet wirkt nicht noch einmal |
-| `occurred_at`     | `JJJJ-MM-TTTHH:MM:SSZ` (UTC, Bruchteile erlaubt, werden abgeschnitten) | Aktionszeit auf dem Handy; nur mit `client_ref` |
-| `confirmed_stale` | `true`/`false`                                 | alte Buchung nach Rückfrage trotzdem senden; nur mit `occurred_at` |
+| Feld              | Format                                                                 | Bedeutung                                                                     |
+| ----------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `client_ref`      | UUID Version 4 (z. B. `crypto.randomUUID()`)                           | Kennung der Buchung; dieselbe Buchung erneut gesendet wirkt nicht noch einmal |
+| `occurred_at`     | `JJJJ-MM-TTTHH:MM:SSZ` (UTC, Bruchteile erlaubt, werden abgeschnitten) | Aktionszeit auf dem Handy; nur mit `client_ref`                               |
+| `confirmed_stale` | `true`/`false`                                                         | alte Buchung nach Rückfrage trotzdem senden; nur mit `occurred_at`            |
 
 `client_ref` lohnt sich auch online: Geht die Antwort verloren, darf das Handy dieselbe Anfrage
 gefahrlos wiederholen.
@@ -620,15 +620,15 @@ gefahrlos wiederholen.
 4. Buchen. Standort und Status haben am Gerät EINEN gemeinsamen Zeitstempel (Aktionszeit der
    Änderung, die den aktuellen Stand bestimmt). Mit `occurred_at` gilt „der Letzte gewinnt“:
 
-| Lage                                                                  | Ergebnis (`outcome` / `reason`)   |
-|-----------------------------------------------------------------------|-----------------------------------|
-| Version aktuell, oder seitdem nur Stammdaten/Prüfdatum geändert       | `applied` (übernommen)            |
-| Version veraltet, Stand inzwischen geändert, Aktionszeit jünger       | `applied` / `overwritten` + Hinweis |
-| Version veraltet, Stand inzwischen geändert, Aktionszeit älter oder gleich | `history_only` / `older` + Hinweis |
-| Gerät inzwischen ausgesondert                                         | `not_applied` / `retired` + Hinweis |
-| neuer Standort inzwischen gesperrt                                    | `not_applied` / `location_locked` + Hinweis |
-| Gerät hat schon diesen Standort und Status                            | `unchanged`                       |
-| alte Buchung nach Rückfrage (sonst unauffällig)                       | wie oben, `stale_confirmed: true` + Hinweis |
+| Lage                                                                       | Ergebnis (`outcome` / `reason`)             |
+| -------------------------------------------------------------------------- | ------------------------------------------- |
+| Version aktuell, oder seitdem nur Stammdaten/Prüfdatum geändert            | `applied` (übernommen)                      |
+| Version veraltet, Stand inzwischen geändert, Aktionszeit jünger            | `applied` / `overwritten` + Hinweis         |
+| Version veraltet, Stand inzwischen geändert, Aktionszeit älter oder gleich | `history_only` / `older` + Hinweis          |
+| Gerät inzwischen ausgesondert                                              | `not_applied` / `retired` + Hinweis         |
+| neuer Standort inzwischen gesperrt                                         | `not_applied` / `location_locked` + Hinweis |
+| Gerät hat schon diesen Standort und Status                                 | `unchanged`                                 |
+| alte Buchung nach Rückfrage (sonst unauffällig)                            | wie oben, `stale_confirmed: true` + Hinweis |
 
 Ohne `occurred_at` bleibt alles wie bisher (veraltete Version → 409 `version_conflict`, gesperrter
 Standort oder ausgesondertes Gerät → 409 `rule_violation`). Ein unbekannter oder fremder Standort
@@ -655,8 +655,11 @@ und die Versionsprüfung). 401 → neu anmelden, Buchung behalten. 5xx oder kein
 **Zeitlimits** (`GET api/v1/client-config`, angemeldet):
 
 ```json
-{"server_time":"2026-10-27T13:05:09Z","offline":{"max_age_days":7,"queue_max_age_days":7},
- "max_clock_skew_seconds":300}
+{
+    "server_time": "2026-10-27T13:05:09Z",
+    "offline": { "max_age_days": 7, "queue_max_age_days": 7 },
+    "max_clock_skew_seconds": 300
+}
 ```
 
 - `max_age_days`: So lange darf das Handy nach der letzten Synchronisierung offline buchen (prüft
@@ -684,12 +687,12 @@ Offline-Buchungen mit besonderem Ergebnis legen einen Hinweis für die Admins de
 Stand überschrieben, nur Historie, nicht übernommen (ausgesondert), nicht übernommen (Standort
 gesperrt), alte Buchung nach Rückfrage. Hinweise werden nie automatisch erledigt und nie gelöscht.
 
-| Methode | Pfad                                | Body       | Antwort |
-|---------|-------------------------------------|------------|---------|
-| GET     | `api/v1/notices[?status=open\|resolved\|all]` | – | `{"notices":[…],"total":…,"open":…,"limit":…,"offset":…}` |
-| GET     | `api/v1/notices/{id}`               | –          | `{"notice":…}` |
-| POST    | `api/v1/notices/{id}/resolve`       | `{note?}`  | `{"notice":…}` (erledigt) |
-| POST    | `api/v1/notices/{id}/reopen`        | `{}`       | `{"notice":…}` (wieder offen) |
+| Methode | Pfad                                          | Body      | Antwort                                                   |
+| ------- | --------------------------------------------- | --------- | --------------------------------------------------------- |
+| GET     | `api/v1/notices[?status=open\|resolved\|all]` | –         | `{"notices":[…],"total":…,"open":…,"limit":…,"offset":…}` |
+| GET     | `api/v1/notices/{id}`                         | –         | `{"notice":…}`                                            |
+| POST    | `api/v1/notices/{id}/resolve`                 | `{note?}` | `{"notice":…}` (erledigt)                                 |
+| POST    | `api/v1/notices/{id}/reopen`                  | `{}`      | `{"notice":…}` (wieder offen)                             |
 
 - Liste: Standard `status=open`, neueste zuerst, `limit` 1–200 (Standard 50), `offset`; `open` zählt
   alle offenen Hinweise der Stadt.
@@ -722,25 +725,24 @@ curl.exe -b cookies.txt -H "Content-Type: application/json" --data-binary "{}" h
 
 Nur unter einer Stadt, für alle angemeldeten Konten der Stadt (`user` und `admin`). Ausgesonderte
 Geräte sind nie enthalten. „Heute“ ist der Kalendertag in deutscher Zeit (Europe/Berlin): Um
-00:30 Uhr am 16. Juni ist ein Gerät mit Prüfdatum 15. Juni überfällig, obwohl in UTC noch der
-15. ist.
+00:30 Uhr am 16. Juni ist ein Gerät mit Prüfdatum 15. Juni überfällig, obwohl in UTC noch der 15. ist.
 
-| Methode | Pfad                     | Zugriff    | Antwort                                                     |
-|---------|--------------------------|------------|-------------------------------------------------------------|
-| GET     | `api/v1/inspection-due`  | angemeldet | `{"today":…,"days":…,"until":…,"overdue":{…},"due_soon":{…}}` |
-| GET     | `api/v1/device-summary`  | angemeldet | `{"today":…,"devices":{…},"inspection":{…}}`                |
+| Methode | Pfad                    | Zugriff    | Antwort                                                       |
+| ------- | ----------------------- | ---------- | ------------------------------------------------------------- |
+| GET     | `api/v1/inspection-due` | angemeldet | `{"today":…,"days":…,"until":…,"overdue":{…},"due_soon":{…}}` |
+| GET     | `api/v1/device-summary` | angemeldet | `{"today":…,"devices":{…},"inspection":{…}}`                  |
 
 - `inspection-due`: Abschnitte `overdue` (Prüfdatum vor heute, am stärksten überfällig zuerst) und
   `due_soon` (heute bis einschließlich `until` = heute + `days`, nächste Fälligkeit zuerst), bei
   gleichem Datum natürlich nach Kennung. Jeder Abschnitt ist `{"devices":[…],"total":…}`; die Geräte
   wie in der Geräteliste, zusätzlich `days_overdue` (ab 1) bzw. `days_until_due` (0 = heute fällig).
   Parameter (alle optional):
-  - `days` 1–365 (Standard 30).
-  - `include_without_date=1`: zusätzlich Abschnitt `without_date` (Geräte ohne Prüfdatum, nach
-    Kennung); ohne den Parameter fehlt das Feld.
-  - `device_type_id`, `location_id`, `include_sublocations=1` wie in der Geräteliste.
-  - `limit` 1–500 je Abschnitt (Standard 200), kein `offset`; `total` zählt alle Treffer.
-  - Andere Parameter (z. B. `status`, `include_retired`) werden ignoriert. Ungültige Werte: 400.
+    - `days` 1–365 (Standard 30).
+    - `include_without_date=1`: zusätzlich Abschnitt `without_date` (Geräte ohne Prüfdatum, nach
+      Kennung); ohne den Parameter fehlt das Feld.
+    - `device_type_id`, `location_id`, `include_sublocations=1` wie in der Geräteliste.
+    - `limit` 1–500 je Abschnitt (Standard 200), kein `offset`; `total` zählt alle Treffer.
+    - Andere Parameter (z. B. `status`, `include_retired`) werden ignoriert. Ungültige Werte: 400.
 - `device-summary` (Startseite, eine Abfrage, keine Parameter): `devices.total` und
   `devices.by_status` (immer `ready`, `maintenance`, `defective` mit `status_label` und `count`, auch
   0), `inspection` mit `overdue`, `due_soon` (heute bis heute + 30 Tage, `due_soon_days`) und
@@ -758,11 +760,27 @@ curl.exe -b cookies.txt http://localhost:8000/firefighting/immendingen/api/v1/de
 Beispielantwort von `device-summary`:
 
 ```json
-{"today":"2026-10-26",
- "devices":{"total":42,"by_status":[{"status":"ready","status_label":"einsatzbereit","count":38},
-                                     {"status":"maintenance","status_label":"in Wartung","count":3},
-                                     {"status":"defective","status_label":"defekt","count":1}]},
- "inspection":{"overdue":3,"due_soon":7,"due_soon_days":30,"without_date":12}}
+{
+    "today": "2026-10-26",
+    "devices": {
+        "total": 42,
+        "by_status": [
+            { "status": "ready", "status_label": "einsatzbereit", "count": 38 },
+            {
+                "status": "maintenance",
+                "status_label": "in Wartung",
+                "count": 3
+            },
+            { "status": "defective", "status_label": "defekt", "count": 1 }
+        ]
+    },
+    "inspection": {
+        "overdue": 3,
+        "due_soon": 7,
+        "due_soon_days": 30,
+        "without_date": 12
+    }
+}
 ```
 
 ### CSV-Export
@@ -771,10 +789,10 @@ Nur unter einer Stadt, für alle angemeldeten Konten der Stadt (`user` und `admi
 ein Download (`Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment`,
 `Cache-Control: no-store`); Fehler (z. B. ungültige Parameter, 400) kommen wie immer als JSON.
 
-| Methode | Pfad                          | Zugriff    | Datei                                      |
-|---------|-------------------------------|------------|--------------------------------------------|
-| GET     | `api/v1/devices/export`       | angemeldet | `geraete-<kürzel>-<JJJJ-MM-TT>.csv`        |
-| GET     | `api/v1/device-events/export` | angemeldet | `historie-<kürzel>-<von>-bis-<bis>.csv`    |
+| Methode | Pfad                          | Zugriff    | Datei                                   |
+| ------- | ----------------------------- | ---------- | --------------------------------------- |
+| GET     | `api/v1/devices/export`       | angemeldet | `geraete-<kürzel>-<JJJJ-MM-TT>.csv`     |
+| GET     | `api/v1/device-events/export` | angemeldet | `historie-<kürzel>-<von>-bis-<bis>.csv` |
 
 Format (für Excel unter Windows gedacht, Doppelklick öffnet die Datei mit korrekten Umlauten):
 
@@ -834,10 +852,10 @@ Nur unter einer Stadt, nur für Admins. Der Import liest die Geräteliste im For
 neue Geräte an und ändert bestehende. Er legt nie Gerätetypen oder Standorte an und sondert weder
 aus noch nimmt er wieder auf. Ablauf in zwei Schritten:
 
-| Methode | Pfad                            | Body                         | Wirkung                                  |
-|---------|---------------------------------|------------------------------|------------------------------------------|
-| POST    | `api/v1/devices/import/preview` | `{file}`                     | prüfen und Vorschau zeigen, nichts speichern |
-| POST    | `api/v1/devices/import`         | `{file, token, comment?}`    | dieselbe Datei erneut prüfen und übernehmen |
+| Methode | Pfad                            | Body                      | Wirkung                                      |
+| ------- | ------------------------------- | ------------------------- | -------------------------------------------- |
+| POST    | `api/v1/devices/import/preview` | `{file}`                  | prüfen und Vorschau zeigen, nichts speichern |
+| POST    | `api/v1/devices/import`         | `{file, token, comment?}` | dieselbe Datei erneut prüfen und übernehmen  |
 
 `file` ist die Datei als Base64. Die Import-Routen nehmen Bodys bis 3 MiB an, alle anderen weiterhin
 höchstens 16 KiB. Der Schutz gegen CSRF bleibt wie überall: nur `Content-Type: application/json`
@@ -880,21 +898,56 @@ und erlaubter `Origin`.
 
 ```json
 {
-  "token": "3f9a…(64 Zeichen, nur ohne Fehler, sonst null)",
-  "encoding": "utf-8", "delimiter": ";", "delimiter_label": "Semikolon",
-  "columns": ["Kennung", "Standort", "Status"],
-  "summary": {"rows": 3, "new": 1, "changed": 1, "unchanged": 0, "skipped": 0, "errors": 1, "warnings": 1},
-  "unknown": {"device_types": [], "locations": ["LF 8"]},
-  "rows": [
-    {"line": 2, "identifier": "MA-01", "result": "changed", "result_label": "Änderungen",
-     "device": {"id": 7, "version": 3},
-     "changes": [{"field": "location", "label": "Standort", "old": "HLF 20 / G1", "new": "Lager"}],
-     "messages": [], "warnings": []},
-    {"line": 3, "identifier": "7", "result": "new", "…": "…",
-     "warnings": ["Die neue Kennung „7“ entspricht ohne führende Nullen dem vorhandenen Gerät „007“. …"]},
-    {"line": 4, "identifier": "MA-09", "result": "error", "…": "…",
-     "messages": ["Der Standort „LF 8“ ist nicht bekannt."]}
-  ]
+    "token": "3f9a…(64 Zeichen, nur ohne Fehler, sonst null)",
+    "encoding": "utf-8",
+    "delimiter": ";",
+    "delimiter_label": "Semikolon",
+    "columns": ["Kennung", "Standort", "Status"],
+    "summary": {
+        "rows": 3,
+        "new": 1,
+        "changed": 1,
+        "unchanged": 0,
+        "skipped": 0,
+        "errors": 1,
+        "warnings": 1
+    },
+    "unknown": { "device_types": [], "locations": ["LF 8"] },
+    "rows": [
+        {
+            "line": 2,
+            "identifier": "MA-01",
+            "result": "changed",
+            "result_label": "Änderungen",
+            "device": { "id": 7, "version": 3 },
+            "changes": [
+                {
+                    "field": "location",
+                    "label": "Standort",
+                    "old": "HLF 20 / G1",
+                    "new": "Lager"
+                }
+            ],
+            "messages": [],
+            "warnings": []
+        },
+        {
+            "line": 3,
+            "identifier": "7",
+            "result": "new",
+            "…": "…",
+            "warnings": [
+                "Die neue Kennung „7“ entspricht ohne führende Nullen dem vorhandenen Gerät „007“. …"
+            ]
+        },
+        {
+            "line": 4,
+            "identifier": "MA-09",
+            "result": "error",
+            "…": "…",
+            "messages": ["Der Standort „LF 8“ ist nicht bekannt."]
+        }
+    ]
 }
 ```
 
@@ -1071,61 +1124,61 @@ Zum Ansehen der App braucht die Anwendung lokal eine eigene Datenbank. Nie dafü
 
 1. Datenbank und Benutzer anlegen (als root in der MariaDB-Konsole, Passwort frei wählen):
 
-   ```sql
-   CREATE DATABASE firefighting_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   CREATE USER 'ff_dev'@'localhost' IDENTIFIED BY 'EIN-PASSWORT';
-   GRANT ALL PRIVILEGES ON firefighting_dev.* TO 'ff_dev'@'localhost';
-   ```
+    ```sql
+    CREATE DATABASE firefighting_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE USER 'ff_dev'@'localhost' IDENTIFIED BY 'EIN-PASSWORT';
+    GRANT ALL PRIVILEGES ON firefighting_dev.* TO 'ff_dev'@'localhost';
+    ```
 
 2. `config/config.example.php` nach `config/config.local.php` kopieren (wird nie committet) und
    anpassen:
 
-   ```php
-   return [
-       'db' => [
-           'host' => '127.0.0.1',
-           'name' => 'firefighting_dev',
-           'user' => 'ff_dev',
-           'pass' => 'EIN-PASSWORT',
-       ],
-       // Links in Mails zeigen auf den lokalen Server.
-       'app' => ['base_url' => 'http://localhost:8000'],
-       // Mails als .eml-Dateien in var/mail statt Versand.
-       'mail' => ['transport' => 'file'],
-       // Nur für den Vite-Entwicklungsserver (npm run dev) nötig.
-       'http' => ['allowed_origins' => ['http://localhost:5173']],
-   ];
-   ```
+    ```php
+    return [
+        'db' => [
+            'host' => '127.0.0.1',
+            'name' => 'firefighting_dev',
+            'user' => 'ff_dev',
+            'pass' => 'EIN-PASSWORT',
+        ],
+        // Links in Mails zeigen auf den lokalen Server.
+        'app' => ['base_url' => 'http://localhost:8000'],
+        // Mails als .eml-Dateien in var/mail statt Versand.
+        'mail' => ['transport' => 'file'],
+        // Nur für den Vite-Entwicklungsserver (npm run dev) nötig.
+        'http' => ['allowed_origins' => ['http://localhost:5173']],
+    ];
+    ```
 
 3. Tabellen anlegen, Test-Stadt mit den Start-Gerätetypen anlegen und ihren ersten Admin einladen:
 
-   ```
-   php bin/migrate.php run
-   php bin/tenant.php create --slug=test --name="Feuerwehr Test"
-   php bin/tenant.php invite-admin --slug=test --email=admin@example.org --print-link
-   ```
+    ```
+    php bin/migrate.php run
+    php bin/tenant.php create --slug=test --name="Feuerwehr Test"
+    php bin/tenant.php invite-admin --slug=test --email=admin@example.org --print-link
+    ```
 
-   `--print-link` zeigt den Einladungslink (`…/einladung-annehmen#token=…`); dieselbe Mail liegt
-   auch in `var/mail/`.
+    `--print-link` zeigt den Einladungslink (`…/einladung-annehmen#token=…`); dieselbe Mail liegt
+    auch in `var/mail/`.
 
 4. Frontend bauen und den Server starten:
 
-   ```
-   cd frontend
-   npm ci
-   npm run build
-   cd ..
-   php -S localhost:8000 public/index.php
-   ```
+    ```
+    cd frontend
+    npm ci
+    npm run build
+    cd ..
+    php -S localhost:8000 public/index.php
+    ```
 
 5. Einladung annehmen: den Link (mit `#token=…`) im Browser öffnen, Name und Passwort festlegen,
    danach anmelden. Ohne Frontend-Build geht es auch per curl (Token = Teil hinter `#token=` im
    Link; Datei danach löschen):
 
-   ```
-   # accept.json: {"token":"<Token>","name":"Erika Musterfrau","password":"<mindestens 10 Zeichen>"}
-   curl.exe -H "Content-Type: application/json" --data-binary "@accept.json" http://localhost:8000/firefighting/test/api/v1/auth/invitation/accept
-   ```
+    ```
+    # accept.json: {"token":"<Token>","name":"Erika Musterfrau","password":"<mindestens 10 Zeichen>"}
+    curl.exe -H "Content-Type: application/json" --data-binary "@accept.json" http://localhost:8000/firefighting/test/api/v1/auth/invitation/accept
+    ```
 
 Danach `http://localhost:8000/firefighting/test/` öffnen. Testdaten (Standorte, Geräte, Verlauf)
 legt nach dem Annehmen der Einladung `php bin/seed-test-city.php --slug=test --execute` an (siehe
@@ -1139,18 +1192,18 @@ die API anlegen (Beispiele oben unter "Gerätetypen und Standorte" und
 1. Handler in `src/Api/V1/` anlegen, der `FirefightingEquipment\Http\RequestHandler` implementiert.
    Er liefert eine `JsonResponse` (Downloads: `CsvResponse`, siehe "CSV-Export") und bekommt einen
    `RequestContext`:
-   - `$context->tenant`: die aktive Stadt (unter `service`: `null`); jede Abfrage nach deren ID
-     filtern.
-   - `$context->db->get()`: die PDO-Verbindung; sie wird erst hier aufgebaut.
-   - `$context->auth()`: angemeldetes Konto und Sitzung (nur bei Routen, die nicht öffentlich sind).
-   - `$context->param('id')`: Wert eines Platzhalters; `$context->stringField('name')`: Textfeld aus
-     dem JSON-Body (fehlt es, folgt 400); `optionalStringField('label')` (fehlt oder `null` →
-     `null`); `intField('max_uses', 1, 500)` (nur echte JSON-Ganzzahlen im Bereich, sonst 400);
-     `$context->request->query()`: Parameter des Query-Strings (nur einfache Werte).
-   - `$context->notifier()->send('zweck', $userId, fn () => MailTemplates::…)`: Mail senden
-     (Vorlage in `src/Mail/MailTemplates.php`); ein Versandfehler wird nur protokolliert.
-   - Bekannte Fehler als `HttpException` werfen (Fabriken in `src/Http/HttpException.php`, neue
-     Codes dort ergänzen); alles andere wird automatisch zu 500.
+    - `$context->tenant`: die aktive Stadt (unter `service`: `null`); jede Abfrage nach deren ID
+      filtern.
+    - `$context->db->get()`: die PDO-Verbindung; sie wird erst hier aufgebaut.
+    - `$context->auth()`: angemeldetes Konto und Sitzung (nur bei Routen, die nicht öffentlich sind).
+    - `$context->param('id')`: Wert eines Platzhalters; `$context->stringField('name')`: Textfeld aus
+      dem JSON-Body (fehlt es, folgt 400); `optionalStringField('label')` (fehlt oder `null` →
+      `null`); `intField('max_uses', 1, 500)` (nur echte JSON-Ganzzahlen im Bereich, sonst 400);
+      `$context->request->query()`: Parameter des Query-Strings (nur einfache Werte).
+    - `$context->notifier()->send('zweck', $userId, fn () => MailTemplates::…)`: Mail senden
+      (Vorlage in `src/Mail/MailTemplates.php`); ein Versandfehler wird nur protokolliert.
+    - Bekannte Fehler als `HttpException` werfen (Fabriken in `src/Http/HttpException.php`, neue
+      Codes dort ergänzen); alles andere wird automatisch zu 500.
 2. Route in `src/Http/Routes.php` mit Zugriffsstufe eintragen, z. B.
    `->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceHandler())` in `tenant()`
    (Städte) oder `service()` (Super-Admin). Stufen: `Public`, `Authenticated`, `Admin` (nur Städte),
@@ -1233,7 +1286,23 @@ je 3 Komplettläufe und ein Lastlauf der Update-Tests mit `--repeat-each=5`):
 | 12     | 160–164 s, 5–13 Fehler in allen Browsern                 | –                               |
 
 Daher `WINDOWS_TEST_WORKERS` in `frontend/playwright.config.ts`: 6 für Chromium und WebKit, 4 für
-alle Profile. `npm test` dauerte vorher (alle Profile, ein gemeinsamer Server) im Median 252 s,
+alle Profile.
+
+Eine eigene Grenze nur für Firefox (`workers` im Projekt) bringt nichts. Gemessen am 30.10.2026
+(1060 Tests, 4 Worker, je 3 Komplettläufe abwechselnd, sonst keine Last auf dem Rechner):
+
+| Firefox-Worker | Dauer     | Fehler                                                     |
+| -------------- | --------- | ---------------------------------------------------------- |
+| ohne Grenze    | 398–408 s | keine                                                      |
+| 2              | 401–408 s | einmal Firefox: Verbindung abgewiesen                      |
+| 1              | 735–749 s | keine (Firefox läuft am Ende allein, fast doppelt so lang) |
+
+Jeder Worker hat seinen eigenen PHP-Server; abgewiesen wird am Server des einzelnen Workers, die
+Zahl der Firefox-Worker ändert daran nichts. `playwright.all.config.ts` bleibt daher ohne Grenze.
+Tritt die Abweisung gehäuft auf, zuerst prüfen, ob nebenher anderes läuft (Build, zweiter
+Testlauf, Virenscanner).
+
+`npm test` dauerte vorher (alle Profile, ein gemeinsamer Server) im Median 252 s,
 danach (Chromium und WebKit, 6 Worker) 85 s: Lint 15,5 s, Vitest 4,8 s, Build 6,7 s, Playwright
 58,0 s.
 
@@ -1304,12 +1373,13 @@ normalen Push des Workflows erlaubt es weiter:
 7. **Target branches** → **Add target** → **Include by pattern** → `deploy` → **Add Inclusion
    pattern**.
 8. Unter **Branch rules** nur diese beiden anhaken:
-   - **Restrict deletions**
-   - **Block force pushes**
+    - **Restrict deletions**
+    - **Block force pushes**
 
-   Alles andere aus lassen, insbesondere **Restrict updates** (dann dürfte nur noch die Bypass-Liste
-   pushen; den `GITHUB_TOKEN` des Workflows kann man dort nicht eintragen, der Job `deploy` würde
-   scheitern) und **Require linear history** (die deploy-Commits haben zwei Eltern).
+    Alles andere aus lassen, insbesondere **Restrict updates** (dann dürfte nur noch die Bypass-Liste
+    pushen; den `GITHUB_TOKEN` des Workflows kann man dort nicht eintragen, der Job `deploy` würde
+    scheitern) und **Require linear history** (die deploy-Commits haben zwei Eltern).
+
 9. **Create**.
 
 Prüfen: Beim nächsten Push auf `main` muss der Job `deploy` weiter grün werden. Ein
@@ -1362,12 +1432,12 @@ Ablauf von `scripts/deploy.sh`:
    und Merge zu wiederholen. Fehlt danach `frontend/dist/index.html`, bricht es ab. Sonst
    `composer install`.
 4. `php85 bin/migrate.php check`. Sind Migrationen offen:
-   1. Datenbanksicherung mit `php85 bin/db-dump.php --suffix=vor-migration-<alter Commit>`.
-      Schlägt sie fehl, bricht das Skript ab, **ohne** zu migrieren. Gibt es noch keine Tabelle
-      `fe_*` (erste Migration), gibt es nichts zu sichern: Das Skript zeigt einen Hinweis und
-      migriert ohne Sicherung.
-   2. `php85 bin/migrate.php run`. Schlägt die Migration fehl, zeigt das Skript den Pfad der
-      Sicherung und die Befehle zum Zurückspielen an. Es spielt **nichts** automatisch zurück.
+    1. Datenbanksicherung mit `php85 bin/db-dump.php --suffix=vor-migration-<alter Commit>`.
+       Schlägt sie fehl, bricht das Skript ab, **ohne** zu migrieren. Gibt es noch keine Tabelle
+       `fe_*` (erste Migration), gibt es nichts zu sichern: Das Skript zeigt einen Hinweis und
+       migriert ohne Sicherung.
+    2. `php85 bin/migrate.php run`. Schlägt die Migration fehl, zeigt das Skript den Pfad der
+       Sicherung und die Befehle zum Zurückspielen an. Es spielt **nichts** automatisch zurück.
 5. Health-Check `https://www.prodad.de/firefighting/service/api/v1/health` (erwartet HTTP 200;
    prüft auch die Datenbankverbindung, scheitert also z. B. bei fehlender
    `config/config.local.php`).
@@ -1390,64 +1460,64 @@ abbrechen und den Rücksprung unten verwenden.
 
 1. Ausgangslage prüfen:
 
-   ```
-   cd ~/htdocs/apps/firefighting-equipment
-   git rev-parse --abbrev-ref HEAD
-   git status --short --untracked-files=no
-   git log --oneline -1
-   ```
+    ```
+    cd ~/htdocs/apps/firefighting-equipment
+    git rev-parse --abbrev-ref HEAD
+    git status --short --untracked-files=no
+    git log --oneline -1
+    ```
 
-   Erwartet: `main`, danach keine Ausgabe von `git status` (nichts lokal geändert), dann der
-   bisherige Stand, z. B. `4f47ad2 Offline-Buchungen, …`. Diesen Commit notieren (ALT).
+    Erwartet: `main`, danach keine Ausgabe von `git status` (nichts lokal geändert), dann der
+    bisherige Stand, z. B. `4f47ad2 Offline-Buchungen, …`. Diesen Commit notieren (ALT).
 
 2. Sicherung des Projektordners (wie `deploy.sh`, Zusatz `umstieg`):
 
-   ```
-   (umask 077 && tar -czf ../_backup/ff-deploy-$(date -u +%Y%m%d-%H%M%SZ)-$(git rev-parse --short HEAD)-umstieg.tar.gz --exclude=./vendor .)
-   ls -l ../_backup/ | grep umstieg
-   ```
+    ```
+    (umask 077 && tar -czf ../_backup/ff-deploy-$(date -u +%Y%m%d-%H%M%SZ)-$(git rev-parse --short HEAD)-umstieg.tar.gz --exclude=./vendor .)
+    ls -l ../_backup/ | grep umstieg
+    ```
 
-   Erwartet: keine Ausgabe von `tar`, danach eine Zeile `-rw------- … ff-deploy-…Z-<ALT>-umstieg.tar.gz`.
+    Erwartet: keine Ausgabe von `tar`, danach eine Zeile `-rw------- … ff-deploy-…Z-<ALT>-umstieg.tar.gz`.
 
 3. Branch `deploy` holen und prüfen:
 
-   ```
-   git fetch origin
-   git merge-base --is-ancestor HEAD origin/deploy && echo "Fast-Forward möglich"
-   git log --oneline -1 origin/deploy
-   git show origin/deploy:scripts/deploy.sh | grep '^BRANCH='
-   git ls-tree --name-only origin/deploy frontend/dist/
-   ```
+    ```
+    git fetch origin
+    git merge-base --is-ancestor HEAD origin/deploy && echo "Fast-Forward möglich"
+    git log --oneline -1 origin/deploy
+    git show origin/deploy:scripts/deploy.sh | grep '^BRANCH='
+    git ls-tree --name-only origin/deploy frontend/dist/
+    ```
 
-   Erwartet: bei `git fetch` u. a. die Zeile `* [new branch]      deploy     -> origin/deploy`;
-   dann `Fast-Forward möglich`; `Deploy <commit>: <Betreff>` (der neueste Stand von `main`);
-   `BRANCH="deploy"`; `frontend/dist/assets`, `frontend/dist/index.html`, `frontend/dist/sw.js`
-   und `frontend/dist/workbox-….js`. Fehlt `Fast-Forward möglich` oder eine dieser Zeilen: hier
-   aufhören (es wurde noch nichts geändert).
+    Erwartet: bei `git fetch` u. a. die Zeile `* [new branch]      deploy     -> origin/deploy`;
+    dann `Fast-Forward möglich`; `Deploy <commit>: <Betreff>` (der neueste Stand von `main`);
+    `BRANCH="deploy"`; `frontend/dist/assets`, `frontend/dist/index.html`, `frontend/dist/sw.js`
+    und `frontend/dist/workbox-….js`. Fehlt `Fast-Forward möglich` oder eine dieser Zeilen: hier
+    aufhören (es wurde noch nichts geändert).
 
 4. Auf `deploy` umstellen:
 
-   ```
-   git checkout -b deploy --track origin/deploy
-   git rev-parse --abbrev-ref HEAD
-   ls frontend/dist/index.html
-   ```
+    ```
+    git checkout -b deploy --track origin/deploy
+    git rev-parse --abbrev-ref HEAD
+    ls frontend/dist/index.html
+    ```
 
-   Erwartet: `Switched to a new branch 'deploy'` und `branch 'deploy' set up to track
-   'origin/deploy'.` (Wortlaut je nach Git-Version), dann `deploy` und `frontend/dist/index.html`.
-   Ab hier ist der neue Code eingespielt, aber Composer und Migrationen laufen erst im nächsten
-   Schritt.
+    Erwartet: `Switched to a new branch 'deploy'` und `branch 'deploy' set up to track
+'origin/deploy'.` (Wortlaut je nach Git-Version), dann `deploy` und `frontend/dist/index.html`.
+    Ab hier ist der neue Code eingespielt, aber Composer und Migrationen laufen erst im nächsten
+    Schritt.
 
 5. Deployment wie künftig immer:
 
-   ```
-   bash scripts/deploy.sh
-   ```
+    ```
+    bash scripts/deploy.sh
+    ```
 
-   Erwartet (gekürzt): `Aktueller Stand: <deploy-Commit>`, `Sicherung: …`, `Already up to date.`,
-   die Ausgabe von Composer, `Health-Check OK (HTTP 200).`, `App-Seite OK (HTTP 200, Basispfad
-   gesetzt).`, `Deployment erfolgreich.` und `(keine neuen Commits)`. Sind Migrationen offen,
-   erscheinen zusätzlich `Datenbanksicherung vor der Migration ...` und die Ausgabe der Migration.
+    Erwartet (gekürzt): `Aktueller Stand: <deploy-Commit>`, `Sicherung: …`, `Already up to date.`,
+    die Ausgabe von Composer, `Health-Check OK (HTTP 200).`, `App-Seite OK (HTTP 200, Basispfad
+gesetzt).`, `Deployment erfolgreich.` und `(keine neuen Commits)`. Sind Migrationen offen,
+    erscheinen zusätzlich `Datenbanksicherung vor der Migration ...` und die Ausgabe der Migration.
 
 6. Im Browser prüfen: `https://www.prodad.de/firefighting/test/` zeigt die App (Kopfleiste mit dem
    Namen der Test-Stadt), `https://www.prodad.de/firefighting/service/` die Kopfleiste
@@ -1457,12 +1527,12 @@ abbrechen und den Rücksprung unten verwenden.
 7. Aufräumen (optional, empfohlen): den lokalen Branch `main` auf dem Server löschen, damit nicht
    versehentlich darauf gewechselt wird:
 
-   ```
-   git branch -d main
-   ```
+    ```
+    git branch -d main
+    ```
 
-   Erwartet: `Deleted branch main (was <ALT>).` (`-d` löscht nur, weil `main` in `deploy`
-   enthalten ist.)
+    Erwartet: `Deleted branch main (was <ALT>).` (`-d` löscht nur, weil `main` in `deploy`
+    enthalten ist.)
 
 **Rücksprung** (nur nötig, wenn ab Schritt 4 etwas nicht passt):
 
@@ -1513,32 +1583,32 @@ Nur von Hand, per SSH. Das Passwort nie in die Befehlszeile schreiben: Es wäre 
 Prozessliste und in der Shell-Historie sichtbar.
 
 1. Code auf den Stand vor dem Deployment zurücksetzen (die Befehle zeigt `deploy.sh` an):
-   ```
-   cd ~/htdocs/apps/firefighting-equipment
-   git reset --hard <alter Commit>
-   php85 /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-cache
-   ```
+    ```
+    cd ~/htdocs/apps/firefighting-equipment
+    git reset --hard <alter Commit>
+    php85 /usr/bin/composer install --no-dev --optimize-autoloader --no-interaction --no-cache
+    ```
 2. Zugangsdatei nur für den eigenen Benutzer anlegen:
-   ```
-   (umask 077 && nano ~/htdocs/apps/_backup/.restore.cnf)
-   ```
-   Inhalt (Werte aus `config/config.local.php`; in den Werten `\` als `\\` und `"` als `\"`
-   schreiben):
-   ```
-   [client]
-   user="BENUTZER"
-   password="PASSWORT"
-   host="HOST"
-   ```
+    ```
+    (umask 077 && nano ~/htdocs/apps/_backup/.restore.cnf)
+    ```
+    Inhalt (Werte aus `config/config.local.php`; in den Werten `\` als `\\` und `"` als `\"`
+    schreiben):
+    ```
+    [client]
+    user="BENUTZER"
+    password="PASSWORT"
+    host="HOST"
+    ```
 3. Sicherung einspielen (`--defaults-extra-file` muss die erste Option sein):
-   ```
-   gunzip -c ~/htdocs/apps/_backup/ff-db-JJJJMMTT-HHMMSSZ-vor-migration-COMMIT.sql.gz \
-     | mysql --defaults-extra-file=$HOME/htdocs/apps/_backup/.restore.cnf DATENBANKNAME
-   ```
+    ```
+    gunzip -c ~/htdocs/apps/_backup/ff-db-JJJJMMTT-HHMMSSZ-vor-migration-COMMIT.sql.gz \
+      | mysql --defaults-extra-file=$HOME/htdocs/apps/_backup/.restore.cnf DATENBANKNAME
+    ```
 4. Zugangsdatei sofort löschen:
-   ```
-   rm -f ~/htdocs/apps/_backup/.restore.cnf
-   ```
+    ```
+    rm -f ~/htdocs/apps/_backup/.restore.cnf
+    ```
 5. Prüfen: `php85 bin/migrate.php status`.
 
 Hinweise:
@@ -1716,11 +1786,11 @@ wird über `mail()` (sendmail) versendet; ohne Gruppe `app` beginnen Links mit
 
 Transporte (`mail.transport`):
 
-| Wert       | Versand                                                                     |
-|------------|-----------------------------------------------------------------------------|
-| `sendmail` | Standard: `mail()` direkt vom Webserver (SPF ja, aber ohne DKIM)              |
-| `smtp`     | über das Postfach `feuerwehr-app@prodad.de` bei STRATO, mit DKIM-Signatur     |
-| `file`     | lokal: jede Mail als `.eml`-Datei, nichts wird verschickt                    |
+| Wert       | Versand                                                                   |
+| ---------- | ------------------------------------------------------------------------- |
+| `sendmail` | Standard: `mail()` direkt vom Webserver (SPF ja, aber ohne DKIM)          |
+| `smtp`     | über das Postfach `feuerwehr-app@prodad.de` bei STRATO, mit DKIM-Signatur |
+| `file`     | lokal: jede Mail als `.eml`-Datei, nichts wird verschickt                 |
 
 ### Versand über SMTP (STRATO-Postfach, mit DKIM)
 
@@ -1829,9 +1899,9 @@ composer test:integration  # nur Integrationstests (Testdatenbank)
 ### Testdatenbank einrichten
 
 1. In MariaDB eine eigene Datenbank anlegen, deren Name auf `_test` endet:
-   ```sql
-   CREATE DATABASE firefighting_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
+    ```sql
+    CREATE DATABASE firefighting_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    ```
 2. `config/config.example.php` nach `config/config.test.php` kopieren und die Zugangsdaten
    eintragen. Die Datei wird nie committet.
 

@@ -14,7 +14,6 @@ import {
     devicesEndpoint,
     LOCATIONS,
     manyDevices,
-    NO_DEVICES,
 } from './support/devices';
 import { CURRENT_SESSION_ONLY } from './support/profile';
 
@@ -377,45 +376,7 @@ test.describe('Liste nicht ladbar', () => {
     });
 });
 
-test.describe('Dashboard des Admins', () => {
-    test.use({
-        api: { 'GET api/v1/auth/me': { status: 200, body: meBody('admin') }, ...NO_DEVICES },
-    });
-
-    test('Handy-Breite: Leiste unten, „Suchen“ erreichbar', async ({ page }) => {
-        await page.setViewportSize({ width: 390, height: 844 });
-        await page.goto('/firefighting/test/dashboard');
-        const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
-        await expect(nav.getByRole('link')).toHaveText([
-            'Dashboard',
-            'Suchen',
-            'Prüffristen',
-            'Profil',
-        ]);
-        await expect(nav.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
-            'aria-current',
-            'page',
-        );
-        await nav.getByRole('link', { name: 'Suchen' }).click();
-        await expect(page).toHaveURL(/\/suchen$/);
-    });
-
-    test('PC-Breite: Leiste unten, „Suchen“ erreichbar', async ({ page }) => {
-        await page.setViewportSize({ width: 1280, height: 800 });
-        await page.goto('/firefighting/test/dashboard');
-        await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
-        const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
-        await expect(nav.getByRole('link')).toHaveText([
-            'Dashboard',
-            'Suchen',
-            'Prüffristen',
-            'Profil',
-        ]);
-        await nav.getByRole('link', { name: 'Suchen' }).click();
-        await expect(page).toHaveURL(/\/suchen$/);
-    });
-});
-
+// Dashboard und Menü des Admins: adminConsole.spec.ts.
 test.describe('Dashboard des Super-Admins', () => {
     test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('superadmin') } } });
 

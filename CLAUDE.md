@@ -19,7 +19,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `config/config.local.php` committen.
 - Code und Bezeichner auf Englisch, Dokumentation und Oberflächentexte auf Deutsch.
 - Jede Änderung an der REST-API (auch neue Felder) kommt zusätzlich in `docs/UEBERGABE-BACKEND.md`
-  (Datum, Commit-Betreff, was und warum, Tests), damit der Backend-Chat sie kennt.
+  (Datum, Commit-Betreff, was und warum, Tests), damit der Backend-Chat sie kennt. Als Betreff trägt
+  der Agent gleich den Commit-Betreff ein, den er in der „✅ FERTIG“-Nachricht vorschlägt (nicht
+  „noch nicht committet“); der Nutzer verwendet ihn.
 - Hängt eine Änderung von Bildschirmbreite oder Browser ab (Layout, Leisten, Touch, Kamera, Service
   Worker), vor „✅ FERTIG“ zusätzlich in `frontend/` `npm run test:e2e:all` (alle fünf Profile, auch
   Firefox und Handy-Breite) laufen lassen; `npm test` prüft lokal nur Chromium und WebKit in
@@ -295,7 +297,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
-  `client.ts`; `devices.ts`, `deviceEvents.ts`, `inspections.ts`, `locations.ts`), `src/data/` (Datenschicht für Geräte und Standorte),
+  `client.ts`; `devices.ts`, `deviceEvents.ts`, `deviceSummary.ts`, `inspections.ts`, `locations.ts`,
+  `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte und das Dashboard),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
@@ -493,16 +496,42 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   zuletzt benutzten steht, erscheint beim Umbuchen nach dem aktuellen mit „gewählt“. Fokus: beim
   Öffnen die Überschrift, danach „Anderen Standort suchen …“. Tests in
   `tests/e2e/locationPicker.spec.ts` und `tests/unit/locationSearch.spec.ts`.
+- Admin-Konsole (KONZEPT.md "Admin-Konsole – Entscheidungen", 29–38; Seiten mit `layout: 'admin'`,
+  nur `admin` unter einer Stadt; der Super-Admin hat vorerst das Platzhalter-Dashboard
+  `DashboardPage`): `App.vue` zeigt `AdminMenu` (`src/components/`) und daneben `AppNotices` (Hinweise
+  zu Stadt, Sitzungsprüfung und Updates, in allen Darstellungen gleich) und die Seite. Menü
+  (`AdminMenuNav`, Einträge in `ADMIN_MENU`, `src/router/adminMenu.ts`, jeder Eintrag kommt mit
+  seiner Seite; Symbole `AdminMenuIcon`): ab 1024 px links mit Text (240 px), 768–1023 px eingeklappt
+  auf Symbole (Text nur für Bildschirmleser, Tooltip über `title`), darunter Kopfleiste in der
+  Stadtfarbe mit „Menü öffnen“ (☰) und einer Schublade (Reka UI `Dialog` „Menü“, Escape und „Menü
+  schließen“, ein Seitenwechsel schließt sie). Oben Logo (192 px) bzw. Standard-Symbol und Name der
+  Stadt, unten der Name des Kontos als Text und „Abmelden“; Zähler an Einträgen (`badge`:
+  `pendingUsers`, `openNotices`) aus `adminOverview`. Auf den Handy-Seiten behält der Admin die Leiste
+  unten mit „Dashboard“. Dashboard (`AdminDashboardPage`, Mockup „Main“) aus `adminOverview`
+  (`src/data/adminOverview.ts`, `AdminOverviewStore` mit `Refresher`, in `installDataLayer`): vier
+  Abfragen gleichzeitig, `GET device-summary`, `GET users?status=pending`, `GET
+  devices?status=maintenance,defective&sort=status&dir=desc&limit=10` (`NOT_READY_LIMIT`) und `GET
+  device-events?limit=8` (`ACTIVITY_LIMIT`); nur wenn alle antworten, gilt der neue Stand, sonst
+  bleibt der bisherige mit Fehler und „Erneut versuchen“. Kacheln (`src/data/dashboard.ts`):
+  Einsatzbereitschaft „42 von 45“ mit Balken (`<progress>`), nicht einsatzbereit „2 defekt · 1 in
+  Wartung“, Prüffristen (führt zu `prueffristen`), offene Hinweise plus Freischaltungen; Listen „Nicht
+  einsatzbereit“ („… und N weitere“) und „Letzte Aktivitäten“ (Zeit, Kennung, Art, Wer, Zeilen aus
+  `eventLines`, Kommentar; nicht übernommene abgesetzt); Geräte öffnen vorerst das Umbuchen. Die
+  übrigen Kacheln führen zur gefilterten Liste, sobald es sie gibt. Browser-Tests, die als Admin auf
+  dem Dashboard landen, simulieren dessen Abfragen mit `ADMIN_OVERVIEW` (`tests/e2e/support/admin.ts`,
+  dort auch `adminOverview`, `summaryJson`, `userJson`, `tenantEventJson`); Tests in
+  `tests/e2e/adminConsole.spec.ts` (Menü in drei Breiten, Dashboard) und
+  `tests/unit/adminOverview.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
   Leiste unten (`UserTabBar`: Suchen, Prüffristen, Profil; für Admins vorne zusätzlich Dashboard),
   `focus` bildschirmfüllend ohne Kopfleiste der App, die Seite zeigt `FocusHeader` (Zurück über
   `goBack` in `src/router/back.ts`: vorige Seite der App laut `history.state.back`, sonst
-  „Suchen“). Handy-Seiten (`suchen`, `prueffristen`, `profil`, `geraete/<id>` mit `<id>` wie die
+  „Suchen“), `admin` Seiten der Admin-Konsole mit deren Menü (siehe „Admin-Konsole“ unten).
+  Handy-Seiten (`suchen`, `prueffristen`, `profil`, `geraete/<id>` mit `<id>` wie die
   Platzhalter im Backend) für `user` und `admin` (KONZEPT.md "User am Handy – Entscheidungen").
-  `meta.tabBar` (nur Dashboard unter einer Stadt, bis die Admin-Konsole ein eigenes Menü hat):
-  Leiste unten auch ohne `layout`, in jeder Breite (am PC sonst kein Weg zu „Suchen“). Der Wächter fragt `auth/me`
+  Der Wächter fragt `auth/me`
   höchstens einmal je Seitenaufruf (`ensureSession`); ohne Sitzung → `anmelden?weiter=…`, falsche
   Rolle → Startseite der Rolle (`landingRoute`: `user` → `suchen`, `admin`/`superadmin` →
   `dashboard`). Nur eine echte Antwort entscheidet über die Sitzung (401 = nicht angemeldet,
@@ -639,7 +668,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Windows (dort ohne) weist ein Server unter hoher Last Verbindungen ab (Firefox:
   `NS_ERROR_CONNECTION_REFUSED`), daher `WINDOWS_TEST_WORKERS` in `playwright.config.ts`: 6 für
   Chromium und WebKit, 4 für alle fünf Profile (gemessen 29.10.2026, README "Frontend"; erst nach
-  neuer Messung ändern). Keine
+  neuer Messung ändern). Keine eigene Grenze für Firefox in `playwright.all.config.ts` (gemessen
+  30.10.2026: 2 Firefox-Worker nicht stabiler, 1 fast doppelt so lang; abgewiesen wird am
+  PHP-Server des einzelnen Workers). Keine
   automatischen Wiederholungen (`retries: 0`), sie würden zeitweise Fehler verdecken. API und Manifest simuliert `page.route()`
   (`tests/e2e/fixtures.ts`) mit denselben Bereichen wie die Routen in PHP (unter `service` nur
   `api/v1/app-icon/…`), eine Datenbank wird nicht gebraucht. Weitere Routen je Test über die
@@ -1514,6 +1545,14 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   „Prüfdatum geändert“, „Stammdaten geändert“. Standorte erscheinen mit ihrem aktuellen Namen und
   Pfad (die Historie speichert nur die ID; nach dem Umbenennen steht dort der neue Name; bewusst so
   in Version 1, Namen zum Zeitpunkt bräuchten eine Migration).
+- `GET device-events` (Admin, `DeviceHistoryListHandler`, in `AdminRoutesAccessTest`; „Letzte
+  Aktivitäten“ der Admin-Konsole): Historie der ganzen Stadt, alle Geräte (auch ausgesonderte),
+  neueste zuerst nach `created_at`, dann `id` (wie der Export mit `order=newest`, Index
+  `idx_fe_device_events_tenant`; `DeviceEventRepository::listForTenant`, `DeviceHistoryPage`),
+  `limit` 1–200 (Standard 50), `offset` 0–1000000; Antwort `{events, total, limit, offset}`. Je
+  Eintrag dieselben Felder wie bei `devices/{id}/events`, dazu `device {id, identifier, device_type
+  {id, name}}` (aktueller Stand des Geräts, `DeviceHistoryEntry`). Keine Filter (dafür der Export).
+  Tests: `DeviceHistoryListTest`.
 - Unbekannte Felder im Body der ändernden Routen → 400 (z. B. `status` oder `location_id` bei
   `fields`, damit nichts still ignoriert wird). Felder werden vor der Suche gelesen (400 vor 404).
 - Reihenfolge der Prüfung beim Ändern: Gerät `FOR UPDATE` (unbekannt/fremd 404) → Version

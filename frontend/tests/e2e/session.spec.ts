@@ -7,6 +7,7 @@ import {
     NOT_AUTHENTICATED,
     test,
 } from './fixtures';
+import { ADMIN_OVERVIEW } from './support/admin';
 import { NO_DEVICES } from './support/devices';
 import { CURRENT_SESSION_ONLY } from './support/profile';
 
@@ -54,7 +55,12 @@ test.describe('Weiche „/“ und Wächter', () => {
     });
 
     test.describe('als Admin', () => {
-        test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('admin') } } });
+        test.use({
+            api: {
+                'GET api/v1/auth/me': { status: 200, body: meBody('admin') },
+                ...ADMIN_OVERVIEW,
+            },
+        });
 
         test('„/“ führt zum Dashboard, auch im Handy-Format', async ({ page, apiCalls }) => {
             await page.goto('/firefighting/test/');
@@ -96,6 +102,7 @@ test.describe('Weiche „/“ und Wächter', () => {
                             calls += 1;
                             return calls === 1 ? failure : { status: 200, body: meBody('admin') };
                         },
+                        ...ADMIN_OVERVIEW,
                     },
                 });
 
@@ -164,10 +171,13 @@ test.describe('Abmelden', () => {
             api: {
                 'GET api/v1/auth/me': { status: 200, body: meBody('admin') },
                 'POST api/v1/auth/logout': { status: 200, body: { logged_out: true } },
+                ...ADMIN_OVERVIEW,
             },
         });
 
         test('führt zur Anmeldung mit Hinweis', async ({ page, apiRequests }) => {
+            // Am PC steht „Abmelden“ im Menü links (am Handy in der Schublade, adminConsole.spec.ts).
+            await page.setViewportSize({ width: 1280, height: 800 });
             await page.goto('/firefighting/test/dashboard');
             await page.getByRole('button', { name: 'Abmelden' }).click();
             await expect(page).toHaveURL(/\/firefighting\/test\/anmelden$/);

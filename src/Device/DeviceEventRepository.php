@@ -34,10 +34,14 @@ final readonly class DeviceEventRepository
 
     private const string FROM = self::JOINS . ' WHERE e.tenant_id = ? AND e.device_id = ?';
 
-    /** Zusätzlich das Gerät mit seinem aktuellen Typ (Export der Historie einer Stadt) */
-    private const string HISTORY_FROM = self::JOINS
+    /** Zusätzlich das Gerät mit seinem aktuellen Typ (Historie einer Stadt, siehe DeviceHistoryEntry) */
+    private const string DEVICE_COLUMNS = ', d.id AS device_id, d.identifier AS device_identifier, t.id AS type_id, t.name AS type_name';
+
+    private const string DEVICE_JOINS = self::JOINS
         . ' JOIN fe_devices d ON d.id = e.device_id AND d.tenant_id = e.tenant_id'
-        . ' JOIN fe_device_types t ON t.id = d.device_type_id AND t.tenant_id = d.tenant_id'
+        . ' JOIN fe_device_types t ON t.id = d.device_type_id AND t.tenant_id = d.tenant_id';
+
+    private const string HISTORY_FROM = self::DEVICE_JOINS
         . ' WHERE e.tenant_id = ? AND e.created_at >= ? AND e.created_at < ?';
 
     public function __construct(private \PDO $pdo)
@@ -117,20 +121,59 @@ final readonly class DeviceEventRepository
         return UnbufferedQuery::rows(
             $this->pdo,
             sprintf(
-                '%s, d.id AS device_id, d.identifier AS device_identifier, t.name AS type_name%s%s ORDER BY e.created_at %s, e.id %s',
+                '%s%s%s%s ORDER BY e.created_at %s, e.id %s',
                 self::SELECT,
+                self::DEVICE_COLUMNS,
                 self::HISTORY_FROM,
                 $where,
                 $direction,
                 $direction,
             ),
             $params,
-            static fn (array $row): DeviceHistoryEntry => new DeviceHistoryEntry(
-                self::hydrate($row),
-                (int) $row['device_id'],
-                (string) $row['device_identifier'],
-                (string) $row['type_name'],
-            ),
+            self::historyEntry(...),
+        );
+    }
+
+    /**
+     * Eine Seite der Historie der ganzen Stadt (alle Geräte, auch ausgesonderte), neueste zuerst:
+     * nach Zeitpunkt, bei gleicher Sekunde nach ID (wie exportHistory mit newestFirst; nutzt den
+     * Index idx_fe_device_events_tenant).
+     */
+    public function listForTenant(Tenant $tenant, int $limit, int $offset): DeviceHistoryPage
+    {
+        if ($limit < 1 || $offset < 0) {
+            throw new \InvalidArgumentException('limit muss positiv, offset nicht negativ sein.');
+        }
+
+        $count = $this->pdo->prepare('SELECT COUNT(*) FROM fe_device_events e WHERE e.tenant_id = ?');
+        $count->execute([$tenant->id]);
+        $total = (int) $count->fetchColumn();
+
+        // limit und offset sind geprüfte Ganzzahlen.
+        $stmt = $this->pdo->prepare(sprintf(
+            '%s%s%s WHERE e.tenant_id = ? ORDER BY e.created_at DESC, e.id DESC LIMIT %d OFFSET %d',
+            self::SELECT,
+            self::DEVICE_COLUMNS,
+            self::DEVICE_JOINS,
+            $limit,
+            $offset,
+        ));
+        $stmt->execute([$tenant->id]);
+
+        return new DeviceHistoryPage(array_map(self::historyEntry(...), $stmt->fetchAll()), $total);
+    }
+
+    /**
+     * @param array<string, mixed> $row Zeile mit SELECT und DEVICE_COLUMNS
+     */
+    private static function historyEntry(array $row): DeviceHistoryEntry
+    {
+        return new DeviceHistoryEntry(
+            self::hydrate($row),
+            (int) $row['device_id'],
+            (string) $row['device_identifier'],
+            (int) $row['type_id'],
+            (string) $row['type_name'],
         );
     }
 
