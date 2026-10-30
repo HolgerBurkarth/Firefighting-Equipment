@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { userLabel } from '../api/auth';
 import type { ApiError } from '../api/client';
 import { logout, session } from '../auth/session';
@@ -18,6 +18,12 @@ defineProps<{ variant: 'sidebar' | 'drawer' }>();
 const emit = defineEmits<{ navigate: [] }>();
 
 const router = useRouter();
+const route = useRoute();
+
+/** Unterseiten (z. B. Gerätedetail unter „Geräte“) heben ihren Eintrag ebenfalls hervor. */
+function inSection(sections: readonly string[] | undefined): boolean {
+    return typeof route.name === 'string' && sections?.includes(route.name) === true;
+}
 const busy = ref(false);
 const error = ref<ApiError | null>(null);
 
@@ -78,6 +84,7 @@ async function onLogout(): Promise<void> {
             v-for="entry in ADMIN_MENU"
             :key="entry.route"
             class="menu-link"
+            :class="{ 'menu-link-active': inSection(entry.sections) }"
             active-class="menu-link-active"
             :to="{ name: entry.route }"
             :title="entry.label"

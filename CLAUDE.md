@@ -381,7 +381,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `IdentifierKeyCasesTest` (PHPUnit, Testdatenbank) und `deviceSearch.spec.ts` (Vitest, meldet auch
   Buchstaben einer neueren Node-Version, die in der Datei fehlen). Änderungen an `identifier_key`
   daher immer mit `identifierKey` und neuen Fällen.
-- Code scannen (`CodeScanner` in `src/components/`, KONZEPT.md Entscheidungen 17 und 27): Knopf
+- Code scannen (`CodeScanner` in `src/components/`, KONZEPT.md Entscheidungen 17 und 27; auch in
+  „Code zuordnen“ des Gerätedetails, Hinweis nach dem Lesen per `detectedText`): Knopf
   „Code scannen“ unter dem Suchfeld; der Scanner ist eine Ansicht von „Suchen“ über `?scannen=1`
   (wie die Standortwahl: Zurück-Knopf schließt nur ihn, `closeQueryView`), bildschirmfüllend
   (`Teleport` nach `body`, `role="dialog"`, Kopfzeile `FocusHeader` „Scanner schließen“, „Abbrechen“,
@@ -438,11 +439,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (`changed`), Gerät in „Zuletzt benutzt“, Ziel (nur bei `applied`) unter die Standorte, Bestätigung
   (`setBookingNotice`, sessionStorage `ff-booking-notice`, übersteht ein Neuladen; `applied` grün
   „M1 → HLF 20 / G2 · einsatzbereit“, sonst `result.message`), dann
-  `returnTo(router, ['search', 'inspections', 'devices'])` (`src/router/back.ts`: ist eine der Seiten die
-  vorige, `back()`, sonst `replace` auf die erste, also „Suchen“ nach einem direkt geöffneten Link).
-  Die Seite zeigt die Bestätigung (`BookingNoticeMessage`, holt sie per `takeBookingNotice`):
-  „Suchen“ bis zur nächsten Eingabe, „Prüffristen“ und die Geräteliste der Admin-Konsole bis zum
-  Verlassen. Nach jeder Buchung `locationStore.refresh('changed')` und
+  `returnTo(router, ['search', 'inspections', 'devices', 'device-details'])` (`src/router/back.ts`:
+  ist eine der Seiten die vorige, `back()`, sonst `replace` auf die erste, also „Suchen“ nach einem
+  direkt geöffneten Link). Die Seite zeigt die Bestätigung (`BookingNoticeMessage`, holt sie per
+  `takeBookingNotice`): „Suchen“ bis zur nächsten Eingabe, „Prüffristen“, die Geräteliste und das
+  Gerätedetail der Admin-Konsole bis zum Verlassen (das Gerätedetail bis zur nächsten Aktion). Für
+  Admins zusätzlich der Link „Gerätedetail (Admin)“ unter „Details und Verlauf“. Nach jeder Buchung `locationStore.refresh('changed')` und
   `adminDeviceList.refresh('changed')` (nur, wenn die Geräteliste schon geladen ist)
   (Gerätezahlen). Browser-Tests mit der
   Umbuchen-Ansicht simulieren `GET api/v1/devices/{id}` (`deviceDetail`) und `GET api/v1/locations`
@@ -470,7 +472,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Inhalt: aktueller Standort, Status, nächste Prüfung (überfällig rot, Vergleich mit heute in der
   Ortszeit), Stammdaten (leer „–“, Scan-Code mit `scanCodeDisplay` wie `ScanCode::display`,
   Beschaffungsdatum und Notiz aus `GET devices/{id}`: `fetchCurrent` liefert `DeviceDetail`), dann
-  der Verlauf: `deviceHistory(id)` aus `src/data/index.ts` (`DeviceHistory` in
+  der Verlauf (Bausteine `DeviceMasterData` und `DeviceHistoryList`, auch im Gerätedetail der
+  Admin-Konsole): `deviceHistory(id)` aus `src/data/index.ts` (`DeviceHistory` in
   `src/data/deviceHistory.ts`, `GET devices/{id}/events` in Blöcken zu `EVENT_PAGE_LIMIT` = 20,
   „Weitere Einträge laden“, doppelte IDs entfernt, Fehler behält die geladenen Einträge). Je Eintrag
   `type_label`, Aktionszeit (`eventTimeText`: „heute 14:02“, „gestern 18:30“, sonst „12.10.2026,
@@ -523,7 +526,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Stadtfarbe mit „Menü öffnen“ (☰) und einer Schublade (Reka UI `Dialog` „Menü“, Escape und „Menü
   schließen“, ein Seitenwechsel schließt sie). Oben Logo (192 px) bzw. Standard-Symbol und Name der
   Stadt, unten der Name des Kontos als Text und „Abmelden“; Zähler an Einträgen (`badge`:
-  `pendingUsers`, `openNotices`) aus `adminOverview`. Auf den Handy-Seiten behält der Admin die Leiste
+  `pendingUsers`, `openNotices`) aus `adminOverview`; `sections` hebt einen Eintrag auch auf
+  Unterseiten hervor („Geräte“ auf dem Gerätedetail). Auf den Handy-Seiten behält der Admin die Leiste
   unten mit „Dashboard“. Dashboard (`AdminDashboardPage`, Mockup „Main“) aus `adminOverview`
   (`src/data/adminOverview.ts`, `AdminOverviewStore` mit `Refresher`, in `installDataLayer`): vier
   Abfragen gleichzeitig, `GET device-summary`, `GET users?status=pending`, `GET
@@ -533,7 +537,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Einsatzbereitschaft „42 von 45“ mit Balken (`<progress>`), nicht einsatzbereit „2 defekt · 1 in
   Wartung“, Prüffristen (führt zu `prueffristen`), offene Hinweise plus Freischaltungen; Listen „Nicht
   einsatzbereit“ („… und N weitere“) und „Letzte Aktivitäten“ (Zeit, Kennung, Art, Wer, Zeilen aus
-  `eventLines`, Kommentar; nicht übernommene abgesetzt); Geräte öffnen vorerst das Umbuchen.
+  `eventLines`, Kommentar; nicht übernommene abgesetzt); Geräte öffnen das Gerätedetail.
   Einsatzbereitschaft führt zu `geraete`, nicht einsatzbereit und „… und N weitere“ zu
   `geraete?status=maintenance,defective`; offene Hinweise führen später zu Protokoll und Benutzern.
   Browser-Tests, die als Admin auf
@@ -557,7 +561,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (`src/components/locationIcons.ts`, auch in `LocationPicker`), Gerätezahl (Ebene 1
   `device_count_total`); Knöpfe „Fach in … anlegen“ (nur aktive Ebene 1) und „… bearbeiten“
   (Stift). Fenster `FormDialog` (Reka UI `Dialog`, Slot `extra` für Sperren/Deaktivieren abseits,
-  `returnFocus` = öffnender Knopf, da WebKit beim Klick nicht fokussiert). Sperren nur leer
+  `returnFocus` = öffnender Knopf, da WebKit beim Klick nicht fokussiert; `variant="danger"` = roter
+  Knopf, z. B. Aussondern). Sperren nur leer
   (`lockBlocker` aus dem Baum: Geräte direkt dort und aktive Fächer; Knopf gesperrt mit Hinweis), dann
   `ConfirmDialog`; 409 des Servers als Meldung auf der Seite. Entsperren eines Fachs erst nach dem
   übergeordneten Standort. Gerätetypen als Tabelle (`deviceTypeRows`: Name natürlich per
@@ -590,7 +595,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   den Standard. Oberfläche: Suchfeld, `AppSelect` „Gerätetyp“ und „Standort“ (aus `deviceTypeStore`
   bzw. `adminLocationStore`, gesperrte/deaktivierte markiert), Status als Knöpfe mit `aria-pressed`,
   „Ausgesonderte anzeigen“, „Filter zurücksetzen“, Anzahl („45 Geräte“, mit Filter „12 Geräte
-  gefunden“). Tabelle Kennung (öffnet vorerst das Umbuchen), Gerätetyp, Standort, Status, Nächste
+  gefunden“). Suche nur in den Feldern von `q` (Gerätetyp und Standort wählt man über die
+  Auswahllisten; live geprüft 30.10.2026). Tabelle Kennung (öffnet das Gerätedetail), Gerätetyp,
+  Standort, Status, Nächste
   Prüfung (überfällig rot, bis 30 Tage „bald fällig“ gelb, `dueState`; ausgesonderte nie), Spaltenköpfe
   mit `aria-sort`; unter 768 px Karten mit `AppSelect` „Sortieren nach“ und Knopf für die Richtung.
   „Export (CSV)“: `GET devices/export` mit denselben Filtern und derselben Sortierung
@@ -599,6 +606,41 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `deviceServer` mit Status, Typ, Standort samt Fächern, `q` und Seiten; Download über
   `MockResponse.text`/`contentType`); Unit-Tests `deviceList.spec.ts`, `adminDeviceList.spec.ts`,
   `client.spec.ts` (`apiDownload`).
+- Gerätedetail der Admin-Konsole (`DeviceDetailPage`, `geraete/<id>/details`, `<id>` wie die
+  Platzhalter im Backend, nur `admin`, `layout: 'admin'`; KONZEPT.md "Bereiche des Admins", Geräte,
+  und Entscheidung 33): „Zurück“ (`goBack`, sonst `geraete`), Kennung als Überschrift mit Typ, Karte
+  mit Standort, Status (groß) und nächster Prüfung (`dueState`: überfällig rot, bald fällig gelb),
+  Stammdaten (`DeviceMasterData`) und Verlauf (`DeviceHistoryList`, ab 1200 px nebeneinander).
+  Gerät per `deviceStore.fetchCurrent` (auch ausgesonderte; 404 „Dieses Gerät gibt es nicht
+  (mehr).“). Aktionen: groß „Umbuchen / Status ändern“ (Link auf `geraete/<id>`, danach zurück hierher
+  mit Bestätigung), „Bearbeiten“, „Prüfdatum ändern“, „Code zuordnen“; rot und abseits (Kasten unter
+  den Stammdaten) „Aussondern …“; ausgesondert stattdessen ein Hinweis mit „Wieder aufnehmen“. Je
+  Aktion ein `FormDialog` in `src/components/` (`DeviceEditDialog`, `DeviceDueDialog`,
+  `DeviceCodeDialog`, `DeviceRetireDialog`, `DeviceReinstateDialog`), jeweils mit optionalem
+  Kommentar für den Verlauf (eine Zeile wie beim Umbuchen) und `useUnsavedInput`. Prüfung beim Tippen
+  und was gesendet wird in `src/data/deviceForm.ts` (wie `DeviceIdentifier`, `DeviceText`,
+  `DeviceDate`, `ScanCode`, nie strenger; Datum aus `<input type="date">` als `JJJJ-MM-TT`, ohne
+  Datumsauswahl auch `TT.MM.JJJJ`): gesendet werden nur geänderte Felder (binär verglichen, leer =
+  `null`); nichts geändert → Fenster zu ohne Anfrage. Ändern nur über `src/data/index.ts`
+  (`saveDeviceFields`, `saveInspectionDue`, `retireDevice`, `reinstateDevice`; API
+  `postDeviceFields`, `postInspectionDue`, `postRetire`, `postReinstate` in `src/api/devices.ts`, Antwort
+  `DeviceDetail`): nach Erfolg `deviceStore.upsert` und Auffrischen der schon geladenen Listen
+  (`deviceStore`, `locationStore`, `adminLocationStore`, `deviceTypeStore`, `adminOverview`,
+  `adminDeviceList`); 409 `version_conflict` → Stand aus `details.device` (`conflictDeviceDetail`) oben
+  übernommen, Hinweis im Fenster, beim Bearbeiten folgen nicht geänderte Felder dem neuen Stand
+  (`rebaseEditForm`); passt die Aktion nicht mehr (inzwischen ausgesondert bzw. aufgenommen), schließt
+  das Fenster. 409 `identifier_taken` bzw. `scan_code_taken` am Feld. Nach jeder Aktion grüne Meldung
+  (`success-notice`) und Verlauf neu. „Bearbeiten“: Kennung, Gerätetyp (aktive und der bisherige),
+  Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz (ohne Scan-Code). „Code zuordnen“: Feld
+  mit Fokus (USB-Handscanner tippt, Enter speichert), Rand wie `trimCode`, Trennzeichen darunter als
+  „Erkannt: …[GS]…“; „Mit der Kamera scannen“ öffnet `CodeScanner` als Ansicht `?scannen=1` (das
+  Fenster schließt sich solange und öffnet sich mit dem gelesenen Code wieder, ohne zu speichern);
+  „Code entfernen“ im Slot `extra`. „Aussondern“: Titel und Knopf nennen das Gerät, Grund freiwillig.
+  „Wieder aufnehmen“: Status (Radiogruppe), Standort und Gerätetyp (`AppSelect`, gesperrte bzw.
+  deaktivierte nur als bisheriger Wert, dann Hinweis und Knopf gesperrt), Kennung, „Scan-Code …
+  behalten“; gesendet nur Abweichungen (`reinstateRequest`). Browser-Tests
+  `tests/e2e/deviceAdmin.spec.ts` (zustandsbehafteter Server je Test über `delegate`, Kamera über
+  `fakeCamera`); Unit-Tests `deviceForm.spec.ts`, `deviceAdminApi.spec.ts`, `router.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und

@@ -386,7 +386,7 @@ onMounted(() => {
                     <td class="cell-identifier">
                         <RouterLink
                             class="device-link"
-                            :to="{ name: 'device', params: { id: device.id } }"
+                            :to="{ name: 'device-details', params: { id: device.id } }"
                         >
                             {{ device.identifier }}
                         </RouterLink>

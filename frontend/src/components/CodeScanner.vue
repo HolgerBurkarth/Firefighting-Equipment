@@ -17,6 +17,13 @@ import FocusHeader from './FocusHeader.vue';
  * `SCAN_INTERVAL_MS` ein Bild; beim ersten Code ist die Kamera sofort aus und `detected` meldet den
  * Text unverändert (auch mit GS1-Trennzeichen).
  */
+withDefaults(
+    defineProps<{
+        /** Hinweis, solange der gelesene Code verarbeitet wird. */
+        detectedText?: string;
+    }>(),
+    { detectedText: 'Code erkannt – Gerät wird gesucht …' },
+);
 const emit = defineEmits<{
     detected: [code: string];
     close: [];
@@ -180,7 +187,7 @@ onBeforeUnmount(() => {
                     Halten Sie den Barcode oder QR-Code in den Rahmen.
                 </p>
                 <p v-else-if="state === 'detected'" class="hint" role="status">
-                    Code erkannt – Gerät wird gesucht …
+                    {{ detectedText }}
                 </p>
                 <div
                     v-else-if="error !== null"

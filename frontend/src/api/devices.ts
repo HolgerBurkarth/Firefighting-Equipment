@@ -392,3 +392,140 @@ export function conflictDevice(
 ): DeviceListItem | null {
     return details === null ? null : parseDeviceListItem(details['device']);
 }
+
+/** Wie `conflictDevice`, mit allen Feldern (der Server sendet DeviceJson::device). */
+export function conflictDeviceDetail(
+    details: Readonly<Record<string, unknown>> | null,
+): DeviceDetail | null {
+    return details === null ? null : parseDeviceDetail(details['device']);
+}
+
+function parseDeviceDetailResponse(json: unknown): DeviceDetail | null {
+    return isRecord(json) ? parseDeviceDetail(json['device']) : null;
+}
+
+/**
+ * Geänderte Stammdaten (POST devices/{id}/fields, nur der Admin): nur angegebene Felder werden
+ * gesendet, `null` leert ein optionales Feld. Kennung und Gerätetyp lassen sich nicht leeren.
+ */
+export interface DeviceFieldChanges {
+    readonly identifier?: string;
+    readonly scanCode?: string | null;
+    readonly deviceTypeId?: number;
+    readonly serialNumber?: string | null;
+    readonly manufacturer?: string | null;
+    readonly model?: string | null;
+    /** JJJJ-MM-TT oder null. */
+    readonly procuredOn?: string | null;
+    readonly note?: string | null;
+}
+
+/** Feldnamen im Body wie DeviceFields in PHP. */
+const FIELD_NAMES: Readonly<Record<keyof DeviceFieldChanges, string>> = {
+    identifier: 'identifier',
+    scanCode: 'scan_code',
+    deviceTypeId: 'device_type_id',
+    serialNumber: 'serial_number',
+    manufacturer: 'manufacturer',
+    model: 'model',
+    procuredOn: 'procured_on',
+    note: 'note',
+};
+
+export function fieldChangesBody(changes: DeviceFieldChanges): Record<string, unknown> {
+    const body: Record<string, unknown> = {};
+    for (const [key, name] of Object.entries(FIELD_NAMES)) {
+        const value = changes[key as keyof DeviceFieldChanges];
+        if (value !== undefined) {
+            body[name] = value;
+        }
+    }
+    return body;
+}
+
+/** Gemeinsam für die Aktionen des Admins: Version und optionaler Kommentar (eine Zeile). */
+export interface DeviceActionBase {
+    readonly version: number;
+    readonly comment?: string;
+}
+
+function actionBody(request: DeviceActionBase): Record<string, unknown> {
+    return {
+        version: request.version,
+        ...(request.comment !== undefined && { comment: request.comment }),
+    };
+}
+
+/** POST devices/{id}/fields: Stammdaten ändern (je Feld ein Eintrag im Verlauf). */
+export function postDeviceFields(
+    id: number,
+    request: DeviceActionBase & { readonly changes: DeviceFieldChanges },
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<DeviceDetail>> {
+    return apiRequest(`devices/${String(id)}/fields`, parseDeviceDetailResponse, {
+        method: 'POST',
+        body: { ...actionBody(request), ...fieldChangesBody(request.changes) },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** POST devices/{id}/inspection-due: nächste Prüfung setzen (JJJJ-MM-TT) oder entfernen (null). */
+export function postInspectionDue(
+    id: number,
+    request: DeviceActionBase & { readonly nextInspectionDue: string | null },
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<DeviceDetail>> {
+    return apiRequest(`devices/${String(id)}/inspection-due`, parseDeviceDetailResponse, {
+        method: 'POST',
+        body: { ...actionBody(request), next_inspection_due: request.nextInspectionDue },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** POST devices/{id}/retire: aussondern (Kennung und Scan-Code werden frei). */
+export function postRetire(
+    id: number,
+    request: DeviceActionBase,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<DeviceDetail>> {
+    return apiRequest(`devices/${String(id)}/retire`, parseDeviceDetailResponse, {
+        method: 'POST',
+        body: actionBody(request),
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/**
+ * Body von POST devices/{id}/reinstate: Status Pflicht; Standort, Kennung und Gerätetyp nur, wenn
+ * sie sich ändern (sonst gelten die bisherigen); `scanCode` angegeben (auch null = entfernen)
+ * ersetzt den bisherigen.
+ */
+export interface ReinstateRequest extends DeviceActionBase {
+    readonly status: BookableStatus;
+    readonly locationId?: number;
+    readonly identifier?: string;
+    readonly scanCode?: string | null;
+    readonly deviceTypeId?: number;
+}
+
+/** POST devices/{id}/reinstate: ein ausgesondertes Gerät wieder aufnehmen. */
+export function postReinstate(
+    id: number,
+    request: ReinstateRequest,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<DeviceDetail>> {
+    return apiRequest(`devices/${String(id)}/reinstate`, parseDeviceDetailResponse, {
+        method: 'POST',
+        body: {
+            ...actionBody(request),
+            status: request.status,
+            ...(request.locationId !== undefined && { location_id: request.locationId }),
+            ...fieldChangesBody({
+                ...(request.identifier !== undefined && { identifier: request.identifier }),
+                ...(request.scanCode !== undefined && { scanCode: request.scanCode }),
+                ...(request.deviceTypeId !== undefined && { deviceTypeId: request.deviceTypeId }),
+            }),
+        },
+        ...(fetchFn && { fetchFn }),
+    });
+}
