@@ -124,6 +124,13 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { roles: ['admin'], layout: 'admin' },
         });
         routes.push({
+            // Neues Gerät mit „Speichern und nächstes“ (KONZEPT.md, Entscheidung 32).
+            path: '/geraete/neu',
+            name: 'device-new',
+            component: () => import('../pages/DeviceNewPage.vue'),
+            meta: { roles: ['admin'], layout: 'admin' },
+        });
+        routes.push({
             path: '/standorte',
             name: 'locations',
             component: () => import('../pages/LocationsPage.vue'),

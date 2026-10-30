@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     conflictDeviceDetail,
     fieldChangesBody,
+    postDevice,
     postDeviceFields,
     postInspectionDue,
     postReinstate,
@@ -66,6 +67,56 @@ describe('Aktionen des Admins', () => {
         });
         expect(result.ok && result.data.version).toBe(3);
         expect(result.ok && result.data.note).toBe('Zeile 1\nZeile 2');
+    });
+
+    it('POST devices mit Pflichtfeldern und nur den angegebenen optionalen', async () => {
+        const { fetch, requests } = respond(201, { device: fullJson(9) });
+        const result = await postDevice(
+            { identifier: 'M 9', deviceTypeId: 1, locationId: 11, status: 'ready' },
+            fetch,
+        );
+        expect(requests[0]?.url).toMatch(/\/api\/v1\/devices$/);
+        expect(requests[0]?.method).toBe('POST');
+        expect(requests[0]?.body).toEqual({
+            identifier: 'M 9',
+            device_type_id: 1,
+            location_id: 11,
+            status: 'ready',
+        });
+        expect(result.ok && result.data.id).toBe(9);
+
+        const second = respond(201, { device: fullJson(10) });
+        await postDevice(
+            {
+                identifier: 'M 10',
+                deviceTypeId: 2,
+                locationId: 20,
+                status: 'defective',
+                scanCode: 'ABC',
+                serialNumber: 'SN',
+                manufacturer: 'Dräger',
+                model: 'FPS',
+                procuredOn: '2020-01-02',
+                nextInspectionDue: '2027-03-01',
+                note: 'Zeile 1\nZeile 2',
+                comment: 'Neu',
+            },
+            second.fetch,
+        );
+        expect(second.requests[0]?.body).toEqual({
+            identifier: 'M 10',
+            scan_code: 'ABC',
+            device_type_id: 2,
+            serial_number: 'SN',
+            manufacturer: 'Dräger',
+            model: 'FPS',
+            procured_on: '2020-01-02',
+            note: 'Zeile 1\nZeile 2',
+            location_id: 20,
+            status: 'defective',
+            next_inspection_due: '2027-03-01',
+            comment: 'Neu',
+        });
     });
 
     it('POST devices/{id}/inspection-due sendet auch null (entfernen)', async () => {

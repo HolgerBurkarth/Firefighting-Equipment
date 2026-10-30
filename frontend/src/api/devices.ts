@@ -469,6 +469,56 @@ export function postDeviceFields(
     });
 }
 
+/**
+ * Body von POST devices (Admin): Kennung, Gerätetyp und Standort Pflicht, Status Standard
+ * einsatzbereit; optionale Felder nur, wenn sie einen Wert haben.
+ */
+export interface NewDeviceRequest {
+    readonly identifier: string;
+    readonly deviceTypeId: number;
+    readonly locationId: number;
+    readonly status: BookableStatus;
+    readonly scanCode?: string;
+    readonly serialNumber?: string;
+    readonly manufacturer?: string;
+    readonly model?: string;
+    /** JJJJ-MM-TT */
+    readonly procuredOn?: string;
+    /** JJJJ-MM-TT */
+    readonly nextInspectionDue?: string;
+    readonly note?: string;
+    readonly comment?: string;
+}
+
+/** POST devices: neues Gerät (201, Eintrag „Angelegt“ im Verlauf). */
+export function postDevice(
+    request: NewDeviceRequest,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<DeviceDetail>> {
+    return apiRequest('devices', parseDeviceDetailResponse, {
+        method: 'POST',
+        body: {
+            ...fieldChangesBody({
+                identifier: request.identifier,
+                deviceTypeId: request.deviceTypeId,
+                ...(request.scanCode !== undefined && { scanCode: request.scanCode }),
+                ...(request.serialNumber !== undefined && { serialNumber: request.serialNumber }),
+                ...(request.manufacturer !== undefined && { manufacturer: request.manufacturer }),
+                ...(request.model !== undefined && { model: request.model }),
+                ...(request.procuredOn !== undefined && { procuredOn: request.procuredOn }),
+                ...(request.note !== undefined && { note: request.note }),
+            }),
+            location_id: request.locationId,
+            status: request.status,
+            ...(request.nextInspectionDue !== undefined && {
+                next_inspection_due: request.nextInspectionDue,
+            }),
+            ...(request.comment !== undefined && { comment: request.comment }),
+        },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
 /** POST devices/{id}/inspection-due: nächste Prüfung setzen (JJJJ-MM-TT) oder entfernen (null). */
 export function postInspectionDue(
     id: number,

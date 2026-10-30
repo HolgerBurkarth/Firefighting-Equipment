@@ -2,6 +2,7 @@ import type {
     BookableStatus,
     DeviceDetail,
     DeviceFieldChanges,
+    NewDeviceRequest,
     ReinstateRequest,
 } from '../api/devices';
 import { normalizeComment } from './booking';
@@ -269,5 +270,142 @@ export function reinstateRequest(
         ...(form.deviceTypeId !== device.deviceType.id && { deviceTypeId: form.deviceTypeId }),
         ...(!form.keepScanCode && device.scanCode !== null && { scanCode: null }),
         ...commentPart(comment),
+    };
+}
+
+/**
+ * Eingaben auf „Neues Gerät“ (`geraete/neu`, KONZEPT.md, "Admin-Konsole – Entscheidungen", 32).
+ * Gerätetyp und Standort `null` = noch nicht gewählt.
+ */
+export interface NewDeviceForm {
+    identifier: string;
+    deviceTypeId: number | null;
+    locationId: number | null;
+    status: BookableStatus;
+    scanCode: string;
+    /** Wert des Datumsfelds (JJJJ-MM-TT) oder ''. */
+    nextInspectionDue: string;
+    serialNumber: string;
+    manufacturer: string;
+    model: string;
+    /** Wert des Datumsfelds (JJJJ-MM-TT) oder ''. */
+    procuredOn: string;
+    note: string;
+    comment: string;
+}
+
+export type NewDeviceField = keyof NewDeviceForm;
+
+export function emptyNewDeviceForm(): NewDeviceForm {
+    return {
+        identifier: '',
+        deviceTypeId: null,
+        locationId: null,
+        status: 'ready',
+        scanCode: '',
+        nextInspectionDue: '',
+        serialNumber: '',
+        manufacturer: '',
+        model: '',
+        procuredOn: '',
+        note: '',
+        comment: '',
+    };
+}
+
+export function sameNewDeviceForm(a: NewDeviceForm, b: NewDeviceForm): boolean {
+    return (Object.keys(a) as NewDeviceField[]).every((key) => a[key] === b[key]);
+}
+
+/** Probleme je Feld (nur Felder mit Problem); der Scan-Code ist freiwillig. */
+export function newDeviceProblems(form: NewDeviceForm): Partial<Record<NewDeviceField, string>> {
+    const problems: Partial<Record<NewDeviceField, string>> = {};
+    const checks: [NewDeviceField, string | null][] = [
+        ['identifier', identifierProblem(form.identifier)],
+        ['deviceTypeId', form.deviceTypeId === null ? 'Bitte einen Gerätetyp wählen.' : null],
+        ['locationId', form.locationId === null ? 'Bitte einen Standort wählen.' : null],
+        ['scanCode', trimCode(form.scanCode) === '' ? null : scanCodeProblem(form.scanCode)],
+        ['nextInspectionDue', dateProblem(form.nextInspectionDue)],
+        ['serialNumber', textProblem(form.serialNumber, TEXT_MAX_LENGTH)],
+        ['manufacturer', textProblem(form.manufacturer, TEXT_MAX_LENGTH)],
+        ['model', textProblem(form.model, TEXT_MAX_LENGTH)],
+        ['procuredOn', dateProblem(form.procuredOn)],
+        ['note', textProblem(form.note, NOTE_MAX_LENGTH, true)],
+    ];
+    for (const [field, problem] of checks) {
+        if (problem !== null) {
+            problems[field] = problem;
+        }
+    }
+    return problems;
+}
+
+/** Body von POST devices; nur aufrufen, wenn `newDeviceProblems` leer ist. */
+export function newDeviceRequest(form: NewDeviceForm): NewDeviceRequest {
+    if (form.deviceTypeId === null || form.locationId === null) {
+        throw new Error('Gerätetyp und Standort fehlen.');
+    }
+    const scanCode = trimCode(form.scanCode);
+    const optional = {
+        scanCode: scanCode === '' ? null : scanCode,
+        serialNumber: textValue(form.serialNumber),
+        manufacturer: textValue(form.manufacturer),
+        model: textValue(form.model),
+        procuredOn: parseDateInput(form.procuredOn) ?? null,
+        nextInspectionDue: parseDateInput(form.nextInspectionDue) ?? null,
+        note: textValue(form.note, true),
+    };
+    const request: { -readonly [K in keyof NewDeviceRequest]: NewDeviceRequest[K] } = {
+        identifier: identifierText(form.identifier),
+        deviceTypeId: form.deviceTypeId,
+        locationId: form.locationId,
+        status: form.status,
+        ...commentPart(form.comment),
+    };
+    for (const [key, value] of Object.entries(optional)) {
+        if (value !== null) {
+            Object.assign(request, { [key]: value });
+        }
+    }
+    return request;
+}
+
+/**
+ * Nächste Kennung für „Speichern und nächstes“: Die Zahl am Ende zählt weiter, führende Nullen
+ * bleiben („M24“ → „M25“, „PA 009“ → „PA 010“, „M99“ → „M100“). Ohne Zahl am Ende oder zu lang:
+ * null (das Feld bleibt leer).
+ */
+export function nextIdentifier(identifier: string): string | null {
+    const match = /^(.*?)(\d+)$/u.exec(identifierText(identifier));
+    if (match === null) {
+        return null;
+    }
+    const [, prefix = '', digits = ''] = match;
+    const next = Array.from(digits);
+    let index = next.length - 1;
+    while (index >= 0 && next[index] === '9') {
+        next[index] = '0';
+        index -= 1;
+    }
+    if (index < 0) {
+        next.unshift('1');
+    } else {
+        next[index] = String(Number(next[index]) + 1);
+    }
+    const result = prefix + next.join('');
+    return length(result) > IDENTIFIER_MAX_LENGTH ? null : result;
+}
+
+/**
+ * Formular nach „Speichern und nächstes“: Gerätetyp, Standort und Prüfdatum bleiben, die Kennung
+ * zählt weiter, alles andere ist wieder leer (Status einsatzbereit).
+ */
+export function nextNewDeviceForm(saved: NewDeviceForm): NewDeviceForm {
+    return {
+        ...emptyNewDeviceForm(),
+        identifier: nextIdentifier(saved.identifier) ?? '',
+        deviceTypeId: saved.deviceTypeId,
+        locationId: saved.locationId,
+        nextInspectionDue: saved.nextInspectionDue,
     };
 }

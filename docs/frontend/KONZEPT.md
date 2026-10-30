@@ -365,7 +365,9 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
     mit Vorschau und Fehlern je Zeile, mit Vorschlag bei Tippfehlern („Meinten Sie ‚HLF 20‘?“).
     Einzelformular mit „Speichern und nächstes“: Typ, Standort und Prüfdatum bleiben, die Kennung zählt
     weiter (M24 → M25); der Scan-Code lässt sich am Handy mit der Kamera einlesen (vorhandener
-    Scanner).
+    Scanner). Umgesetzt in Schritt 6 als eigene Seite `geraete/neu` (Knopf „Neues Gerät“ in der
+    Geräteliste): „Speichern und nächstes“ ist der erste Knopf (auch Enter), „Speichern“ öffnet das
+    neue Gerät; Enter im Feld Scan-Code speichert nicht (Handscanner), sondern führt weiter.
 33. **Adressen:** Die Detailseite eines Geräts für Admins ist `geraete/<id>/details`;
     `geraete/<id>` bleibt das Umbuchen (Entscheidung 15). Die Geräteliste der Konsole (`geraete`) hat
     den Filter „Ausgesonderte anzeigen“; von dort öffnet der Admin die Details und nimmt das Gerät

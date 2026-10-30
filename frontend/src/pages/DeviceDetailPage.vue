@@ -273,29 +273,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.detail-nav {
-    display: flex;
-}
-
-.back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    min-height: var(--touch-min);
-    padding: 0 8px 0 0;
-    border: 0;
-    background: none;
-    color: var(--line);
-    font: inherit;
-    font-weight: var(--font-weight-semibold);
-    cursor: pointer;
-}
-
-.back-link:hover {
-    color: var(--text);
-    text-decoration: underline;
-}
-
 .device-head {
     display: flex;
     flex-wrap: wrap;

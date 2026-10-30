@@ -24,7 +24,12 @@ export interface AdminMenuEntry {
 export const ADMIN_MENU: readonly AdminMenuEntry[] = [
     { route: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { route: 'search', label: 'Suchen', icon: 'search' },
-    { route: 'devices', label: 'Geräte', icon: 'devices', sections: ['device-details'] },
+    {
+        route: 'devices',
+        label: 'Geräte',
+        icon: 'devices',
+        sections: ['device-details', 'device-new'],
+    },
     { route: 'locations', label: 'Standorte', icon: 'location' },
     { route: 'device-types', label: 'Gerätetypen', icon: 'tag' },
 ];
