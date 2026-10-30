@@ -88,7 +88,7 @@ final class CacheableResponseTest extends TestCase
 
     public function testFrontendContentTypes(): void
     {
-        foreach (['text/html; charset=utf-8', 'text/javascript; charset=utf-8', 'text/css; charset=utf-8', 'font/woff2', 'font/woff', 'application/json; charset=utf-8'] as $type) {
+        foreach (['text/html; charset=utf-8', 'text/javascript; charset=utf-8', 'text/css; charset=utf-8', 'font/woff2', 'font/woff', 'application/wasm', 'application/json; charset=utf-8'] as $type) {
             $response = new CacheableResponse(new Request('GET', '/x'), $type, 'x', self::ETAG, CachePolicy::Revalidate);
             self::assertSame($type, $response->headers()['Content-Type']);
         }

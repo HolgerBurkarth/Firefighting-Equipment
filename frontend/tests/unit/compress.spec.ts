@@ -26,6 +26,13 @@ describe('compressedVariants', () => {
             compressedVariants('crlf.js', Buffer.from('a();\r\nb();\r\n'.repeat(20))),
         ).toThrow('crlf.js');
     });
+
+    it('WebAssembly ist binär: CR erlaubt, verlustfrei', () => {
+        const wasm = Buffer.alloc(4096, Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x0d, 0x0a, 0x01]));
+        const [br, gz] = compressedVariants('zxing_reader-abc.wasm', wasm);
+        expect(brotliDecompressSync(br?.data ?? Buffer.alloc(0))).toEqual(wasm);
+        expect(gunzipSync(gz?.data ?? Buffer.alloc(0))).toEqual(wasm);
+    });
 });
 
 describe('compressDirectory', () => {
@@ -41,6 +48,7 @@ describe('compressDirectory', () => {
         writeFileSync(join(directory, 'sw.js'), SCRIPT);
         writeFileSync(join(directory, 'assets', 'index-abc.css'), SCRIPT);
         writeFileSync(join(directory, 'assets', 'font-abc.woff2'), SCRIPT);
+        writeFileSync(join(directory, 'assets', 'zxing_reader-abc.wasm'), SCRIPT);
         writeFileSync(join(directory, 'index.html'), SCRIPT);
         writeFileSync(join(directory, 'build.json'), SCRIPT);
 
@@ -59,6 +67,9 @@ describe('compressDirectory', () => {
             'index-abc.css',
             'index-abc.css.br',
             'index-abc.css.gz',
+            'zxing_reader-abc.wasm',
+            'zxing_reader-abc.wasm.br',
+            'zxing_reader-abc.wasm.gz',
         ]);
         expect(gunzipSync(readFileSync(join(directory, 'assets', 'index-abc.css.gz')))).toEqual(
             SCRIPT,

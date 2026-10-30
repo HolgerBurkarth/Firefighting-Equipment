@@ -14,6 +14,7 @@ use FirefightingEquipment\Http\ContentEncoding;
  * Liegt neben einer Datei eine vorkomprimierte Fassung (".br", ".gz", frontend/build/compress.ts),
  * wird sie statt der Datei gesendet, wenn Accept-Encoding sie erlaubt; direkt abrufbar ist sie nie
  * (Endung nicht erlaubt), und ohne die Datei selbst gilt sie nicht.
+ * WebAssembly (Lesemodul des Kamera-Scanners) nur aus assets/, also immer mit Hash im Namen.
  */
 final readonly class FrontendAssets
 {
@@ -26,7 +27,11 @@ final readonly class FrontendAssets
         'css' => CacheableResponse::CSS,
         'woff2' => CacheableResponse::WOFF2,
         'woff' => CacheableResponse::WOFF,
+        'wasm' => CacheableResponse::WASM,
     ];
+
+    /** Endungen, die nur in assets/ ausgeliefert werden (nie direkt im Build-Ordner). */
+    public const array ASSETS_ONLY = ['wasm'];
 
     /**
      * Kennung der ausgelieferten Version ({"build": "…"}), nur direkt im Build-Ordner; wie
@@ -81,14 +86,16 @@ final readonly class FrontendAssets
      */
     public function file(string $relativePath, ?string $acceptEncoding = null): ?FrontendFile
     {
-        $name = str_starts_with($relativePath, 'assets/') ? substr($relativePath, strlen('assets/')) : $relativePath;
+        $inAssets = str_starts_with($relativePath, 'assets/');
+        $name = $inAssets ? substr($relativePath, strlen('assets/')) : $relativePath;
         if (preg_match(self::FILE_NAME_PATTERN, $name) !== 1 || str_contains($name, '..')) {
             return null;
         }
+        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         $contentType = $relativePath === self::BUILD_INFO_FILE
             ? CacheableResponse::JSON
-            : self::CONTENT_TYPES[strtolower(pathinfo($name, PATHINFO_EXTENSION))] ?? null;
-        if ($contentType === null) {
+            : self::CONTENT_TYPES[$extension] ?? null;
+        if ($contentType === null || (!$inAssets && in_array($extension, self::ASSETS_ONLY, true))) {
             return null;
         }
 

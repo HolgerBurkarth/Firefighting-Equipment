@@ -9,15 +9,20 @@ namespace FirefightingEquipment\Http\Frontend;
  * oder -Stile, kein eval.
  *
  * Spätere Bausteine ergänzen gezielt nur die Quelle, die sie brauchen, und begründen sie hier, z. B.
- * Kamera-Scanner: worker-src blob:, script-src 'wasm-unsafe-eval'; QR-Code/Logo-Vorschau:
- * img-src data: blob:. Nie 'unsafe-inline' oder 'unsafe-eval' (per Test gesichert).
+ * QR-Code/Logo-Vorschau: img-src data: blob:. Nie 'unsafe-inline' oder 'unsafe-eval' (per Test
+ * gesichert).
+ *
+ * Kamera-Scanner (zxing-wasm, frontend/src/scanner/): script-src 'wasm-unsafe-eval' erlaubt NUR das
+ * Übersetzen von WebAssembly (WebAssembly.instantiateStreaming), kein eval von JavaScript. Die
+ * WASM-Datei kommt aus assets/ ('self', connect-src), kein Worker, kein blob:, kein CDN. Das
+ * Kamerabild (video.srcObject) braucht keine Quelle.
  */
 final class ContentSecurityPolicy
 {
     /** @var array<string, list<string>> Direktive => Quellen, in dieser Reihenfolge ausgegeben */
     public const array DIRECTIVES = [
         'default-src' => ["'self'"],
-        'script-src' => ["'self'"],
+        'script-src' => ["'self'", "'wasm-unsafe-eval'"],
         'style-src' => ["'self'"],
         'img-src' => ["'self'"],
         'font-src' => ["'self'"],

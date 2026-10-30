@@ -13,6 +13,13 @@ import {
     type DevicePageQuery,
     type StateChangeRequest,
 } from '../api/devices';
+import {
+    findByCode,
+    IDENTIFIER_MAX_LENGTH,
+    identifierText,
+    isPossibleScanCode,
+    trimCode,
+} from './deviceSearch';
 import { Refresher, type RefreshReason } from './refresher';
 
 /**
@@ -112,6 +119,40 @@ export class DeviceStore {
                   }
                 : result,
         );
+    }
+
+    /**
+     * Gerät zu einem gescannten oder per Enter bestätigten Code (`findByCode`: Scan-Code genau, dann
+     * Kennung). Lokal aus der Liste; im Modus `server` oder vor dem ersten Laden vom Server: zuerst
+     * `scan_code` genau, dann `q` mit der Kennung und der genaue Vergleich hier (`q` sucht Teiltext).
+     */
+    async findByCode(code: string): Promise<ApiResult<DeviceListItem | null>> {
+        if (this.current.value.mode === 'local') {
+            return { ok: true, status: 200, data: findByCode(this.current.value.devices, code) };
+        }
+        const trimmed = trimCode(code);
+        if (isPossibleScanCode(trimmed)) {
+            const result = await this.fetchPage({ limit: 1, offset: 0, scanCode: trimmed });
+            if (!result.ok) {
+                return result;
+            }
+            const device = result.data.devices[0];
+            if (device !== undefined) {
+                return { ok: true, status: result.status, data: device };
+            }
+        }
+        const identifier = identifierText(trimmed);
+        if (identifier === '' || Array.from(identifier).length > IDENTIFIER_MAX_LENGTH) {
+            return { ok: true, status: 200, data: null };
+        }
+        const result = await this.fetchPage({
+            limit: DEVICE_PAGE_LIMIT,
+            offset: 0,
+            q: identifier,
+        });
+        return result.ok
+            ? { ok: true, status: result.status, data: findByCode(result.data.devices, trimmed) }
+            : result;
     }
 
     /**

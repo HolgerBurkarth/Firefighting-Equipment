@@ -30,7 +30,8 @@ export function manyDevices(count: number): Record<string, unknown>[] {
 
 /**
  * GET api/v1/devices wie DeviceListHandler: Blöcke nach `limit`/`offset`; mit `q` die Treffer aus
- * `search` (Suche auf dem Server simuliert der Test selbst).
+ * `search` (Suche auf dem Server simuliert der Test selbst), mit `scan_code` die Geräte aus `all`
+ * und `search('')` mit genau diesem Scan-Code.
  */
 export function devicesEndpoint(
     all: readonly Record<string, unknown>[],
@@ -42,6 +43,14 @@ export function devicesEndpoint(
         const limit = Number(params.get('limit') ?? '50');
         const offset = Number(params.get('offset') ?? '0');
         const q = params.get('q');
+        const scanCode = params.get('scan_code');
+        if (scanCode !== null) {
+            const hits = [...all, ...search('')].filter((d) => d['scan_code'] === scanCode);
+            return {
+                status: 200,
+                body: { devices: hits.slice(0, limit), total: hits.length, limit, offset },
+            };
+        }
         if (q !== null) {
             const hits = search(q);
             return {

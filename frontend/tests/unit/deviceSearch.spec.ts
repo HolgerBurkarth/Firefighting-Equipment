@@ -1,7 +1,11 @@
+// @vitest-environment node
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+    codeKey,
     findByCode,
     identifierKey,
+    isPossibleScanCode,
     MAX_SEARCH_HITS,
     searchDevices,
     searchKey,
@@ -116,5 +120,82 @@ describe('findByCode', () => {
         const list = [device(1, { scan_code: '0104006381333931\u001d10ABC' })];
         expect(findByCode(list, '0104006381333931\u001d10ABC')?.id).toBe(1);
         expect(findByCode(list, '010400638133393110ABC')).toBeNull();
+    });
+});
+
+interface KeyCase {
+    readonly description: string;
+    readonly input: string;
+    readonly server: string;
+}
+
+const keyCases = JSON.parse(
+    readFileSync(
+        new URL('../../../tests/Fixtures/identifier-key-cases.json', import.meta.url),
+        'utf8',
+    ),
+) as { cases: KeyCase[]; letters: KeyCase };
+
+describe('gemeinsame Testfälle mit identifier_key (IdentifierKeyCasesTest)', () => {
+    it.each(keyCases.cases.map((c) => [c.description, c] as const))('%s', (_, c) => {
+        expect(codeKey(c.input)).toBe(c.server);
+        // Gespeicherte Kennung (wie DeviceIdentifier) ergibt denselben Schlüssel.
+        expect(identifierKey(c.input.normalize('NFC').trim().replace(/ {2,}/g, ' '))).toBe(
+            c.server,
+        );
+    });
+
+    it('jeder Groß- und Titelbuchstabe wie LOWER() in MariaDB', () => {
+        const server = Array.from(keyCases.letters.server);
+        const differing = Array.from(keyCases.letters.input)
+            .filter((char, index) => identifierKey(char) !== server[index])
+            .map((char) => `U+${(char.codePointAt(0) ?? 0).toString(16).toUpperCase()}`);
+        expect(differing).toEqual([]);
+    });
+
+    it('die Datei enthält alle Groß- und Titelbuchstaben dieser Node-Version', () => {
+        const known = new Set(Array.from(keyCases.letters.input));
+        const missing: string[] = [];
+        for (let codePoint = 0x41; codePoint <= 0x10ffff; codePoint += 1) {
+            if (codePoint >= 0xd800 && codePoint <= 0xdfff) {
+                continue;
+            }
+            const char = String.fromCodePoint(codePoint);
+            if (/^[\p{Lu}\p{Lt}]$/u.test(char) && !known.has(char)) {
+                missing.push(`U+${codePoint.toString(16).toUpperCase()}`);
+            }
+        }
+        expect(missing).toEqual([]);
+    });
+});
+
+describe('codeKey', () => {
+    it('zusammengesetzte Form wie gespeicherte Kennungen', () => {
+        expect(codeKey('É-1')).toBe(codeKey('É-1'));
+        expect(codeKey('É-1')).toBe('é-1');
+    });
+
+    it('Sigma am Wortende wie die Datenbank (je Zeichen)', () => {
+        expect(codeKey('ΣΣ')).toBe('σσ');
+    });
+});
+
+describe('isPossibleScanCode', () => {
+    it.each([
+        ['04006381333931', true],
+        ['0104006381333931\u001d10ABC\u001e\u0004', true],
+        ['mit Leerzeichen', true],
+        ['x'.repeat(200), true],
+        ['x'.repeat(201), false],
+        ['', false],
+        ['a\tb', false],
+        ['a\nb', false],
+        ['a\u0000b', false],
+        ['a\u001fb', false],
+        ['a\u0085b', false],
+        ['a\u200bb', false],
+        ['a\u2028b', false],
+    ])('%j → %s', (code, expected) => {
+        expect(isPossibleScanCode(code)).toBe(expected);
     });
 });

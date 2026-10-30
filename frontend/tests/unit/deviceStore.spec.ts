@@ -258,6 +258,88 @@ describe('DeviceStore: Suche auf dem Server und einzelne Geräte', () => {
     });
 });
 
+describe('DeviceStore: Gerät zu einem Code', () => {
+    /** Modus `server` (mehr als MAX_LOCAL_DEVICES), danach antwortet `answer`. */
+    async function serverStore(answer: (query: DevicePageQuery) => DevicePage | null) {
+        const queries: DevicePageQuery[] = [];
+        let loaded = false;
+        const store = new DeviceStore((query) => {
+            if (!loaded) {
+                loaded = true;
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    data: { devices: [], total: MAX_LOCAL_DEVICES + 1, limit: 200, offset: 0 },
+                });
+            }
+            queries.push(query);
+            const data = answer(query);
+            return Promise.resolve(data === null ? NETWORK : { ok: true, status: 200, data });
+        });
+        await store.refresh('open');
+        expect(store.state.mode).toBe('server');
+        return { store, queries };
+    }
+
+    function page(list: DevicePage['devices']): DevicePage {
+        return { devices: list, total: list.length, limit: 200, offset: 0 };
+    }
+
+    it('lokal aus der Liste, ohne Anfrage', async () => {
+        const source = pagedSource([device(1, { identifier: 'M1', scan_code: 'QR-1' })]);
+        const store = new DeviceStore(source.fetchPage);
+        await store.refresh('open');
+        const calls = source.calls.length;
+        const byScanCode = await store.findByCode('QR-1');
+        expect(byScanCode.ok && byScanCode.data?.id).toBe(1);
+        const wrongCase = await store.findByCode('qr-1');
+        expect(wrongCase.ok && wrongCase.data).toBeNull();
+        const byIdentifier = await store.findByCode(' m1 ');
+        expect(byIdentifier.ok && byIdentifier.data?.id).toBe(1);
+        expect(source.calls).toHaveLength(calls);
+    });
+
+    it('Server: zuerst scan_code genau', async () => {
+        const code = '01040063\u001d10AB';
+        const { store, queries } = await serverStore((query) =>
+            query.scanCode === code ? page([device(7, { scan_code: code })]) : page([]),
+        );
+        const result = await store.findByCode(`${code}\r\n`);
+        expect(result.ok && result.data?.id).toBe(7);
+        expect(queries).toEqual([{ limit: 1, offset: 0, scanCode: code }]);
+    });
+
+    it('Server: dann q mit der Kennung und genauer Vergleich', async () => {
+        const { store, queries } = await serverStore((query) =>
+            query.q === undefined
+                ? page([])
+                : page([device(1, { identifier: 'PA 30' }), device(2, { identifier: 'PA 3' })]),
+        );
+        const result = await store.findByCode('pa  3');
+        expect(result.ok && result.data?.id).toBe(2);
+        expect(queries).toEqual([
+            { limit: 1, offset: 0, scanCode: 'pa  3' },
+            { limit: 200, offset: 0, q: 'pa 3' },
+        ]);
+    });
+
+    it('Server: nur die möglichen Anfragen (kein Scan-Code bzw. Kennung zu lang)', async () => {
+        const { store, queries } = await serverStore(() => page([]));
+        const tab = await store.findByCode('a\tb');
+        expect(tab.ok && tab.data).toBeNull();
+        expect(queries).toEqual([{ limit: 200, offset: 0, q: 'a\tb' }]);
+        queries.length = 0;
+        const long = await store.findByCode('x'.repeat(31));
+        expect(long.ok && long.data).toBeNull();
+        expect(queries).toEqual([{ limit: 1, offset: 0, scanCode: 'x'.repeat(31) }]);
+    });
+
+    it('Server: ein Fehler wird gemeldet', async () => {
+        const { store } = await serverStore(() => null);
+        expect((await store.findByCode('M1')).ok).toBe(false);
+    });
+});
+
 describe('DeviceStore: Buchen', () => {
     const RESULT = {
         outcome: 'applied',

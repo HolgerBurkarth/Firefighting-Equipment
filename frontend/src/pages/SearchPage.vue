@@ -1,20 +1,32 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    shallowRef,
+    useTemplateRef,
+    watch,
+} from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
 import type { DeviceListItem } from '../api/devices';
 import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
+import CodeScanner from '../components/CodeScanner.vue';
 import DeviceCard from '../components/DeviceCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import { deviceStore, recentDeviceIds } from '../data';
 import { takeBookingNotice } from '../data/booking';
 import { changeTimeText } from '../data/changeTime';
 import { useNow } from '../runtime/now';
+import { closeQueryView } from '../router/back';
 import {
     findByCode,
     MAX_SEARCH_HITS,
     searchDevices,
     searchTokens,
+    trimCode,
     type SearchResult,
 } from '../data/deviceSearch';
 
@@ -22,11 +34,22 @@ import {
 const SERVER_SEARCH_DELAY_MS = 300;
 
 const router = useRouter();
+const route = useRoute();
 const input = useTemplateRef<HTMLInputElement>('input');
 
+/**
+ * Der Kamera-Scanner ist eine Ansicht dieser Seite (`?scannen=1`, wie die Standortwahl beim
+ * Umbuchen): Der Zurück-Knopf des Handys schließt nur ihn, ein Update lädt dabei nicht neu.
+ */
+const SCANNER_QUERY = 'scannen';
+const scanButton = useTemplateRef<HTMLButtonElement>('scanButton');
+const scannerOpen = computed(() => route.query[SCANNER_QUERY] === '1');
+
 const query = ref('');
-/** Nach Enter ohne eindeutigen Treffer (wie ein Scan ohne Treffer). */
+/** Nach Enter oder einem Scan ohne eindeutigen Treffer. */
 const notFound = ref(false);
+/** Fehler beim Nachschlagen eines gescannten Codes (z. B. keine Verbindung). */
+const scanError = shallowRef<ApiError | null>(null);
 /** Ergebnis der eben gespeicherten Buchung (Entscheidung 22), bis zur nächsten Eingabe. */
 const bookingNotice = shallowRef(takeBookingNotice());
 
@@ -121,7 +144,42 @@ onBeforeUnmount(() => {
 
 function onInput(): void {
     notFound.value = false;
+    scanError.value = null;
     bookingNotice.value = null;
+}
+
+async function openScanner(): Promise<void> {
+    await router.push({ query: { ...route.query, [SCANNER_QUERY]: '1' } });
+}
+
+function closeScanner(): Promise<void> {
+    return closeQueryView(router, SCANNER_QUERY);
+}
+
+// Nach dem Schließen zurück zum Knopf (Tastatur, Bildschirmleser).
+watch(scannerOpen, async (open) => {
+    if (!open) {
+        await nextTick();
+        scanButton.value?.focus({ preventScroll: true });
+    }
+});
+
+/**
+ * Gescannter Code (KONZEPT.md, Entscheidung 17): Scan-Code genau, dann Kennung → Gerät öffnen (an
+ * Stelle des Scanners, Zurück führt also zu „Suchen“). Sonst Scanner zu, der Text steht im
+ * Suchfeld, darüber „Kein Gerät mit diesem Code gefunden.“ bzw. der Fehler.
+ */
+async function onDetected(code: string): Promise<void> {
+    const result = await deviceStore.findByCode(code);
+    if (result.ok && result.data !== null) {
+        await router.replace({ name: 'device', params: { id: result.data.id } });
+        return;
+    }
+    await closeScanner();
+    bookingNotice.value = null;
+    query.value = trimCode(code);
+    notFound.value = result.ok;
+    scanError.value = result.ok ? null : result.error;
 }
 
 function openDevice(device: DeviceListItem): void {
@@ -147,8 +205,14 @@ async function onSubmit(): Promise<void> {
         found = await runServerSearch(text);
         candidates = found?.hits ?? [];
     }
-    const match = findByCode(candidates, text) ?? (found?.total === 1 ? found.hits[0] : null);
-    if (match !== null && match !== undefined) {
+    let match = findByCode(candidates, text);
+    if (match === null && list.value.mode === 'server' && found !== null) {
+        // Scan-Code bzw. Kennung genau, auch wenn sie nicht unter den ersten Treffern von `q` ist.
+        const exact = await deviceStore.findByCode(text);
+        match = exact.ok ? exact.data : null;
+    }
+    match ??= found?.total === 1 ? (found.hits[0] ?? null) : null;
+    if (match !== null) {
         openDevice(match);
         return;
     }
@@ -198,11 +262,39 @@ function retry(): void {
         </label>
     </form>
 
+    <button
+        ref="scanButton"
+        class="btn btn-primary scan-button"
+        type="button"
+        data-testid="scan-button"
+        @click="openScanner"
+    >
+        <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+        >
+            <path d="M4 8V5a1 1 0 0 1 1-1h3" />
+            <path d="M16 4h3a1 1 0 0 1 1 1v3" />
+            <path d="M20 16v3a1 1 0 0 1-1 1h-3" />
+            <path d="M8 20H5a1 1 0 0 1-1-1v-3" />
+            <path d="M7 12h10" />
+        </svg>
+        Code scannen
+    </button>
+
+    <CodeScanner v-if="scannerOpen" @detected="onDetected" @close="closeScanner" />
+
     <BookingNoticeMessage v-if="bookingNotice !== null" :notice="bookingNotice" />
 
     <p v-if="notFound" class="notice notice-info" role="status" data-testid="search-not-found">
         Kein Gerät mit diesem Code gefunden.
     </p>
+    <ErrorNotice v-if="scanError !== null" :error="scanError" />
 
     <!-- Noch nie geladen: Laden bzw. Fehler mit erneutem Versuch. -->
     <template v-if="list.mode === null">
@@ -266,6 +358,10 @@ function retry(): void {
 .search-form {
     display: flex;
     flex-direction: column;
+}
+
+.scan-button {
+    width: 100%;
 }
 
 .search-field {

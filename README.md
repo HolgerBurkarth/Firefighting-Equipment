@@ -1168,10 +1168,16 @@ in `docs/frontend/`. Node.js 24 LTS wird nur lokal und in GitHub Actions gebrauc
 liegt nur der fertige Build (`frontend/dist/`, im Branch `deploy`). Ausgeliefert wird er von PHP:
 Alle GET-Adressen unter `/firefighting/<bereich>/` außerhalb von `api/` bekommen die App-Seite
 oder eine Datei des Builds (Regeln in `CLAUDE.md`, "Frontend ausliefern"). Da STRATO die Ausgabe
-nicht komprimiert, legt der Build neben jedes Skript und jeden Stil eine Brotli- (`.br`) und eine
-gzip-Fassung (`.gz`); PHP sendet die passende laut `Accept-Encoding`. Prüfen auf dem Server:
+nicht komprimiert, legt der Build neben jedes Skript, jeden Stil und die WebAssembly-Datei des
+Kamera-Scanners eine Brotli- (`.br`) und eine gzip-Fassung (`.gz`); PHP sendet die passende laut
+`Accept-Encoding`. Prüfen auf dem Server:
 `curl -s -o /dev/null -D - -H 'Accept-Encoding: br' https://www.prodad.de/firefighting/test/sw.js` (GET; HEAD gibt 404) zeigt
 `content-encoding: br` und `vary: Accept-Encoding`.
+
+Kamera-Scanner („Code scannen“ auf „Suchen“): Bibliothek `zxing-wasm` (nur das Lesemodul, MIT). Ihre
+WebAssembly-Datei (`assets/zxing_reader-<hash>.wasm`, rund 950 KB, mit Brotli rund 320 KB) lädt erst
+beim ersten Öffnen des Scanners, vom eigenen Server (nie vom CDN); dafür erlaubt die CSP
+`script-src 'wasm-unsafe-eval'`. Die Kamera braucht HTTPS (lokal genügt `localhost`).
 
 ```
 cd frontend
