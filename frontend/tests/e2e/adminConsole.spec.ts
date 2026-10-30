@@ -200,7 +200,7 @@ test.describe('Dashboard', () => {
         await expect(page.getByTestId('not-ready-more')).toHaveText('… und 1 weitere');
         await expect(list.getByRole('link', { name: /PA 4/ })).toHaveAttribute(
             'href',
-            '/firefighting/test/geraete/4',
+            '/firefighting/test/geraete/4/details',
         );
     });
 
@@ -214,7 +214,7 @@ test.describe('Dashboard', () => {
         await expect(items.nth(0)).toContainText('„Nach der Übung“');
         await expect(items.nth(0).getByRole('link', { name: 'M5' })).toHaveAttribute(
             'href',
-            '/firefighting/test/geraete/5',
+            '/firefighting/test/geraete/5/details',
         );
         // Nicht übernommene Offline-Buchung: das Gewünschte und der Grund.
         await expect(items.nth(1)).toContainText(

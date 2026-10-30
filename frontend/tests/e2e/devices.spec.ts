@@ -10,7 +10,7 @@ import {
     type MockResponse,
 } from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
-import { deviceDetail, deviceJson } from './support/devices';
+import { deviceDetail, deviceJson, eventsEndpoint } from './support/devices';
 import { horizontalOverflow } from './support/layout';
 import { deviceTypeServer, locationServer } from './support/masterData';
 
@@ -428,19 +428,23 @@ test.describe('Buchung aus der Liste', () => {
             ...MASTER_DATA,
             'GET api/v1/devices': deviceServer(DEVICES),
             ...deviceDetail(DEVICES[0] ?? deviceJson(1)),
+            'GET api/v1/devices/1/events': eventsEndpoint([]),
             'POST api/v1/devices/1/state': applied,
         },
     });
 
-    test('Kennung öffnet das Umbuchen; danach zurück zur Liste mit Bestätigung', async ({
+    test('Kennung öffnet das Gerätedetail; Zurück führt zur gefilterten Liste', async ({
         page,
     }) => {
         await open(page, '?status=ready');
         await identifiers(page).first().click();
-        await expect(page).toHaveURL(/\/geraete\/1$/);
+        await expect(page).toHaveURL(/\/geraete\/1\/details$/);
+        await page.getByRole('link', { name: 'Umbuchen / Status ändern' }).click();
         await page.getByRole('button', { name: 'in Wartung', exact: true }).click();
         await page.getByRole('button', { name: 'Speichern' }).click();
-        await expect(page).toHaveURL(/\/geraete\?status=ready$/);
+        await expect(page).toHaveURL(/\/geraete\/1\/details$/);
         await expect(page.getByTestId('booking-notice')).toContainText('M1');
+        await page.getByRole('button', { name: 'Zurück' }).click();
+        await expect(page).toHaveURL(/\/geraete\?status=ready$/);
     });
 });

@@ -100,6 +100,9 @@ describe('Wächter', () => {
         expect((await routerAt('/geraete/1234567890123456789')).currentRoute.value.name).toBe(
             'not-found',
         );
+        setSession(state('admin'));
+        expect((await routerAt('/geraete/7/details')).currentRoute.value.params['id']).toBe('7');
+        expect((await routerAt('/geraete/07/details')).currentRoute.value.name).toBe('not-found');
     });
 
     it('Dashboard des Admins in der Admin-Konsole, des Super-Admins ohne eigene Darstellung', async () => {
@@ -114,6 +117,8 @@ describe('Wächter', () => {
     it.each([
         ['/standorte', 'locations'],
         ['/geraetetypen', 'device-types'],
+        ['/geraete', 'devices'],
+        ['/geraete/12/details', 'device-details'],
     ] as const)('Seite %s der Admin-Konsole nur für Admins', async (path, name) => {
         setSession(state('admin'));
         const route = (await routerAt(path)).currentRoute.value;

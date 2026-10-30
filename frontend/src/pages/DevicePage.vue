@@ -34,10 +34,13 @@ import {
 import { locationPaths, type LocationChoice } from '../data/recentLocations';
 import { closeQueryView, returnTo } from '../router/back';
 import { useUnsavedInput } from '../runtime/unsavedInput';
+import { session } from '../auth/session';
 
 const route = useRoute();
 const router = useRouter();
 const deviceId = Number(route.params['id']);
+/** Admins öffnen von hier das Gerätedetail (Bearbeiten, Aussondern, Wieder aufnehmen). */
+const isAdmin = computed(() => session.value?.user.role === 'admin');
 
 /**
  * Die Standortwahl ist eine Ansicht dieser Seite, geöffnet über `?standortwahl=1`: Eingaben bleiben
@@ -292,9 +295,9 @@ async function save(): Promise<void> {
     void adminDeviceList.refresh('changed');
     setBookingNotice(bookingNotice(result.data));
     saved.value = true;
-    // Zurück, woher man kam (Suchen, Prüffristen oder die Geräteliste der Admin-Konsole), sonst zu
-    // „Suchen“ (Entscheidung 22).
-    await returnTo(router, ['search', 'inspections', 'devices']);
+    // Zurück, woher man kam (Suchen, Prüffristen, Geräteliste oder Gerätedetail der Admin-Konsole),
+    // sonst zu „Suchen“ (Entscheidung 22).
+    await returnTo(router, ['search', 'inspections', 'devices', 'device-details']);
 }
 </script>
 
@@ -343,6 +346,13 @@ async function save(): Promise<void> {
             <button ref="detailsLink" class="details-link" type="button" @click="openDetails">
                 Details und Verlauf
             </button>
+            <RouterLink
+                v-if="isAdmin"
+                class="details-link"
+                :to="{ name: 'device-details', params: { id: deviceId } }"
+            >
+                Gerätedetail (Admin)
+            </RouterLink>
         </div>
 
         <form v-else class="device-form" novalidate @submit.prevent="save">
@@ -477,6 +487,13 @@ async function save(): Promise<void> {
                 <button ref="detailsLink" class="details-link" type="button" @click="openDetails">
                     Details und Verlauf
                 </button>
+                <RouterLink
+                    v-if="isAdmin"
+                    class="details-link"
+                    :to="{ name: 'device-details', params: { id: deviceId } }"
+                >
+                    Gerätedetail (Admin)
+                </RouterLink>
             </div>
 
             <div class="device-footer">
@@ -707,6 +724,8 @@ async function save(): Promise<void> {
 
 /* Link „Details und Verlauf“ (Entscheidung 15): unten, zurückhaltend, aber mindestens 44 px. */
 .details-link {
+    display: inline-flex;
+    align-items: center;
     align-self: center;
     min-height: var(--touch-min);
     padding: 0 12px;

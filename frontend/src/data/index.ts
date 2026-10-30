@@ -1,5 +1,16 @@
 import type { ApiResult } from '../api/client';
 import {
+    conflictDevice,
+    postDeviceFields,
+    postInspectionDue,
+    postReinstate,
+    postRetire,
+    type DeviceActionBase,
+    type DeviceDetail,
+    type DeviceFieldChanges,
+    type ReinstateRequest,
+} from '../api/devices';
+import {
     createDeviceType,
     renameDeviceType as postDeviceTypeName,
     setDeviceTypeActive as postDeviceTypeActive,
@@ -99,6 +110,72 @@ export async function setDeviceTypeActive(
     active: boolean,
 ): Promise<ApiResult<DeviceType>> {
     return afterMasterDataChange(await postDeviceTypeActive(id, active), deviceTypeStore);
+}
+
+/**
+ * Nach einer Änderung des Admins an einem Gerät (Stammdaten, Prüfdatum, Aussondern, Wieder
+ * aufnehmen): Die Liste für „Suchen“ übernimmt den Stand sofort (ausgesonderte fallen heraus);
+ * Listen mit Gerätezahlen, Prüffristen und Dashboard laden neu, sofern schon geladen. Bei 409
+ * version_conflict übernimmt die Liste den aktuellen Stand aus der Antwort.
+ */
+function afterDeviceChange(result: ApiResult<DeviceDetail>): ApiResult<DeviceDetail> {
+    if (!result.ok) {
+        const current =
+            result.error.code === 'version_conflict' ? conflictDevice(result.error.details) : null;
+        if (current !== null) {
+            deviceStore.upsert(current);
+        }
+        return result;
+    }
+    deviceStore.upsert(result.data);
+    if (deviceStore.state.mode !== null) {
+        void deviceStore.refresh('changed');
+    }
+    for (const store of [locationStore, adminLocationStore]) {
+        if (store.state.locations !== null) {
+            void store.refresh('changed');
+        }
+    }
+    if (deviceTypeStore.state.types !== null) {
+        void deviceTypeStore.refresh('changed');
+    }
+    if (adminOverview.state.overview !== null) {
+        void adminOverview.refresh('changed');
+    }
+    void adminDeviceList.refresh('changed');
+    return result;
+}
+
+/** Stammdaten ändern (Admin; nur die angegebenen Felder). */
+export async function saveDeviceFields(
+    id: number,
+    request: DeviceActionBase & { readonly changes: DeviceFieldChanges },
+): Promise<ApiResult<DeviceDetail>> {
+    return afterDeviceChange(await postDeviceFields(id, request));
+}
+
+/** Nächste Prüfung setzen oder entfernen (Admin). */
+export async function saveInspectionDue(
+    id: number,
+    request: DeviceActionBase & { readonly nextInspectionDue: string | null },
+): Promise<ApiResult<DeviceDetail>> {
+    return afterDeviceChange(await postInspectionDue(id, request));
+}
+
+/** Aussondern (Admin). */
+export async function retireDevice(
+    id: number,
+    request: DeviceActionBase,
+): Promise<ApiResult<DeviceDetail>> {
+    return afterDeviceChange(await postRetire(id, request));
+}
+
+/** Ein ausgesondertes Gerät wieder aufnehmen (Admin). */
+export async function reinstateDevice(
+    id: number,
+    request: ReinstateRequest,
+): Promise<ApiResult<DeviceDetail>> {
+    return afterDeviceChange(await postReinstate(id, request));
 }
 
 /** Verlauf eines Geräts („Details und Verlauf“), je Ansicht neu. */

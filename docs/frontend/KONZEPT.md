@@ -285,8 +285,22 @@ dort“: Der Name führt zur Geräteliste mit diesem Standort bzw. Typ. Schritt 
 Filtern nach Gerätetyp, Standort (samt Fächern) und Status, „Ausgesonderte anzeigen“, Sortierung
 über die Spaltenköpfe (am Handy Karten mit Auswahl und Richtung), „Weitere laden“ in Blöcken zu 50
 und „Export (CSV)“ mit denselben Filtern. Filter und Sortierung rechnet der Server, sie stehen in der
-Adresse; die Kacheln „Einsatzbereitschaft“ und „Nicht einsatzbereit“ führen dorthin. Die Kennung
-öffnet bis zur Detailseite (Schritt 4) das Umbuchen; nach dem Speichern geht es zur Liste zurück.
+Adresse; die Kacheln „Einsatzbereitschaft“ und „Nicht einsatzbereit“ führen dorthin. Das Suchfeld
+sucht in Kennung, Scan-Code, Seriennummer, Hersteller und Modell; Gerätetyp und Standort wählt man
+über die Auswahllisten (so entschieden nach dem Live-Test, 30.10.2026). Schritt 4: Die Kennung (in
+der Liste und auf dem Dashboard) öffnet das Gerätedetail `geraete/<id>/details`: oben Kennung, Typ,
+Standort, Status groß und farbig und die nächste Prüfung, darunter Stammdaten und Verlauf (am breiten
+Bildschirm nebeneinander). Groß „Umbuchen / Status ändern“ (danach zurück zum Detail mit
+Bestätigung), kleiner „Bearbeiten“ (Stammdaten außer Scan-Code), „Prüfdatum ändern“ (leer =
+entfernen) und „Code zuordnen“ (Handscanner tippt ins Feld und Enter speichert; am Handy „Mit der
+Kamera scannen“, der gelesene Code steht danach im Fenster und wird erst mit „Code speichern“
+übernommen; „Code entfernen“). Rot und abseits „Aussondern …“ mit Rückfrage, die das Gerät nennt,
+und freiwilligem Grund. Ein ausgesondertes Gerät zeigt stattdessen „Wieder aufnehmen“: Status,
+Standort, Kennung, Gerätetyp und „Scan-Code behalten“, vorbelegt mit dem bisherigen Stand; ist der
+bisherige Standort inzwischen gesperrt oder der Typ deaktiviert, sagt das Fenster es sofort. Jede
+Aktion hat einen freiwilligen Kommentar für den Verlauf. Wurde das Gerät inzwischen geändert, zeigt
+die Seite den neuen Stand, das Fenster bleibt offen und sagt es; eigene Eingaben bleiben. Auf der
+Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
 
 | | Admin | Super-Admin |
 |---|---|---|

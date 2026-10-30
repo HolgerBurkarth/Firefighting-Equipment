@@ -7,7 +7,7 @@ export const LOCATION_NAME_MAX_LENGTH = 100;
 export const DEVICE_TYPE_NAME_MAX_LENGTH = 50;
 
 /** Leerraum, den PHP `trim()` entfernt (DeviceNameRules), nicht jeder Unicode-Leerraum. */
-function phpTrim(value: string): string {
+export function phpTrim(value: string): string {
     return value.replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g, '');
 }
 

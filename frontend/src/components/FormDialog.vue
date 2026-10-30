@@ -33,9 +33,18 @@ const props = withDefaults(
          * nicht fokussiert (Reka UI gäbe den Fokus sonst an den Seitenanfang).
          */
         returnFocus?: HTMLElement | null;
+        /** `danger`: Aktion mit Folgen (z. B. „Aussondern“), Knopf rot. */
+        variant?: 'accent' | 'danger';
     }>(),
     // Boolesche Props wären ohne Angabe false; Absenden ist ohne Angabe erlaubt.
-    { description: null, busy: false, canSubmit: true, error: null, returnFocus: null },
+    {
+        description: null,
+        busy: false,
+        canSubmit: true,
+        error: null,
+        returnFocus: null,
+        variant: 'accent',
+    },
 );
 const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{ submit: [] }>();
@@ -69,7 +78,12 @@ function onCloseAutoFocus(event: Event): void {
                     <ErrorNotice v-if="error !== null" :error="error" />
                     <div class="form-actions">
                         <DialogClose class="btn" type="button">Abbrechen</DialogClose>
-                        <button class="btn btn-accent" type="submit" :disabled="busy || !canSubmit">
+                        <button
+                            class="btn"
+                            :class="`btn-${variant}`"
+                            type="submit"
+                            :disabled="busy || !canSubmit"
+                        >
                             {{ submitLabel }}
                         </button>
                     </div>

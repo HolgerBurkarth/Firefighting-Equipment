@@ -142,6 +142,13 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             component: () => import('../pages/DevicePage.vue'),
             meta: { roles: DEVICE_ROLES, layout: 'focus' },
         });
+        routes.push({
+            // Gerätedetail für Admins (KONZEPT.md, "Admin-Konsole – Entscheidungen", 33).
+            path: '/geraete/:id([1-9]\\d{0,17})/details',
+            name: 'device-details',
+            component: () => import('../pages/DeviceDetailPage.vue'),
+            meta: { roles: ['admin'], layout: 'admin' },
+        });
     }
     routes.push({
         path: '/:pathMatch(.*)*',

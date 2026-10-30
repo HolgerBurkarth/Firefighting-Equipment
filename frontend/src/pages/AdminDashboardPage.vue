@@ -126,7 +126,7 @@ onMounted(() => {
                     <li v-for="device in overview.notReady.devices" :key="device.id">
                         <RouterLink
                             class="row row-link"
-                            :to="{ name: 'device', params: { id: device.id } }"
+                            :to="{ name: 'device-details', params: { id: device.id } }"
                         >
                             <span class="row-identifier">{{ device.identifier }}</span>
                             <span class="row-text">
@@ -163,7 +163,10 @@ onMounted(() => {
                             <span>
                                 <RouterLink
                                     class="activity-device"
-                                    :to="{ name: 'device', params: { id: event.device.id } }"
+                                    :to="{
+                                        name: 'device-details',
+                                        params: { id: event.device.id },
+                                    }"
                                 >
                                     {{ event.device.identifier }}</RouterLink
                                 >
