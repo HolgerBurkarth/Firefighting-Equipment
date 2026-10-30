@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { appBase } from './build/appBase.ts';
 import { buildId, buildInfo } from './build/buildInfo.ts';
+import { compressBuild } from './build/compress.ts';
 import { sanitizeFileName } from './build/fileNames.ts';
 
 /** PHP-Entwicklungsserver: php -S localhost:8000 public/index.php (im Hauptordner). */
@@ -37,6 +38,8 @@ export default defineConfig({
                 skipWaiting: false,
             },
         }),
+        // Zuletzt: .br und .gz neben jede Datei (auch sw.js), PHP wählt die Fassung.
+        compressBuild(),
     ],
     server: {
         port: 5173,

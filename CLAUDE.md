@@ -186,7 +186,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `sw.js`/`workbox-….js`, `build.json`). Immer mit starkem `ETag` und `nosniff`; `If-None-Match` (auch `W/`,
   Liste, `*`) → 304 ohne Body. Zusätzliche Header nur aus der festen Liste
   `Content-Security-Policy`, `Referrer-Policy`, `X-Frame-Options` (ohne Steuerzeichen, sonst
-  `InvalidArgumentException`), bisher nur auf der App-Seite. Fehler dieser Routen bleiben JSON mit
+  `InvalidArgumentException`), bisher nur auf der App-Seite. Dateien des Frontends mit
+  vorkomprimierter Fassung tragen zusätzlich `Vary: Accept-Encoding` (auch bei 304) und, wenn
+  komprimiert gesendet, `Content-Encoding` (`br` oder `gzip`, `ContentEncoding`; nicht bei 304;
+  nie ohne `Vary`), siehe "Frontend ausliefern". Fehler dieser Routen bleiben JSON mit
   `no-store`. Keine weiteren Ausnahmen ohne Rückfrage; neue nur über
   `CacheableResponse`/`CachePolicy` und hier dokumentiert.
 - Versionierung der API für das Frontend (beschlossener Plan, gilt für alle Arbeiten an API und
@@ -214,7 +217,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 
 ## Frontend ausliefern
 - Code in `src/Http/Frontend/` (`FrontendHandler`, `FrontendAssets`, `FrontendFile`,
-  `ContentSecurityPolicy`, `FrontendUnavailableException`). `Application::create` setzt
+  `ContentSecurityPolicy`, `FrontendUnavailableException`) und `src/Http/ContentEncoding.php`. `Application::create` setzt
   `FrontendHandler` mit `FrontendAssets::defaultDirectory()` (= `frontend/dist`, außerhalb von
   `public/`; nur PHP liest es). Ohne `FrontendHandler` (Konstruktor-Standard `null`, Tests mit eigenen
   Routern) bleiben unbekannte Pfade 404. `.htaccess` und `public/index.php` brauchen dafür nichts:
@@ -239,7 +242,26 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `frontend/build/buildInfo.ts`); andere `.json` bleiben 404. Dateinamen des Builds folgen
   derselben Regel (`frontend/build/fileNames.ts`, `sanitizeFileName` in `vite.config.ts`; z. B. wird
   Vues `_plugin-vue_export-helper` zu `plugin-vue_export-helper`, sonst 404); `delivery.spec.ts`
-  ruft jede Datei des Builds über PHP ab.
+  ruft jede Datei des Builds über PHP ab (außer den komprimierten Fassungen).
+- Komprimierung (KONZEPT.md Entscheidung 26; STRATO komprimiert die Ausgabe nicht): Der Build
+  legt neben jede `.js`/`.css` (auch `sw.js`, `workbox-….js`) `<datei>.br` (Brotli, Stufe 11) und
+  `<datei>.gz` (gzip, Stufe 9), jeweils nur, wenn kleiner als die Datei (`frontend/build/compress.ts`,
+  Vite-Plugin `compressBuild`, `closeBundle` mit `order: 'post'`, also nach vite-plugin-pwa).
+  Schriften sind schon komprimiert, `index.html` ändert PHP (Basispfad), `build.json` ist zu klein:
+  diese bleiben unkomprimiert. Enthält eine Datei ein CR, bricht der Build ab (Git schreibt `.js`/
+  `.css` im Branch `deploy` mit LF, die Fassung passte dann nicht mehr; `.br`/`.gz` sind in
+  `.gitattributes` `binary`). PHP dekomprimiert nie: `FrontendAssets::file(pfad, Accept-Encoding)`
+  sucht die Fassungen neben der erlaubten, vorhandenen Datei (Endungen `ContentEncoding::fileSuffix`
+  = `VARIANTS` in `compress.ts`, per Test gleich; ebenfalls per `realpath` innerhalb von
+  `frontend/dist`) und wählt per `ContentEncoding::negotiate` (RFC 9110: Gewicht des eigenen
+  Eintrags, sonst `*`, `q=0` schließt aus, höchstes Gewicht, bei Gleichstand `br` vor `gzip`;
+  `x-gzip` = `gzip`; ungültige Gewichte übergangen; ohne erlaubte Fassung unkomprimiert, nie 406).
+  ETag je Fassung über die gesendeten Bytes, bei komprimierten mit Anhang `-br`/`-gz`
+  (`FrontendFile::etag`). `Vary: Accept-Encoding` nur, wenn es Fassungen gibt. Fassungen sind nie
+  direkt abrufbar (Endung nicht erlaubt → 404), ohne die Datei selbst gelten sie nicht. Tests:
+  `ContentEncodingTest`, `FrontendDeliveryTest` (Fassungen im Test-Build mit beliebigem Inhalt),
+  `compress.spec.ts`, `delivery.spec.ts` (jede Fassung des echten Builds dekomprimiert gleich der
+  Datei).
 - Basispfad: `index.html` des Builds enthält genau einmal `<base href="/__FF_BASE__/" />`
   (`FrontendAssets::BASE_PLACEHOLDER` = `BASE_PLACEHOLDER` in `frontend/build/appBase.ts`, per Test
   gleich). PHP ersetzt ihn durch `AppPath::PREFIX/<bereich>/` (HTML-maskiert). Ein Build für alle
@@ -273,6 +295,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `now.ts` `useNow` für Zeitangaben: alle 30 s und bei `visibilitychange` neu, `countdown.ts`
   `useCountdown` Sperre nach 429 bis `Retry-After`), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
+  `build/compress.ts` (Vite-Plugin: `.br`/`.gz` neben jede Datei, siehe "Frontend ausliefern"),
   `tests/unit/` (Vitest), `tests/e2e/` (Playwright). Build nach `frontend/dist/` (in `.gitignore`).
 - Design-Variablen nur in `src/styles/tokens.css` (Farben hell/dunkel aus dem Mockup, Statusfarben,
   Radien, Schatten, Mindestgröße 44 px); Komponenten verwenden nur `var(--…)`. Anzeigemodus: ohne

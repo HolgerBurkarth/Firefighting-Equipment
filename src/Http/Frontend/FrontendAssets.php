@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Http\Frontend;
 
 use FirefightingEquipment\Http\CacheableResponse;
+use FirefightingEquipment\Http\ContentEncoding;
 
 /**
  * Liest den Build des Frontends (frontend/dist, außerhalb von public/). Ausgeliefert werden nur
  * index.html (mit eingesetztem Basispfad) und Dateien mit erlaubter Endung direkt im Build-Ordner
  * oder in assets/; Namen nur aus [A-Za-z0-9_.-], ohne Unterordner, nie ".." oder versteckte Dateien.
+ * Liegt neben einer Datei eine vorkomprimierte Fassung (".br", ".gz", frontend/build/compress.ts),
+ * wird sie statt der Datei gesendet, wenn Accept-Encoding sie erlaubt; direkt abrufbar ist sie nie
+ * (Endung nicht erlaubt), und ohne die Datei selbst gilt sie nicht.
  */
 final readonly class FrontendAssets
 {
@@ -68,11 +72,14 @@ final readonly class FrontendAssets
     }
 
     /**
-     * Datei im Build-Ordner ("sw.js", "build.json") oder in assets/ ("assets/index-abc.js").
+     * Datei im Build-Ordner ("sw.js", "build.json") oder in assets/ ("assets/index-abc.js"), in der
+     * besten vorhandenen Fassung laut Accept-Encoding (ContentEncoding::negotiate).
+     *
+     * @param string|null $acceptEncoding Header Accept-Encoding der Anfrage
      *
      * @return FrontendFile|null null, wenn der Name nicht erlaubt ist oder die Datei fehlt
      */
-    public function file(string $relativePath): ?FrontendFile
+    public function file(string $relativePath, ?string $acceptEncoding = null): ?FrontendFile
     {
         $name = str_starts_with($relativePath, 'assets/') ? substr($relativePath, strlen('assets/')) : $relativePath;
         if (preg_match(self::FILE_NAME_PATTERN, $name) !== 1 || str_contains($name, '..')) {
@@ -86,15 +93,39 @@ final readonly class FrontendAssets
         }
 
         $root = realpath($this->directory);
-        $path = realpath($this->directory . '/' . $relativePath);
-        if ($root === false || $path === false || !str_starts_with($path, $root . DIRECTORY_SEPARATOR) || !is_file($path)) {
+        if ($root === false) {
             return null;
         }
-        $body = file_get_contents($path);
+        $path = self::fileInside($root, $this->directory . '/' . $relativePath);
+        if ($path === null) {
+            return null;
+        }
+
+        $variants = [];
+        foreach (ContentEncoding::cases() as $encoding) {
+            $variant = self::fileInside($root, $path . $encoding->fileSuffix());
+            if ($variant !== null) {
+                $variants[$encoding->value] = $variant;
+            }
+        }
+        $encoding = ContentEncoding::negotiate(
+            $acceptEncoding,
+            array_map(ContentEncoding::from(...), array_keys($variants)),
+        );
+
+        $body = file_get_contents($encoding === null ? $path : $variants[$encoding->value]);
         if ($body === false) {
             throw new \RuntimeException(sprintf('Datei des Frontends nicht lesbar: %s', $relativePath));
         }
 
-        return new FrontendFile($contentType, $body);
+        return new FrontendFile($contentType, $body, $encoding, $variants !== []);
+    }
+
+    /** Echter Pfad einer vorhandenen Datei innerhalb des Build-Ordners, sonst null. */
+    private static function fileInside(string $root, string $path): ?string
+    {
+        $real = realpath($path);
+
+        return $real !== false && str_starts_with($real, $root . DIRECTORY_SEPARATOR) && is_file($real) ? $real : null;
     }
 }

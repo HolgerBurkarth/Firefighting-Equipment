@@ -430,6 +430,10 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
 26. **Komprimierung:** STRATO komprimiert die Ausgabe nicht (live geprüft). Der Build erzeugt daher
     komprimierte Fassungen aller Dateien (`.gz`, ggf. `.br`); PHP liefert sie aus, wenn
     `Accept-Encoding` es erlaubt (`Content-Encoding`, `Vary: Accept-Encoding`, ETag je Fassung).
+    Umgesetzt: Brotli und gzip für alle Skripte und Stile (auch Service Worker), je nur, wenn die
+    Fassung kleiner ist; Schriften sind schon komprimiert, die App-Seite ist klein und wird von PHP
+    angepasst. Der Build schrumpft beim Laden von rund 350 KB auf rund 115 KB (Brotli). Browser
+    ohne Brotli bekommen gzip, Programme ohne `Accept-Encoding` die Datei unkomprimiert.
 27. **Kamera-Scanner:** `zxing-wasm` (nur Lesemodul, MIT); immer dieselbe Bibliothek, auch wo der
     Browser einen eigenen `BarcodeDetector` hat (gleiche Ergebnisse bei GS1-Trennzeichen). Die
     WASM-Datei liegt im Build (kein CDN); CSP nur `script-src 'wasm-unsafe-eval'`.
