@@ -17,7 +17,7 @@ describe('parseDeviceListItem', () => {
         const parsed = parseDeviceListItem(
             deviceJson(5, {
                 identifier: 'PA 3',
-                scan_code: '0104006381333931\u001d21ABC',
+                scan_code: '010400638133393110L42\u001d21ABC',
                 status: 'defective',
                 status_label: 'defekt',
                 next_inspection_due: '2026-12-01',
@@ -31,7 +31,7 @@ describe('parseDeviceListItem', () => {
         expect(parsed).toEqual({
             id: 5,
             identifier: 'PA 3',
-            scanCode: '0104006381333931\u001d21ABC',
+            scanCode: '010400638133393110L42\u001d21ABC',
             deviceType: { id: 1, name: 'Atemschutzmaske' },
             location: { id: 11, name: 'G1', path: 'HLF 20 / G1' },
             status: 'defective',

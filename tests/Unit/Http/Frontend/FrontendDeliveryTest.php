@@ -140,6 +140,7 @@ final class FrontendDeliveryTest extends TestCase
         yield 'Skript' => ['/firefighting/test/assets/index-abc123.js', 'text/javascript; charset=utf-8', 'public, max-age=31536000, immutable'];
         yield 'Stil' => ['/firefighting/test/assets/index-abc123.css', 'text/css; charset=utf-8', 'public, max-age=31536000, immutable'];
         yield 'Schrift' => ['/firefighting/immendingen/assets/font-abc123.woff2', 'font/woff2', 'public, max-age=31536000, immutable'];
+        yield 'WebAssembly (Scanner)' => ['/firefighting/test/assets/zxing_reader-abc123.wasm', 'application/wasm', 'public, max-age=31536000, immutable'];
         yield 'Service Worker' => ['/firefighting/test/sw.js', 'text/javascript; charset=utf-8', 'no-cache'];
         yield 'Workbox' => ['/firefighting/service/workbox-abc123.js', 'text/javascript; charset=utf-8', 'no-cache'];
         yield 'Build-Kennung' => ['/firefighting/test/build.json', 'application/json; charset=utf-8', 'no-cache'];
@@ -272,6 +273,8 @@ final class FrontendDeliveryTest extends TestCase
         yield 'gzip-Fassung direkt' => ['/firefighting/test/sw.js.gz'];
         yield 'Fassung ohne Original' => ['/firefighting/test/assets/nur-komprimiert-abc123.js'];
         yield 'Fassung einer nicht erlaubten Datei' => ['/firefighting/test/assets/notiz.txt'];
+        yield 'WebAssembly außerhalb von assets/' => ['/firefighting/test/zxing_reader-abc123.wasm'];
+        yield 'WebAssembly in Großschreibung außerhalb von assets/' => ['/firefighting/test/zxing_reader-abc123.WASM'];
         yield 'ungültiges Kürzel' => ['/firefighting/-test/'];
         yield 'Kürzel zu lang' => ['/firefighting/' . str_repeat('a', 51) . '/'];
     }

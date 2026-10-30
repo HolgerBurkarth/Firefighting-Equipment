@@ -388,7 +388,15 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
     Kleinschreibung, wie im Backend). Kein Treffer: Hinweis „Kein Gerät mit diesem Code gefunden“,
     der gescannte Text steht danach im Suchfeld. Die Kamera liest QR- und Barcodes über eine
     Bibliothek (der eingebaute Scanner fehlt in Safari); die CSP wird nur so weit wie nötig
-    erweitert.
+    erweitert. Umgesetzt: großer Knopf „Code scannen“ unter dem Suchfeld. Der Scanner füllt den
+    Bildschirm (Kamerabild mit Rahmen, „Halten Sie den Barcode oder QR-Code in den Rahmen.“) und ist
+    eine Ansicht von „Suchen“: Der Zurück-Knopf des Handys, „Abbrechen“ und der Pfeil oben schließen
+    ihn, die Kamera geht dabei immer aus. Beim ersten erkannten Code geht die Kamera aus und das
+    Gerät öffnet sich; Zurück führt dann zu „Suchen“. Ohne Treffer steht der Code im Suchfeld mit dem
+    Hinweis. Ist die Kamera nicht erlaubt, nicht vorhanden oder belegt, erscheint eine Meldung mit
+    „Erneut versuchen“. Die Kennung wird dabei genau wie im Backend kleingeschrieben (auch bei
+    seltenen Buchstaben, gemeinsame Testfälle mit der Datenbank). Bei mehr als 2.000 Geräten fragt
+    die App den Server (`scan_code`, dann die Kennung).
 18. **Kommentar:** Bei „defekt“ Pflicht, mindestens 5 Zeichen (prüft nur die Oberfläche). Bei
     „einsatzbereit“ und „in Wartung“ freiwillig. Umgesetzt: Pflicht nur, wenn der Status auf
     „defekt“ wechselt (ein neuer Defekt); ein schon defektes Gerät z. B. in die Werkstatt umbuchen
@@ -436,7 +444,11 @@ Live-Tests von Schritt 1 (Handy) und Schritt 4 (am PC gab es sonst keinen Weg zu
     ohne Brotli bekommen gzip, Programme ohne `Accept-Encoding` die Datei unkomprimiert.
 27. **Kamera-Scanner:** `zxing-wasm` (nur Lesemodul, MIT); immer dieselbe Bibliothek, auch wo der
     Browser einen eigenen `BarcodeDetector` hat (gleiche Ergebnisse bei GS1-Trennzeichen). Die
-    WASM-Datei liegt im Build (kein CDN); CSP nur `script-src 'wasm-unsafe-eval'`.
+    WASM-Datei liegt im Build (kein CDN); CSP nur `script-src 'wasm-unsafe-eval'`. Umgesetzt:
+    Lesemodul und WASM-Datei (rund 950 KB, komprimiert rund 320 KB) laden erst beim ersten Öffnen
+    des Scanners; danach liegt die Datei im Cache des Browsers (Name mit Hash). Gelesen werden alle
+    Formate, der Inhalt unverändert (GS1 mit Trennzeichen GS wie der Scan-Code im Backend). In den
+    Service-Worker-Cache kommt sie erst mit dem Offline-Modus.
 28. **Später** (sehr große Bestände bzw. Offline-Abschnitt): genauer Filter für die Kennung und
     `ids=` in `GET devices`, Laden „geändert seit“ statt über `offset`.
 

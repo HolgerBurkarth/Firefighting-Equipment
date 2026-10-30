@@ -46,8 +46,11 @@ final class TestCityData
         'Wärmebildkamera' => ['MSA', 'Evolution 6000'],
     ];
 
-    /** GS1: Anwendungskennung 01 (GTIN) + GTIN-14, danach GS und 21 (Seriennummer). */
-    private const string GS1_PREFIX = '0104048675000017';
+    /** GTIN-14 der Atemschutzgeräte (gültige Prüfziffer, per Test). */
+    public const string GTIN = '04048675000013';
+
+    /** Trennzeichen GS (FNC1) zwischen GS1-Elementen. */
+    private const string GS = "\x1D";
 
     private function __construct()
     {
@@ -137,8 +140,9 @@ final class TestCityData
                 default => DeviceStatus::Ready,
             };
             $serial = sprintf('ARHL-%04d', 2000 + $n);
-            // GS1-DataMatrix mit Trennzeichen GS (0x1D) vor der Seriennummer.
-            $devices[] = self::device('PA ' . $n, 'Atemschutzgerät', $location, $status, self::GS1_PREFIX . "\x1D21" . $serial, $serial, $today, $i++);
+            // GS1-DataMatrix: PA 1–9 GTIN und Seriennummer, PA 10–12 zusätzlich mit Charge (GS danach).
+            $batch = $n >= 10 ? sprintf('L%02d', 20 + $n) : null;
+            $devices[] = self::device('PA ' . $n, 'Atemschutzgerät', $location, $status, self::gs1($serial, $batch), $serial, $today, $i++);
         }
         for ($n = 1; $n <= 20; $n++) {
             $location = match (true) {
@@ -183,7 +187,7 @@ final class TestCityData
             $scanCode = match ($n % 3) {
                 0 => null,
                 1 => 'TS-' . $identifier,
-                default => self::GS1_PREFIX . "\x1D21" . $serial,
+                default => self::gs1($serial, $n % 2 === 0 ? null : sprintf('L%02d', $n % 100)),
             };
             $devices[] = self::device(
                 $identifier,
@@ -198,6 +202,15 @@ final class TestCityData
         }
 
         return $devices;
+    }
+
+    /**
+     * GS1-Code wie auf echten Etiketten: 01 (GTIN, feste Länge) ohne GS danach, optional 10 (Charge,
+     * variable Länge) mit GS danach, zuletzt 21 (Seriennummer, variabel, am Ende ohne GS).
+     */
+    private static function gs1(string $serial, ?string $batch): string
+    {
+        return '01' . self::GTIN . ($batch === null ? '' : '10' . $batch . self::GS) . '21' . $serial;
     }
 
     private static function device(

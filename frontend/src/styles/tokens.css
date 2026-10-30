@@ -71,6 +71,9 @@
     --shadow-raised: 0 8px 20px rgb(20 30 50 / 20%);
     --shadow-group: 0 4px 14px rgb(20 30 50 / 14%);
     --overlay: rgb(15 23 42 / 45%);
+    /* Kamera-Scanner: Bild auf Schwarz, Rahmen hell (in beiden Modi gleich) */
+    --camera-bg: #000000;
+    --camera-frame: rgb(255 255 255 / 85%);
 
     /* Bedienelemente: mindestens 44 px (Konzept), große Tasten 56 px */
     --touch-min: 44px;

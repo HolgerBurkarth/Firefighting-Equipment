@@ -14,7 +14,7 @@ final class ContentSecurityPolicyTest extends TestCase
     public function testHeader(): void
     {
         self::assertSame(
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; "
+            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; font-src 'self'; "
             . "connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; "
             . "base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
             ContentSecurityPolicy::header(),
@@ -29,6 +29,14 @@ final class ContentSecurityPolicyTest extends TestCase
                 self::assertNotContains($source, ["'unsafe-inline'", "'unsafe-eval'", "'unsafe-hashes'", '*', 'http:', 'https:'], $directive);
             }
         }
+    }
+
+    /** Nur das Übersetzen von WebAssembly (Kamera-Scanner), kein eval von JavaScript. */
+    public function testScriptsOnlyFromSelfPlusWebAssembly(): void
+    {
+        self::assertSame(["'self'", "'wasm-unsafe-eval'"], ContentSecurityPolicy::DIRECTIVES['script-src']);
+        self::assertSame(["'self'"], ContentSecurityPolicy::DIRECTIVES['worker-src']);
+        self::assertSame(["'self'"], ContentSecurityPolicy::DIRECTIVES['connect-src']);
     }
 
     public function testNoFramingAndNoForeignBase(): void

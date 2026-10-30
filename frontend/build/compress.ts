@@ -4,19 +4,25 @@ import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
 import type { Plugin } from 'vite';
 
 /**
- * Endungen, die vorkomprimiert werden. Schriften (woff2/woff) sind schon komprimiert, index.html
- * ändert PHP beim Ausliefern (Basispfad), build.json ist zu klein.
+ * Endungen, die vorkomprimiert werden (WebAssembly: Lesemodul des Kamera-Scanners, rund 900 KiB).
+ * Schriften (woff2/woff) sind schon komprimiert, index.html ändert PHP beim Ausliefern
+ * (Basispfad), build.json ist zu klein.
  */
-export const COMPRESSIBLE_EXTENSIONS: readonly string[] = ['.js', '.css'];
+export const COMPRESSIBLE_EXTENSIONS: readonly string[] = ['.js', '.css', '.wasm'];
+
+/** Textdateien: Git schreibt sie mit LF (.gitattributes); .wasm ist dort binär. */
+const TEXT_EXTENSIONS: readonly string[] = ['.js', '.css'];
 
 /** Fassungen wie ContentEncoding::fileSuffix() in PHP (per Test gleich), Brotli vor gzip. */
 export const VARIANTS = [
     {
         suffix: '.br',
-        compress: (source: Buffer): Buffer =>
+        compress: (source: Buffer, text: boolean): Buffer =>
             brotliCompressSync(source, {
                 params: {
-                    [constants.BROTLI_PARAM_MODE]: constants.BROTLI_MODE_TEXT,
+                    [constants.BROTLI_PARAM_MODE]: text
+                        ? constants.BROTLI_MODE_TEXT
+                        : constants.BROTLI_MODE_GENERIC,
                     [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY,
                     [constants.BROTLI_PARAM_SIZE_HINT]: source.length,
                 },
@@ -30,22 +36,23 @@ export const VARIANTS = [
 ] as const;
 
 /**
- * Komprimierte Fassungen einer Datei; nur die, die kleiner als das Original sind. Dateien mit CR
- * werden abgelehnt: Git schreibt .js und .css mit LF (.gitattributes, Branch deploy), danach passte
- * die Fassung nicht mehr zur Datei.
+ * Komprimierte Fassungen einer Datei; nur die, die kleiner als das Original sind. Textdateien mit
+ * CR werden abgelehnt: Git schreibt .js und .css mit LF (.gitattributes, Branch deploy), danach
+ * passte die Fassung nicht mehr zur Datei.
  */
 export function compressedVariants(
     name: string,
     source: Buffer,
 ): { suffix: string; data: Buffer }[] {
-    if (source.includes(0x0d)) {
+    const text = TEXT_EXTENSIONS.includes(extname(name));
+    if (text && source.includes(0x0d)) {
         throw new Error(
             `${name}: enthält CR; die komprimierten Fassungen passten nach Git nicht mehr`,
         );
     }
     return VARIANTS.map((variant) => ({
         suffix: variant.suffix,
-        data: variant.compress(source),
+        data: variant.compress(source, text),
     })).filter((variant) => variant.data.length < source.length);
 }
 

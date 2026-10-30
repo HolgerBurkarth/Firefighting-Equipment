@@ -88,8 +88,9 @@ final class SeedTestCityCommandTest extends DeviceSchemaTestCase
         self::assertSame(['HLF 20', 'ready', 3], $this->device('WBK 1'));
         self::assertSame(['Atemschutzwerkstatt', 'retired', 3], $this->device('M24'));
         self::assertSame(['MTW', 'ready', 1], $this->device('HRT 11'));
-        // GS1-Code mit Trennzeichen GS gespeichert.
-        self::assertSame("0104048675000017\x1D21ARHL-2001", $this->value("SELECT scan_code FROM fe_devices WHERE identifier = 'PA 1'"));
+        // GS1-Codes wie auf echten Etiketten gespeichert: ohne GS nach der GTIN, GS nach der Charge.
+        self::assertSame('010404867500001321ARHL-2001', $this->value("SELECT scan_code FROM fe_devices WHERE identifier = 'PA 1'"));
+        self::assertSame("010404867500001310L30\x1D21ARHL-2010", $this->value("SELECT scan_code FROM fe_devices WHERE identifier = 'PA 10'"));
         // Anlegen mit Kommentar „Testdaten“ durch den Admin, Verlauf reihum von beiden Konten.
         self::assertSame(60, (int) $this->value(
             "SELECT COUNT(*) FROM fe_device_events WHERE tenant_id = ? AND event_type = 'created' AND comment = 'Testdaten' AND user_id = ?",

@@ -150,6 +150,8 @@ export interface DevicePageQuery {
     readonly offset: number;
     /** Suche auf dem Server (Teiltext in Kennung, Scan-Code, Seriennummer, Hersteller, Modell). */
     readonly q?: string;
+    /** Scan-Code genau (`scan_code`; Regeln wie `ScanCode`, sonst 400). */
+    readonly scanCode?: string;
 }
 
 /** GET devices (ohne ausgesonderte Geräte, sortiert nach Kennung). */
@@ -163,6 +165,9 @@ export function fetchDevicePage(
     });
     if (query.q !== undefined) {
         params.set('q', query.q);
+    }
+    if (query.scanCode !== undefined) {
+        params.set('scan_code', query.scanCode);
     }
     return apiRequest(`devices?${params.toString()}`, parseDevicePage, {
         ...(fetchFn && { fetchFn }),

@@ -68,7 +68,8 @@ final class FrontendAssetsTest extends TestCase
 
     public function testOnlyBuiltFileTypes(): void
     {
-        self::assertSame(['js', 'css', 'woff2', 'woff'], array_keys(FrontendAssets::CONTENT_TYPES));
+        self::assertSame(['js', 'css', 'woff2', 'woff', 'wasm'], array_keys(FrontendAssets::CONTENT_TYPES));
+        self::assertSame(['wasm'], FrontendAssets::ASSETS_ONLY);
     }
 
     public function testBuildInfoFileMatchesFrontendSource(): void

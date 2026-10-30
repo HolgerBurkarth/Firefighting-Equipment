@@ -25,6 +25,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Firefox und Handy-Breite) laufen lassen; `npm test` prüft lokal nur Chromium und WebKit in
   PC-Breite. Tests, deren Erwartung von der Breite abhängt, setzen sie ausdrücklich
   (`page.setViewportSize`).
+- Kann sich ein Browser-Test je Betriebssystem anders verhalten (z. B. Kamera und Medien,
+  Testattrappen mit Browser-Objekten, Dateien, Prozesse und Ports, Schriften; CI läuft unter Linux,
+  lokal Windows), vor „✅ FERTIG“ zusätzlich unter Linux (WSL) laufen lassen, mindestens die
+  betroffenen Dateien in allen fünf Profilen (README "Browser-Tests unter Linux (WSL)").
+  Attrappen und Testhilfen gehen in allen Browsern und Systemen denselben Weg der App, keine
+  Sonderwege je Betriebssystem.
 - Status von Nachrichten an den Nutzer – jede Nachricht beginnt mit genau einer Kennzeichnung:
   - "⏳ ZWISCHENSTAND – ich arbeite weiter": Es läuft noch etwas. Dazu: was gerade läuft, wie lange
     es voraussichtlich dauert und was danach kommt. Der Nutzer muss nichts tun.
@@ -178,7 +184,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   personenbezogene Daten, ohne Sitzung und nie `Set-Cookie`). `CacheableResponse` erlaubt nur die
   Content-Types `image/png`, `application/manifest+json; charset=utf-8` und für das Frontend
   `text/html; charset=utf-8`, `text/javascript; charset=utf-8`, `text/css; charset=utf-8`,
-  `font/woff2`, `font/woff` und `application/json; charset=utf-8` (NUR für `build.json` des
+  `font/woff2`, `font/woff`, `application/wasm` (nur `assets/`, Kamera-Scanner) und `application/json; charset=utf-8` (NUR für `build.json` des
   Frontends; API-Antworten nie über `CacheableResponse`) (Konstanten in `CacheableResponse`), und nur die beiden Richtlinien aus
   `CachePolicy`: `Immutable` (`public, max-age=31536000, immutable`: Logo/Symbol nur, wenn `?v=`
   gleich der aktuellen Versionskennung ist; Frontend nur `assets/…` mit Hash im Namen) und
@@ -233,7 +239,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (sonst würde HTML als Skript geladen). Alles andere (`""`, `index.html`, `geraete/12`,
   `passwort-zuruecksetzen` …) → `index.html` mit Basispfad, `Revalidate`.
 - Erlaubte Dateien (`FrontendAssets`): nur Endungen aus `FrontendAssets::CONTENT_TYPES` (`js`, `css`,
-  `woff2`, `woff`), Name `[A-Za-z0-9][A-Za-z0-9_.-]*` (höchstens 128 Zeichen), keine Unterordner
+  `woff2`, `woff`, `wasm`; `wasm` = `application/wasm`, Lesemodul des Kamera-Scanners, nur in
+  `assets/`, also immer `Immutable`: `FrontendAssets::ASSETS_ONLY`), Name `[A-Za-z0-9][A-Za-z0-9_.-]*` (höchstens 128 Zeichen), keine Unterordner
   außer `assets/`, kein `..`, keine versteckten Dateien, zusätzlich per `realpath` innerhalb von
   `frontend/dist`. Neue Endungen nur, wenn der Build sie wirklich enthält (Content-Type in
   `CacheableResponse` ergänzen). Einzige Ausnahme ohne Endung in der Liste: genau
@@ -244,12 +251,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Vues `_plugin-vue_export-helper` zu `plugin-vue_export-helper`, sonst 404); `delivery.spec.ts`
   ruft jede Datei des Builds über PHP ab (außer den komprimierten Fassungen).
 - Komprimierung (KONZEPT.md Entscheidung 26; STRATO komprimiert die Ausgabe nicht): Der Build
-  legt neben jede `.js`/`.css` (auch `sw.js`, `workbox-….js`) `<datei>.br` (Brotli, Stufe 11) und
+  legt neben jede `.js`/`.css`/`.wasm` (auch `sw.js`, `workbox-….js`) `<datei>.br` (Brotli, Stufe 11) und
   `<datei>.gz` (gzip, Stufe 9), jeweils nur, wenn kleiner als die Datei (`frontend/build/compress.ts`,
   Vite-Plugin `compressBuild`, `closeBundle` mit `order: 'post'`, also nach vite-plugin-pwa).
   Schriften sind schon komprimiert, `index.html` ändert PHP (Basispfad), `build.json` ist zu klein:
-  diese bleiben unkomprimiert. Enthält eine Datei ein CR, bricht der Build ab (Git schreibt `.js`/
-  `.css` im Branch `deploy` mit LF, die Fassung passte dann nicht mehr; `.br`/`.gz` sind in
+  diese bleiben unkomprimiert. Enthält eine `.js`/`.css` ein CR, bricht der Build ab (Git schreibt
+  sie im Branch `deploy` mit LF, die Fassung passte dann nicht mehr; `.wasm`, `.br`, `.gz` sind in
   `.gitattributes` `binary`). PHP dekomprimiert nie: `FrontendAssets::file(pfad, Accept-Encoding)`
   sucht die Fassungen neben der erlaubten, vorhandenen Datei (Endungen `ContentEncoding::fileSuffix`
   = `VARIANTS` in `compress.ts`, per Test gleich; ebenfalls per `realpath` innerhalb von
@@ -271,9 +278,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - CSP (`ContentSecurityPolicy::DIRECTIVES`, eine Liste je Direktive): `default-src`, `script-src`,
   `style-src`, `img-src`, `font-src`, `connect-src`, `manifest-src`, `worker-src`, `base-uri`,
   `form-action` je `'self'`; `object-src` und `frame-ancestors` `'none'`. Nie `'unsafe-inline'`,
-  `'unsafe-eval'`, `'unsafe-hashes'`, `*`, `http:` oder `https:` (per Test). Spätere Bausteine
-  ergänzen gezielt nur, was sie brauchen, mit Begründung im Kommentar (z. B. Kamera-Scanner:
-  `worker-src blob:`, `script-src 'wasm-unsafe-eval'`; QR-Code/Logo-Vorschau: `img-src data: blob:`).
+  `'unsafe-eval'`, `'unsafe-hashes'`, `*`, `http:` oder `https:` (per Test). Einzige Ergänzung
+  bisher: `script-src 'self' 'wasm-unsafe-eval'` für den Kamera-Scanner (erlaubt nur das Übersetzen
+  von WebAssembly, kein eval von JavaScript; WASM aus `assets/`, kein Worker, kein `blob:`, kein CDN;
+  per Test genau so). Spätere Bausteine ergänzen gezielt nur, was sie brauchen, mit Begründung im
+  Kommentar (z. B. QR-Code/Logo-Vorschau: `img-src data: blob:`).
   Daher im Frontend keine Inline-Skripte, keine `<style>`-Elemente und kein `style=""` im HTML;
   Schriften liegen im Build (kein Google Fonts).
 - Build fehlt oder `index.html` ohne Platzhalter → 503 `frontend_unavailable` (Einzelheiten nur im
@@ -293,7 +302,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung,
   `appUpdate.ts` Updates, `unsavedInput.ts` ungespeicherte Eingaben, `build.ts` Build-Kennung,
   `now.ts` `useNow` für Zeitangaben: alle 30 s und bei `visibilitychange` neu, `countdown.ts`
-  `useCountdown` Sperre nach 429 bis `Retry-After`), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
+  `useCountdown` Sperre nach 429 bis `Retry-After`), `src/scanner/` (Kamera-Scanner:
+  `barcodeReader.ts` Lesemodul, `camera.ts` Kamera und Meldungen), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
   `build/compress.ts` (Vite-Plugin: `.br`/`.gz` neben jede Datei, siehe "Frontend ausliefern"),
   `tests/unit/` (Vitest), `tests/e2e/` (Playwright). Build nach `frontend/dist/` (in `.gitignore`).
@@ -326,18 +336,58 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `setSession(null)`, `replaced` = anderes Konto per `setSession`) `clear()` aller Stores und die
   Bestätigung einer Buchung verwerfen; nur bei `logout` zusätzlich „Zuletzt benutzt“ (Geräte und
   Standorte) des Kontos löschen. Im Modus `server`: `searchServer(q, limit)` (`q` getrimmt,
-  höchstens 100 Zeichen) und `findMany(ids)` (einzeln `GET devices/{id}`). `fetchCurrent(id)`
+  höchstens 100 Zeichen) und `findMany(ids)` (einzeln `GET devices/{id}`). `findByCode(code)`: im
+  Modus `local` `findByCode` über die Liste, sonst (auch vor dem ersten Laden) `GET
+  devices?scan_code=…&limit=1` (nur wenn `isPossibleScanCode`: Regeln wie `ScanCode`, sonst gäbe
+  es 400), dann `q` mit der Kennung (`identifierText`, nur bis 30 Zeichen, `limit=200`) und der
+  genaue Vergleich in der App. `fetchCurrent(id)`
   (`GET devices/{id}`, übernimmt den Stand per `upsert`) und `book(id, request)` (siehe Umbuchen).
-- Suchen (`SearchPage`, KONZEPT.md Entscheidungen 14, 16, 20, 24): lokale Suche
+- Suchen (`SearchPage`, KONZEPT.md Entscheidungen 14, 16, 17, 20, 24, 27): lokale Suche
   `searchDevices` (`src/data/deviceSearch.ts`): Wörter mit UND über Kennung, Scan-Code,
   Seriennummer, Hersteller, Modell, Gerätetyp, Standortpfad; Vergleichsform `searchKey` (ohne
   Groß-/Kleinschreibung und Akzente, ß = ss); Reihenfolge Kennung genau, Kennung beginnt mit dem
   ersten Wort, Rest (je in der Reihenfolge der Liste); höchstens `MAX_SEARCH_HITS` (50), darüber
   „Mehr als 50 Treffer – bitte weiter eingrenzen.“. Modus `server`: 300 ms nach dem letzten
   Tastendruck `searchServer`, ältere Antworten verworfen. Enter (auch USB-Scanner) wie ein Scan:
-  `findByCode` (Scan-Code exakt, dann Kennung wie `identifier_key` mit `toLowerCase`, mehrere
-  Leerzeichen wie eines, Leerraum am Rand egal) → Gerät öffnen; sonst genau ein Treffer → öffnen;
-  mehrere → Tastatur schließen; keiner → „Kein Gerät mit diesem Code gefunden.“, Text bleibt.
+  `findByCode` (Scan-Code exakt, Rand ohne Leerzeichen/Tab/CR/LF wie `ScanCode`, dann Kennung per
+  `codeKey`: zusammengesetzte Form, Leerraum am Rand weg, mehrere Leerzeichen wie eines, dann
+  `identifierKey`) → Gerät öffnen (im Modus `server` zuerst unter den Treffern, sonst
+  `deviceStore.findByCode`); sonst genau ein Treffer → öffnen; mehrere → Tastatur schließen;
+  keiner → „Kein Gerät mit diesem Code gefunden.“, Text bleibt. `identifierKey` schreibt klein wie
+  `LOWER()` in MariaDB unter `utf8mb4_unicode_ci` (Unicode von UCA 4.0.0): je Zeichen (kein Sigma
+  am Wortende), İ → i, Großbuchstaben aus `DATABASE_UNCASED` und alle außerhalb der BMP bleiben
+  (dort kennt die Kollation keine Kleinbuchstaben), dann ẞ → ß. Gemeinsame Testfälle
+  `tests/Fixtures/identifier-key-cases.json` (`cases`: Kennung → `identifier_key` über eine echte
+  Zeile; `letters`: alle `\p{Lu}`/`\p{Lt}` laut Node → `LOWER()`), geprüft von
+  `IdentifierKeyCasesTest` (PHPUnit, Testdatenbank) und `deviceSearch.spec.ts` (Vitest, meldet auch
+  Buchstaben einer neueren Node-Version, die in der Datei fehlen). Änderungen an `identifier_key`
+  daher immer mit `identifierKey` und neuen Fällen.
+- Code scannen (`CodeScanner` in `src/components/`, KONZEPT.md Entscheidungen 17 und 27): Knopf
+  „Code scannen“ unter dem Suchfeld; der Scanner ist eine Ansicht von „Suchen“ über `?scannen=1`
+  (wie die Standortwahl: Zurück-Knopf schließt nur ihn, `closeQueryView`), bildschirmfüllend
+  (`Teleport` nach `body`, `role="dialog"`, Kopfzeile `FocusHeader` „Scanner schließen“, „Abbrechen“,
+  Escape). Beim Öffnen gleichzeitig Lesemodul (`import()` von `src/scanner/barcodeReader.ts`:
+  zxing-wasm `zxing-wasm/reader`, `prepareZXingModule` mit `locateFile` auf die WASM-Datei des
+  Builds per `?url`, nie das CDN; `textMode: 'Plain'`, damit GS1-Trennzeichen wie im Scan-Code
+  bleiben; alle Formate, ein Code) und Kamera (`openCamera` in `src/scanner/camera.ts`:
+  Rückkamera, ohne Ton, 1280 × 720 ideal); alle `SCAN_INTERVAL_MS` (120 ms) ein Bild über eine
+  Canvas (höchstens `MAX_FRAME_EDGE` 1280 px) lesen. Erster Code: Kamera sofort aus, dann
+  `deviceStore.findByCode`; gefunden → `router.replace` auf das Gerät (Zurück führt zu „Suchen“);
+  sonst Scanner zu, Text (`trimCode`) im Suchfeld, „Kein Gerät mit diesem Code gefunden.“ bzw.
+  `ErrorNotice`, Fokus auf „Code scannen“. Fehler (`CAMERA_ERROR_MESSAGES`): `unsupported` (kein
+  `navigator.mediaDevices`, ohne „Erneut versuchen“), `denied`, `missing`, `busy`, `load` (Lesemodul
+  nicht ladbar). Schließen, Zurück und Verlassen beenden die Kamera immer. Browser-Tests
+  `tests/e2e/scanner.spec.ts` mit simulierter Kamera (`tests/e2e/support/camera.ts`: Codes mit dem
+  Schreibmodul von zxing-wasm in Node, Kamerabild als Canvas; in ALLEN Browsern und Systemen derselbe
+  Weg: `getUserMedia` liefert einen Ersatz-Stream aus eigenen Klassen, das Init-Skript ersetzt für
+  ein Video damit `srcObject`, `play`, Größe und `drawImage`. Kein echter `MediaStream`:
+  Playwright-WebKit unter Windows hat keinen, und WebKit räumt das JS-Objekt einer echten Spur weg,
+  dann ginge ein Zähler an der Spur verloren (rote CI unter Linux). `cameraCounts`: `opened`,
+  `stopped` (Spuren je einmal), `attached` (Videos, die den Stream noch halten); nach jedem Ende
+  `cameraReleased(n)`, auch bei Fehlern wie „Lesemodul nicht ladbar“), echt sind Lesemodul,
+  WASM-Datei, CSP und PHP; Unit-Tests
+  `camera.spec.ts`, `deviceSearch.spec.ts`, `deviceStore.spec.ts`. `devicesEndpoint` kennt dafür
+  auch `scan_code`.
   „Zuletzt benutzt“ (`src/data/recentDevices.ts`, `recentDeviceIds`/`rememberDevice` aus
   `src/data/index.ts`): localStorage `ff-recent-devices:<kürzel>:<konto-id>`, nur IDs, höchstens 8,
   neueste zuerst; `DevicePage` merkt sich das Gerät beim Öffnen; angezeigt nur Geräte der aktuellen
@@ -686,7 +736,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   die Zeitlimits gebraucht werden.
   Meldungen von `ConfigLoader` nennen nie Werte.
 - Tests: Testsuiten `unit` und `integration` (`composer test`, `composer test:unit`,
-  `composer test:integration`). Die ganze Suite dauert lokal unter einer Minute;
+  `composer test:integration`). Die ganze Suite dauert lokal rund 3 Minuten;
   `process-timeout` 900 in `composer.json` bleibt als Reserve. Integrationstests werden übersprungen, wenn
   `config/config.test.php` fehlt. Dauerhafte Tabellen legen sie nur mit Präfix `fe_test_`
   an und löschen sie wieder; aufgeräumt wird ausschließlich `fe_test_*` und nur in einer
@@ -1304,8 +1354,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Konten. Ohne `--execute` Probelauf. Schreibt NUR über die Repositorys (Ereignisse, Versionen,
   Sperren wie im Betrieb), nie per SQL; keine Mails; Zeitpunkte = Zeit des Aufrufs (die Historie
   wird nicht zurückdatiert, sie ist nur `INSERT`).
-- Inhalt: 15 Standorte, 60 ausgesuchte Geräte (`TestCityData::devices`) mit Scan-Codes (auch GS1
-  mit GS), Prüfdaten relativ zu heute (`Clock`, Europe/Berlin), Geräten auf dem ganzen Fahrzeug,
+- Inhalt: 15 Standorte, 60 ausgesuchte Geräte (`TestCityData::devices`) mit Scan-Codes (GS1 wie auf
+  echten Etiketten über `TestCityData::gs1`: `01<GTIN>21<Serie>` ohne GS nach der GTIN fester Länge,
+  einige `01<GTIN>10<Charge><GS>21<Serie>` mit GS nach der variablen Charge; `TestCityData::GTIN` mit
+  gültiger Prüfziffer, per Test), Prüfdaten relativ zu heute (`Clock`, Europe/Berlin), Geräten auf dem ganzen Fahrzeug,
   Verlauf an 7 Geräten, M24 ausgesondert; `--devices=1…5000`: Geräte T0001 …, Verlauf an
   T0001–T0006, T0007 ausgesondert. Gerätetypen aus den Start-Gerätetypen (fehlt einer oder ist er
   deaktiviert → Abbruch).
@@ -1879,7 +1931,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Anmeldung und Registrierung im Frontend (umgesetzt: anmelden, registrieren, email-bestaetigen,
   passwort-vergessen, passwort-zuruecksetzen, einladung-annehmen, Abmelden; Updates der App; siehe
   "Frontend" und KONZEPT.md "Anmeldung und Registrierung", "Updates der App").
-- Nicht in Version 1: Mengenartikel, QR-/Barcodes, Prüfprotokolle.
+- Nicht in Version 1: Mengenartikel, Etiketten mit QR-/Barcodes erzeugen oder drucken,
+  Prüfprotokolle.
 
 ## GitHub Actions (CI)
 - Workflow `.github/workflows/ci.yml` bei jedem Push auf `main`, bei Pull Requests und von Hand

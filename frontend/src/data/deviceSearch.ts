@@ -76,23 +76,99 @@ export function searchDevices(
 }
 
 /**
- * Schlüssel der Kennung wie `identifier_key` im Backend: Kleinschreibung, großes ẞ als ß
- * (`toLowerCase` macht beides); ß ≠ ss und é ≠ e (anders als die Suche).
+ * Großbuchstaben, die MariaDB unter `utf8mb4_unicode_ci` (Unicode-Stand von UCA 4.0.0) nicht
+ * kleinschreibt, wohl aber `toLowerCase` (neuere Unicode-Versionen), als Bereiche von Codepunkten;
+ * dazu alle außerhalb der BMP. Gemessen an der Datenbank, geprüft für jeden Groß- und Titelbuchstaben
+ * über `tests/Fixtures/identifier-key-cases.json` (IdentifierKeyCasesTest, deviceSearch.spec.ts).
+ */
+const DATABASE_UNCASED: readonly (readonly [number, number])[] = [
+    [0x220, 0x220],
+    [0x23a, 0x37f],
+    [0x3cf, 0x3d8],
+    [0x3f4, 0x3ff],
+    [0x48a, 0x48a],
+    [0x4c0, 0x4c0],
+    [0x4c5, 0x4c5],
+    [0x4c9, 0x4c9],
+    [0x4cd, 0x4cd],
+    [0x4f6, 0x4f6],
+    [0x4fa, 0x52e],
+    [0x10a0, 0x1cbf],
+    [0x1efa, 0x1efe],
+    [0x2132, 0xa7f5],
+];
+
+/** Kleinschreibung wie `LOWER()` in MariaDB: je Zeichen (kein Sigma am Wortende), İ wird zu i. */
+function databaseLowerCase(value: string): string {
+    let result = '';
+    for (const char of value) {
+        const codePoint = char.codePointAt(0) ?? 0;
+        if (codePoint === 0x130) {
+            result += 'i';
+        } else if (
+            codePoint > 0xffff ||
+            DATABASE_UNCASED.some(([from, to]) => codePoint >= from && codePoint <= to)
+        ) {
+            result += char;
+        } else {
+            result += char.toLowerCase();
+        }
+    }
+    return result;
+}
+
+/**
+ * Schlüssel der Kennung wie `identifier_key` im Backend (`REPLACE(LOWER(identifier), 'ẞ', 'ß')`):
+ * Kleinschreibung wie die Datenbank, großes ẞ als ß; ß ≠ ss und é ≠ e (anders als die Suche).
  */
 export function identifierKey(identifier: string): string {
-    return identifier.toLowerCase();
+    return databaseLowerCase(identifier).replace(/ẞ/g, 'ß');
+}
+
+/** Leerraum am Rand wie `ScanCode` im Backend (Scanner hängen oft ein Zeilenende an). */
+export function trimCode(code: string): string {
+    return code.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
+}
+
+/** Höchstlängen wie `ScanCode::MAX_LENGTH` und `DeviceIdentifier::MAX_LENGTH` im Backend. */
+export const SCAN_CODE_MAX_LENGTH = 200;
+export const IDENTIFIER_MAX_LENGTH = 30;
+
+/**
+ * Könnte der (getrimmte) Text ein Scan-Code sein (Regeln wie `ScanCode`)? Sonst lehnte der Server
+ * `scan_code` mit 400 ab: Steuerzeichen außer EOT, GS, RS, Formatzeichen, U+2028/2029, zu lang.
+ */
+export function isPossibleScanCode(code: string): boolean {
+    return (
+        code !== '' &&
+        Array.from(code).length <= SCAN_CODE_MAX_LENGTH &&
+        !/[\u0000-\u0003\u0005-\u001c\u001f\u007f-\u009f\p{Cf}\u2028\u2029]/u.test(code)
+    );
+}
+
+/**
+ * Schlüssel einer eingegebenen oder gescannten Kennung: wie `DeviceIdentifier` (Leerraum am Rand
+ * weg, mehrere Leerzeichen zu einem, zusammengesetzte Form), dann `identifierKey`.
+ */
+export function codeKey(code: string): string {
+    return identifierKey(identifierText(code));
+}
+
+/** Kennung so, wie das Backend sie speichert (ohne Kleinschreibung), z. B. für `q`. */
+export function identifierText(code: string): string {
+    return code.normalize('NFC').trim().replace(/ {2,}/g, ' ');
 }
 
 /**
  * Gerät zu einem gescannten oder per Enter bestätigten Code (KONZEPT.md, Entscheidung 17): zuerst
  * der Scan-Code exakt (wie im Backend, Groß-/Kleinschreibung zählt), dann die Kennung ohne Groß-/
- * Kleinschreibung. Leerraum am Rand zählt nicht (Scanner hängen oft ein Zeilenende an).
+ * Kleinschreibung (`codeKey`, wie der UNIQUE-Index).
  */
 export function findByCode(
     devices: readonly DeviceListItem[],
     code: string,
 ): DeviceListItem | null {
-    const trimmed = code.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
+    const trimmed = trimCode(code);
     if (trimmed === '') {
         return null;
     }
@@ -100,7 +176,6 @@ export function findByCode(
     if (byScanCode !== undefined) {
         return byScanCode;
     }
-    // Mehrere Leerzeichen fasst das Backend in Kennungen zu einem zusammen (DeviceIdentifier).
-    const key = identifierKey(trimmed.replace(/ {2,}/g, ' '));
+    const key = codeKey(trimmed);
     return devices.find((device) => identifierKey(device.identifier) === key) ?? null;
 }
