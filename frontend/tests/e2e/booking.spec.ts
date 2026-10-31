@@ -318,6 +318,14 @@ test.describe('Keine Verbindung beim Speichern', () => {
                 calls += 1;
                 return calls === 1 ? 'abort' : applied(request);
             },
+            'GET api/v1/client-config': {
+                status: 200,
+                body: {
+                    server_time: '2026-10-31T12:00:00Z',
+                    offline: { max_age_days: 7, queue_max_age_days: 7 },
+                    max_clock_skew_seconds: 300,
+                },
+            },
         },
         allowedConsoleError: NETWORK_ERROR_CONSOLE,
     });
@@ -326,11 +334,15 @@ test.describe('Keine Verbindung beim Speichern', () => {
         calls = 0;
     });
 
-    test('Eingaben bleiben, erneutes Senden mit derselben client_ref', async ({
+    test('ohne lokale Kopie: Eingaben bleiben, erneutes Senden mit derselben client_ref', async ({
         page,
         apiRequests,
     }) => {
-        await openFromSearch(page);
+        // Direkt geöffnet (z. B. Link), die Geräteliste war nie geladen: keine Warteschlange.
+        await page.goto('/firefighting/test/geraete/1');
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'M1 · Atemschutzmaske' }),
+        ).toBeVisible();
         await statusButton(page, 'in Wartung').click();
         await page.getByLabel('Kommentar (optional)').fill('zur Prüfung');
         await page.getByRole('button', { name: 'Speichern' }).click();
@@ -344,6 +356,26 @@ test.describe('Keine Verbindung beim Speichern', () => {
         );
         const [first, second] = stateRequests(apiRequests);
         expect(second).toEqual(first);
+    });
+
+    test('mit lokaler Kopie: die Buchung kommt in die Warteschlange und geht später raus', async ({
+        page,
+        apiRequests,
+    }) => {
+        // Offline-Modus (KONZEPT.md, "Offline-Modus – Entscheidungen", 52; offline.spec.ts).
+        await openFromSearch(page);
+        await statusButton(page, 'in Wartung').click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
+        await expect(page.getByTestId('booking-notice')).toContainText(
+            'wird gesendet, sobald eine Verbindung besteht: M1 → in Wartung',
+        );
+        // Die nächste Gelegenheit (hier: wieder sichtbar) sendet sie mit Aktionszeit.
+        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+        await expect(page.getByTestId('queued-done')).toBeVisible();
+        const [first, second] = stateRequests(apiRequests);
+        expect(second?.['occurred_at']).toMatch(/Z$/);
+        expect(second?.['client_ref']).not.toBe(first?.['client_ref']);
     });
 });
 

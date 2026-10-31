@@ -13,12 +13,14 @@ import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
 import type { DeviceListItem } from '../api/devices';
 import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
+import BookingQueuePanel from '../components/BookingQueuePanel.vue';
 import CodeScanner from '../components/CodeScanner.vue';
 import DeviceCard from '../components/DeviceCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import { deviceStore, recentDeviceIds } from '../data';
 import { takeBookingNotice } from '../data/booking';
 import { changeTimeText } from '../data/changeTime';
+import { isOffline } from '../runtime/connectivity';
 import { useNow } from '../runtime/now';
 import { closeQueryView } from '../router/back';
 import {
@@ -290,6 +292,7 @@ function retry(): void {
     <CodeScanner v-if="scannerOpen" @detected="onDetected" @close="closeScanner" />
 
     <BookingNoticeMessage v-if="bookingNotice !== null" :notice="bookingNotice" />
+    <BookingQueuePanel />
 
     <p v-if="notFound" class="notice notice-info" role="status" data-testid="search-not-found">
         Kein Gerät mit diesem Code gefunden.
@@ -307,7 +310,13 @@ function retry(): void {
     </template>
 
     <template v-else>
-        <p v-if="list.error !== null" class="hint" role="status" data-testid="refresh-error">
+        <!-- Offline sagt es der Streifen oben (AppNotices). -->
+        <p
+            v-if="list.error !== null && !isOffline"
+            class="hint"
+            role="status"
+            data-testid="refresh-error"
+        >
             Die Liste konnte nicht aufgefrischt werden, sie zeigt den letzten Stand.
             <small>({{ list.error.code }})</small>
         </p>

@@ -961,7 +961,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Super-Admin auf dem Dashboard landen, simulieren dessen Abfragen damit; zustandsbehafteter Server
   `serviceServer` bzw. `superAdminServer` über `delegate`); Unit-Tests
   `tenants.spec.ts`, `router.spec.ts`.
-- Offline-Modus (KONZEPT.md "Offline-Modus – Entscheidungen", 48–56; Schritt O1 umgesetzt):
+- Offline-Modus (KONZEPT.md "Offline-Modus – Entscheidungen", 48–56; Schritte O1 und O2 umgesetzt):
   Erreichbarkeit `src/runtime/connectivity.ts` (`isOffline` = Browser offline oder die letzte
   Anfrage bekam keine Verbindung; `apiRequest`/`apiDownload` melden `reportServerReached`;
   `installConnectivity` in `main.ts`, `onBackOnline`). Gespeicherte Sitzung (`src/auth/session.ts`,
@@ -980,7 +980,30 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Sitzung bei gestörter Prüfung wie bisher `connection-notice`, sonst offline bzw. mit gespeicherter
   Sitzung der graue Streifen `offline-notice` („Offline – angezeigt wird der Stand vom 31.10.,
   14:02.“, `syncedAtText`). Browser-Tests `tests/e2e/offline.spec.ts` (API per `abort`, die
-  App-Seite liefert der Testserver; IndexedDB im Test direkt gelesen); Unit-Tests `offline.spec.ts`.
+  App-Seite liefert der Testserver; IndexedDB im Test direkt gelesen, ohne die Datenbank anzulegen:
+  `IndexedDbStore.openVersion` legt fehlende Tabellen sonst mit der nächsten Version an); Unit-Tests
+  `offline.spec.ts`. Warteschlange (Schritt O2; `src/data/bookingQueue.ts`, `BookingQueue` als
+  `bookingQueue` in `src/data/index.ts`, `installBookingQueue` in `main.ts`): je Stadt und Konto
+  (IndexedDB `queue`), Einträge `QueuedBooking` (`client_ref`, Gerät mit Version, Ziel mit Pfad bzw.
+  Status, Kommentar, `occurredAt` = `actionTime` in UTC-Sekunden; Zustände `waiting`, `sending`,
+  `done` mit Ergebnis des Servers, `stale` mit „Trotzdem senden“ (`confirmed_stale`) bzw.
+  „Verwerfen“, `failed` mit „Verwerfen“). `send` der Reihe nach, älteste zuerst; ohne Verbindung,
+  5xx und 401 wartet die Buchung weiter; `stale_action` → `stale`, andere 4xx (auch
+  `clock_implausible`) → `failed`. Gesendet beim Bekanntwerden des Kontos, nach jedem Laden der
+  Geräte, bei `online` und `visibilitychange` (nicht, solange der Browser offline meldet); vorher
+  einmal je Seitenaufruf `GET client-config` (`src/api/clientConfig.ts`, nur wenn etwas wartet;
+  Grenzen in localStorage `ff-offline-limits:<kürzel>`, sonst 7/7 Tage). Wartende Buchungen zeigt die
+  Liste mit dem gewünschten Stand (`pendingDevice`, nur solange die Version gleich ist). Umbuchen
+  (`DevicePage`): offline (Streifen) und erlaubt (`offlineBookingProblem`: Kopie vorhanden und höchstens
+  `maxAgeDays` alt) gleich in die Warteschlange (neue `client_ref`, Hinweis „Gespeichert – wird
+  gesendet, sobald eine Verbindung besteht: …“, zurück wie online); meldet der Browser offline und ist
+  es nicht erlaubt, der Grund (`offline-problem`); sonst online, und scheitert das an der Verbindung,
+  bei erlaubtem Offline-Buchen ebenfalls in die Warteschlange, sonst wie bisher der Fehler (Eingaben
+  bleiben, gleiche `client_ref`). Anzeige `BookingQueuePanel` auf „Suchen“ (Uhr, Haken, Ergebnis,
+  „Angekommene ausblenden“). Abmelden (`AccountPanel`, `AdminMenuNav`) mit ungesendeten Buchungen erst
+  nach `ConfirmDialog` (`unsentWarning`); Abmelden und ein anderes Konto löschen die Warteschlange,
+  eine abgelaufene Sitzung nicht. Tests `tests/e2e/offline.spec.ts`, `booking.spec.ts`
+  („Keine Verbindung beim Speichern“), Unit-Tests `bookingQueue.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und

@@ -166,9 +166,10 @@ vollständig sind.
 
 48. **Schritte:** O1 Grundlage (lokale Kopie der Daten, Sitzung offline behalten, grauer Streifen,
     Lesemodul des Scanners im Cache); O2 Warteschlange mit automatischem Senden, Ergebnis je Buchung,
-    Grenzen aus `client-config` und Rückfrage bei alten Buchungen (erst damit bucht die App offline);
-    O3 Abmelden mit Warnung und Löschen aller lokalen Daten; O4 Abschluss mit
-    `LIVETEST-OFFLINE.md` für Holger (echtes Offline kann der Browser im Live-Test nicht).
+    Grenzen aus `client-config`, Rückfrage bei alten Buchungen und Warnung beim Abmelden (erst damit
+    bucht die App offline; Abmelden mit Warnung gehört dazu, damit nie Buchungen unbemerkt verloren
+    gehen); O3 Abschluss mit `LIVETEST-OFFLINE.md` für Holger (echtes Offline kann der Browser im
+    Live-Test nicht).
 49. **Lokale Kopie:** IndexedDB (Datenbank `ff-offline`, je Stadt und Konto ein Eintrag
     `<kürzel>:<konto-id>`) mit der Geräteliste, den Standorten, dem Zeitpunkt der letzten
     vollständigen Synchronisierung (Uhr des Handys) und den Grenzen aus `client-config`. Gespeichert
@@ -207,8 +208,12 @@ vollständig sind.
     gespeicherte Sitzung des Kontos. Abmelden geht nur online (der Server beendet die Sitzung).
 56. **Scanner offline:** Das Lesemodul (WASM) kommt in den Cache des Service Workers.
 
-Stand (31.10.2026, Nacht): O1 umgesetzt (lokale Kopie, gespeicherte Sitzung, grauer Streifen,
-Lesemodul im Cache).
+Stand (31.10.2026, Nacht): O1 umgesetzt und live (lokale Kopie, gespeicherte Sitzung, grauer
+Streifen, Lesemodul im Cache). O2 umgesetzt: Warteschlange, Ergebnis, Grenzen, Warnung beim Abmelden.
+Vorläufig (Agent, Nacht 31.10.): `client-config` liest die App nur, wenn eine Buchung wartet (sonst
+gelten die zuletzt gelesenen bzw. 7 Tage); scheitert „Speichern“ online an der Verbindung, kommt die
+Buchung mit neuer `client_ref` in die Warteschlange (kam die erste doch an, ergibt die zweite
+„unverändert“); ohne gültige Kopie bleibt es beim bisherigen Fehler mit „erneut senden“.
 
 ## Fehlerbehandlung
 - Fehler in Alltagssprache, gut sichtbar (z. B. farbiger Hinweis oben: „Keine Verbindung, wird

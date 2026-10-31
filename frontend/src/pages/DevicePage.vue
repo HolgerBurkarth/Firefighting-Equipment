@@ -16,6 +16,7 @@ import FocusHeader from '../components/FocusHeader.vue';
 import LocationPicker from '../components/LocationPicker.vue';
 import {
     adminDeviceList,
+    bookingQueue,
     deviceStore,
     locationStore,
     recentLocationIds,
@@ -28,9 +29,13 @@ import {
     commentLength,
     MAX_COMMENT_LENGTH,
     MIN_DEFECT_COMMENT_LENGTH,
+    newClientRef,
     normalizeComment,
     setBookingNotice,
 } from '../data/booking';
+import { actionTime, offlineBookingProblem, pendingDevice, queuedText } from '../data/bookingQueue';
+import { offlineData } from '../data/offline';
+import { connectivity, isOffline } from '../runtime/connectivity';
 import { locationPaths, type LocationChoice } from '../data/recentLocations';
 import { closeQueryView, returnTo } from '../router/back';
 import { useUnsavedInput } from '../runtime/unsavedInput';
@@ -234,6 +239,7 @@ onMounted(() => {
 watch([chosenLocation, chosenStatus], () => {
     nothingChanged.value = false;
     saveError.value = null;
+    offlineProblem.value = null;
 });
 
 function pickLocation(id: number): void {
@@ -242,6 +248,65 @@ function pickLocation(id: number): void {
 
 function pickStatus(value: BookableStatus): void {
     chosenStatus.value = value === device.value?.status ? null : value;
+}
+
+/** Gründe, warum offline nicht gebucht werden kann (Daten zu alt, keine Kopie). */
+const offlineProblem = ref<string | null>(null);
+
+/**
+ * Buchung in die Warteschlange (neue `client_ref`, Aktionszeit jetzt); die Liste zeigt sofort den
+ * gewünschten Stand, danach zurück wie nach dem Speichern online (Entscheidungen 52 und 54).
+ */
+async function saveOffline(
+    current: DeviceListItem,
+    content: { version: number; locationId?: number; status?: BookableStatus; comment?: string },
+): Promise<void> {
+    const now = new Date();
+    offlineProblem.value = offlineBookingProblem(
+        offlineData.syncedAt,
+        bookingQueue.currentLimits,
+        now,
+    );
+    if (offlineProblem.value !== null) {
+        return;
+    }
+    const target =
+        content.locationId === undefined ? undefined : paths.value.get(content.locationId);
+    const booking = {
+        clientRef: newClientRef(),
+        deviceId,
+        identifier: current.identifier,
+        deviceTypeName: current.deviceType.name,
+        version: content.version,
+        occurredAt: actionTime(now),
+        ...(content.locationId !== undefined && {
+            locationId: content.locationId,
+            locationPath: target?.path ?? current.location.path,
+        }),
+        ...(content.status !== undefined && {
+            status: content.status,
+            statusLabel: STATUS_LABELS[content.status],
+        }),
+        ...(content.comment !== undefined && { comment: content.comment }),
+    };
+    saving.value = true;
+    const added = await bookingQueue.add(booking);
+    saving.value = false;
+    if (!added) {
+        offlineProblem.value = 'Die Buchung ließ sich auf diesem Gerät nicht speichern.';
+        return;
+    }
+    deviceStore.upsert(pendingDevice(current, { ...booking, state: 'waiting' }));
+    if (content.locationId !== undefined) {
+        rememberLocation(content.locationId);
+    }
+    rememberDevice(deviceId);
+    setBookingNotice({
+        kind: 'info',
+        text: `Gespeichert – wird gesendet, sobald eine Verbindung besteht: ${queuedText({ ...booking, state: 'waiting' })}`,
+    });
+    saved.value = true;
+    await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);
 }
 
 async function save(): Promise<void> {
@@ -267,12 +332,34 @@ async function save(): Promise<void> {
         ...(changesStatus.value && status.value !== null && { status: status.value }),
         ...(text !== '' && { comment: text }),
     };
+    // Offline (Streifen): gleich in die Warteschlange (KONZEPT.md, "Offline-Modus – Entscheidungen",
+    // 52), sofern offline gebucht werden darf; meldet der Browser offline, sonst gleich der Grund.
+    // Online und nach einer nur gescheiterten Anfrage wie bisher senden; scheitert es an der
+    // Verbindung, ebenfalls in die Warteschlange (wenn erlaubt), sonst der Fehler (die Eingaben
+    // bleiben, erneut senden wirkt dank client_ref nicht doppelt).
+    const queueProblem = offlineBookingProblem(
+        offlineData.syncedAt,
+        bookingQueue.currentLimits,
+        new Date(),
+    );
+    if (isOffline.value && (queueProblem === null || connectivity.browserOffline)) {
+        await saveOffline(current, content);
+        return;
+    }
     saving.value = true;
     const result = await deviceStore.book(deviceId, {
         ...content,
         clientRef: refs.refFor(content),
     });
     saving.value = false;
+    if (!result.ok && result.error.code === 'network' && queueProblem === null) {
+        await saveOffline(current, content);
+        return;
+    }
+    // Die Kopie ist zu alt für die Warteschlange: zusätzlich der Grund (Entscheidung 54).
+    if (!result.ok && result.error.code === 'network' && offlineData.syncedAt !== null) {
+        offlineProblem.value = queueProblem;
+    }
     if (!result.ok) {
         const latest =
             result.error.code === 'version_conflict' ? conflictDevice(result.error.details) : null;
@@ -501,6 +588,14 @@ async function save(): Promise<void> {
                     Bitte wählen Sie einen anderen Standort oder Status.
                 </p>
                 <ErrorNotice v-if="saveError !== null" :error="saveError" />
+                <p
+                    v-if="offlineProblem !== null"
+                    class="notice notice-error"
+                    role="alert"
+                    data-testid="offline-problem"
+                >
+                    {{ offlineProblem }}
+                </p>
                 <button class="btn btn-primary" type="submit" :disabled="saving">
                     {{ saving ? 'Wird gespeichert …' : 'Speichern' }}
                 </button>
