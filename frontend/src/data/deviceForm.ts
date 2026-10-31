@@ -274,6 +274,18 @@ export function reinstateRequest(
 }
 
 /**
+ * Meldungen am Feld, wenn beim Wiederaufnehmen Kennung bzw. Scan-Code inzwischen vergeben sind
+ * (409 identifier_taken bzw. scan_code_taken). Die Meldung des Servers nennt die Felder der API
+ * (`Feld "identifier"`, `mit null entfernen`), daher eigene Texte für die Oberfläche.
+ */
+export function reinstateIdentifierTaken(identifier: string): string {
+    return `Die Kennung „${identifierText(identifier)}“ ist inzwischen an ein anderes Gerät vergeben. Bitte geben Sie eine andere Kennung ein.`;
+}
+
+export const REINSTATE_SCAN_CODE_TAKEN =
+    'Dieser Scan-Code ist inzwischen einem anderen Gerät zugeordnet. Entfernen Sie das Häkchen, um das Gerät ohne Scan-Code wieder aufzunehmen.';
+
+/**
  * Eingaben auf „Neues Gerät“ (`geraete/neu`, KONZEPT.md, "Admin-Konsole – Entscheidungen", 32).
  * Gerätetyp und Standort `null` = noch nicht gewählt.
  */

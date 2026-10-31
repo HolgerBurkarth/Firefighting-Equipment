@@ -68,7 +68,10 @@ export function lockBlocker(location: Location | SubLocation): string | null {
     if (parts.length === 0) {
         return null;
     }
-    return `Sperren geht nur, wenn der Standort leer ist. Hier liegen noch ${parts.join(' und ')}.`;
+    // Einzahl nur bei genau einem Gerät bzw. Fach („Hier liegt noch 1 aktives Fach.“).
+    const verb =
+        parts.length === 1 && location.deviceCount + sublocations === 1 ? 'liegt' : 'liegen';
+    return `Sperren geht nur, wenn der Standort leer ist. Hier ${verb} noch ${parts.join(' und ')}.`;
 }
 
 /** Eine Gruppe im Baum der Verwaltung: Standort der Ebene 1 mit den angezeigten Fächern. */

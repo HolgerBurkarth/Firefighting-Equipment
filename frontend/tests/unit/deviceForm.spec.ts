@@ -12,7 +12,9 @@ import {
     nextNewDeviceForm,
     parseDateInput,
     rebaseEditForm,
+    REINSTATE_SCAN_CODE_TAKEN,
     reinstateFormFromDevice,
+    reinstateIdentifierTaken,
     reinstateRequest,
     sameNewDeviceForm,
     scanCodeProblem,
@@ -220,6 +222,13 @@ describe('Wieder aufnehmen', () => {
         const without = detail(6, { status: 'retired', status_label: 'ausgesondert' });
         const form = { ...reinstateFormFromDevice(without), keepScanCode: false };
         expect(reinstateRequest(without, form, '')).toEqual({ version: 1, status: 'ready' });
+    });
+
+    it('eigene Meldungen, wenn Kennung bzw. Scan-Code vergeben sind (ohne Felder der API)', () => {
+        expect(reinstateIdentifierTaken(' M  5 ')).toBe(
+            'Die Kennung „M 5“ ist inzwischen an ein anderes Gerät vergeben. Bitte geben Sie eine andere Kennung ein.',
+        );
+        expect(REINSTATE_SCAN_CODE_TAKEN).not.toMatch(/Feld|null|scan_code/);
     });
 });
 

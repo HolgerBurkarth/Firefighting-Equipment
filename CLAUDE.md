@@ -93,8 +93,24 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
      des gepushten main-Commits, und `https://www.prodad.de/firefighting/service/api/v1/health`
      liefert `{"status":"ok","database":"ok"}`. Scheitert das Deploy: NICHTS zurückspielen,
      anhalten, die Ausgabe berichten.
-  5. „✅ FERTIG“ zusätzlich mit: was live ist (Commit, Build-Kennung), Laufzeit der CI, Reparaturen
-     (Ursache je roten Lauf) und was im Chat live im Browser geprüft werden soll.
+  5. Live prüfen (seit 31.10.2026): Nach jedem Deploy prüft der Agent die betroffenen Funktionen
+     selbst im Browser mit Claude in Chrome, bevor er „✅ FERTIG“ meldet.
+     - Nur in der Test-Stadt `https://www.prodad.de/firefighting/test/`, nie in echten Städten
+       (z. B. Immendingen).
+     - Keine Passwörter eingeben und nicht abmelden (neu anmelden tut nur der Nutzer). Fehlt eine
+       Anmeldung: „❓ RÜCKFRAGE“.
+     - Keine Dateien herunterladen; CSV-Inhalte im Browser per JavaScript prüfen (den Blob vor dem
+       Speichern abfangen).
+     - Testgeräte: Kennungen M90–M99 bzw. Gerätetyp „Live-Testtyp 2“; an bestehenden Geräten
+       geänderte Werte danach zurücksetzen.
+     - Ergebnis je geprüftem Punkt (☑/☒) in die passende LIVETEST-Datei (z. B.
+       `docs/frontend/LIVETEST-ADMIN-KONSOLE.md`) eintragen; Fehler beheben, Wünsche nach
+       `docs/TODO-SPAETER.md`.
+     - Was der Browser nicht prüfen kann (schmale Fensterbreiten, iPhone, Handscanner, Kamera,
+       Mails), als offen für den Nutzer markieren.
+  6. „✅ FERTIG“ zusätzlich mit: was live ist (Commit, Build-Kennung), Laufzeit der CI, Reparaturen
+     (Ursache je roten Lauf), was live im Browser geprüft ist (☑/☒) und was für den Nutzer offen
+     bleibt.
 - Vorher anhalten und fragen („❓ RÜCKFRAGE“):
   - Migrationen, die bestehende Daten ändern oder löschen (`UPDATE`, `DELETE`, `DROP`, Spalten
     entfernen oder umbenennen). Reine Erweiterungen (neue Tabellen oder Spalten) gehen ohne.
@@ -2429,9 +2445,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Admin-Konsole (abgeschlossen am 31.10.2026, Schritte 1–13: Menü und Dashboard, Standorte und
   Gerätetypen, Geräteliste mit Sammelaktionen, Gerätedetail, neues Gerät, CSV-Import, Benutzer und
   Einladungscodes, Protokoll, Einstellungen, Live-Tests; siehe "Frontend" und KONZEPT.md
-  "Admin-Konsole"). Der abschließende Durchlauf nach `docs/frontend/LIVETEST-ADMIN-KONSOLE.md` läuft
-  danach im Browser; Ergebnisse dort und kurz in KONZEPT.md, Fehler beheben, Wünsche nach
-  `docs/TODO-SPAETER.md`.
+  "Admin-Konsole"). Der abschließende Durchlauf nach `docs/frontend/LIVETEST-ADMIN-KONSOLE.md` lief
+  am 31.10.2026 im Browser (Ergebnisse dort und kurz in KONZEPT.md); offen sind nur Punkte für den
+  Nutzer (iPhone, schmale Breiten, Handscanner, Mails, Anmelden/Abmelden).
 - Nicht in Version 1: Mengenartikel, Etiketten mit QR-/Barcodes erzeugen oder drucken,
   Prüfprotokolle.
 
