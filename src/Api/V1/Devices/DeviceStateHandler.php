@@ -7,14 +7,10 @@ namespace FirefightingEquipment\Api\V1\Devices;
 use FirefightingEquipment\Api\V1\DeviceErrors;
 use FirefightingEquipment\Device\Booking\BookingRequest;
 use FirefightingEquipment\Device\Booking\BookingResult;
-use FirefightingEquipment\Device\Booking\ClientRef;
-use FirefightingEquipment\Device\Booking\ClientRefConflictException;
+use FirefightingEquipment\Device\Booking\DeviceBooker;
 use FirefightingEquipment\Device\Booking\DeviceBookingRepository;
-use FirefightingEquipment\Device\Booking\DuplicateClientRefException;
-use FirefightingEquipment\Device\Booking\StoredBooking;
 use FirefightingEquipment\Device\DeviceEventRecorder;
 use FirefightingEquipment\Device\DeviceException;
-use FirefightingEquipment\Device\DeviceNotFoundException;
 use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
 use FirefightingEquipment\Http\HttpException;
@@ -56,8 +52,7 @@ final readonly class DeviceStateHandler implements RequestHandler
         $deviceId = $context->param('id');
         $pdo = $context->db->get();
         $recorder = new DeviceEventRecorder();
-        $devices = new DeviceRepository($pdo, $recorder);
-        $bookings = new DeviceBookingRepository($pdo);
+        $booker = new DeviceBooker($tenant, new DeviceRepository($pdo, $recorder), new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo));
 
         try {
             $version = DeviceFields::version($context);
@@ -66,21 +61,16 @@ final readonly class DeviceStateHandler implements RequestHandler
             [$clientRef, $occurredAt, $confirmedStale] = DeviceFields::bookingFields($context);
             $hash = BookingRequest::hash($deviceId, $version, $change, $comment, $occurredAt);
 
-            $stored = $clientRef === null ? null : $bookings->find($tenant, $clientRef);
-            if ($stored !== null) {
-                return $this->replay($context, $devices, $stored, $clientRef, $userId, $deviceId, $hash);
+            $previous = $booker->previous($clientRef, $userId, $deviceId, $hash);
+            if ($previous !== null) {
+                return self::response($previous);
             }
 
             $stale = $occurredAt !== null && $this->checkActionTime($occurredAt, $confirmedStale);
-            $booking = new BookingRequest($clientRef, $occurredAt, $stale, $hash);
-            try {
-                $result = $devices->book($tenant, $userId, $deviceId, $version, $change, $comment, $booking);
-            } catch (DuplicateClientRefException) {
-                // Dieselbe client_ref gleichzeitig verarbeitet: Die andere Anfrage hat gespeichert.
-                $clientRef ?? throw new \LogicException('client_ref fehlt.');
-                $stored = $bookings->find($tenant, $clientRef) ?? throw new \LogicException('Quittung fehlt.');
-
-                return $this->replay($context, $devices, $stored, $clientRef, $userId, $deviceId, $hash);
+            $result = $booker->book($userId, $deviceId, $version, $change, $comment, new BookingRequest($clientRef, $occurredAt, $stale, $hash));
+            if ($result->replayed) {
+                // Dieselbe client_ref gleichzeitig verarbeitet: Die andere Anfrage hat gespeichert und benachrichtigt.
+                return self::response($result);
             }
         } catch (DeviceException $e) {
             throw DeviceErrors::http($e);
@@ -137,39 +127,6 @@ final readonly class DeviceStateHandler implements RequestHandler
         }
 
         return true;
-    }
-
-    /**
-     * Wiederholt das gespeicherte Ergebnis derselben Buchung (nichts geschrieben, keine Mail).
-     *
-     * @throws ClientRefConflictException andere Buchung mit derselben client_ref
-     * @throws DeviceNotFoundException
-     */
-    private function replay(
-        RequestContext $context,
-        DeviceRepository $devices,
-        StoredBooking $stored,
-        ClientRef $clientRef,
-        int $userId,
-        int $deviceId,
-        string $hash,
-    ): JsonResponse {
-        if (!$stored->matches($userId, $deviceId, $hash)) {
-            throw new ClientRefConflictException();
-        }
-        $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
-        $device = $devices->find($tenant, $deviceId) ?? throw DeviceNotFoundException::forId($deviceId);
-
-        return self::response(new BookingResult(
-            $device,
-            $stored->outcome,
-            $stored->reason,
-            $stored->staleConfirmed,
-            $clientRef,
-            replayed: true,
-            eventId: $stored->eventId,
-            noticeId: new DeviceNoticeRepository($context->db->get())->idForBooking($tenant, $stored->id),
-        ));
     }
 
     private static function response(BookingResult $result): JsonResponse

@@ -152,6 +152,93 @@ final class DeviceFields
     }
 
     /**
+     * Sammel-Anfrage (POST devices/bulk/…): {devices: [Eintrag, …], comment?} mit 1 bis $max
+     * Einträgen. Je Eintrag ein Kontext mit dem Objekt als Body, damit die Felder des Eintrags wie
+     * die einer einzelnen Anfrage gelesen werden.
+     *
+     * @return list<RequestContext>
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public static function bulkEntries(RequestContext $context, int $max): array
+    {
+        self::rejectUnknown($context, ['devices', 'comment']);
+        $entries = $context->body['devices'] ?? null;
+        if (!is_array($entries) || !array_is_list($entries) || $entries === [] || count($entries) > $max) {
+            throw HttpException::invalidRequest(sprintf('Das Feld "devices" muss eine Liste mit 1 bis %d Geräten sein.', $max));
+        }
+
+        $result = [];
+        foreach ($entries as $index => $entry) {
+            if (!is_array($entry) || array_is_list($entry)) {
+                throw HttpException::invalidRequest(sprintf('Eintrag %d in "devices" muss ein Objekt mit "id" und "version" sein.', $index + 1));
+            }
+            /** @var array<string, mixed> $entry */
+            $result[] = new RequestContext(
+                $context->request,
+                $context->tenant,
+                $context->db,
+                $context->errors,
+                $context->params,
+                $entry,
+                $context->auth,
+                $context->hasher,
+                $context->mailer,
+                $context->urls,
+            );
+        }
+
+        return $result;
+    }
+
+    /**
+     * Eintrag von POST devices/bulk/inspection-due: {id, version, next_inspection_due} (null =
+     * entfernen).
+     *
+     * @throws HttpException   400 invalid_request
+     * @throws DeviceException ungültiges Datum
+     */
+    public static function bulkInspectionDue(RequestContext $entry): ?DeviceDate
+    {
+        self::rejectUnknown($entry, ['id', 'version', 'next_inspection_due']);
+        if (!$entry->hasField('next_inspection_due')) {
+            throw HttpException::invalidRequest('Das Feld "next_inspection_due" fehlt (Datum JJJJ-MM-TT oder null zum Entfernen).');
+        }
+
+        return self::date($entry, 'next_inspection_due', self::DUE_SUBJECT);
+    }
+
+    /**
+     * Eintrag von POST devices/bulk/state: {id, version, location_id?, status?, client_ref?}
+     * (Online-Buchung der Admin-Konsole, ohne Aktionszeit).
+     *
+     * @return array{DeviceStateChange, ?ClientRef}
+     *
+     * @throws HttpException   400 invalid_request
+     * @throws DeviceException weder Standort noch Status, ungültige client_ref
+     */
+    public static function bulkStateChange(RequestContext $entry): array
+    {
+        self::rejectUnknown($entry, ['id', 'version', 'location_id', 'status', 'client_ref']);
+        $clientRef = $entry->optionalStringField('client_ref');
+
+        return [
+            new DeviceStateChange($entry->optionalIntField('location_id', 1, self::MAX_ID), self::serviceStatus($entry, false)),
+            $clientRef === null ? null : ClientRef::fromString($clientRef),
+        ];
+    }
+
+    /**
+     * ID des Geräts in einem Eintrag einer Sammel-Anfrage.
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public static function deviceId(RequestContext $entry): int
+    {
+        return $entry->intField('id', 1, self::MAX_ID);
+    }
+
+    /**
      * POST devices/{id}/retire: nur version und comment; liefert den Kommentar.
      *
      * @throws HttpException   400 invalid_request

@@ -139,6 +139,75 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         self::assertSame([], $this->mailer->sent);
     }
 
+    public function testBulkActionSendsOneSummaryMailPerRecipient(): void
+    {
+        $first = $this->createViaApi('MA-01')['id'];
+        $second = $this->createViaApi('MA-02', ['location_id' => $this->hlf])['id'];
+        $same = $this->createViaApi('MA-03', ['location_id' => $this->room, 'status' => 'defective'])['id'];
+        $this->mailer->sent = [];
+        $this->mailer->batches = [];
+
+        $response = $this->api('POST', 'devices/bulk/state', ['comment' => 'Nach Einsatz', 'devices' => [
+            ['id' => $first, 'version' => 1, 'location_id' => $this->room, 'status' => 'defective'],
+            ['id' => $second, 'version' => 1, 'location_id' => $this->room, 'status' => 'defective'],
+            ['id' => $same, 'version' => 1, 'location_id' => $this->room, 'status' => 'defective'],
+            ['id' => 999_999, 'version' => 1, 'status' => 'defective'],
+        ]]);
+        self::assertSame(200, $response->statusCode(), $response->body());
+
+        self::assertSame(['log-admin@example.org', 'chef@example.org'], $this->recipients());
+        self::assertSame([2], $this->mailer->batches, 'eine Sammlung, also eine SMTP-Verbindung');
+        $mail = $this->mailer->sent[0];
+        self::assertSame(self::SUBJECT_PREFIX . '2 Geräte – umgebucht, Status defekt', $mail->subject);
+        self::assertStringContainsString(
+            "Vorgang: Sammelaktion (umgebucht, Status defekt)\nGeräte: 2\nWer: Kommandant\nWann: ",
+            $mail->text,
+        );
+        self::assertStringContainsString("Kommentar: Nach Einsatz\n", $mail->text);
+        self::assertStringContainsString(
+            "MA-01 (Atemschutzmaske)\n  Standort: HLF 20 / G1 → Lager\n  Status: einsatzbereit → defekt\n"
+            . "MA-02 (Atemschutzmaske)\n  Standort: HLF 20 → Lager\n  Status: einsatzbereit → defekt\n",
+            $mail->text,
+        );
+        self::assertStringNotContainsString('MA-03', $mail->text, 'unverändert');
+        self::assertStringContainsString(
+            "\nZur Geräteliste in der Anwendung:\n\n" . self::BASE_URL . "/firefighting/immendingen/geraete\n\nSie erhalten",
+            $mail->text,
+        );
+        self::assertNoLink($this->mailer->sent[1]);
+    }
+
+    public function testBulkDueDateMailAndSingleChangedDevice(): void
+    {
+        $first = $this->createViaApi('MA-01')['id'];
+        $second = $this->createViaApi('MA-02')['id'];
+        $this->mailer->sent = [];
+
+        $this->api('POST', 'devices/bulk/inspection-due', ['devices' => [
+            ['id' => $first, 'version' => 1, 'next_inspection_due' => '2027-03-01'],
+            ['id' => $second, 'version' => 1, 'next_inspection_due' => '2027-03-01'],
+        ]]);
+        self::assertSame(self::SUBJECT_PREFIX . '2 Geräte – Prüfdatum geändert', $this->mailer->sent[0]->subject);
+        self::assertStringContainsString("MA-02 (Atemschutzmaske)\n  Nächste Prüfung: – → 01.03.2027\n", $this->mailer->sent[0]->text);
+
+        // Nur ein Gerät geändert: die gewöhnliche Mail zum Gerät.
+        $this->mailer->sent = [];
+        $this->api('POST', 'devices/bulk/inspection-due', ['devices' => [
+            ['id' => $first, 'version' => 2, 'next_inspection_due' => '2027-03-01'],
+            ['id' => $second, 'version' => 2, 'next_inspection_due' => '2028-03-01'],
+        ]]);
+        self::assertSame(['log-admin@example.org', 'chef@example.org'], $this->recipients());
+        self::assertSame(self::SUBJECT_PREFIX . 'MA-02 Prüfdatum geändert', $this->mailer->sent[0]->subject);
+
+        // Nichts geändert oder nur Fehler: keine Mail.
+        $this->mailer->sent = [];
+        $this->api('POST', 'devices/bulk/inspection-due', ['devices' => [
+            ['id' => $first, 'version' => 2, 'next_inspection_due' => '2027-03-01'],
+            ['id' => $second, 'version' => 1, 'next_inspection_due' => '2029-03-01'],
+        ]]);
+        self::assertSame([], $this->mailer->sent);
+    }
+
     public function testOtherTenantsActionsDoNotReachAdminsOfThisTenant(): void
     {
         $this->account('tuttlingen', 'akteur@example.org', ['role' => 'admin']);

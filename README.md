@@ -173,7 +173,9 @@ wieder aufnehmen, Prüfdatum, Stammdaten). Standard: aus.
 Empfänger sind aktive, nicht gesperrte Konten mit eingeschalteter Option: Admins nur für Vorgänge
 ihrer Stadt, Super-Admins für alle Städte. Wer den Vorgang auslöst, bekommt keine Mail. Je Vorgang
 (Anfrage) gibt es eine Mail je Empfänger; ein CSV-Import ergibt eine Sammelmail mit Zusammenfassung
-und höchstens 50 Zeilen Einzelheiten. Betreff z. B. "Log Feuerwehr Immendingen: M1 umgebucht, Status
+und höchstens 50 Zeilen Einzelheiten, eine Sammelaktion der Geräteliste eine Sammelmail mit allen
+geänderten Geräten (Betreff z. B. "Log Feuerwehr Immendingen: 12 Geräte – Prüfdatum geändert"; ändert
+sie nur ein Gerät, die gewöhnliche Mail). Betreff z. B. "Log Feuerwehr Immendingen: M1 umgebucht, Status
 defekt"; der Text nennt Wer, Wann (deutsche Zeit), Gerät(e), Von/Nach, Kommentar und den Link zur
 Anwendung (Trennzeichen eines Scan-Codes als [GS], [RS], [EOT]). Gesendet wird erst nach dem Speichern; ein Versandfehler ändert am Vorgang nichts (nur
 `mail_failed (device_log, Konto #ID)` im Server-Log). Begrenzung: höchstens 25 Empfänger je Vorgang
@@ -466,6 +468,8 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
 | POST    | `api/v1/devices/{id}/state`          | angemeldet | `{"device":…,"result":…}` (siehe "Offline-Buchungen") |
 | POST    | `api/v1/devices/{id}/retire`         | Admin      | `{"device":…}`                                        |
 | POST    | `api/v1/devices/{id}/reinstate`      | Admin      | `{"device":…}`                                        |
+| POST    | `api/v1/devices/bulk/inspection-due` | Admin      | `{"results":[…],"summary":…}` (Sammelaktion)          |
+| POST    | `api/v1/devices/bulk/state`          | Admin      | `{"results":[…],"summary":…}` (Sammelaktion)          |
 | GET     | `api/v1/devices/{id}/events`         | angemeldet | `{"events":[…],"total":…,"limit":…,"offset":…}`       |
 | GET     | `api/v1/devices/export`              | angemeldet | CSV-Download (siehe "CSV-Export")                     |
 | GET     | `api/v1/device-events/export`        | angemeldet | CSV-Download (siehe "CSV-Export")                     |
@@ -545,6 +549,19 @@ Stadt; anlegen, Stammdaten und Prüfdatum ändern, aussondern und wieder aufnehm
   Art nicht kennt, ist `null`. Standorte erscheinen mit ihrem heutigen Namen (nach dem Umbenennen
   also mit dem neuen). Reihenfolge nach Eingang beim Server (so, wie der Server die Buchungen
   verarbeitet hat); die Aktionszeit steht daneben.
+
+- Sammelaktionen (Admin, Mehrfachauswahl der Geräteliste): `…/bulk/inspection-due` mit
+  `{"devices": [{"id", "version", "next_inspection_due"}, …], "comment"}` bzw. `…/bulk/state` mit
+  `{"devices": [{"id", "version", "location_id"?, "status"?, "client_ref"?}, …], "comment"}`,
+  höchstens 50 Geräte je Anfrage (die App teilt größere Auswahlen in Blöcke). Jedes Gerät wird wie
+  bei der einzelnen Route geprüft und in einer eigenen Transaktion geändert, mit eigenem Eintrag in
+  der Historie; Teilerfolg ist möglich. Antwort immer 200: je Gerät `outcome` (`applied`,
+  `unchanged`, `error`), `device` (Stand danach bzw. aktueller Stand, `null` bei fremder oder
+  unbekannter ID), `error` (`null` bzw. `{error, message, details}` wie bei der einzelnen Route,
+  z. B. `version_conflict`) und `replayed` (dieselbe `client_ref` war schon angekommen), dazu
+  `summary` (`total`, `applied`, `unchanged`, `errors`). Ungültige Felder (Meldung nennt den
+  Eintrag), mehr als 50 Geräte oder ein Gerät doppelt: 400, bevor etwas geändert wird. Die
+  Benachrichtigung „Log“ kommt als EINE Sammelmail je Empfänger.
 
 | Fall                                                                              | Antwort                |
 | --------------------------------------------------------------------------------- | ---------------------- |
@@ -1412,7 +1429,10 @@ Gemessen (31.10.2026, lokal): Der vollständige Lauf hat 1405 Browser-Tests in 2
 Profile), also rund 176 je Teil. Ein Push mit Änderungen nur an einer Testdatei (z. B.
 `userLayout.spec.ts`, 60 Tests) läuft in einem Teil statt in acht; ein Push nur mit PHP-Code ohne
 Auslieferung (`src/Http/`) ganz ohne Browser-Tests, einer nur mit Frontend-Code ohne PHP-Tests.
-Laufzeiten in GitHub Actions: werden nach den ersten Läufen mit dem neuen Workflow ergänzt.
+Laufzeiten in GitHub Actions (vollständiger Lauf, 31.10.2026): insgesamt 5:50 min; Betroffene
+Bereiche 1:00, Typprüfung und Build 46 s, Lint und Vitest 1:31, PHP-Tests 1:28, Browser-Tests je
+Teil 2:22–3:41 (der längste Weg: Bereiche bzw. Build, dann der langsamste Teil), Bericht 58 s,
+deploy 11 s.
 
 Bei einem Fehler: Artefakt `playwright-report` herunterladen, entpacken und mit
 `npx playwright show-report <ordner>` öffnen (Traces der gescheiterten Tests sind darin); die

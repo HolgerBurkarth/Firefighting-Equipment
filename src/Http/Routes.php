@@ -24,6 +24,8 @@ use FirefightingEquipment\Api\V1\Auth\SessionDeleteHandler;
 use FirefightingEquipment\Api\V1\Auth\SessionListHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceAction;
 use FirefightingEquipment\Api\V1\Devices\DeviceActionHandler;
+use FirefightingEquipment\Api\V1\Devices\DeviceBulkAction;
+use FirefightingEquipment\Api\V1\Devices\DeviceBulkHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceEventListHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceExportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceHistoryExportHandler;
@@ -162,6 +164,8 @@ final class Routes
             ->add('GET', 'api/v1/devices/import/values', Access::Admin, new DeviceImportTemplateHandler(validValues: true, clock: $clock))
             ->add('POST', 'api/v1/devices/import/preview', Access::Admin, new DeviceImportHandler(apply: false, clock: $clock), DeviceImportHandler::MAX_BODY_BYTES)
             ->add('POST', 'api/v1/devices/import', Access::Admin, new DeviceImportHandler(apply: true, clock: $clock), DeviceImportHandler::MAX_BODY_BYTES)
+            ->add('POST', 'api/v1/devices/bulk/inspection-due', Access::Admin, new DeviceBulkHandler(DeviceBulkAction::InspectionDue))
+            ->add('POST', 'api/v1/devices/bulk/state', Access::Admin, new DeviceBulkHandler(DeviceBulkAction::State))
             ->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceActionHandler(DeviceAction::Show))
             ->add('POST', 'api/v1/devices/{id}/fields', Access::Admin, new DeviceActionHandler(DeviceAction::UpdateFields))
             ->add('POST', 'api/v1/devices/{id}/inspection-due', Access::Admin, new DeviceActionHandler(DeviceAction::SetInspectionDue))

@@ -111,6 +111,38 @@ export class AdminDeviceList {
         };
     }
 
+    /**
+     * Alle Geräte des angezeigten Filters (für „Alle auswählen“ der Sammelaktionen), in Blöcken zu
+     * 200 nacheinander; doppelte IDs entfernt. Die angezeigte Liste bleibt unverändert.
+     */
+    async all(): Promise<ApiResult<readonly DeviceListItem[]>> {
+        const filter = this.current.value.filter;
+        const devices = new Map<number, DeviceListItem>();
+        let total = 0;
+        do {
+            if (filter === null) {
+                break;
+            }
+            const result = await this.fetchPage({
+                ...deviceListParams(filter),
+                limit: DEVICE_PAGE_LIMIT,
+                offset: devices.size,
+            });
+            if (!result.ok) {
+                return result;
+            }
+            const before = devices.size;
+            for (const device of result.data.devices) {
+                devices.set(device.id, device);
+            }
+            total = result.data.total;
+            if (devices.size === before) {
+                break;
+            }
+        } while (devices.size < total);
+        return { ok: true, status: 200, data: [...devices.values()] };
+    }
+
     clear(): void {
         this.generation += 1;
         this.refresher.reset();

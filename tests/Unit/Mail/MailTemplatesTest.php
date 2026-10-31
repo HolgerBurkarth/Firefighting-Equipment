@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Tests\Unit\Mail;
 
 use FirefightingEquipment\Device\Device;
+use FirefightingEquipment\Device\DeviceDate;
 use FirefightingEquipment\Device\DeviceEvent;
 use FirefightingEquipment\Device\DeviceEventLocation;
 use FirefightingEquipment\Device\DeviceEventType;
@@ -337,6 +338,35 @@ angelegt.", $mail->text);
         self::assertStringContainsString("\nStatus: einsatzbereit → defekt\n\nSie erhalten diese E-Mail", $withoutLink->text);
         self::assertStringNotContainsString('http', $withoutLink->text);
         self::assertTextRules($withoutLink);
+    }
+
+    public function testDeviceBulkLogListsEveryDevice(): void
+    {
+        $at = new \DateTimeImmutable('2026-07-01 08:30:00', new \DateTimeZone('UTC'));
+        $second = new Device(6, DeviceIdentifier::fromString('MA-02'), 2, 'Atemschutzmaske', 3, 'Lager', null, DeviceStatus::Ready, null, null, null, null, null, null, 2, $at, $at);
+        $changes = [
+            [self::device(), [self::event(DeviceEventType::StateChanged, $at, fromStatus: DeviceStatus::Ready, toStatus: DeviceStatus::Maintenance, comment: 'Prüfung')]],
+            [$second, [self::event(DeviceEventType::StateChanged, $at, fromStatus: DeviceStatus::Defective, toStatus: DeviceStatus::Maintenance, comment: 'Prüfung')]],
+        ];
+
+        $mail = MailTemplates::deviceBulkLog(self::user(), self::tenant(), $changes, self::URL);
+
+        self::assertSame('Log Feuerwehr Immendingen: 2 Geräte – Status in Wartung', $mail->subject);
+        self::assertStringContainsString(
+            "Vorgang: Sammelaktion (Status in Wartung)\nGeräte: 2\nWer: Kommandant\nWann: 01.07.2026 um 10:30 Uhr\nKommentar: Prüfung\n\n"
+            . "Einzelheiten:\n\nMA-01 (Atemschutzmaske)\n  Status: einsatzbereit → in Wartung\nMA-02 (Atemschutzmaske)\n  Status: defekt → in Wartung\n",
+            $mail->text,
+        );
+        self::assertTextRules($mail, self::URL);
+
+        $mixed = [$changes[0], [$second, [self::event(DeviceEventType::StateChanged, $at, fromStatus: DeviceStatus::Ready, toStatus: DeviceStatus::Defective)]]];
+        self::assertSame('Log Feuerwehr Immendingen: 2 Geräte – Status geändert', MailTemplates::deviceBulkLog(self::user(), self::tenant(), $mixed, null)->subject);
+        $due = new DeviceEvent(1, DeviceEventType::DueChanged, 9, 'Kommandant', null, null, null, null, null, DeviceDate::fromString('2027-03-01', 'Datum'), null, null, null, null, $at);
+        $dueMail = MailTemplates::deviceBulkLog(self::user(), self::tenant(), [[self::device(), [$due]], [$second, [$due]]], null);
+        self::assertSame('Log Feuerwehr Immendingen: 2 Geräte – Prüfdatum geändert', $dueMail->subject);
+        self::assertStringContainsString("MA-02 (Atemschutzmaske)\n  Nächste Prüfung: – → 01.03.2027\n", $dueMail->text);
+        self::assertStringNotContainsString('Kommentar:', $dueMail->text);
+        self::assertTextRules($dueMail);
     }
 
     public function testDeviceLogNeedsEvents(): void

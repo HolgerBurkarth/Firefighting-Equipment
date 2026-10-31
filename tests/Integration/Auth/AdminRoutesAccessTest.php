@@ -57,6 +57,8 @@ MA-01;defekt
         yield 'Prüfdatum setzen' => ['POST', 'devices/{device}/inspection-due', ['version' => 1, 'next_inspection_due' => '2027-03-01']];
         yield 'Gerät aussondern' => ['POST', 'devices/{device}/retire', ['version' => 1]];
         yield 'Gerät wieder aufnehmen' => ['POST', 'devices/{retired}/reinstate', ['version' => 1, 'status' => 'ready']];
+        yield 'Sammelaktion Prüfdatum' => ['POST', 'devices/bulk/inspection-due', ['devices' => [['id' => '{device}', 'version' => 1, 'next_inspection_due' => '2027-03-01']]]];
+        yield 'Sammelaktion Umbuchen' => ['POST', 'devices/bulk/state', ['devices' => [['id' => '{device}', 'version' => 1, 'location_id' => '{location}']]]];
         yield 'Import-Vorlage' => ['GET', 'devices/import/template', null];
         yield 'Gültige Werte des Imports' => ['GET', 'devices/import/values', null];
         yield 'Import prüfen' => ['POST', 'devices/import/preview', ['file' => '{import_file}']];
@@ -101,8 +103,12 @@ MA-01;defekt
         if ($method === 'DELETE' && $path === 'tenant/logo') {
             new TenantAppearanceRepository($this->pdo())->saveLogo($this->tenant('immendingen'), LogoRenderer::fromUpload(TestPng::create()), $admin);
         }
-        // Platzhalter als ganzer Wert im Body werden zur ID (echte JSON-Ganzzahl).
-        $body = $body === null ? null : array_map(static fn (mixed $v): mixed => is_string($v) ? ($placeholders[$v] ?? $v) : $v, $body);
+        // Platzhalter als ganzer Wert im Body werden zur ID (echte JSON-Ganzzahl), auch in Listen.
+        if ($body !== null) {
+            array_walk_recursive($body, static function (mixed &$v) use ($placeholders): void {
+                $v = is_string($v) ? ($placeholders[$v] ?? $v) : $v;
+            });
+        }
         $url = self::url('immendingen', $path);
         $before = $this->snapshot();
 

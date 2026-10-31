@@ -92,6 +92,48 @@ final readonly class DeviceLogNotifier
     }
 
     /**
+     * Sammelaktion der Geräteliste (POST devices/bulk/…): EINE Mail je Empfänger mit allen geänderten
+     * Geräten; ein einzelnes geändertes Gerät wie deviceChanged().
+     *
+     * @param list<array{Device, list<int>}> $changes je geändertem Gerät die IDs seiner Ereignisse
+     *
+     * @return int Anzahl übergebener Mails
+     */
+    public function bulkChanged(Tenant $tenant, User $actor, array $changes): int
+    {
+        $changes = array_values(array_filter($changes, static fn (array $change): bool => $change[1] !== []));
+        if ($changes === []) {
+            return 0;
+        }
+        if (count($changes) === 1) {
+            return $this->deviceChanged($tenant, $actor, $changes[0][0], $changes[0][1]);
+        }
+        try {
+            $entries = [];
+            foreach ($changes as [$device, $eventIds]) {
+                $events = $this->events->findForDevice($tenant, $device->id, $eventIds);
+                if ($events !== []) {
+                    $entries[] = [$device, $events];
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->errors->report('mail_failed (' . self::PURPOSE . ')', $e);
+
+            return 0;
+        }
+        if ($entries === []) {
+            return 0;
+        }
+        $url = $this->urls->devices($tenant);
+
+        return $this->send(
+            $tenant,
+            $actor,
+            static fn (User $recipient): MailMessage => MailTemplates::deviceBulkLog($recipient, $tenant, $entries, self::linkFor($recipient, $url)),
+        );
+    }
+
+    /**
      * Hinweis zu einer Offline-Buchung (ersetzt für diese Anfrage die Mail zum Vorgang, damit es nur
      * eine Mail gibt). Der Kommentar steht im Eintrag der Historie.
      *

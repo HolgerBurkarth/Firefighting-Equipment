@@ -384,6 +384,65 @@ final class MailTemplates
     }
 
     /**
+     * Benachrichtigung „Log“ für eine Sammelaktion der Geräteliste (Prüfdatum bzw. Umbuchen und
+     * Status mehrerer Geräte in einer Anfrage): eine Mail mit allen geänderten Geräten, je Gerät
+     * Kennung und Typ, darunter eingerückt Von/Nach. Betreff „Log <Stadt>: 12 Geräte – <Grund>“.
+     * Die Zahl der Geräte begrenzt der Endpunkt (DeviceBulkHandler::MAX_DEVICES).
+     *
+     * @param non-empty-list<array{Device, non-empty-list<DeviceEvent>}> $changes in der Reihenfolge der Anfrage
+     * @param string|null                                               $url     Geräteliste (AppUrls::devices), null = ohne Link
+     *
+     * @throws MailException
+     */
+    public static function deviceBulkLog(User $recipient, Tenant $tenant, array $changes, ?string $url): MailMessage
+    {
+        $first = $changes[0][1][0];
+        $events = array_merge(...array_map(static fn (array $change): array => $change[1], $changes));
+        $reason = self::bulkReason($events);
+        $greeting = self::greeting($recipient);
+        $area = self::area($tenant);
+        $lines = [
+            'Vorgang: Sammelaktion (' . $reason . ')',
+            'Geräte: ' . count($changes),
+            'Wer: ' . $first->userName,
+            'Wann: ' . self::when($first->createdAt),
+        ];
+        if ($first->comment !== null) {
+            $lines[] = 'Kommentar: ' . self::logValue($first->comment);
+        }
+        $details = implode("\n", $lines);
+
+        $deviceLines = [];
+        foreach ($changes as [$device, $deviceEvents]) {
+            $deviceLines[] = self::logValue($device->identifier->value) . ' (' . $device->deviceTypeName . ')';
+            foreach ($deviceEvents as $event) {
+                foreach (self::deviceLogDetails($event) as $line) {
+                    $deviceLines[] = '  ' . $line;
+                }
+            }
+        }
+        $deviceText = implode("\n", $deviceLines);
+        $link = self::logLink('Zur Geräteliste in der Anwendung:', $url);
+        $footer = self::deviceLogFooter();
+        $text = <<<TXT
+            {$greeting}
+
+            bei der Feuerwehr Geräteverwaltung ({$area})
+            wurde eine Sammelaktion protokolliert:
+
+            {$details}
+
+            Einzelheiten:
+
+            {$deviceText}
+
+            {$link}{$footer}
+            TXT;
+
+        return self::message($recipient, self::logSubject($tenant, sprintf('%d Geräte – %s', count($changes), $reason)), $text);
+    }
+
+    /**
      * Benachrichtigung „Log“ für einen Hinweis zu einer Offline-Buchung: Art, Gerät, die Buchung
      * (Konto mit E-Mail, Aktionszeit, Eingang, Wunsch, Kommentar) und der andere Stand (bei
      * overwritten der überschriebene, sonst der Stand beim Eingang). Betreff „Log <Stadt>: Hinweis –
@@ -605,6 +664,36 @@ final class MailTemplates
         }
 
         return $events[0]->type === DeviceEventType::DueChanged ? 'Prüfdatum geändert' : 'Stammdaten geändert';
+    }
+
+    /**
+     * Grund einer Sammelaktion für Betreff und Vorgang: „Prüfdatum geändert“ bzw. „umgebucht“ und
+     * der Status („Status defekt“, bei verschiedenen Zielen „Status geändert“).
+     *
+     * @param list<DeviceEvent> $events
+     */
+    private static function bulkReason(array $events): string
+    {
+        $moved = false;
+        $statuses = [];
+        foreach ($events as $event) {
+            if ($event->type !== DeviceEventType::StateChanged) {
+                continue;
+            }
+            $moved = $moved || $event->toLocation !== null;
+            if ($event->toStatus !== null) {
+                $statuses[$event->toStatus->value] = $event->toStatus;
+            }
+        }
+        $parts = [];
+        if ($moved) {
+            $parts[] = 'umgebucht';
+        }
+        if ($statuses !== []) {
+            $parts[] = count($statuses) === 1 ? 'Status ' . array_values($statuses)[0]->label() : 'Status geändert';
+        }
+
+        return $parts === [] ? 'Prüfdatum geändert' : implode(', ', $parts);
     }
 
     /**
