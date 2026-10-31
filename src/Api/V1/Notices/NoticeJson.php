@@ -12,8 +12,8 @@ use FirefightingEquipment\Device\Notice\NoticeUser;
 
 /**
  * JSON-Darstellung eines Hinweises (nur für Admins): Art, Status, Gerät, Buchung und anderer Stand
- * mit Konten (Anzeigename und E-Mail; anonymisiert ohne E-Mail), Verlauf (älteste zuerst). Zeiten in
- * UTC, Standorte mit aktuellem Namen und Pfad.
+ * mit Konten (Anzeigename und E-Mail; anonymisiert ohne E-Mail) und Kommentar der Buchung, Verlauf
+ * (älteste zuerst). Zeiten in UTC, Standorte mit aktuellem Namen und Pfad.
  */
 final class NoticeJson
 {
@@ -45,6 +45,7 @@ final class NoticeJson
                 'location' => self::location($notice->requestedLocation),
                 'status' => $notice->requestedStatus?->value,
                 'status_label' => $notice->requestedStatus?->label(),
+                'comment' => $notice->comment,
             ],
             'other' => [
                 'user' => $notice->otherUser === null ? null : self::user($notice->otherUser),

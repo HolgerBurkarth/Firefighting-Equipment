@@ -12,6 +12,7 @@ use FirefightingEquipment\Device\DeviceStatus;
  * Buchung (Konto, Aktionszeit, gewünschter Standort und/oder Status) und der andere Stand (beim
  * Eingang der Buchung; bei overwritten der überschriebene) mit Aktionszeit und Konto. Standorte mit
  * ihrem aktuellen Namen und Pfad. $history: Verlauf (erledigt, wieder geöffnet), älteste zuerst.
+ * $comment: Kommentar der Buchung (aus ihrem Eintrag im Verlauf des Geräts).
  */
 final readonly class DeviceNotice
 {
@@ -42,6 +43,7 @@ final readonly class DeviceNotice
         public \DateTimeImmutable $createdAt,
         public \DateTimeImmutable $updatedAt,
         public array $history = [],
+        public ?string $comment = null,
     ) {
     }
 }

@@ -295,9 +295,9 @@ async function save(): Promise<void> {
     void adminDeviceList.refresh('changed');
     setBookingNotice(bookingNotice(result.data));
     saved.value = true;
-    // Zurück, woher man kam (Suchen, Prüffristen, Geräteliste oder Gerätedetail der Admin-Konsole),
-    // sonst zu „Suchen“ (Entscheidung 22).
-    await returnTo(router, ['search', 'inspections', 'devices', 'device-details']);
+    // Zurück, woher man kam (Suchen, Prüffristen, Geräteliste, Gerätedetail oder Hinweis der
+    // Admin-Konsole), sonst zu „Suchen“ (Entscheidung 22).
+    await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);
 }
 </script>
 

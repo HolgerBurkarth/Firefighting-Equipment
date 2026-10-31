@@ -114,6 +114,12 @@ onMounted(() => {
                 <span class="tile-value">{{ tiles.open.value }}</span>
                 <span class="tile-detail">{{ tiles.open.detail }}</span>
                 <RouterLink
+                    v-if="(overview.summary.openNotices ?? 0) > 0"
+                    class="tile-action"
+                    :to="{ name: 'notices' }"
+                    >Hinweise ansehen</RouterLink
+                >
+                <RouterLink
                     v-if="overview.pendingUsers > 0"
                     class="tile-action"
                     :to="{ name: 'users' }"
@@ -293,7 +299,7 @@ onMounted(() => {
     font-size: var(--font-size-md);
 }
 
-/* Link in der Kachel „Offene Hinweise“ (die Kachel selbst führt noch nirgends hin). */
+/* Links in der Kachel „Offene Hinweise“ (Protokoll bzw. Benutzer; die Kachel selbst ist kein Link). */
 .tile-action {
     display: inline-flex;
     align-items: center;

@@ -1,4 +1,4 @@
-import { apiRequest, isRecord, type ApiResult } from './client';
+import { apiDownload, apiRequest, isRecord, type ApiResult, type DownloadedFile } from './client';
 import { isId, isUtcTime, nullableString } from './devices';
 
 /** Standort in der Historie (aktueller Name und Pfad, DeviceEventJson::location). */
@@ -265,4 +265,41 @@ export function fetchDeviceEvents(
     return apiRequest(`devices/${String(id)}/events?${params.toString()}`, parseDeviceEventPage, {
         ...(fetchFn && { fetchFn }),
     });
+}
+
+/** Filter des Exports der Historie (DeviceHistoryExportHandler); Tage JJJJ-MM-TT, beide einschließlich. */
+export interface HistoryExportParams {
+    readonly from: string;
+    readonly to: string;
+    readonly deviceTypeId: number | null;
+    /** Immer mit Fächern (include_sublocations=1). */
+    readonly locationId: number | null;
+    readonly order: 'newest' | 'oldest';
+}
+
+export function historyExportSearchParams(params: HistoryExportParams): URLSearchParams {
+    const search = new URLSearchParams({ from: params.from, to: params.to });
+    if (params.deviceTypeId !== null) {
+        search.set('device_type_id', String(params.deviceTypeId));
+    }
+    if (params.locationId !== null) {
+        search.set('location_id', String(params.locationId));
+        search.set('include_sublocations', '1');
+    }
+    if (params.order !== 'newest') {
+        search.set('order', params.order);
+    }
+    return search;
+}
+
+/** GET device-events/export: Historie der Stadt als CSV (Fehler wie 409 bei zu vielen Einträgen als ApiError). */
+export function downloadHistoryExport(
+    params: HistoryExportParams,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<DownloadedFile>> {
+    return apiDownload(
+        `device-events/export?${historyExportSearchParams(params).toString()}`,
+        'historie.csv',
+        fetchFn,
+    );
 }

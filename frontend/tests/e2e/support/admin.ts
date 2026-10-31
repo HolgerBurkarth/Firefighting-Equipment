@@ -139,3 +139,44 @@ export function adminOverview(
 
 /** Leeres Dashboard für Tests, die als Admin nur auf der Startseite landen. */
 export const ADMIN_OVERVIEW = adminOverview();
+
+/**
+ * Hinweis wie NoticeJson::notice (Admin): M1 offline auf HLF 20 / G1 · defekt gebucht und damit
+ * den Stand „Lager · einsatzbereit“ des Kommandanten überschrieben.
+ */
+export function noticeJson(
+    id: number,
+    overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+    return {
+        id,
+        kind: 'overwritten',
+        kind_label: 'Anderen Stand überschrieben',
+        status: 'open',
+        status_label: 'offen',
+        stale_confirmed: false,
+        created_at: '2026-10-30T09:00:00Z',
+        updated_at: '2026-10-30T09:00:00Z',
+        device: { id: 1, identifier: 'M1', device_type: 'Atemschutzmaske' },
+        booking: {
+            client_ref: '00000000-0000-4000-8000-000000000001',
+            event_id: 40,
+            user: { id: 3, name: 'Gerätewart', email: 'geraetewart+1@example.org' },
+            occurred_at: '2026-10-30T07:15:00Z',
+            received_at: '2026-10-30T09:00:00Z',
+            location: { id: 11, name: 'G1', path: 'HLF 20 / G1' },
+            status: 'defective',
+            status_label: 'defekt',
+            comment: 'Ventil klemmt',
+        },
+        other: {
+            user: { id: 8, name: 'Kommandant', email: 'kommandant@example.org' },
+            occurred_at: '2026-10-30T06:00:00Z',
+            location: { id: 30, name: 'Lager', path: 'Lager' },
+            status: 'ready',
+            status_label: 'einsatzbereit',
+        },
+        history: [],
+        ...overrides,
+    };
+}

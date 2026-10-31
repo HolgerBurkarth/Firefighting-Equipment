@@ -336,8 +336,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
   `client.ts`; `devices.ts`, `deviceBulk.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
-  `deviceTypes.ts`, `inspections.ts`, `invitationCodes.ts`, `locations.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
-  Gerätetypen, Benutzer und das Dashboard),
+  `deviceTypes.ts`, `inspections.ts`, `invitationCodes.ts`, `locations.ts`, `notices.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
+  Gerätetypen, Benutzer, Hinweise und das Dashboard),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
@@ -469,11 +469,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (`changed`), Gerät in „Zuletzt benutzt“, Ziel (nur bei `applied`) unter die Standorte, Bestätigung
   (`setBookingNotice`, sessionStorage `ff-booking-notice`, übersteht ein Neuladen; `applied` grün
   „M1 → HLF 20 / G2 · einsatzbereit“, sonst `result.message`), dann
-  `returnTo(router, ['search', 'inspections', 'devices', 'device-details'])` (`src/router/back.ts`:
+  `returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice'])` (`src/router/back.ts`:
   ist eine der Seiten die vorige, `back()`, sonst `replace` auf die erste, also „Suchen“ nach einem
   direkt geöffneten Link). Die Seite zeigt die Bestätigung (`BookingNoticeMessage`, holt sie per
-  `takeBookingNotice`): „Suchen“ bis zur nächsten Eingabe, „Prüffristen“, die Geräteliste und das
-  Gerätedetail der Admin-Konsole bis zum Verlassen (das Gerätedetail bis zur nächsten Aktion). Für
+  `takeBookingNotice`): „Suchen“ bis zur nächsten Eingabe, „Prüffristen“, die Geräteliste, das
+  Gerätedetail und der Hinweis des Protokolls in der Admin-Konsole bis zum Verlassen (Gerätedetail
+  und Hinweis bis zur nächsten Aktion). Für
   Admins zusätzlich der Link „Gerätedetail (Admin)“ unter „Details und Verlauf“. Nach jeder Buchung `locationStore.refresh('changed')` und
   `adminDeviceList.refresh('changed')` (nur, wenn die Geräteliste schon geladen ist)
   (Gerätezahlen). Browser-Tests mit der
@@ -569,8 +570,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   einsatzbereit“ („… und N weitere“) und „Letzte Aktivitäten“ (Zeit, Kennung, Art, Wer, Zeilen aus
   `eventLines`, Kommentar; nicht übernommene abgesetzt); Geräte öffnen das Gerätedetail.
   Einsatzbereitschaft führt zu `geraete`, nicht einsatzbereit und „… und N weitere“ zu
-  `geraete?status=maintenance,defective`; in der Kachel „Offene Hinweise“ führt „Freischaltungen
-  ansehen“ (nur mit wartenden) zu `benutzer`, die Hinweise später zum Protokoll.
+  `geraete?status=maintenance,defective`; in der Kachel „Offene Hinweise“ führen „Hinweise ansehen“
+  (nur mit offenen) zu `protokoll` und „Freischaltungen ansehen“ (nur mit wartenden) zu `benutzer`.
   Browser-Tests, die als Admin auf
   dem Dashboard landen, simulieren dessen Abfragen mit `ADMIN_OVERVIEW` (`tests/e2e/support/admin.ts`,
   dort auch `adminOverview`, `summaryJson`, `userJson`, `tenantEventJson`); Tests in
@@ -797,6 +798,41 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Vorschau vorhanden oder Kommentar. Logik in `src/data/deviceImport.ts`. Browser-Tests
   `tests/e2e/deviceImport.spec.ts` (Datei über das Ereignis `filechooser`, Vorschau-Server mit Liste
   von Antworten je Aufruf); Unit-Tests `deviceImport.spec.ts`, `router.spec.ts`.
+- Protokoll der Admin-Konsole (`NoticesPage`, `protokoll`, Route `notices`; `NoticePage`,
+  `protokoll/<id>`, Route `notice`, Ziel der Hinweis-Mails `AppUrls::notice`; nur `admin`,
+  `layout: 'admin'`, Menü „Protokoll“ mit Zähler `openNotices` und `sections: ['notice']`; KONZEPT.md
+  "Hinweise für Admins"; API siehe "Hinweise (API)" und "CSV-Export (API)"): Reka UI `Tabs` wie bei
+  den Benutzern (Stile `.tabs`, `.tab`, `.tab-panel` in `base.css`), Reiter „Hinweise“ (Zahl der
+  offenen) und „Verlauf exportieren“ (`protokoll?ansicht=export`, `HistoryExportPanel`, Inhalt bleibt
+  beim Wechsel). Store `noticeList` (`NoticeList`, `src/data/noticeList.ts`, in `installDataLayer`):
+  `GET notices` mit Filter `open`/`resolved`/`all` (in der Adresse `status=erledigt`/`alle`, ohne =
+  offen; `noticeFilterFromQuery`), Seiten zu `NOTICE_PAGE_SIZE` (50) mit „Weitere laden“ wie
+  `adminDeviceList`, Auffrischen so viele wie geladen (höchstens 200). Je Hinweis eine Karte (Link):
+  `kind_label`, Status, Gerät, „Buchung: <Stand> · von <Name> · <Zeit>“ und „Überschriebener Stand“
+  bzw. „Stand beim Eingang“ (`otherStateHeading`, `stateText` in `src/data/notices.ts`). Der Hinweis
+  (zuerst aus der Liste, dann `loadNotice` = `GET notices/{id}`; 404 „Diesen Hinweis gibt es
+  nicht.“): Überschrift `kind_label` mit Status, Gerät (Link zum Gerätedetail), Erklärung je Art
+  (`noticeExplanation`, bei `stale_confirmed` zusätzlich der Satz zur Rückfrage), Karten „Buchung“
+  (Konto mit E-Mail, Erfasst, Eingang, gewünschter Standort/Status, Kommentar), anderer Stand und
+  „Gerät jetzt“ (`deviceStore.fetchCurrent`, „Umbuchen / Status ändern“ auf `geraete/<id>`, danach
+  zurück mit Bestätigung; ausgesondert nur ein Hinweis). „Rückfrage per E-Mail“ je Konto mit E-Mail
+  (`inquiryMailLink`: `mailto:` mit Betreff „Rückfrage zu Ihrer Buchung von <Typ> <Kennung>“ und
+  Anfang des Textes mit Zeit und Stand; ohne E-Mail kein Link). „Erledigen …“ (`FormDialog`, Notiz
+  freiwillig, mehrzeilig: `noticeNote` wie `DeviceText::noticeNote`, andere Steuerzeichen werden
+  Leerzeichen, höchstens 500 Zeichen per `noticeNoteProblem`; leer = `{}`) bzw. „Wieder öffnen“
+  (sofort), über `resolveNotice`/`reopenNotice` (`src/data/index.ts`; danach `noticeList` und, wenn
+  geladen, `adminOverview` neu); darunter „Verlauf des Hinweises“ (Aktion, Zeit, Konto, Notiz).
+  „Verlauf exportieren“: Schnellwahl „Letzte 30/90/365 Tage“ (`aria-pressed`), „Von“ und „Bis
+  (einschließlich)“ (`<input type="date">`, Standard die letzten 90 Tage bis heute wie der Server;
+  Prüfung `historyExportProblems`: leer, ungültig, Ende vor Beginn, mehr als
+  `HISTORY_EXPORT_MAX_DAYS` = 366; `HISTORY_EXPORT_DEFAULT_DAYS` und `MAX_DAYS` per Test gleich PHP),
+  `AppSelect` „Gerätetyp“ und „Standort (mit Fächern)“ (aus `deviceTypeStore` bzw.
+  `adminLocationStore`, mit deaktivierten/gesperrten), Reihenfolge als Radiogruppe; Download
+  `downloadHistoryExport` (`src/api/deviceEvents.ts`, `apiDownload`, Standort immer mit
+  `include_sublocations=1`, `order` nur bei `oldest`) und `saveDownload`; 409 (zu viele Einträge) und
+  andere Fehler als `ErrorNotice` mit der Meldung des Servers. Browser-Tests
+  `tests/e2e/notices.spec.ts` (zustandsbehafteter Server je Test über `delegate`, `noticeJson` in
+  `tests/e2e/support/admin.ts`); Unit-Tests `notices.spec.ts`, `router.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
@@ -836,9 +872,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Vitest, gleicht auch `ALPHABET`, `LENGTH`, `MAX_INPUT_LENGTH` ab); Änderungen an
   `InvitationCodeValue` daher immer mit dem Frontend und neuen Fällen. Seiten der Mail-Links
   (`AppUrls::*_PAGE`, auch `geraete/<id>/details` und `protokoll/<id>`) muss es im Router geben
-  (`appUrlsPages.spec.ts`). `protokoll` und `protokoll/<id>` (Routen `notices`, `notice`) leiten
-  vorerst auf `dashboard` weiter (Zähler der offenen Hinweise), bis die Seite Protokoll kommt
-  (Admin-Konsole, Schritt 12); Tests in `router.spec.ts` und `adminConsole.spec.ts`. `email-bestaetigen` sendet
+  (`appUrlsPages.spec.ts`). `email-bestaetigen` sendet
   das Token erst per Knopf (Virenscanner öffnen Links vorab).
 - `einladung-annehmen` (`InvitationAcceptPage`, neue Admins): Name und Passwort (Live-Prüfung mit
   Name und Stadt, die E-Mail kennt nur der Server); danach keine Sitzung, sondern Anmeldung mit
@@ -1926,6 +1960,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   höchstens 500 Zeichen, Zeilenumbrüche erlaubt, `DeviceText::noticeNote`), `POST notices/{id}/reopen
   {}`; Antwort `{"notice": …}`. Beide wiederholbar (Ziel-Status schon erreicht: nichts, kein Eintrag
   im Verlauf). Fremd/unbekannt 404, unbekannte Felder 400 (vor 404). Kein automatisches Erledigen.
+  `booking.comment` = Kommentar der Buchung (aus `fe_device_events` über `event_id`, sonst `null`).
 - Code: `src/Device/Notice/` (`NoticeKind` mit `forResult`, `NoticeStatus`, `NoticeChange`,
   `DeviceNotice`, `NewNotice`, `NoticeUser`, `NoticeHistoryEntry`, `DeviceNoticePage`,
   `DeviceNoticeRepository`, `NoticeNotFoundException`), Endpunkte `src/Api/V1/Notices/`

@@ -41,7 +41,13 @@ final class DeviceNoticeTest extends DeviceApiTestCase
         $this->moveOnline($id, ['version' => 1, 'status' => 'defective']);
         $this->setStateChangedAt($id, '-3 hours');
 
-        $json = $this->offline($id, ['version' => 1, 'location_id' => $this->room, 'status' => 'maintenance', 'occurred_at' => $this->at('-1 hour')]);
+        $json = $this->offline($id, [
+            'version' => 1,
+            'location_id' => $this->room,
+            'status' => 'maintenance',
+            'occurred_at' => $this->at('-1 hour'),
+            'comment' => 'Ventil klemmt',
+        ]);
         $noticeId = $json['result']['notice_id'];
         self::assertIsInt($noticeId);
 
@@ -59,6 +65,7 @@ final class DeviceNoticeTest extends DeviceApiTestCase
             'location' => ['id' => $this->room, 'name' => 'Lager', 'path' => 'Lager'],
             'status' => 'maintenance',
             'status_label' => 'in Wartung',
+            'comment' => 'Ventil klemmt',
         ], $notice['booking']);
         self::assertSame([
             'user' => ['id' => $this->adminId, 'name' => 'Kommandant', 'email' => 'admin@example.org'],
@@ -109,7 +116,9 @@ final class DeviceNoticeTest extends DeviceApiTestCase
         self::assertSame(5, $this->countRows('fe_device_notices'));
 
         $retiredNotice = $this->notice($kinds['not_applied_retired']['result']['notice_id']);
-        self::assertSame(['retired', null, 'defective'], [$retiredNotice['other']['status'], $retiredNotice['booking']['location'], $retiredNotice['booking']['status']]);
+        self::assertSame(['retired', null, 'defective', null], [
+            $retiredNotice['other']['status'], $retiredNotice['booking']['location'], $retiredNotice['booking']['status'], $retiredNotice['booking']['comment'],
+        ]);
     }
 
     public function testResolveAndReopenKeepHistory(): void

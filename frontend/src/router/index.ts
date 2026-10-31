@@ -170,14 +170,20 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             component: () => import('../pages/UsersPage.vue'),
             meta: { roles: ['admin'], layout: 'admin' },
         });
-        // Ziele der Mail-Links AppUrls::notice: Bis die Seite Protokoll kommt (Admin-Konsole,
-        // Schritt 12), führen sie auf das Dashboard mit dem Zähler der offenen Hinweise, statt auf
-        // „Seite nicht gefunden“.
-        routes.push({ path: '/protokoll', name: 'notices', redirect: { name: 'dashboard' } });
         routes.push({
+            // Protokoll: Hinweise zu Offline-Buchungen und Export des Verlaufs (KONZEPT.md,
+            // "Hinweise für Admins"); Reiter und Filter in der Adresse.
+            path: '/protokoll',
+            name: 'notices',
+            component: () => import('../pages/NoticesPage.vue'),
+            meta: { roles: ['admin'], layout: 'admin' },
+        });
+        routes.push({
+            // Ein Hinweis (Ziel der Hinweis-Mails, AppUrls::notice).
             path: '/protokoll/:id([1-9]\\d{0,17})',
             name: 'notice',
-            redirect: { name: 'dashboard' },
+            component: () => import('../pages/NoticePage.vue'),
+            meta: { roles: ['admin'], layout: 'admin' },
         });
     }
     routes.push({

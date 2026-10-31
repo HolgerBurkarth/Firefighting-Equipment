@@ -47,7 +47,7 @@ export function isCount(value: unknown): value is number {
     return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
-function isStatus(value: unknown): value is DeviceStatus {
+export function isStatus(value: unknown): value is DeviceStatus {
     return typeof value === 'string' && (STATUSES as readonly string[]).includes(value);
 }
 

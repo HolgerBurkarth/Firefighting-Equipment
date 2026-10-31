@@ -54,8 +54,13 @@ function localDate(time: Date): string {
 
 /** Zeitpunkt im Verlauf: „heute 14:02“, „gestern 18:30“, sonst „12.10.2026, 09:15“. */
 export function eventTimeText(utc: string, now: Date = new Date()): string {
+    return recentDayText(new Date(utc), now) ?? dateTimeText(utc);
+}
+
+/** Zeitpunkt immer mit Datum: „12.10.2026, 09:15“ (z. B. in einer Mail, die später gelesen wird). */
+export function dateTimeText(utc: string): string {
     const time = new Date(utc);
-    return recentDayText(time, now) ?? `${localDate(time)}, ${clockText(time)}`;
+    return `${localDate(time)}, ${clockText(time)}`;
 }
 
 /** Kalenderdatum des Servers `JJJJ-MM-TT` als `TT.MM.JJJJ` (ohne Zeitzone). */

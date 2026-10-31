@@ -718,7 +718,7 @@ gesperrt), alte Buchung nach Rückfrage. Hinweise werden nie automatisch erledig
 - Ein Hinweis enthält `kind` mit `kind_label`, `status` (`open`/`resolved`, „offen“/„erledigt“),
   `stale_confirmed`, `device` (`id`, `identifier`, `device_type`), `booking` (Konto mit Anzeigename
   und E-Mail, `occurred_at` = Aktionszeit, `received_at` = Eingang, gewünschter `location`/`status`,
-  `client_ref`, `event_id`) und `other` (der andere Stand: Konto, Aktionszeit, Standort, Status; bei
+  `comment` der Buchung, `client_ref`, `event_id`) und `other` (der andere Stand: Konto, Aktionszeit, Standort, Status; bei
   „überschrieben“ der überschriebene, sonst der Stand beim Eingang) sowie `history` (Verlauf:
   `action` `resolve`/`reopen`, Konto, Zeitpunkt, Notiz). Gelöschte Konten erscheinen als
   „Gelöschter Benutzer #ID“ ohne E-Mail.
