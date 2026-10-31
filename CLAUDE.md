@@ -10,9 +10,17 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - In kleinen Schritten arbeiten. Vor größeren Änderungen erst einen Plan vorlegen.
 - Wünsche für später stehen in `docs/TODO-SPAETER.md`; nicht vorziehen, neue Wünsche dort ergänzen.
 - Bestehende Funktionen dürfen nicht kaputtgehen: Jede Änderung bekommt Tests, vor jedem Commit
-  müssen die Prüfungen der folgenden Regel grün sein; den vollständigen Lauf macht CI, deployt wird
-  nur nach grünem CI-Lauf.
-- Agenten committen und pushen nie; das macht der Nutzer.
+  müssen die Prüfungen von "Prüfen vor „✅ FERTIG“" grün sein. CI prüft je Push nur die betroffenen
+  Bereiche, nachts alles (siehe "GitHub Actions (CI)"); deployt wird nur nach grünem CI-Lauf.
+- Commits (seit 31.10.2026): Nach „✅ FERTIG“ committet der Agent selbst, ein Commit je Schritt mit
+  allen Dateien des Schritts, Betreff wie in der Meldung genannt, mit der üblichen Attribution
+  (`Co-Authored-By`). Vorher immer `git status` prüfen: keine fremden, temporären oder nicht zum
+  Schritt gehörenden Dateien (Testausgaben, Notizen, Konfiguration mit Zugangsdaten). Pushen tut nur
+  der Nutzer, gesammelt (mehrere Commits); Agenten pushen nie und ändern keine schon gepushten
+  Commits.
+- Muss ein Schritt vor dem nächsten unbedingt live geprüft werden oder durch CI laufen (z. B. neue
+  Abläufe auf dem Server, Migrationen, Änderungen am Workflow), sagt die „✅ FERTIG“-Meldung das
+  ausdrücklich.
 - Während Prüfläufe laufen (z. B. mehrere Testläufe im Hintergrund), keine Testdateien und keinen
   getesteten Code ändern oder anlegen: Die Läufe lesen sie neu ein, das Ergebnis wäre verfälscht.
   Erst nach dem Ende weiterarbeiten.
@@ -21,10 +29,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Code und Bezeichner auf Englisch, Dokumentation und Oberflächentexte auf Deutsch.
 - Jede Änderung an der REST-API (auch neue Felder) kommt zusätzlich in `docs/UEBERGABE-BACKEND.md`
   (Datum, Commit-Betreff, was und warum, Tests), damit der Backend-Chat sie kennt. Als Betreff trägt
-  der Agent gleich den Commit-Betreff ein, den er in der „✅ FERTIG“-Nachricht vorschlägt (nicht
-  „noch nicht committet“); der Nutzer verwendet ihn.
-- Prüfen vor „✅ FERTIG“ (lokal nur das Nötige, den vollständigen Lauf aller Tests in allen fünf
-  Profilen macht CI, siehe "GitHub Actions (CI)"):
+  der Agent den Betreff seines Commits ein (nicht „noch nicht committet“).
+- Prüfen vor „✅ FERTIG“ (lokal nur das Nötige; alle Tests in allen fünf Profilen prüft der
+  nächtliche Lauf der CI, siehe "GitHub Actions (CI)"):
   - Frontend geändert: in `frontend/` `npm run lint`, `npm run typecheck`, `npm run test:unit` und
     die betroffenen Browser-Testdateien in Chromium und WebKit (`npm run build`, dann
     `npm run test:e2e -- tests/e2e/<datei>.spec.ts`; betroffen sind die Dateien der geänderten
@@ -33,10 +40,15 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     Service Worker), diese Dateien zusätzlich in allen fünf Profilen (`npm run test:e2e:all --
     tests/e2e/<datei>.spec.ts`, auch Firefox und Handy-Breite). Tests, deren Erwartung von der
     Breite abhängt, setzen sie ausdrücklich (`page.setViewportSize`).
-  - PHP geändert (`src/`, `bin/`, `tests/`, `migrations/`, `resources/`, `scripts/`, `composer.*`):
-    `composer test`. Sonst nicht nötig; Ausnahme: Wer die Regeln für Stadt-Kürzel in README oder
-    CLAUDE.md ändert, lässt `composer test -- --filter SlugRulesDocumentationTest` laufen (CI läuft
-    bei reinen `.md`-Änderungen nicht).
+  - `composer test` NUR, wenn PHP-Code (`src/`, PHP-Tests in `tests/`, `public/`, `resources/`,
+    die per PHPUnit geprüften `scripts/`), Migrationen, `bin/`, `composer.*`, Vorlagen der
+    Konfiguration (`config/`) oder gemeinsame Fixtures (`tests/Fixtures/*.json`) geändert wurden.
+    Sonst nicht; Ausnahmen mit Filter: Dateien des Frontends, die PHP-Tests abgleichen
+    (`frontend/index.html`, `frontend/build/appBase.ts`, `buildInfo.ts`, `compress.ts`,
+    `frontend/src/styles/tokens.css`) → `composer test -- --filter
+    'FrontendAssetsTest|ContentEncodingTest'`; Regeln für Stadt-Kürzel in README oder CLAUDE.md →
+    `composer test -- --filter SlugRulesDocumentationTest` (CI läuft bei reinen `.md`-Änderungen
+    nicht, und `.md`-Dateien lösen die PHP-Tests der CI nie aus).
 - Kann sich ein Browser-Test je Betriebssystem anders verhalten (z. B. Kamera und Medien,
   Testattrappen mit Browser-Objekten, Dateien, Prozesse und Ports, Schriften; CI läuft unter Linux,
   lokal Windows), vor „✅ FERTIG“ zusätzlich unter Linux (WSL) laufen lassen, nur die betroffenen
@@ -49,7 +61,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     es voraussichtlich dauert und was danach kommt. Der Nutzer muss nichts tun.
   - "❓ RÜCKFRAGE – ich warte auf Ihre Antwort": Ohne Antwort geht es nicht weiter.
   - "✅ FERTIG – ich halte an": Die Aufgabe ist abgeschlossen. Dazu: Testergebnisse, was geändert
-    wurde, was der Nutzer committen soll bzw. wie er es prüft.
+    wurde, welcher Commit angelegt ist (Betreff), wie der Nutzer es prüft, ob der Schritt vor dem
+    nächsten live geprüft werden oder durch CI laufen muss, und das Ergebnis des letzten nächtlichen
+    CI-Laufs (`gh run list --workflow=ci.yml --event=schedule --limit=1`; rot → Ursache nennen und
+    zuerst untersuchen; ohne `gh` oder Anmeldung sagen, dass es nicht geprüft werden konnte).
   - "⛔ ABGEBROCHEN – Problem": Es geht nicht weiter; Ursache und Vorschlag.
   Bei lang laufenden Aktionen (Prüfläufe, Komplettläufe) vorher die erwartete Dauer nennen und eine
   feste Zeitgrenze setzen.
@@ -861,7 +876,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   ändernde Anfragen `http://localhost:5173` in `http.allowed_origins`).
 - Browser-Tests (Playwright: Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build,
   ausgeliefert von PHP (`php -q -S localhost:<port> public/index.php`), also mit echter CSP und
-  echtem Caching. Profile: in CI (`CI` gesetzt) alle fünf, aufgeteilt auf acht Jobs (`--shard`,
+  echtem Caching. Profile: in CI (`CI` gesetzt) alle fünf, aufgeteilt auf bis zu acht Jobs (`--shard`,
   Reporter `blob`, zusammengeführt mit `playwright merge-reports`; siehe "GitHub Actions (CI)"),
   lokal mit `npm test`/`npm run test:e2e` nur `chromium` und `webkit` (`LOCAL_PROJECTS` in
   `playwright.config.ts`, Reporter `list`); Firefox und die Handy-Profile prüft vor allem CI, lokal
@@ -2211,15 +2226,44 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Prüfprotokolle.
 
 ## GitHub Actions (CI)
-- Workflow `.github/workflows/ci.yml` bei jedem Push auf `main`, bei Pull Requests und von Hand
-  (`workflow_dispatch`). Standardrecht `contents: read`; nur der Job `deploy` hat `contents: write`.
+- Workflow `.github/workflows/ci.yml` bei jedem Push auf `main`, bei Pull Requests, nachts
+  (`schedule`, `17 2 * * *` UTC) und von Hand (`workflow_dispatch`). Standardrecht `contents: read`;
+  nur der Job `deploy` hat `contents: write`. Der nächtliche Lauf hat eine eigene
+  `concurrency`-Gruppe (`ci-nightly`), hält also keinen Push auf.
 - Ändert ein Push bzw. Pull Request nur `.md`-Dateien (`paths-ignore: '**/*.md'`), läuft kein
   Workflow; `deploy` bleibt dann unverändert, der nächste Lauf mit Code nimmt die Dokumentation mit.
   Tests, die `.md`-Dateien lesen (`SlugRulesDocumentationTest`), laufen daher erst mit dem nächsten
-  Code-Push (siehe "Arbeitsweise").
-- Jobs (parallel, Ziel unter 6 Minuten je Lauf): `php`, `frontend-checks` (Lint, Vitest),
-  `frontend-build` (Typprüfung und Build) und nach dem Build `e2e` (Browser-Tests in acht Teilen),
-  danach `e2e-report` (Bericht) und `deploy`.
+  Push, der die PHP-Tests auslöst, spätestens nachts (siehe "Arbeitsweise").
+- Jobs (parallel, Ziel unter 6 Minuten je Lauf): `changes` (betroffene Bereiche), `frontend-checks`
+  (Lint, Vitest) und `frontend-build` (Typprüfung und Build) immer; nach `changes` `php` und nach dem
+  Build `e2e` (Browser-Tests in bis zu acht Teilen), beide nur, wenn betroffen; danach `e2e-report`
+  (Bericht) und `deploy`.
+- Bereiche (seit 31.10.2026, Regeln NUR in `frontend/build/ciScope.ts`, Tests
+  `tests/unit/ciScope.spec.ts`): Job `changes` (ganze Historie, `npm ci`) bestimmt die Basis: Push
+  auf `main` = `git merge-base HEAD origin/deploy` (der letzte main-Stand in `deploy`; nach einem
+  roten Lauf bleibt `deploy` stehen, der nächste Push prüft dessen Änderungen mit), Pull Request =
+  seine Basis, nachts, von Hand oder ohne `deploy` = `all`. Dann `node build/ciScope.ts <basis>`
+  über `git diff --name-only --no-renames <basis> HEAD`:
+  - Alles (`EVERYTHING`): `.github/workflows/`, `playwright.config.ts`, `playwright.all.config.ts`,
+    `build/ciScope.ts`.
+  - PHP-Tests (`PHP`): `src/`, `bin/`, `migrations/`, `tests/` (auch `tests/Fixtures/`),
+    `scripts/`, `config/`, `resources/`, `public/`, `composer.*`, `phpunit.xml`, `.htaccess`,
+    `.gitattributes` und die Dateien des Frontends, die PHP-Tests abgleichen (`index.html`,
+    `build/appBase.ts`, `buildInfo.ts`, `compress.ts`, `src/styles/tokens.css`; per Test aus
+    `self::FRONTEND . '/…'` in den PHP-Tests). README/CLAUDE.md nie (siehe "Arbeitsweise").
+  - Alle Browser-Tests (`E2E_ALL`): `src/Http/`, `public/`, `composer.*`, `tests/Fixtures/*.json`
+    und alles in `frontend/` außer `tests/unit/`, `vitest.config.ts`, `eslint.config.js` und
+    Prettier (`E2E_NONE`, keine Browser-Tests) und `tests/e2e/`.
+  - Nur betroffene Testdateien: TypeScript in `frontend/tests/e2e/` (außer `globalSetup.ts`; dieses
+    und `support/update-server.php` → alle, `E2E_NOT_IMPORTED`) über `playwright test --list
+    --only-changed=<basis>`. `--only-changed` kennt nur Testdateien und was sie importieren, nicht
+    den Code der App (die Tests laden den Build); deshalb prüft jede Änderung an der App alle.
+  - Ausgaben `php`, `e2e` (`true`/`false`), `e2e_files` (Testdateien, leer = alle) und
+    `e2e_shards` (Matrix): alle Tests `E2E_SHARDS` (8) Teile, sonst `shardCount` = so viele, dass
+    ein Teil höchstens so viele Tests hat wie beim vollständigen Lauf (mindestens 1).
+- Nächtlicher Lauf: alle Jobs und alle Browser-Tests, `deploy` läuft nie (nur bei Push). Rot →
+  vor dem nächsten „✅ FERTIG“ untersuchen (siehe "Arbeitsweise"). GitHub schaltet `schedule` nach
+  60 Tagen ohne Aktivität im Repository ab (dann in den Actions wieder einschalten).
 - Job `php`: Ubuntu 24.04, PHP 8.5 mit den Erweiterungen von STRATO (ohne intl/sodium),
   Service-Container `mariadb:10.11` mit Datenbank `firefighting_test`; die Workflow-Datei schreibt
   `config/config.test.php` mit Wegwerf-Zugangsdaten nur für diesen Container (keine echten
@@ -2233,10 +2277,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Job `frontend-checks`: Node aus `frontend/.nvmrc`, `npm ci`, `npm run lint`, `npm run test:unit`.
 - Job `frontend-build`: `npm ci`, `npm run build` (mit `vue-tsc`); lädt den Build als Artefakt
   `frontend-dist` hoch. Genau dieser Build wird in `e2e` getestet und kommt nach `deploy`.
-- Job `e2e` (Matrix `shard` 1–8, `fail-fast: false`, braucht `frontend-build`): PHP (für `php -S`),
-  `composer install --no-dev`, `npm ci`, Artefakt `frontend-dist` nach `frontend/dist`, dann
-  `npm run test:e2e -- --shard=<n>/<anzahl>` (alle fünf Profile, weil `CI` gesetzt ist; Anzahl aus
-  `strategy.job-total`, mehr Teile nur über die Liste `shard`). `globalSetup` baut die zweite
+- Job `e2e` (Matrix `shard` aus `changes.outputs.e2e_shards`, `fail-fast: false`, braucht `changes`
+  und `frontend-build`, nur bei `e2e == 'true'`): PHP (für `php -S`), `composer install --no-dev`,
+  `npm ci`, Artefakt `frontend-dist` nach `frontend/dist`, dann `npm run test:e2e --
+  --shard=<n>/<anzahl> <e2e_files>` (alle fünf Profile, weil `CI` gesetzt ist; Anzahl aus
+  `strategy.job-total`, mehr Teile nur über `E2E_SHARDS`). `globalSetup` baut die zweite
   Version für die Update-Tests in jedem Teil selbst (rund 7 s). Reporter in CI `github` und `blob`
   (`playwright.config.ts`): Teilbericht als Artefakt `blob-report-<n>` (1 Tag), bei Fehlern
   zusätzlich `test-results/` als `playwright-traces-<n>` (7 Tage, Traces gescheiterter Tests:
@@ -2254,8 +2299,10 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (`_maybeDontRestoreTabs`, [microsoft/playwright#43413](https://github.com/microsoft/playwright/issues/43413),
   Playwright 1.64 mit Firefox 157, als „not planned“ geschlossen), darf EINMAL neu gestartet werden.
   Scheitert auch der neue Lauf, wird nicht noch einmal neu gestartet, sondern untersucht.
-- Job `deploy`: nur bei Push auf `main` und nur, wenn `php`, `frontend-checks`, `frontend-build`
-  und alle Teile von `e2e` grün sind; nie parallel
+- Job `deploy`: nur bei Push auf `main` und nur, wenn `changes`, `frontend-checks` und
+  `frontend-build` grün sind und `php` sowie alle Teile von `e2e` grün oder übersprungen (Bereich
+  nicht betroffen; `!cancelled()` statt der Standardbedingung, die übersprungene als Fehler wertet);
+  nie parallel
   (`concurrency: deploy-branch`). Lädt das Artefakt und ruft
   `bash scripts/publish-deploy-branch.sh <main-commit> <dist-ordner>` auf.
 - `scripts/publish-deploy-branch.sh`: baut mit eigenem temporärem Index den Baum von `main` plus den

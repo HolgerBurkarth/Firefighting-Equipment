@@ -1,10 +1,13 @@
-# Tests bei jedem Push und Pull Request; nur bei einem Push auf main und nur wenn alle Tests grün
-# sind, legt der Job "deploy" Code plus Frontend-Build im Branch "deploy" ab. Auf den Server kommt
-# der Stand weiterhin von Hand (scripts/deploy.sh).
+# Tests bei jedem Push und Pull Request; nur bei einem Push auf main und nur wenn alle nötigen Tests
+# grün sind, legt der Job "deploy" Code plus Frontend-Build im Branch "deploy" ab. Auf den Server
+# kommt der Stand weiterhin von Hand (scripts/deploy.sh).
 #
-# Ablauf (parallel, README "GitHub Actions und Branch deploy"): PHP-Tests, Lint und Vitest, Build;
-# die Browser-Tests laufen nach dem Build in acht Teilen (Matrix "shard") über alle fünf Profile
-# gegen genau diesen Build (Artefakt frontend-dist), ihre Berichte führt "e2e-report" zusammen.
+# Ablauf (README "GitHub Actions und Branch deploy"): Lint und Vitest sowie der Build laufen immer.
+# Der Job "changes" (frontend/build/ciScope.ts) bestimmt aus den geänderten Dateien seit dem letzten
+# Stand in deploy (Pull Request: seit dessen Basis), ob PHP-Tests und welche Browser-Tests nötig
+# sind; die Browser-Tests laufen nach dem Build in bis zu acht Teilen (Matrix "shard") über alle
+# fünf Profile gegen genau diesen Build (Artefakt frontend-dist), ihre Berichte führt "e2e-report"
+# zusammen. Nachts (schedule) und von Hand (workflow_dispatch) läuft alles, ohne deploy zu ändern.
 name: CI
 
 on:
@@ -15,13 +18,18 @@ on:
     paths-ignore: ['**/*.md']
   pull_request:
     paths-ignore: ['**/*.md']
+  # Vollständiger Lauf jede Nacht (UTC; nicht zur vollen Stunde, dann ist GitHub stark ausgelastet).
+  schedule:
+    - cron: '17 2 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Der nächtliche Lauf hat eine eigene Gruppe: Er soll weder einen Push aufhalten noch von einem
+  # Push abgebrochen werden.
+  group: ci-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -30,8 +38,59 @@ env:
   PHP_EXTENSIONS: pdo_mysql, mysqli, mbstring, gd, bcmath, dom, fileinfo, zip, curl, openssl
 
 jobs:
+  changes:
+    name: Betroffene Bereiche
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      php: ${{ steps.scope.outputs.php }}
+      e2e: ${{ steps.scope.outputs.e2e }}
+      e2e_files: ${{ steps.scope.outputs.e2e_files }}
+      e2e_shards: ${{ steps.scope.outputs.e2e_shards }}
+    steps:
+      # Ganze Historie samt Branch deploy, damit die Basis und --only-changed sie finden.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+
+      # Basis: Push auf main = letzter main-Stand in deploy (dessen zweiter Elternteil ist der
+      # main-Commit, also der gemeinsame Vorfahr). Nach einem roten Lauf bleibt deploy stehen, der
+      # nächste Push prüft dann auch dessen Änderungen. Pull Request = seine Basis. Nachts, von Hand
+      # oder ohne deploy: alles.
+      - name: Basis
+        id: base
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base=all
+          if [ "$EVENT" = push ] && git rev-parse --verify -q origin/deploy >/dev/null; then
+            base=$(git merge-base HEAD origin/deploy || echo all)
+          elif [ "$EVENT" = pull_request ]; then
+            base=$(git merge-base HEAD "$PR_BASE" || echo all)
+          fi
+          echo "Basis: $base"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
+      - name: Bereiche bestimmen
+        id: scope
+        working-directory: frontend
+        run: node build/ciScope.ts "${{ steps.base.outputs.base }}" >> "$GITHUB_OUTPUT"
+
   php:
     name: PHP-Tests
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
@@ -154,15 +213,17 @@ jobs:
 
   e2e:
     name: Browser-Tests (Teil ${{ matrix.shard }}/${{ strategy.job-total }})
-    needs: frontend-build
+    needs: [changes, frontend-build]
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       # Alle Teile laufen zu Ende, damit der Bericht vollständig ist.
       fail-fast: false
       matrix:
-        # Mehr Teile: nur diese Liste verlängern ("--shard" liest die Anzahl aus job-total).
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        # Anzahl aus dem Job "changes" (E2E_SHARDS in frontend/build/ciScope.ts bei allen Tests,
+        # weniger bei wenigen betroffenen); "--shard" liest sie aus job-total.
+        shard: ${{ fromJSON(needs.changes.outputs.e2e_shards) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -227,9 +288,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
+      # E2E_FILES: nur die betroffenen Testdateien (leer = alle), siehe Job "changes".
       - name: Playwright
         working-directory: frontend
-        run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          E2E_FILES: ${{ needs.changes.outputs.e2e_files }}
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} $E2E_FILES
 
       # Teilbericht (Reporter blob, playwright.config.ts) für e2e-report; Traces gescheiterter Tests
       # stecken darin und zusätzlich in test-results/.
@@ -287,8 +351,15 @@ jobs:
 
   deploy:
     name: Branch deploy aktualisieren
-    needs: [php, frontend-checks, frontend-build, e2e]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [changes, php, frontend-checks, frontend-build, e2e]
+    # Übersprungene PHP- bzw. Browser-Tests (Bereich nicht betroffen) blockieren nicht; gescheiterte
+    # oder abgebrochene schon. Nachts und von Hand nie (nur Push).
+    if: >-
+      !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.result == 'success' && needs.frontend-checks.result == 'success' &&
+      needs.frontend-build.result == 'success' &&
+      (needs.php.result == 'success' || needs.php.result == 'skipped') &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
