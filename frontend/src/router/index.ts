@@ -93,6 +93,12 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { roles: ['superadmin'], layout: 'admin' },
         });
         routes.push({
+            path: '/super-admins',
+            name: 'super-admins',
+            component: () => import('../pages/SuperAdminsPage.vue'),
+            meta: { roles: ['superadmin'], layout: 'admin' },
+        });
+        routes.push({
             path: '/einstellungen',
             name: 'settings',
             component: () => import('../pages/ServiceSettingsPage.vue'),

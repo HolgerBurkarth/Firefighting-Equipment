@@ -67,4 +67,5 @@ export const ADMIN_SETTINGS: AdminMenuEntry = {
 export const SERVICE_MENU: readonly AdminMenuEntry[] = [
     { route: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { route: 'tenants', label: 'Städte', icon: 'city', sections: ['tenant'] },
+    { route: 'super-admins', label: 'Super-Admins', icon: 'shield' },
 ];

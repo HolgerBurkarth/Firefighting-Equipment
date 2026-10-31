@@ -949,13 +949,17 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   tenants/{id}` (404 „Diese Stadt gibt es nicht.“) und `GET tenants/{id}/users` (nur ansehen, Suche
   `tenantUserRows`); „Umbenennen …“ und „Admin einladen …“ (`FormDialog`; 400 bzw. 409 `email_taken`
   am Feld; gesperrte Stadt: Knopf gesperrt), „<Name> sperren …“/„entsperren …“ mit `ConfirmDialog`;
-  eingeladene, nicht gesperrte Konten mit „Einladung erneut senden“ (`invitationText`).
+  eingeladene, nicht gesperrte Konten mit „Einladung erneut senden“ (`invitationText`). `super-admins`
+  (`SuperAdminsPage`, Route `super-admins`): Liste aus `superAdminList` (Name, E-Mail, Status mit
+  `statusText`), „<Name> sperren …“ bzw. „entsperren …“ mit `ConfirmDialog` (`setSuperAdminLocked`);
+  das eigene Konto („Sie“) und geschützte („geschützt“) ohne Knopf; 409 als Meldung, die Liste lädt
+  neu. Live-Test-Liste `docs/frontend/LIVETEST-SUPER-ADMIN.md` (schreibend nur Holger).
   `einstellungen` (`ServiceSettingsPage`, Route `settings` wie unter Städten): Anzeigemodus,
   `NotificationSetting` mit `all-tenants`, Passwort, angemeldete Geräte; kein Erscheinungsbild.
   Keine Links in eine Stadt. Browser-Tests `tests/e2e/superAdmin.spec.ts` (Hilfen `tenantJson`,
   `accountJson`, `superAdminJson`, `SERVICE_OVERVIEW` in `tests/e2e/support/service.ts`; Tests, die als
   Super-Admin auf dem Dashboard landen, simulieren dessen Abfragen damit; zustandsbehafteter Server
-  `serviceServer` über `delegate`); Unit-Tests
+  `serviceServer` bzw. `superAdminServer` über `delegate`); Unit-Tests
   `tenants.spec.ts`, `router.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
