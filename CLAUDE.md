@@ -393,8 +393,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
   `client.ts`; `appearance.ts`, `devices.ts`, `deviceBulk.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
-  `deviceTypes.ts`, `inspections.ts`, `invitationCodes.ts`, `locations.ts`, `notices.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
-  Gerätetypen, Benutzer, Hinweise und das Dashboard),
+  `deviceTypes.ts`, `inspections.ts`, `invitationCodes.ts`, `locations.ts`, `notices.ts`, `tenants.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
+  Gerätetypen, Benutzer, Hinweise und das Dashboard; unter `service` `service.ts`),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, Änderungen des Erscheinungsbilds `saveAccentColor`, `saveLogo`,
   `removeLogo` über `setTenant`, `logoImage.ts` Logo auf 512 × 512 PNG, `appBase.ts` Bereich und
@@ -607,8 +607,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Öffnen die Überschrift, danach „Anderen Standort suchen …“. Tests in
   `tests/e2e/locationPicker.spec.ts` und `tests/unit/locationSearch.spec.ts`.
 - Admin-Konsole (KONZEPT.md "Admin-Konsole – Entscheidungen", 29–38; Seiten mit `layout: 'admin'`,
-  nur `admin` unter einer Stadt; der Super-Admin hat vorerst das Platzhalter-Dashboard
-  `DashboardPage`): `App.vue` zeigt `AdminMenu` (`src/components/`) und daneben `AppNotices` (Hinweise
+  nur `admin` unter einer Stadt; den Bereich des Super-Admins siehe unten): `App.vue` zeigt `AdminMenu` (`src/components/`) und daneben `AppNotices` (Hinweise
   zu Stadt, Sitzungsprüfung und Updates, in allen Darstellungen gleich) und die Seite. Menü
   (`AdminMenuNav`, Einträge in `ADMIN_MENU`, `src/router/adminMenu.ts`, jeder Eintrag kommt mit
   seiner Seite; Symbole `AdminMenuIcon`): ab 1024 px links mit Text (240 px), 768–1023 px eingeklappt
@@ -922,6 +921,30 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `tests/e2e/settings.spec.ts` (zustandsbehafteter Server über `delegate`; Logo als SVG über
   `filechooser`, das gesendete PNG wird im Test entfiltert und geprüft); Unit-Tests
   `appearanceSettings.spec.ts`, `appearanceApi.spec.ts`, `appearance.spec.ts`, `router.spec.ts`.
+- Super-Admin unter `service` (KONZEPT.md "Super-Admin – Entscheidungen", 39–47; API siehe "Städte
+  verwalten und Admins einladen", unverändert): Seiten mit `layout: 'admin'` und `roles:
+  ['superadmin']`, nur unter `service` (unter einer Stadt „Seite nicht gefunden“). `AdminMenu`/
+  `AdminMenuNav` mit `service`: Einträge `SERVICE_MENU` (`src/router/adminMenu.ts`, jeder Eintrag
+  kommt mit seiner Seite), oben „Service“/„Super-Admin“ mit Standard-Symbol, keine Zähler, kein
+  `adminOverview`. Datenschicht `src/data/service.ts` (`installServiceDataLayer` in `main.ts` statt
+  `installDataLayer`): `ListStore` mit `Refresher` für `tenantList` (`GET tenants`) und
+  `superAdminList` (`GET superadmins`), geleert bei `onSessionEnded`; Ändern nur über die Funktionen
+  dort (danach lädt die Liste neu, abgewartet). API `src/api/tenants.ts`, Logik `src/data/tenants.ts`
+  (`slugProblem` wie `TenantSlug` in derselben Reihenfolge, `suggestSlug`, `tenantNameProblem`,
+  `emailProblem` wie `EmailAddress`, nie strenger; Konstanten per Test gleich PHP; `tenantState`
+  aktiv/„Einladung offen“/gesperrt, `tenantRows`, `serviceTiles`, `openInvitations`). Dashboard
+  (`ServiceDashboardPage`): Kacheln Städte (aktiv/gesperrt, führt zu `staedte`), offene
+  Admin-Einladungen (Summe `admins_invited`), Benutzer gesamt (Summe `users_active`); offene
+  Einladungen über `GET tenants/{id}/users?status=invited` je Stadt mit Einladungen (nur nicht
+  gesperrte, älteste zuerst) mit „Erneut senden“; darunter `TenantTable` (Name, Adresse als Text,
+  Status, Admins, Benutzer; Spaltenköpfe mit `aria-sort`, am Handy Karten mit Knöpfen „Sortieren“).
+  `staedte` (`TenantsPage`, Route `tenants`): Suche in Name und Kürzel und `TenantTable`.
+  `einstellungen` (`ServiceSettingsPage`, Route `settings` wie unter Städten): Anzeigemodus,
+  `NotificationSetting` mit `all-tenants`, Passwort, angemeldete Geräte; kein Erscheinungsbild.
+  Keine Links in eine Stadt. Browser-Tests `tests/e2e/superAdmin.spec.ts` (Hilfen `tenantJson`,
+  `accountJson`, `superAdminJson`, `SERVICE_OVERVIEW` in `tests/e2e/support/service.ts`; Tests, die als
+  Super-Admin auf dem Dashboard landen, simulieren dessen Abfragen damit); Unit-Tests
+  `tenants.spec.ts`, `router.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und

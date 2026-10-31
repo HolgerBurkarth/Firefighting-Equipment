@@ -11,7 +11,7 @@ import {
     takeLoginNotice,
 } from '../../src/auth/session';
 import { createAppRouter } from '../../src/router';
-import { ADMIN_MENU, ADMIN_SETTINGS } from '../../src/router/adminMenu';
+import { ADMIN_MENU, ADMIN_SETTINGS, SERVICE_MENU } from '../../src/router/adminMenu';
 import { parseAppBase, type AppBase } from '../../src/runtime/appBase';
 import { respond } from './support/fetch';
 import { meBody } from './support/me';
@@ -105,13 +105,13 @@ describe('Wächter', () => {
         expect((await routerAt('/geraete/07/details')).currentRoute.value.name).toBe('not-found');
     });
 
-    it('Dashboard des Admins in der Admin-Konsole, des Super-Admins ohne eigene Darstellung', async () => {
+    it('Dashboard des Admins und des Super-Admins mit Menü', async () => {
         setSession(state('admin'));
         expect((await routerAt('/dashboard')).currentRoute.value.meta.layout).toBe('admin');
         setSession(state('superadmin'));
-        expect(
-            (await routerAt('/dashboard', SERVICE)).currentRoute.value.meta.layout,
-        ).toBeUndefined();
+        expect((await routerAt('/dashboard', SERVICE)).currentRoute.value.meta.layout).toBe(
+            'admin',
+        );
     });
 
     it.each([
@@ -124,7 +124,6 @@ describe('Wächter', () => {
         ['/benutzer', 'users'],
         ['/protokoll', 'notices'],
         ['/protokoll/7', 'notice'],
-        ['/einstellungen', 'settings'],
     ] as const)('Seite %s der Admin-Konsole nur für Admins', async (path, name) => {
         setSession(state('admin'));
         const route = (await routerAt(path)).currentRoute.value;
@@ -134,6 +133,46 @@ describe('Wächter', () => {
         expect((await routerAt(path)).currentRoute.value.name).toBe('search');
         setSession(state('superadmin'));
         expect((await routerAt(path, SERVICE)).currentRoute.value.name).toBe('not-found');
+    });
+
+    it('Einstellungen unter einer Stadt für Admins, unter service für Super-Admins', async () => {
+        setSession(state('admin'));
+        const route = (await routerAt('/einstellungen')).currentRoute.value;
+        expect(route.name).toBe('settings');
+        expect(route.meta.roles).toEqual(['admin']);
+        setSession(state('user'));
+        expect((await routerAt('/einstellungen')).currentRoute.value.name).toBe('search');
+        setSession(state('superadmin'));
+        const service = (await routerAt('/einstellungen', SERVICE)).currentRoute.value;
+        expect(service.name).toBe('settings');
+        expect(service.meta.roles).toEqual(['superadmin']);
+        expect(service.meta.layout).toBe('admin');
+    });
+
+    it.each([
+        ['/staedte', 'tenants'],
+        ['/einstellungen', 'settings'],
+    ] as const)('Seite %s nur für Super-Admins unter service', async (path, name) => {
+        setSession(state('superadmin'));
+        const route = (await routerAt(path, SERVICE)).currentRoute.value;
+        expect(route.name).toBe(name);
+        expect(route.meta.layout).toBe('admin');
+        expect(route.meta.roles).toEqual(['superadmin']);
+    });
+
+    it('Seiten des Super-Admins gibt es unter einer Stadt nicht', async () => {
+        setSession(state('admin'));
+        expect((await routerAt('/staedte')).currentRoute.value.name).toBe('not-found');
+    });
+
+    it('jeder Eintrag im Menü des Super-Admins hat eine Seite unter service', async () => {
+        setSession(state('superadmin'));
+        const router = await routerAt('/dashboard', SERVICE);
+        for (const entry of [...SERVICE_MENU, ADMIN_SETTINGS]) {
+            const route = router.resolve({ name: entry.route });
+            expect(route.meta.layout, entry.route).toBe('admin');
+            expect(route.meta.roles, entry.route).toEqual(['superadmin']);
+        }
     });
 
     it('Mail-Link auf einen Hinweis ohne Sitzung: nach der Anmeldung zum Hinweis', async () => {

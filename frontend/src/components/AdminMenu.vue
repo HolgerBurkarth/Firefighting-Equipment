@@ -19,8 +19,13 @@ import AdminMenuNav from './AdminMenuNav.vue';
  * Menü der Admin-Konsole (KONZEPT.md, "Admin-Konsole – Entscheidungen", 34): ab 768 px links (am
  * Tablet eingeklappt auf Symbole, ab 1024 px mit Text), darunter eine Kopfleiste in der Stadtfarbe
  * mit ☰, das eine Schublade öffnet (Reka UI Dialog: Fokus bleibt darin, Escape schließt, danach
- * zurück auf ☰). Ein Seitenwechsel schließt die Schublade.
+ * zurück auf ☰). Ein Seitenwechsel schließt die Schublade. Unter `service` dasselbe Menü mit den
+ * Einträgen des Super-Admins (KONZEPT.md, "Super-Admin – Entscheidungen", 40).
  */
+const props = defineProps<{
+    /** Bereich des Super-Admins (`service`): eigenes Menü, keine Stadt, keine Zähler. */
+    service: boolean;
+}>();
 const drawerOpen = ref(false);
 const route = useRoute();
 
@@ -33,7 +38,9 @@ watch(
 
 // Zähler im Menü (wartende Freischaltungen, offene Hinweise) auf jeder Seite der Konsole.
 onMounted(() => {
-    void adminOverview.refresh('open');
+    if (!props.service) {
+        void adminOverview.refresh('open');
+    }
 });
 </script>
 
@@ -76,20 +83,24 @@ onMounted(() => {
                             <path d="M18 6L6 18" />
                         </svg>
                     </DialogClose>
-                    <AdminMenuNav variant="drawer" @navigate="drawerOpen = false" />
+                    <AdminMenuNav
+                        variant="drawer"
+                        :service="service"
+                        @navigate="drawerOpen = false"
+                    />
                 </DialogContent>
             </DialogPortal>
         </DialogRoot>
         <div class="topbar-text">
             <span class="topbar-title" data-testid="app-title">
-                {{ tenantState.tenant?.name ?? 'Feuerwehr' }}
+                {{ service ? 'Service' : (tenantState.tenant?.name ?? 'Feuerwehr') }}
             </span>
-            <span class="topbar-subtitle">Geräteverwaltung</span>
+            <span class="topbar-subtitle">{{ service ? 'Super-Admin' : 'Geräteverwaltung' }}</span>
         </div>
     </header>
 
     <aside class="admin-sidebar">
-        <AdminMenuNav variant="sidebar" />
+        <AdminMenuNav variant="sidebar" :service="service" />
     </aside>
 </template>
 
