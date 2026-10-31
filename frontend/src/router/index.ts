@@ -10,7 +10,12 @@ import {
 import { setUnauthorizedHandler } from '../api/client';
 import type { AuthState, UserRole } from '../api/auth';
 import { landingRoute } from '../auth/redirect';
-import { ensureSession, resetSession, setLoginNotice } from '../auth/session';
+import {
+    ensureSession,
+    onStoredSessionRejected,
+    resetSession,
+    setLoginNotice,
+} from '../auth/session';
 import type { AppBase } from '../runtime/appBase';
 
 declare module 'vue-router' {
@@ -263,7 +268,7 @@ export function createAppRouter(base: AppBase, history?: RouterHistory): Router 
     });
 
     // 401 einer geschützten Anfrage: Sitzung abgelaufen → Anmeldung, danach zurück.
-    setUnauthorizedHandler(() => {
+    const toLogin = (): void => {
         const from = router.currentRoute.value;
         resetSession();
         if (from.meta.public === true) {
@@ -271,7 +276,10 @@ export function createAppRouter(base: AppBase, history?: RouterHistory): Router 
         }
         setLoginNotice('session_expired');
         void router.push({ name: 'login', query: { weiter: from.fullPath } });
-    });
+    };
+    setUnauthorizedHandler(toLogin);
+    // Offline mit der gespeicherten Sitzung gearbeitet, dann lehnt der Server sie ab: ebenso.
+    onStoredSessionRejected(toLogin);
 
     return router;
 }

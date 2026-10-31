@@ -1,4 +1,5 @@
 import { apiUrl } from '../runtime/appBase';
+import { reportServerReached } from '../runtime/connectivity';
 
 /**
  * Vertragsnummer der API, bei jedem Aufruf als X-Client-Api gesendet. Gleich mit
@@ -105,8 +106,10 @@ export async function apiRequest<T>(
     try {
         response = await fetchFn(apiUrl(path), init);
     } catch {
+        reportServerReached(false);
         return { ok: false, error: apiError('network', null) };
     }
+    reportServerReached(true);
 
     let json: unknown;
     try {
@@ -160,8 +163,10 @@ export async function apiDownload(
             headers: { [CLIENT_API_HEADER]: String(CLIENT_API_VERSION) },
         });
     } catch {
+        reportServerReached(false);
         return { ok: false, error: apiError('network', null) };
     }
+    reportServerReached(true);
     if (!response.ok) {
         let json: unknown;
         try {

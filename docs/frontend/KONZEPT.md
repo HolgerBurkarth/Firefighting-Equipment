@@ -158,6 +158,58 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
   Warteschlange). Liegen noch Buchungen in der Warteschlange, warnt die App vorher deutlich
   (z. B. „3 Buchungen wurden noch nicht gesendet und gehen beim Abmelden verloren“).
 
+### Offline-Modus – Entscheidungen
+Geplant in der Nacht vom 31.10.2026 (Agent, ohne Rückfrage; „Vorläufig“ prüft Holger). API:
+`CLAUDE.md`, "Offline-Buchungen (API)" und `GET client-config` (fertig und live). Jeder Schritt
+lässt die App online wie bisher; Offline-Buchen gibt es erst, wenn Warteschlange und Ergebnis
+vollständig sind.
+
+48. **Schritte:** O1 Grundlage (lokale Kopie der Daten, Sitzung offline behalten, grauer Streifen,
+    Lesemodul des Scanners im Cache); O2 Warteschlange mit automatischem Senden, Ergebnis je Buchung,
+    Grenzen aus `client-config` und Rückfrage bei alten Buchungen (erst damit bucht die App offline);
+    O3 Abmelden mit Warnung und Löschen aller lokalen Daten; O4 Abschluss mit
+    `LIVETEST-OFFLINE.md` für Holger (echtes Offline kann der Browser im Live-Test nicht).
+49. **Lokale Kopie:** IndexedDB (Datenbank `ff-offline`, je Stadt und Konto ein Eintrag
+    `<kürzel>:<konto-id>`) mit der Geräteliste, den Standorten, dem Zeitpunkt der letzten
+    vollständigen Synchronisierung (Uhr des Handys) und den Grenzen aus `client-config`. Gespeichert
+    nach jedem vollständigen Laden der Geräteliste; beim Start zeigt die App zuerst die Kopie, dann
+    frischt sie vom Server auf. Suchen, Gerät (Umbuchen-Ansicht), Prüffristen und Standortwahl
+    funktionieren damit ohne Verbindung; „Details und Verlauf“ braucht den Server. Vorläufig (Agent,
+    Nacht 31.10.): nur bis 2.000 Geräte (Modus `local`); darüber keine Kopie und kein Offline-Modus.
+    Vorläufig: Die Standorte kommen in die Kopie, sobald die App sie ohnehin lädt (Umbuchen,
+    Standortwahl); vorher bleibt offline nur der aktuelle Standort des Geräts zur Auswahl.
+50. **Sitzung offline:** Die letzte vom Server bestätigte Sitzung (Konto, Rolle, Stadt; nie das
+    Cookie) steht in localStorage `ff-session:<kürzel>`, nur unter Städten. Antwortet `auth/me`
+    wegen einer Störung nicht, öffnet die App die Seite mit dieser Sitzung und fragt im Hintergrund
+    weiter (2, 4, 8, dann alle 15 s, sofort bei „online“). Nur eine echte Antwort ändert sie: 401 →
+    Anmeldung (Kopie und Warteschlange bleiben für dasselbe Konto), ein anderes Konto ersetzt sie.
+51. **Streifen „Offline“:** grau oben, solange der Browser offline meldet oder die letzte Anfrage
+    keine Verbindung bekam (bis zur nächsten Antwort des Servers): „Offline – angezeigt wird der
+    Stand vom 31.10., 14:02.“ Er ersetzt dann die Meldung „Keine Verbindung zum Server …“.
+52. **Warteschlange:** Ist die App offline (Streifen) oder scheitert „Speichern“ an der
+    Verbindung, kommt die Buchung in die Warteschlange (IndexedDB, je Stadt und Konto) mit neuer
+    `client_ref`, Aktionszeit (`occurred_at`, Uhr des Handys), Version, Ziel und Kommentar; die
+    lokale Liste zeigt sofort den gewünschten Stand. Gesendet wird automatisch, älteste zuerst, eine
+    nach der anderen: beim Start, wenn die Verbindung zurückkommt, beim Zurückkehren in die App und
+    nach jeder Buchung. „Suchen“ zeigt die Warteschlange: Uhr = wartet, Haken = beim Server
+    angekommen, darunter das Ergebnis.
+53. **Ergebnis:** je Buchung der Satz des Servers (`result.message`): übernommen (grün), überschrieben
+    bzw. nur im Verlauf bzw. nicht übernommen (gelb, die Admins erhalten einen Hinweis), Fehler (rot)
+    mit „Verwerfen“. Angekommene Buchungen bleiben sichtbar, bis man sie ausblendet.
+54. **Grenzen:** `client-config` wird bei jeder Synchronisierung gelesen und in der Kopie
+    gespeichert. Ist die letzte Synchronisierung älter als `max_age_days`, ist offline Buchen
+    gesperrt („Daten zu alt, bitte mit dem Internet verbinden“). Liegt eine Buchung länger als
+    `queue_max_age_days` in der Warteschlange (oder meldet der Server `stale_action`), geht sie nicht
+    automatisch raus: „Trotzdem senden“ (`confirmed_stale`) oder „Verwerfen“. `clock_implausible`
+    (Uhr des Handys geht vor) erscheint verständlich mit „Verwerfen“.
+55. **Abmelden:** Liegen Buchungen in der Warteschlange, fragt die App vorher („3 Buchungen wurden
+    noch nicht gesendet und gehen beim Abmelden verloren“). Abmelden löscht Kopie, Warteschlange und
+    gespeicherte Sitzung des Kontos. Abmelden geht nur online (der Server beendet die Sitzung).
+56. **Scanner offline:** Das Lesemodul (WASM) kommt in den Cache des Service Workers.
+
+Stand (31.10.2026, Nacht): O1 umgesetzt (lokale Kopie, gespeicherte Sitzung, grauer Streifen,
+Lesemodul im Cache).
+
 ## Fehlerbehandlung
 - Fehler in Alltagssprache, gut sichtbar (z. B. farbiger Hinweis oben: „Keine Verbindung, wird
   erneut versucht“).
@@ -758,7 +810,7 @@ Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Li
     Lesemodul und WASM-Datei (rund 950 KB, komprimiert rund 320 KB) laden erst beim ersten Öffnen
     des Scanners; danach liegt die Datei im Cache des Browsers (Name mit Hash). Gelesen werden alle
     Formate, der Inhalt unverändert (GS1 mit Trennzeichen GS wie der Scan-Code im Backend). In den
-    Service-Worker-Cache kommt sie erst mit dem Offline-Modus.
+    Service-Worker-Cache kommt sie mit dem Offline-Modus (Entscheidung 56, umgesetzt in O1).
 28. **Später** (sehr große Bestände bzw. Offline-Abschnitt): genauer Filter für die Kennung und
     `ids=` in `GET devices`, Laden „geändert seit“ statt über `offset`.
 

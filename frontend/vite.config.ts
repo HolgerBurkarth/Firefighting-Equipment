@@ -27,7 +27,9 @@ export default defineConfig({
             strategies: 'generateSW',
             filename: 'sw.js',
             workbox: {
-                globPatterns: ['**/*.{js,css,html,woff2}'],
+                // Mit dem Lesemodul des Kamera-Scanners (wasm, rund 950 KB): Scannen geht auch
+                // offline (KONZEPT.md, "Offline-Modus – Entscheidungen", 56).
+                globPatterns: ['**/*.{js,css,html,woff2,wasm}'],
                 navigateFallback: 'index.html',
                 navigateFallbackDenylist: [/\/api\//, /\/manifest\.webmanifest$/],
                 cleanupOutdatedCaches: true,

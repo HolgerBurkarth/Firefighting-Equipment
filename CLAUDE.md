@@ -961,6 +961,26 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Super-Admin auf dem Dashboard landen, simulieren dessen Abfragen damit; zustandsbehafteter Server
   `serviceServer` bzw. `superAdminServer` über `delegate`); Unit-Tests
   `tenants.spec.ts`, `router.spec.ts`.
+- Offline-Modus (KONZEPT.md "Offline-Modus – Entscheidungen", 48–56; Schritt O1 umgesetzt):
+  Erreichbarkeit `src/runtime/connectivity.ts` (`isOffline` = Browser offline oder die letzte
+  Anfrage bekam keine Verbindung; `apiRequest`/`apiDownload` melden `reportServerReached`;
+  `installConnectivity` in `main.ts`, `onBackOnline`). Gespeicherte Sitzung (`src/auth/session.ts`,
+  `configureStoredSession` nur unter Städten, localStorage `ff-session:<kürzel>`, Format von
+  `auth/me` ohne Sitzung/Cookie): jede bestätigte Sitzung wird gemerkt, `resetSession` und Abmelden
+  löschen sie. Scheitert `auth/me` mit einer Störung und ist eine gespeichert, löst `ensureSession`
+  sofort mit ihr auf (`usingStoredSession`), die Prüfung läuft im Hintergrund weiter; eine echte
+  Ablehnung ruft `onStoredSessionRejected` (Router: wie 401, Anmeldung mit Rückkehradresse). Lokale
+  Kopie `src/data/offline.ts` (`installOfflineCopy` in `main.ts`, IndexedDB über
+  `src/runtime/localDb.ts`: Datenbank `ff-offline`, Tabellen `snapshots` und `queue`, im Test
+  `MemoryDb`): Schlüssel `<kürzel>:<konto-id>`, `OfflineSnapshot` (Format 1, `syncedAt`, Geräte,
+  `total`, Standorte); beim Bekanntwerden des Kontos `DeviceStore.restore`/`LocationStore.restore`
+  (nur solange noch nichts geladen ist), gespeichert nach jedem vollständigen Laden der Geräte
+  (`onLoaded`, Modus `local`) bzw. der Standorte (nur nach Geräten vom Server); Abmelden und ein
+  anderes Konto löschen die Kopie, eine abgelaufene Sitzung nicht. `AppNotices`: ohne gespeicherte
+  Sitzung bei gestörter Prüfung wie bisher `connection-notice`, sonst offline bzw. mit gespeicherter
+  Sitzung der graue Streifen `offline-notice` („Offline – angezeigt wird der Stand vom 31.10.,
+  14:02.“, `syncedAtText`). Browser-Tests `tests/e2e/offline.spec.ts` (API per `abort`, die
+  App-Seite liefert der Testserver; IndexedDB im Test direkt gelesen); Unit-Tests `offline.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
@@ -1020,7 +1040,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   hat ohne intl keine). Länge in Unicode-Zeichen (`Array.from`), nicht UTF-16-Einheiten.
 - Service Worker `sw.js` (Workbox, `generateSW`), registriert aus dem Bundle (kein Inline-Skript),
   Scope `/firefighting/<bereich>/`, Rückfall auf `index.html` außer `api/` und
-  `manifest.webmanifest`. Das Manifest liefert PHP (`manifest: false` im Plugin).
+  `manifest.webmanifest`. Das Manifest liefert PHP (`manifest: false` im Plugin). Vorab geladen
+  (`globPatterns`) werden `js`, `css`, `html`, `woff2` und `wasm` (Lesemodul des Scanners, offline).
 - Updates (KONZEPT.md "Updates der App", `src/runtime/appUpdate.ts`): `skipWaiting: false`, die neue
   Version wartet, bis `AppUpdater` sie per `SKIP_WAITING` aktiviert und die Seite neu lädt (nie
   `skipWaiting: true`: die laufende App bräuchte sonst gelöschte Teile). Prüfen
