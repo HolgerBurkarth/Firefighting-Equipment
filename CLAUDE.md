@@ -32,7 +32,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   der Agent den Betreff seines Commits ein (nicht „noch nicht committet“).
 - Prüfen vor „✅ FERTIG“ (lokal nur das Nötige; alle Tests in allen fünf Profilen prüft der
   nächtliche Lauf der CI, siehe "GitHub Actions (CI)"):
-  - Frontend geändert: in `frontend/` `npm run lint`, `npm run typecheck`, `npm run test:unit` und
+  - Frontend geändert: in `frontend/` `npm run lint`, `npm run typecheck`, `npm run test:unit:log`
+    (wie `test:unit`, hängt je Lauf Ergebnis und Namen gescheiterter Tests an
+    `frontend/test-logs/unit.log` an, Ordner in `.gitignore`; einen Fehler, der sich nicht
+    wiederholen lässt, dort mit Datum als „nicht reproduzierbar“ nachtragen und in der
+    „✅ FERTIG“-Meldung mit Testnamen nennen) und
     die betroffenen Browser-Testdateien in Chromium und WebKit (`npm run build`, dann
     `npm run test:e2e -- tests/e2e/<datei>.spec.ts`; betroffen sind die Dateien der geänderten
     Seiten, Bausteine und Testhilfen).
@@ -396,7 +400,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `removeLogo` über `setTenant`, `logoImage.ts` Logo auf 512 × 512 PNG, `appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
   `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung,
-  `appUpdate.ts` Updates, `unsavedInput.ts` ungespeicherte Eingaben, `build.ts` Build-Kennung,
+  `appUpdate.ts` Updates, `updateTrace.ts` Zeitleiste der Updates, `unsavedInput.ts` ungespeicherte
+  Eingaben, `build.ts` Build-Kennung,
   `now.ts` `useNow` für Zeitangaben: alle 30 s und bei `visibilitychange` neu, `countdown.ts`
   `useCountdown` Sperre nach 429 bis `Retry-After`, `download.ts` `saveDownload`, `share.ts`
   `shareLink`/`copyText`), `src/scanner/` (Kamera-Scanner:
@@ -997,10 +1002,22 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`loadingPage` in `App.vue` bzw. die Seite selbst), nie kurz „nicht gefunden“; gelingt es nicht,
   bleibt die Seite beim Laden und `App.vue` zeigt „Die neue Version konnte nicht geladen werden.“ mit
   Knopf „Neu laden“ (`reloadNeeded`, `reloadFromServer`: Service Worker abmelden, Adresse samt
-  `#token`/`#code` neu laden); bei Schleifensperre erscheint die Seite wie bisher) oder per Knopf „Jetzt aktualisieren“ im Hinweis von `App.vue` (nur mit ungespeicherten
+  `#token`/`#code` neu laden, OHNE Schleifensperre: ein Klick ist keine Schleife); bei
+  Schleifensperre erscheint die Seite wie bisher) oder per Knopf „Jetzt aktualisieren“ im Hinweis von `App.vue` (nur mit ungespeicherten
   Eingaben oder während der Sperre; mit ungespeicherten Eingaben erst nach der Rückfrage „Ihre
-  Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?“, Standard „Abbrechen“). Gegen Schleifen: nach einem automatischen Neuladen 10 Minuten
-  keines mehr (`RELOAD_COOLDOWN_MS`, sessionStorage je Tab). Die erste Übernahme nach der Installation
+  Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?“, Standard „Abbrechen“). Gegen Schleifen: nach jedem automatischen Neuladen 10 Minuten
+  keines mehr (`RELOAD_COOLDOWN_MS`, sessionStorage je Tab). Seite ohne Kontrolle eines Service
+  Workers (vom Server: erster Besuch, Strg+F5, nach „Neu laden“; `checkUncontrolled`, beim Start
+  nur, wenn einer wartet, sonst bei jeder fertigen Installation): liefert `build.json` eine andere
+  Kennung, ist ein Update da; dieselbe Kennung und ein wartender Service Worker → `SKIP_WAITING`
+  ohne Neuladen (die Seite ist schon neu). Grund (live 31.10.2026, nur Chrome/Chromium): Hält ein
+  anderer Tab den alten Service Worker, löscht `unregister()` die Registrierung nicht; das
+  `register()` der Seite vom Server holt sie samt altem Service Worker zurück, die neue Version
+  wartet weiter, das nächste Neuladen lieferte die alte. Andere Tabs übernimmt der neue Service
+  Worker (`clientsClaim`); sie laden erst beim nächsten Seitenwechsel neu (mit Eingabe: Hinweis),
+  auch wenn die Dateien der alten Version fehlen (der Wächter lädt vor dem Nachladen der Zielseite).
+  `attach` verfolgt auch eine Installation, die schon vor `attach` lief (Chrome installiert eine
+  zurückgeholte Registrierung sofort neu). Die erste Übernahme nach der Installation
   ist kein Update und gilt auch beim Aktualisieren nicht als „neue Version übernommen“ (deren Service
   Worker lieferte beim Neuladen die alte Seite). Meldet `build.json` dabei schon eine andere Kennung
   (Strg+F5, dann Deploy; `claimedByNewer`), ist die übernehmende Version vermutlich die neue, sicher
@@ -1029,9 +1046,12 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `writeFileSync` sie erst leert), sendet `SKIP_WAITING` und lädt NUR
   nach der Übernahme (`controllerchange`, höchstens `TAKEOVER_TIMEOUT_MS`) neu; bleibt sie aus
   (Chrome hält die Aktivierung an, wenn der alte Service Worker beim Wechsel eine Anfrage bekommt),
-  meldet sie den Service Worker ab und lädt dann neu (Seite vom Server). Ohne neue Version oder wenn
-  das Abmelden scheitert, kein Neuladen (sonst lieferte der alte Service Worker die alte Seite und die
-  Sperre verhinderte einen zweiten Versuch). Solange: Hinweis „Neue Version wird geladen …“
+  meldet sie als letzten Ausweg den Service Worker ab und lädt dann neu (Seite vom Server; mit
+  Schleifensperre). Liefert `unregister()` false, gilt es trotzdem als abgemeldet, wenn
+  `navigator.serviceWorker.getRegistration()` nichts mehr kennt (`unregisterForReload`: früher
+  abgemeldet, ein anderer Tab hält sie nur noch; neue Seiten kommen vom Server). Ohne neue Version
+  oder wenn das Abmelden scheitert, kein Neuladen (sonst lieferte der alte Service Worker die alte
+  Seite und die Sperre verhinderte einen zweiten Versuch). Solange: Hinweis „Neue Version wird geladen …“
   (`switching`). Lädt die App neu, lässt der Wächter den Seitenwechsel offen (Promise ohne Ende) statt
   ihn abzubrechen: Ein Abbruch setzte bei Zurück/Vor (popstate) die Historie zurück, das überholte das
   Neuladen. Vor und während des Neuladens (`reload`) beginnt keine Anfrage mehr (keine Prüfung, keine
@@ -1043,6 +1063,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Mailprogramm): Ein Seitenwechsel mitten in einer Anfrage meldet WebKit als Skriptfehler. Fehlende Teile nach einem Deploy
   (`isChunkLoadError`) → Zielseite einmal neu laden. Was ein Neuladen überstehen muss (z. B. der
   Hinweis der Anmeldeseite in `session.ts`), steht in sessionStorage.
+  Zeitleiste zur Diagnose (`UpdateTrace`, `src/runtime/updateTrace.ts`, KONZEPT.md "Updates der
+  App"): sessionStorage `ff-update-trace` (`UPDATE_TRACE_KEY`), JSON-Liste `{at, event, detail?}`,
+  höchstens `UPDATE_TRACE_MAX` (50), älteste fallen weg; live lesbar per
+  `JSON.parse(sessionStorage['ff-update-trace'])`. Nur feste Ereignisse und Build-Kennungen, nie
+  Adressen (Token im Fragment) oder persönliche Daten; Fehler des Speichers ohne Folgen.
 - Regel für ALLE Formulare: ungespeicherte Eingaben über `useUnsavedInput(() => …)`
   (`src/runtime/unsavedInput.ts`) melden: true, solange etwas eingegeben und nicht gespeichert ist;
   nach dem Speichern oder Leeren false. Nur so lädt die App nie mitten in einer Eingabe neu.
@@ -1052,6 +1077,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Befehle (in `frontend/`): `npm ci`, einmalig `npx playwright install chromium firefox webkit`;
   `npm test` (ESLint + Prettier, Vitest, `vue-tsc` + Build, alle Browser-Tests in Chromium und
   WebKit); was vor „✅ FERTIG“ lokal laufen muss, steht unter "Arbeitsweise". Einzeln: `npm run lint`, `npm run format`, `npm run typecheck`, `npm run test:unit`,
+  `npm run test:unit:log` (dasselbe mit Protokoll in `test-logs/unit.log`,
+  `tests/unit/support/unitLog.ts`: Reporter `json` nach `test-logs/unit-last.json`, danach je Lauf
+  eine Zeile Zeit (UTC) und Ergebnis, bei Rot je gescheitertem Test `FAIL <datei> > <describe> >
+  <test>: <erste Zeile der Meldung>`; leert kein Playwright-Lauf),
   `npm run build`, `npm run test:e2e` (braucht den Build; lokal nur Chromium und WebKit),
   `npm run test:e2e:all` (alle fünf Profile, `playwright.all.config.ts`), `npm run test:load`
   (Lastläufe, siehe unten). Entwicklung: `npm run dev`
@@ -1100,7 +1129,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `test-builds/state/<bereich>`, die neue (Inhalt `next`; `build-json` = nur `build.json` neu, `sw.js`
   bleibt alt); jeder Test hat einen eigenen Bereich. Er beantwortet die öffentlichen Aufrufe der Anmeldeseite
   selbst, weil WebKit Anfragen einer vom Service Worker kontrollierten Seite nicht an `page.route()`
-  gibt. Bereiche je Test über `randomUUID` (Prozess-IDs werden unter Windows wiederverwendet).
+  gibt; für Seiten hinter der Anmeldung in weiteren Tabs zusätzlich eine Tabelle je Bereich
+  `test-builds/state/<bereich>.api.json` (`writeApiTable`, `"METHODE pfad"` ohne Query → `{status,
+  body}`, z. B. `adminDeviceApi`: Gerätedetail und Geräteliste als Admin). Bereiche je Test über `randomUUID` (Prozess-IDs werden unter Windows wiederverwendet).
   Abgedeckte Fälle: ohne/mit Eingabe, Rückfrage, erster Besuch mit Deploy vor der
   Installation (Registrierung per Init-Skript zurückgehalten), Seite per Strg+F5 geladen und vom
   neuen Service Worker übernommen (nur Chromium: `Page.reload` mit `ignoreCache` über CDP), zwei Tabs
@@ -1109,8 +1140,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   rund 30 s „Neu laden“), Installation beim Start länger als 5 s (`next-held`; nach der Freigabe
   lädt Workbox die übrigen Dateien nacheinander, `index.html` zuerst; der Test wartet darauf bis zur
   Frist der App, `START_LOAD_TIMEOUT_MS` ab Beginn des Starts, nicht länger; die Uhr läuft nach
-  `clock.install()` weiter, Timer feuern, `runFor` springt nur vor). Der Mail-Link-Test (eigener Tab)
-  prüft Konsolenfehler selbst, mit derselben Ausnahme `isAbortedFontDownload`. Sporadische Fehler der Update-Logik nie mit längeren Wartezeiten
+  `clock.install()` weiter, Timer feuern, `runFor` springt nur vor), „Neu laden“ mit zweitem alten
+  Tab (Gerätedetail mit offenem „Bearbeiten“ und Eingabe: danach steuert die neue Version die Seite,
+  keiner wartet, auch nach `page.reload()`; der andere Tab lädt nicht neu, zeigt den Hinweis, behält
+  die Eingabe und wechselt mit „Zurück“ auf die neue Version, obwohl die Dateien der alten fehlen;
+  vor der Korrektur rot in Chromium und Chrome, in Firefox und WebKit nicht betroffen). Tests mit
+  eigenem Tab (Mail-Link, zweiter alter Tab) prüfen Konsolenfehler selbst (`collectProblems`), mit
+  derselben Ausnahme `isAbortedFontDownload`. Sporadische Fehler der Update-Logik nie mit längeren Wartezeiten
   überdecken: unter Last wiederholen (`npm run test:load -- [Datei] [--project=…] [--runs=N]`,
   `tests/e2e/support/loadRun.ts`: alle fünf Profile, ohne Angabe `--repeat-each=10`, je Durchgang
   `--output=test-results/load/<Zeit>-<n>`, damit die Traces bleiben; der nächste normale Lauf leert

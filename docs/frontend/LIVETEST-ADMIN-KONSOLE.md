@@ -171,6 +171,30 @@ Prüfung des Updates am PC (A1). Ergebnisse je Punkt bitte hier eintragen (☑ b
 - Funde, behoben: C3 Einzahl „Hier liegt noch 1 aktives Fach.“ bzw. „1 Gerät.“; E7 eigene Meldung
   am Feld, wenn Kennung bzw. Scan-Code beim Wiederaufnehmen vergeben sind (vorher mit
   `(Feld "identifier")` bzw. „mit null entfernen“ aus der API).
+- ☑ Behebungen live geprüft (Claude per Chrome, 31.10.2026, Build `b6a25b03573c`): Sperren zeigt
+  „Hier liegt noch 1 aktives Fach.“ (Live-Test Wagen) bzw. „Hier liegt noch 1 Gerät.“ (M90 kurz in
+  Live-Test Wagen / G1), mehrere weiter mit „liegen“ (MTW, LF 10, HLF 20 / G4). Wiederaufnahme von M94
+  (dazu kurz ausgesondert, M93 mit Kennung M94 und Scan-Code LT-SC-94): „Die Kennung „M94“ ist
+  inzwischen an ein anderes Gerät vergeben. Bitte geben Sie eine andere Kennung ein.“ bzw. mit M95 die
+  Meldung zum Scan-Code, beides ohne Feldnamen der API. M90, M93, M94 danach zurückgesetzt.
+- ☒ Fund beim Update nach diesem Deploy (PC, Chrome, Tab mit altem Build `b3438d44f157` im Service
+  Worker, direkt `standorte` geöffnet): nach rund 30 s „Die neue Version konnte nicht geladen
+  werden.“, obwohl die neue Version danach als `waiting` installiert war. „Neu laden“ holte die neue
+  Seite vom Server, beim nächsten normalen Neuladen lieferte aber wieder der alte Service Worker die
+  alte Version (die neue weiter `waiting`). Vermutung: Die neu geladene Seite registriert `sw.js` erneut
+  und belebt so die eben abgemeldete Registrierung mit dem alten Service Worker wieder. Erst „Jetzt
+  aktualisieren“ brachte die neue Version. Noch nicht behoben, Untersuchung als nächster Schritt.
+  Untersuchung (31.10.2026): Laut Protokoll stand „Neu laden“ schon nach höchstens 21 s da (nicht
+  30 s), der Tab war wiederverwendet (vorher `geraete/140/details`). Vermutung bestätigt (im
+  installierten Chrome nachgestellt, nur Chrome/Chromium betroffen): Hält ein anderer Tab den alten
+  Service Worker, löscht das Abmelden die Registrierung nicht, und das `register()` der Seite vom
+  Server holt sie samt altem Service Worker zurück; dazu verhinderte die Sperre nach „Neu laden“
+  das automatische Update. Der lange Start selbst ließ sich lokal nicht nachstellen (8 Varianten);
+  wahrscheinlich war die Registrierung schon früher abgemeldet, sodass `unregister()` false
+  meldete. Behoben: Eine Seite vom Server in der aktuellen Version aktiviert einen wartenden Service
+  Worker selbst, `unregister()` mit false gilt als abgemeldet, wenn der Browser die Registrierung
+  nicht mehr kennt, „Neu laden“ setzt keine Sperre; neu die Zeitleiste
+  `JSON.parse(sessionStorage['ff-update-trace'])` (KONZEPT.md "Updates der App").
 - Notiz (kein Fehler): „Letzte Aktivitäten“ ist nach Eingang beim Server sortiert, zeigt aber die
   Zeit der Aktion (bei Offline-Buchungen können die Zeiten daher nicht absteigend wirken).
 - Testdaten in der Test-Stadt (bleiben vorerst): M90, M91 (neu), M92 (früheres M91), M93 (HLF 20),

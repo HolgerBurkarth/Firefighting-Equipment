@@ -1266,6 +1266,7 @@ cd frontend
 npm ci                                            # Abhängigkeiten
 npx playwright install chromium firefox webkit    # einmalig: Browser für die Tests
 npm test                                          # Lint, Vitest, Typprüfung + Build, Playwright
+npm run test:unit:log                             # Vitest mit Protokoll in test-logs/unit.log
 npm run test:e2e:all                              # Browser-Tests mit allen fünf Profilen
 npm run test:load -- tests/e2e/appUpdate.spec.ts  # Lastlauf (jeder Test 10-mal, alle Profile)
 npm run build                                     # nur Build nach frontend/dist

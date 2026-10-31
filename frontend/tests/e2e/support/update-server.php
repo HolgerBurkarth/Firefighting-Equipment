@@ -37,6 +37,22 @@ $area = preg_match('#^/firefighting/([a-z0-9-]+)/#', is_string($uri) ? $uri : ''
 $path = is_string($uri) ? (string) parse_url($uri, PHP_URL_PATH) : '';
 if (preg_match('#^/firefighting/[a-z0-9-]+/(api/.*|manifest\.webmanifest)$#', $path, $api) === 1) {
     header('Cache-Control: no-store');
+    /*
+     * Seiten hinter der Anmeldung (z. B. ein Gerätedetail in einem zweiten Tab): Der Test legt je
+     * Bereich eine Tabelle test-builds/state/<bereich>.api.json an, "METHODE pfad" (Pfad ohne Bereich
+     * und Query) → {status, body}. Sie gilt vor den festen Antworten unten.
+     */
+    $apiFile = $frontend . '/test-builds/state/' . $area . '.api.json';
+    $table = $area !== '' && is_file($apiFile)
+        ? json_decode((string) file_get_contents($apiFile), true)
+        : null;
+    $entry = is_array($table) ? ($table[($_SERVER['REQUEST_METHOD'] ?? '') . ' ' . $api[1]] ?? null) : null;
+    if (is_array($entry) && is_int($entry['status'] ?? null)) {
+        http_response_code($entry['status']);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($entry['body'] ?? new stdClass(), JSON_UNESCAPED_UNICODE);
+        return;
+    }
     if ($api[1] === 'api/v1/tenant') {
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([

@@ -13,6 +13,7 @@
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write . && eslint . --fix",
     "test:unit": "vitest run",
+    "test:unit:log": "node tests/unit/support/unitLog.ts",
     "test:e2e": "playwright test",
     "test:e2e:all": "playwright test --config playwright.all.config.ts",
     "test:load": "node tests/e2e/support/loadRun.ts",
