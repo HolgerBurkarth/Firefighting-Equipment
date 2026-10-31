@@ -100,3 +100,77 @@ export function fetchUsers(
     const query = status === undefined ? '' : `?${new URLSearchParams({ status }).toString()}`;
     return apiRequest(`users${query}`, parseUserList, { ...(fetchFn && { fetchFn }) });
 }
+
+/** Rollen, die ein Admin vergibt (UserActionHandler::role). */
+export type ManagedRole = Exclude<UserRole, 'superadmin'>;
+
+function parseUserResponse(json: unknown): AdminUser | null {
+    return isRecord(json) ? parseAdminUser(json['user']) : null;
+}
+
+function userAction(
+    id: number,
+    action: string,
+    body: Record<string, unknown>,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<AdminUser>> {
+    return apiRequest(`users/${String(id)}/${action}`, parseUserResponse, {
+        method: 'POST',
+        body,
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** POST users/{id}/approve: Registrierung freischalten (nur `pending`; Mail an das Konto). */
+export function approveUser(
+    id: number,
+    request: { readonly displayName: string; readonly role: ManagedRole },
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<AdminUser>> {
+    return userAction(
+        id,
+        'approve',
+        { display_name: request.displayName, role: request.role },
+        fetchFn,
+    );
+}
+
+/** POST users/{id}/reject: Registrierung ablehnen (anonymisiert; Mail an die bisherige Adresse). */
+export function rejectUser(id: number, fetchFn?: typeof fetch): Promise<ApiResult<AdminUser>> {
+    return userAction(id, 'reject', {}, fetchFn);
+}
+
+/** POST users/{id}/lock bzw. unlock (Sperren beendet alle Sitzungen des Kontos). */
+export function setUserLocked(
+    id: number,
+    locked: boolean,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<AdminUser>> {
+    return userAction(id, locked ? 'lock' : 'unlock', {}, fetchFn);
+}
+
+/** POST users/{id}/role (beendet alle Sitzungen des Kontos). */
+export function changeUserRole(
+    id: number,
+    role: ManagedRole,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<AdminUser>> {
+    return userAction(id, 'role', { role }, fetchFn);
+}
+
+/** POST users/{id}/display-name. */
+export function changeUserDisplayName(
+    id: number,
+    displayName: string,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<AdminUser>> {
+    return userAction(id, 'display-name', { display_name: displayName }, fetchFn);
+}
+
+/** DELETE users/{id}: löschen = anonymisieren (der Verlauf behält „Gelöschter Benutzer #ID“). */
+export function deleteUser(id: number, fetchFn?: typeof fetch): Promise<ApiResult<AdminUser>> {
+    return apiRequest(`users/${String(id)}`, parseUserResponse, {
+        method: 'DELETE',
+        ...(fetchFn && { fetchFn }),
+    });
+}

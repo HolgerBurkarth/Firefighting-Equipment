@@ -321,7 +321,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
   `client.ts`; `devices.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
   `deviceTypes.ts`, `inspections.ts`, `locations.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
-  Gerätetypen und das Dashboard),
+  Gerätetypen, Benutzer und das Dashboard),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
@@ -551,7 +551,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   einsatzbereit“ („… und N weitere“) und „Letzte Aktivitäten“ (Zeit, Kennung, Art, Wer, Zeilen aus
   `eventLines`, Kommentar; nicht übernommene abgesetzt); Geräte öffnen das Gerätedetail.
   Einsatzbereitschaft führt zu `geraete`, nicht einsatzbereit und „… und N weitere“ zu
-  `geraete?status=maintenance,defective`; offene Hinweise führen später zu Protokoll und Benutzern.
+  `geraete?status=maintenance,defective`; in der Kachel „Offene Hinweise“ führt „Freischaltungen
+  ansehen“ (nur mit wartenden) zu `benutzer`, die Hinweise später zum Protokoll.
   Browser-Tests, die als Admin auf
   dem Dashboard landen, simulieren dessen Abfragen mit `ADMIN_OVERVIEW` (`tests/e2e/support/admin.ts`,
   dort auch `adminOverview`, `summaryJson`, `userJson`, `tenantEventJson`); Tests in
@@ -677,6 +678,30 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Gerätedetail) und „Abbrechen“ (`goBack`, sonst `geraete`). Unter 768 px eine Spalte, Knöpfe volle
   Breite. Browser-Tests `tests/e2e/deviceNew.spec.ts` (simulierter `POST devices` ab ID 100);
   Unit-Tests `deviceForm.spec.ts`, `deviceAdminApi.spec.ts`, `router.spec.ts`.
+- Benutzerverwaltung der Admin-Konsole (`UsersPage`, `benutzer`, Route `users`, nur `admin`,
+  `layout: 'admin'`, Menü „Benutzer“ mit Zähler `pendingUsers`; KONZEPT.md "Bereiche des Admins",
+  Benutzer; API siehe "Benutzerverwaltung durch den Admin", unverändert): Store `userStore`
+  (`UserStore`, `src/data/userStore.ts`, `GET users` ohne gelöschte, in `installDataLayer`), Ändern
+  nur über `src/data/index.ts` (`approveUser`, `rejectUser`, `setUserLocked`, `saveUser`,
+  `deleteUser`; API in `src/api/users.ts`): danach lädt `userStore` neu (abgewartet), `adminOverview`
+  nur, wenn geladen; 404 und `rule_violation` laden die Liste ebenfalls neu; betrifft eine Änderung
+  das eigene Konto, übernimmt die Sitzung den Anzeigenamen (`setSession`, gleiches Konto). Logik in
+  `src/data/users.ts`. Oben (deutlich, nur mit wartenden) „N neue Anmeldungen warten auf
+  Freischaltung“ (`pendingUsers`: Status `pending`, älteste zuerst) als Karten mit „Freischalten …“
+  (`FormDialog`: Anzeigename vorbelegt mit dem Namen, Prüfung `displayNameProblem` wie `PersonName`;
+  Rolle als Radiogruppe `ROLE_OPTIONS`, Standard Benutzer) und „Ablehnen …“ (`ConfirmDialog`, nennt
+  die Mail). Darunter alle anderen Konten (`userRows`: Suche mit UND in Anzeigename, Name und E-Mail
+  per `searchKey`; Spalten Name (Anzeigename, abweichender Name darunter `nameHint`, „Sie“ am eigenen
+  Konto), E-Mail, Rolle, Status (`statusText`: gesperrt vor dem Status, „E-Mail unbestätigt“),
+  Registriert; Spaltenköpfe mit `aria-sort`, am Handy Karten mit Knöpfen „Sortieren“ wie bei den
+  Gerätetypen). Unbestätigte Konten haben statt des Stifts „Ablehnen …“ (sie verschwinden sonst nach
+  7 Tagen von selbst). Der Stift öffnet Anzeigename (nur `active`) und Rolle, gesendet nur Geändertes
+  (`userChanges`, erst Name, dann Rolle), nichts geändert → zu ohne Anfrage; abseits (Slot `extra`)
+  „… sperren …“ (Rückfrage) bzw. „… entsperren“ und rot „… löschen …“ (Rückfrage, nennt „Gelöschter
+  Benutzer #ID“). Am eigenen Konto Hinweis, Rolle gesperrt, kein Sperren und Löschen (der Server lehnt
+  es ohnehin mit 409 ab). Fehler des Servers im Fenster (400 am Anzeigenamen) bzw. auf der Seite,
+  Erfolg als `success-notice`. Browser-Tests `tests/e2e/users.spec.ts` (zustandsbehafteter Server je
+  Test über `delegate`); Unit-Tests `users.spec.ts`, `router.spec.ts`.
 - CSV-Import der Admin-Konsole (`DeviceImportPage`, `geraete/import`, Route `device-import`, nur
   `admin`, `layout: 'admin'`, im Menü unter „Geräte“; KONZEPT.md Entscheidung 32): „1. Vorlage
   ausfüllen“ mit „Vorlage herunterladen“ und „Gültige Werte herunterladen“ (`downloadImportTemplate`,
@@ -739,10 +764,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Vitest, gleicht auch `ALPHABET`, `LENGTH`, `MAX_INPUT_LENGTH` ab); Änderungen an
   `InvitationCodeValue` daher immer mit dem Frontend und neuen Fällen. Seiten der Mail-Links
   (`AppUrls::*_PAGE`, auch `geraete/<id>/details` und `protokoll/<id>`) muss es im Router geben
-  (`appUrlsPages.spec.ts`). `benutzer`, `protokoll` und `protokoll/<id>` (Routen `users`, `notices`,
-  `notice`) leiten vorerst auf `dashboard` weiter (Zähler für Freischaltungen und offene Hinweise),
-  bis die Seiten Benutzer und Protokoll kommen (Admin-Konsole, Schritte 8 und 12); Tests in
-  `router.spec.ts` und `adminConsole.spec.ts`. `email-bestaetigen` sendet
+  (`appUrlsPages.spec.ts`). `protokoll` und `protokoll/<id>` (Routen `notices`, `notice`) leiten
+  vorerst auf `dashboard` weiter (Zähler der offenen Hinweise), bis die Seite Protokoll kommt
+  (Admin-Konsole, Schritt 12); Tests in `router.spec.ts` und `adminConsole.spec.ts`. `email-bestaetigen` sendet
   das Token erst per Knopf (Virenscanner öffnen Links vorab).
 - `einladung-annehmen` (`InvitationAcceptPage`, neue Admins): Name und Passwort (Live-Prüfung mit
   Name und Stadt, die E-Mail kennt nur der Server); danach keine Sitzung, sondern Anmeldung mit

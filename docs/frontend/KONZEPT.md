@@ -331,6 +331,14 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
 - **Benutzer:** oben deutlicher Hinweis „2 neue Anmeldungen warten“; Freischalten im kleinen
   Fenster mit Anzeigename und Rolle. Einladungscodes im eigenen Reiter: der Code erscheint nur
   einmal, groß, mit Kopieren-Button und QR-Code.
+  Umgesetzt in Schritt 8 (`benutzer`, Menü „Benutzer“ mit Zähler; Einladungscodes folgen in
+  Schritt 9): oben die wartenden Anmeldungen (älteste zuerst) mit „Freischalten“ (Anzeigename,
+  vorbelegt mit dem Namen, und Rolle) und „Ablehnen“ (Rückfrage, die Person erhält eine Mail);
+  darunter alle Konten als Liste mit Suche (Name, E-Mail) und sortierbaren Spalten, am Handy Karten.
+  Der Stift öffnet Anzeigename und Rolle, abseits Sperren (mit Rückfrage) bzw. Entsperren und rot
+  Löschen (Rückfrage). Unbestätigte Registrierungen lassen sich ablehnen. Das eigene Konto lässt sich
+  nicht sperren, herabstufen oder löschen. Die Kachel „Offene Hinweise“ auf dem Dashboard führt mit
+  „Freischaltungen ansehen“ hierher.
 - **Protokoll:** Hinweise zu Konflikten (siehe oben).
 - **Einstellungen:** Anzeigemodus, Erscheinungsbild der Feuerwehr mit Vorschau, Mail-Benachrichtigung,
   Passwort und angemeldete Geräte.
@@ -394,8 +402,8 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
     Hinweis-Mails auf `protokoll/<id>`; Super-Admins erhalten keinen Link auf ein Gerät (sie sehen
     keine Geräte). Die Mail „Neue Registrierung wartet auf Freischaltung“ verlinkt auf `benutzer`.
     Umgesetzt in Schritt 5: Super-Admins erhalten in Log- und Hinweis-Mails gar keinen Link, die
-    Sammelmail eines CSV-Imports verlinkt auf `geraete`. Bis die Seiten Benutzer und Protokoll da
-    sind, führen `benutzer` und `protokoll/<id>` auf das Dashboard.
+    Sammelmail eines CSV-Imports verlinkt auf `geraete`. Bis die Seite Protokoll da ist, führt
+    `protokoll/<id>` auf das Dashboard; `benutzer` ist seit Schritt 8 die Benutzerverwaltung.
 37. **Logo:** Die App bringt jedes Bild (PNG, JPG, SVG …) selbst auf 512 × 512 PNG (quadratisch, mit
     Rand) und zeigt die Vorschau per Canvas; der Server prüft weiter genau 512 × 512.
 38. **Live-Test der Benutzerverwaltung** (Test-Stadt): „Freischalten“ mit dem vorhandenen Konto

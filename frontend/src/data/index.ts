@@ -34,7 +34,17 @@ import {
     type NewLocation,
     type SavedLocation,
 } from '../api/locations';
-import { onSessionEnded, session } from '../auth/session';
+import {
+    approveUser as postApprove,
+    changeUserDisplayName,
+    changeUserRole,
+    deleteUser as postDelete,
+    rejectUser as postReject,
+    setUserLocked as postLocked,
+    type AdminUser,
+    type ManagedRole,
+} from '../api/users';
+import { onSessionEnded, session, setSession } from '../auth/session';
 import { browserStorage } from '../runtime/theme';
 import { AdminDeviceList } from './adminDeviceList';
 import { AdminOverviewStore } from './adminOverview';
@@ -43,6 +53,7 @@ import { DeviceStore } from './deviceStore';
 import { DeviceTypeStore } from './deviceTypeStore';
 import { INSPECTION_WINDOW_DAYS, SERVER_INSPECTION_LIMIT } from './inspections';
 import { LocationStore } from './locationStore';
+import { UserStore } from './userStore';
 import { setBookingNotice } from './booking';
 import { addRecent, clearRecent, loadRecent } from './recentDevices';
 import { recentLocations } from './recentLocations';
@@ -60,6 +71,8 @@ export const adminLocationStore = new LocationStore(() => fetchAllLocations());
 export const deviceTypeStore = new DeviceTypeStore();
 /** Geräteliste der Admin-Konsole (Filter und Seiten vom Server, auch ausgesonderte). */
 export const adminDeviceList = new AdminDeviceList();
+/** Benutzerverwaltung des Admins (Konten der Stadt ohne gelöschte). */
+export const userStore = new UserStore();
 
 /**
  * Nach einer Änderung an Standorten oder Gerätetypen lädt die Verwaltung neu (abgewartet), andere
@@ -211,6 +224,74 @@ export async function applyDeviceImport(request: ImportRequest): Promise<ApiResu
     return result;
 }
 
+/**
+ * Nach einer Änderung an einem Konto: Liste neu (abgewartet, die Seite zeigt danach den neuen
+ * Stand), das Dashboard (Zähler der Freischaltungen) nur, wenn schon geladen. Ändert der Admin den
+ * eigenen Anzeigenamen, übernimmt die Sitzung ihn (Begrüßung und Menü).
+ */
+async function afterUserChange(result: ApiResult<AdminUser>): Promise<ApiResult<AdminUser>> {
+    if (!result.ok) {
+        if (result.error.code === 'not_found' || result.error.code === 'rule_violation') {
+            // Inzwischen gelöscht bzw. anders: den aktuellen Stand zeigen.
+            void userStore.refresh('changed');
+        }
+        return result;
+    }
+    const current = session.value;
+    if (current !== null && current.user.id === result.data.id) {
+        setSession({ ...current, user: { ...current.user, displayName: result.data.displayName } });
+    }
+    if (adminOverview.state.overview !== null) {
+        void adminOverview.refresh('changed');
+    }
+    await userStore.refresh('changed');
+    return result;
+}
+
+/** Registrierung freischalten mit Anzeigename und Rolle (Mail an das Konto). */
+export async function approveUser(
+    id: number,
+    request: { readonly displayName: string; readonly role: ManagedRole },
+): Promise<ApiResult<AdminUser>> {
+    return afterUserChange(await postApprove(id, request));
+}
+
+/** Registrierung ablehnen (Konto wird anonymisiert, Mail an die bisherige Adresse). */
+export async function rejectUser(id: number): Promise<ApiResult<AdminUser>> {
+    return afterUserChange(await postReject(id));
+}
+
+/** Sperren bzw. entsperren. */
+export async function setUserLocked(id: number, locked: boolean): Promise<ApiResult<AdminUser>> {
+    return afterUserChange(await postLocked(id, locked));
+}
+
+/**
+ * Anzeigename und Rolle ändern, nur was sich ändert (erst der Name, dann die Rolle); ohne Änderung
+ * null. Scheitert die Rolle, ist der Name schon gespeichert (die Liste zeigt ihn).
+ */
+export async function saveUser(
+    user: AdminUser,
+    changes: { readonly displayName?: string; readonly role?: ManagedRole },
+): Promise<ApiResult<AdminUser> | null> {
+    let result: ApiResult<AdminUser> | null = null;
+    if (changes.displayName !== undefined) {
+        result = await afterUserChange(await changeUserDisplayName(user.id, changes.displayName));
+        if (!result.ok) {
+            return result;
+        }
+    }
+    if (changes.role !== undefined) {
+        result = await afterUserChange(await changeUserRole(user.id, changes.role));
+    }
+    return result;
+}
+
+/** Löschen = anonymisieren. */
+export async function deleteUser(id: number): Promise<ApiResult<AdminUser>> {
+    return afterUserChange(await postDelete(id));
+}
+
 /** Verlauf eines Geräts („Details und Verlauf“), je Ansicht neu. */
 export function deviceHistory(id: number): DeviceHistory {
     return new DeviceHistory(id);
@@ -270,6 +351,7 @@ export function installDataLayer(
         adminLocationStore,
         deviceTypeStore,
         adminDeviceList,
+        userStore,
     ],
     storage = browserStorage(),
 ): () => void {

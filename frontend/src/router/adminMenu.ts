@@ -32,4 +32,5 @@ export const ADMIN_MENU: readonly AdminMenuEntry[] = [
     },
     { route: 'locations', label: 'Standorte', icon: 'location' },
     { route: 'device-types', label: 'Gerätetypen', icon: 'tag' },
+    { route: 'users', label: 'Benutzer', icon: 'account', badge: 'pendingUsers' },
 ];
