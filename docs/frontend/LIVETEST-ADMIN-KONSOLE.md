@@ -184,6 +184,17 @@ Prüfung des Updates am PC (A1). Ergebnisse je Punkt bitte hier eintragen (☑ b
   alte Version (die neue weiter `waiting`). Vermutung: Die neu geladene Seite registriert `sw.js` erneut
   und belebt so die eben abgemeldete Registrierung mit dem alten Service Worker wieder. Erst „Jetzt
   aktualisieren“ brachte die neue Version. Noch nicht behoben, Untersuchung als nächster Schritt.
+  Untersuchung (31.10.2026): Laut Protokoll stand „Neu laden“ schon nach höchstens 21 s da (nicht
+  30 s), der Tab war wiederverwendet (vorher `geraete/140/details`). Vermutung bestätigt (im
+  installierten Chrome nachgestellt, nur Chrome/Chromium betroffen): Hält ein anderer Tab den alten
+  Service Worker, löscht das Abmelden die Registrierung nicht, und das `register()` der Seite vom
+  Server holt sie samt altem Service Worker zurück; dazu verhinderte die Sperre nach „Neu laden“
+  das automatische Update. Der lange Start selbst ließ sich lokal nicht nachstellen (8 Varianten);
+  wahrscheinlich war die Registrierung schon früher abgemeldet, sodass `unregister()` false
+  meldete. Behoben: Eine Seite vom Server in der aktuellen Version aktiviert einen wartenden Service
+  Worker selbst, `unregister()` mit false gilt als abgemeldet, wenn der Browser die Registrierung
+  nicht mehr kennt, „Neu laden“ setzt keine Sperre; neu die Zeitleiste
+  `JSON.parse(sessionStorage['ff-update-trace'])` (KONZEPT.md "Updates der App").
 - Notiz (kein Fehler): „Letzte Aktivitäten“ ist nach Eingang beim Server sortiert, zeigt aber die
   Zeit der Aktion (bei Offline-Buchungen können die Zeiten daher nicht absteigend wirken).
 - Testdaten in der Test-Stadt (bleiben vorerst): M90, M91 (neu), M92 (früheres M91), M93 (HLF 20),

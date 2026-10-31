@@ -4,9 +4,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 import { START_LOAD_TIMEOUT_MS } from '../../src/runtime/appUpdate';
-import { expect, test as base } from './fixtures';
+import { expect, meBody, test as base, type ApiMocks, type MockResponse } from './fixtures';
 import { NEXT_BUILD_ID } from './globalSetup';
+import { ADMIN_OVERVIEW } from './support/admin';
 import { isAbortedFontDownload } from './support/consoleErrors';
+import { LOCATIONS, deviceDetail, deviceJson } from './support/devices';
+import { deviceTypeJson } from './support/masterData';
 
 /**
  * Updates mit zwei echten Builds: Der Update-Testserver des Workers (tests/e2e/support/
@@ -297,6 +300,80 @@ test.describe('Updates der App: Seiten ohne Kontrolle des Service Workers, mehre
     });
 });
 
+/**
+ * API eines Admins mit Gerätedetail (M1) und Geräteliste, als feste Antworten (Funktionen einmal mit
+ * einer Anfrage ohne Query ausgewertet).
+ */
+function adminDeviceApi(area: string): Record<string, MockResponse> {
+    const api: ApiMocks = {
+        'GET api/v1/auth/me': { status: 200, body: meBody('admin', 'Thomas Keller') },
+        ...ADMIN_OVERVIEW,
+        ...LOCATIONS,
+        'GET api/v1/device-types': {
+            status: 200,
+            body: { device_types: [deviceTypeJson(1, 'Atemschutzmaske', 1)] },
+        },
+        ...deviceDetail(deviceJson(1)),
+        'GET api/v1/devices/1/events': {
+            status: 200,
+            body: { events: [], total: 0, limit: 20, offset: 0 },
+        },
+    };
+    return Object.fromEntries(
+        Object.entries(api).map(([key, response]) => {
+            const [method = '', path = ''] = key.split(' ');
+            const url = `http://localhost/firefighting/${area}/${path}`;
+            return [
+                key,
+                typeof response === 'function'
+                    ? response({ area, method, path, url, body: null })
+                    : response,
+            ];
+        }),
+    );
+}
+
+/**
+ * Antworten des Update-Testservers für den Bereich (update-server.php). Für Tabs ohne Wächter: In
+ * WebKit erreichen Anfragen einer vom Service Worker kontrollierten Seite page.route() nicht.
+ */
+function writeApiTable(area: string, api: Record<string, MockResponse>): void {
+    writeFileSync(join(STATE, `${area}.api.json`), JSON.stringify(api));
+}
+
+/**
+ * Fehler eines weiteren Tabs (ohne Wächter aus fixtures.ts): Konsolenfehler und Skriptfehler, mit
+ * derselben Ausnahme für abgebrochene Schrift-Downloads in Firefox.
+ */
+function collectProblems(page: Page, browserName: string, origin: string): string[] {
+    const problems: string[] = [];
+    page.on('pageerror', (error) => problems.push(`Skriptfehler: ${error.message}`));
+    page.on('console', (message) => {
+        if (
+            message.type() === 'error' &&
+            !isAbortedFontDownload(message.text(), browserName, origin)
+        ) {
+            problems.push(`Konsolenfehler: ${message.text()}`);
+        }
+    });
+    return problems;
+}
+
+/** „controlled“ bzw. „uncontrolled“, dazu „installing“ und „waiting“ der Registrierung. */
+function workerState(page: Page): Promise<string> {
+    return page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const parts = [navigator.serviceWorker.controller === null ? 'uncontrolled' : 'controlled'];
+        if (registration?.installing) {
+            parts.push('installing');
+        }
+        if (registration?.waiting) {
+            parts.push('waiting');
+        }
+        return parts.join(', ');
+    });
+}
+
 /** Token wie in tests/e2e/support/update-server.php (nur dieses gilt). */
 const MAIL_TOKEN = 'Upd8-Token_aus-der-Mail_0123456789abcdefghijk';
 
@@ -315,16 +392,7 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         // Schrift-Downloads in Firefox); seine API-Aufrufe beantwortet der Update-Testserver.
         deploy(area);
         const mail = await context.newPage();
-        const problems: string[] = [];
-        mail.on('pageerror', (error) => problems.push(`Skriptfehler: ${error.message}`));
-        mail.on('console', (message) => {
-            if (
-                message.type() === 'error' &&
-                !isAbortedFontDownload(message.text(), browserName, baseURL ?? '')
-            ) {
-                problems.push(`Konsolenfehler: ${message.text()}`);
-            }
-        });
+        const problems = collectProblems(mail, browserName, baseURL ?? '');
         await mail.goto(`/firefighting/${area}/email-bestaetigen#token=${MAIL_TOKEN}`);
 
         await expect(mail.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
@@ -373,6 +441,85 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         // Die Seite bleibt beim Laden, nie kurz die alte Anmeldeseite.
         await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeHidden();
         await expect(page.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+    });
+
+    test('„Neu laden“ mit zweitem alten Tab: neue Version bleibt, der andere Tab behält seine Eingabe', async ({
+        page,
+        context,
+        browserName,
+        baseURL,
+    }, testInfo) => {
+        // Wie live (31.10.2026): Ein zweiter Tab (Gerätedetail mit offenem „Bearbeiten“) hält den
+        // alten Service Worker. „Neu laden“ meldete ihn ab, die Seite kam vom Server, aber die neue
+        // Version wartete weiter (Chrome holte beim register() die alte Registrierung zurück, das
+        // nächste Neuladen lieferte die alte Version). Jetzt aktiviert die Seite vom Server den
+        // wartenden Service Worker; der andere Tab lädt dabei nicht neu und verliert nichts.
+        testInfo.setTimeout(testInfo.timeout + 30_000);
+        const area = newArea(testInfo.project.name);
+        writeApiTable(area, adminDeviceApi(area));
+        const other = await context.newPage();
+        const problems = collectProblems(other, browserName, baseURL ?? '');
+        await other.goto(`/firefighting/${area}/geraete/1/details`);
+        await expect(other.getByRole('heading', { level: 1 })).toContainText('M1');
+        await other.waitForFunction(() => navigator.serviceWorker.controller !== null);
+        await other.getByRole('button', { name: 'Bearbeiten' }).click();
+        const dialog = other.getByRole('dialog', { name: 'M1 bearbeiten' });
+        await dialog.getByLabel('Seriennummer').fill('SN-neu');
+        await other.evaluate(() => {
+            (window as unknown as { ffMarker: boolean }).ffMarker = true;
+        });
+        await openOldVersion(page, area);
+
+        // Deploy, bei dem der Browser den neuen Service Worker erst nach rund 30 s findet: „Neu laden“.
+        writeFileSync(join(STATE, area), 'build-json');
+        await page.clock.install();
+        await page.reload();
+        await expect(page.getByTestId('update-loading')).toBeVisible();
+        const reloadNeeded = page.getByTestId('update-reload-needed');
+        await expect
+            .poll(
+                async () => {
+                    await page.clock.runFor(1000);
+                    return reloadNeeded.isVisible();
+                },
+                { intervals: [50], timeout: 30_000 },
+            )
+            .toBe(true);
+        // Inzwischen ist der neue Service Worker installiert und wartet.
+        writeFileSync(join(STATE, area), 'next');
+        await page.evaluate(async () => {
+            await (await navigator.serviceWorker.getRegistration())?.update();
+        });
+        await expect.poll(() => workerState(page)).toBe('controlled, waiting');
+
+        await reloadNeeded.getByRole('button', { name: 'Neu laden' }).click();
+        await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        // Die neue Version übernimmt (vorher in Chromium: Seite ohne Kontrolle, neue Version wartet).
+        await expect.poll(() => workerState(page)).toBe('controlled');
+        await page.reload();
+        await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+
+        // Der andere Tab: nicht neu geladen, Eingabe da, Hinweis statt Neuladen.
+        await expect(other.getByTestId('update-notice')).toContainText(
+            'Neue Version verfügbar – nach dem Speichern wird aktualisiert.',
+        );
+        await expect(dialog.getByLabel('Seriennummer')).toHaveValue('SN-neu');
+        expect(
+            await other.evaluate(() => (window as unknown as { ffMarker?: boolean }).ffMarker),
+        ).toBe(true);
+        await expect(other.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+        // Seitenwechsel dort: Die Dateien der alten Version gibt es nicht mehr; die App lädt die neue
+        // Version mit der Zielseite, statt an einem fehlenden Teil zu scheitern.
+        await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+        await expect(dialog).toBeHidden();
+        await other.getByRole('button', { name: 'Zurück' }).click();
+        await expect(other.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(other).toHaveURL(`/firefighting/${area}/geraete`);
+        await expect(other.getByRole('heading', { level: 1, name: 'Geräte' })).toBeVisible();
+        expect(problems).toEqual([]);
+        await other.close();
     });
 
     test('neuer Service Worker installiert langsam: Start wartet und aktiviert ihn sofort danach', async ({

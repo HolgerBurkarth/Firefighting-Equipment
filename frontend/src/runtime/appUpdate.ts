@@ -1,6 +1,7 @@
 import { shallowRef, type InjectionKey } from 'vue';
 import { START_LOCATION, type Router } from 'vue-router';
 import { hasUnsavedInput } from './unsavedInput';
+import { UpdateTrace } from './updateTrace';
 
 /**
  * Updates der App (Konzept: KONZEPT.md „Updates der App“). Der Service Worker einer neuen Version
@@ -81,6 +82,8 @@ export interface UpdateRegistration {
 
 export interface UpdateContainer {
     readonly controller: unknown;
+    /** Registrierung, die der Browser für neue Seiten verwendet; undefined = keine (abgemeldet). */
+    getRegistration(): Promise<unknown>;
     addEventListener(type: 'controllerchange', listener: Listener): void;
     removeEventListener(type: 'controllerchange', listener: Listener): void;
 }
@@ -132,8 +135,11 @@ export class AppUpdater {
     private reloading = false;
     /** Laufende Anfragen an den Server (update(), build.json); vor dem Neuladen abgewartet. */
     private readonly requests = new Set<Promise<unknown>>();
+    /** Zeitleiste zur Diagnose (sessionStorage, siehe updateTrace.ts). */
+    private readonly trace: UpdateTrace;
 
     constructor(private readonly env: UpdateEnvironment) {
+        this.trace = new UpdateTrace(env.storage, env.now);
         // Hat ein anderer Tab die neue Version aktiviert, läuft hier noch der alte Code unter dem
         // neuen Service Worker: dann ebenfalls neu laden (beim nächsten Seitenwechsel). Übernimmt
         // ein Service Worker eine Seite ohne Kontrolle (erste Installation, Strg+F5), entscheidet
@@ -142,6 +148,7 @@ export class AppUpdater {
         env.container.addEventListener('controllerchange', () => {
             const replaced = hadController;
             hadController = true;
+            this.trace.record('controllerchange', replaced ? 'replaced' : 'first');
             // Ersetzt oder gerade selbst aktiviert: Es übernimmt die neue Version.
             if (replaced || this.applying) {
                 this.controllerChanged = true;
@@ -161,12 +168,13 @@ export class AppUpdater {
     /** Verfolgt die Registrierung des Service Workers. */
     attach(registration: UpdateRegistration): void {
         this.registration = registration;
+        this.trace.record('register', this.workerSummary(registration));
         if (registration.waiting !== null) {
             this.markReady();
         }
-        registration.addEventListener('updatefound', () => {
-            const worker = registration.installing;
+        const watch = (worker: UpdateWorker | null): void => {
             worker?.addEventListener('statechange', () => {
+                this.trace.record('statechange', worker.state);
                 if (worker.state !== 'installed') {
                     return;
                 }
@@ -177,13 +185,60 @@ export class AppUpdater {
                 // Nur ein ANDERER Service Worker in Kontrolle zählt: WebKit meldet bei der ersten
                 // Installation den neuen schon als controller, während er noch „installed“ ist.
                 const controller = this.env.container.controller;
-                if (controller !== null && controller !== worker) {
+                if (controller === null) {
+                    void this.checkUncontrolled();
+                } else if (controller !== worker) {
                     this.markReady();
                 } else {
                     void this.compareBuild();
                 }
             });
+        };
+        // Lief die Installation schon, bevor die App die Registrierung bekam (Chrome installiert
+        // eine zurückgeholte Registrierung sofort neu), kam updatefound vorher.
+        watch(registration.installing);
+        registration.addEventListener('updatefound', () => {
+            this.trace.record('updatefound');
+            watch(registration.installing);
         });
+    }
+
+    /**
+     * Seite ohne Kontrolle eines Service Workers (vom Server: erster Besuch, Strg+F5, „Neu laden“).
+     * Liefert der Server eine andere Version, ist ein Update da. Ist die Seite selbst die aktuelle
+     * und wartet ein neuer Service Worker, wird er aktiviert (ohne Neuladen, die Seite ist schon
+     * neu): Sonst wartet er, solange ein anderer Tab den alten hält, und das nächste Neuladen
+     * lieferte wieder die alte Version (live 31.10.2026: Chrome holt beim register() eine
+     * abgemeldete Registrierung samt altem Service Worker zurück). Andere Tabs der alten Version
+     * folgen wie bei jeder Übernahme beim nächsten Seitenwechsel (controllerchange).
+     */
+    private async checkUncontrolled(): Promise<void> {
+        const served = await this.servedBuild();
+        if (served === null) {
+            return;
+        }
+        if (served !== this.env.buildId) {
+            this.ready.value = true;
+            return;
+        }
+        const waiting = this.registration?.waiting ?? null;
+        if (waiting === null || this.env.container.controller !== null || this.reloading) {
+            return;
+        }
+        this.trace.record('activate-waiting', 'uncontrolled current page');
+        waiting.postMessage(SKIP_WAITING_MESSAGE);
+    }
+
+    /** Kurzer Zustand der Registrierung für die Zeitleiste. */
+    private workerSummary(registration: UpdateRegistration | null): string {
+        const parts = [this.env.container.controller === null ? 'uncontrolled' : 'controlled'];
+        if (registration?.installing) {
+            parts.push('installing');
+        }
+        if (registration?.waiting) {
+            parts.push('waiting');
+        }
+        return parts.join(', ');
     }
 
     /**
@@ -222,12 +277,22 @@ export class AppUpdater {
         url: string,
         registered: Promise<unknown> = Promise.resolve(),
     ): Promise<boolean> {
+        this.trace.record('start', `build=${this.env.buildId}`);
         // Registrierung abwarten (für das Aktivieren der neuen Version), aber nie unbegrenzt.
         await this.withTimeout(registered);
-        if (this.env.container.controller === null || !this.env.isOnline()) {
+        this.trace.record('registered', this.workerSummary(this.registration));
+        if (!this.env.isOnline()) {
+            return false;
+        }
+        if (this.env.container.controller === null) {
+            // Die Seite kommt vom Server; wartet ein neuer Service Worker, im Hintergrund prüfen.
+            if (this.registration?.waiting) {
+                void this.checkUncontrolled();
+            }
             return false;
         }
         const served = await this.withTimeout(this.track(this.env.fetchBuildId()));
+        this.trace.record('build', served ?? 'unknown');
         if (served === null || served === this.env.buildId) {
             return false;
         }
@@ -252,22 +317,26 @@ export class AppUpdater {
 
     /**
      * Knopf „Neu laden“ (die neue Version ließ sich nicht aktivieren): Service Worker abmelden, damit
-     * die Seite vom Server kommt (neue Version, registriert ihn neu), und `url` samt #token bzw.
-     * #code neu laden.
+     * die Seite vom Server kommt (neue Version, registriert ihn neu und aktiviert eine wartende neue
+     * Version, siehe checkUncontrolled), und `url` samt #token bzw. #code neu laden. Ohne Sperre
+     * gegen Schleifen: Ein Klick ist keine; sonst erschiene danach eine alte Seite nur mit dem
+     * Hinweis statt sich selbst zu aktualisieren.
      */
     async reloadFromServer(url: string): Promise<void> {
         this.applying = true;
         this.switching.value = true;
-        await this.unregister();
-        await this.reload(url);
+        this.trace.record('reload-from-server');
+        this.trace.record('unregister', String(await this.unregister()));
+        await this.reload(url, false);
     }
 
     /**
      * Lädt `url` neu. Vorher enden alle Anfragen: Ab jetzt beginnt keine neue (auch keine geplante
      * Wiederholung der Suche, keine Prüfung), laufende werden höchstens REQUEST_SETTLE_TIMEOUT_MS
      * abgewartet. Sonst bräche das Neuladen z. B. ein update() ab, und WebKit meldet das als Fehler.
+     * `remember`: Sperre gegen Schleifen setzen (jedes automatische Neuladen).
      */
-    private async reload(url: string): Promise<void> {
+    private async reload(url: string, remember = true): Promise<void> {
         this.reloading = true;
         if (this.requests.size > 0) {
             await Promise.race([
@@ -277,7 +346,10 @@ export class AppUpdater {
                 }),
             ]);
         }
-        this.rememberReload();
+        if (remember) {
+            this.rememberReload();
+        }
+        this.trace.record('reload', remember ? 'automatic' : 'button');
         this.env.navigate(url);
     }
 
@@ -305,6 +377,7 @@ export class AppUpdater {
         if (!this.ready.value || this.autoBlocked.value) {
             return false;
         }
+        this.trace.record('reload-needed', this.workerSummary(this.registration));
         this.reloadNeeded.value = true;
         return new Promise<never>(() => undefined);
     }
@@ -322,16 +395,23 @@ export class AppUpdater {
 
     /** Liefert der Server eine andere Version als die laufende, ist ein Update da. true = neuer. */
     private async compareBuild(): Promise<boolean> {
-        // Während des Neuladens nicht mehr fragen (der Browser bricht die Anfrage ohnehin ab).
-        if (this.applying || !this.env.isOnline()) {
-            return false;
-        }
-        const served = await this.track(this.env.fetchBuildId());
+        const served = await this.servedBuild();
         if (served === null || served === this.env.buildId) {
             return false;
         }
         this.ready.value = true;
         return true;
+    }
+
+    /** Build-Kennung des Servers; null offline, während des Neuladens und bei jedem Fehler. */
+    private async servedBuild(): Promise<string | null> {
+        // Während des Neuladens nicht mehr fragen (der Browser bricht die Anfrage ohnehin ab).
+        if (this.applying || !this.env.isOnline()) {
+            return null;
+        }
+        const served = await this.track(this.env.fetchBuildId());
+        this.trace.record('build', served ?? 'unknown');
+        return served;
     }
 
     /**
@@ -354,6 +434,9 @@ export class AppUpdater {
             return false;
         }
         if (this.recentlyReloaded()) {
+            if (!this.autoBlocked.value) {
+                this.trace.record('blocked', 'reloaded recently');
+            }
             this.autoBlocked.value = true;
             return false;
         }
@@ -378,6 +461,7 @@ export class AppUpdater {
         }
         this.applying = true;
         this.switching.value = true;
+        this.trace.record('apply', this.workerSummary(this.registration));
         // Kennt der Service Worker die neue Version noch nicht (nur die Build-Kennung zeigte sie),
         // erst danach fragen. Wird sie gerade installiert, darauf warten: Sonst lieferte der alte
         // Service Worker beim Neuladen wieder die alte Seite.
@@ -410,10 +494,13 @@ export class AppUpdater {
         if (this.env.container.controller !== null && !takenOver) {
             // Die neue Version wartet, übernimmt aber nicht: Chrome hält die Aktivierung an, wenn der
             // alte Service Worker genau beim Wechsel eine Anfrage bekommt (anderer Tab, Schrift …),
-            // und setzt sie nicht zuverlässig fort. Dann den Service Worker abmelden: Die Seite kommt
-            // beim Neuladen vom Server (neue Version) und registriert ihn neu. Ohne wartende neue
-            // Version (z. B. Download gescheitert) nicht neu laden.
-            if (waiting === null || !(await this.unregister())) {
+            // und setzt sie nicht zuverlässig fort. Letzter Ausweg: den Service Worker abmelden. Die
+            // Seite kommt beim Neuladen vom Server (neue Version), registriert ihn neu und aktiviert
+            // die wartende Version (checkUncontrolled). Ohne wartende neue Version (z. B. Download
+            // gescheitert) nicht neu laden.
+            this.trace.record('takeover-missing', this.workerSummary(this.registration));
+            if (waiting === null || !(await this.unregisterForReload())) {
+                this.trace.record('apply-failed');
                 this.applying = false;
                 this.switching.value = false;
                 return false;
@@ -421,6 +508,27 @@ export class AppUpdater {
         }
         await this.reload(url);
         return true;
+    }
+
+    /**
+     * Abmelden, damit das Neuladen die Seite vom Server holt. true auch, wenn unregister() false
+     * meldet, der Browser die Registrierung aber nicht mehr kennt: Sie wurde schon früher abgemeldet
+     * und nur ein anderer Tab hält sie noch (live 31.10.2026); neue Seiten kommen dann ohnehin vom
+     * Server.
+     */
+    private async unregisterForReload(): Promise<boolean> {
+        const unregistered = await this.unregister();
+        this.trace.record('unregister', String(unregistered));
+        if (unregistered) {
+            return true;
+        }
+        try {
+            const gone = (await this.env.container.getRegistration()) === undefined;
+            this.trace.record('registration', gone ? 'gone' : 'still known');
+            return gone;
+        } catch {
+            return false;
+        }
     }
 
     private async unregister(): Promise<boolean> {
@@ -454,8 +562,10 @@ export class AppUpdater {
         }
         try {
             await this.track(registration.update());
-        } catch {
+            this.trace.record('update', this.workerSummary(registration));
+        } catch (error) {
             // Keine Verbindung oder Server gestört: beim nächsten Anlass erneut.
+            this.trace.record('update-error', error instanceof Error ? error.name : 'unknown');
         }
     }
 
@@ -534,6 +644,7 @@ export class AppUpdater {
             };
             this.env.container.addEventListener('controllerchange', done);
             this.env.setTimeout(done, TAKEOVER_TIMEOUT_MS);
+            this.trace.record('skip-waiting');
             waiting.postMessage(SKIP_WAITING_MESSAGE);
         });
     }
@@ -633,6 +744,7 @@ export function startUpdateChecks(router: Router, updater: AppUpdater): void {
 
 const NO_SERVICE_WORKER: UpdateContainer = {
     controller: null,
+    getRegistration: () => Promise.resolve(undefined),
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
 };

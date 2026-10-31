@@ -201,10 +201,33 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   vom neuen Service Worker gesteuert.
 - Neu geladen wird nur, wenn danach sicher die neue Version kommt (der neue Service Worker hat die
   Seite übernommen). Hängt die Übernahme (Chrome hält sie an, wenn der alte Service Worker genau
-  dann eine Anfrage bekommt), meldet die App den Service Worker ab und lädt die Seite vom Server.
-  Während des Wechsels steht oben „Neue Version wird geladen …“. Beim Zurück-Knopf landet die neue
-  Version auf der richtigen Seite.
-- Schleifensperre in allen Fällen gleich (10 Minuten je Tab), danach nur der Hinweis mit Knopf.
+  dann eine Anfrage bekommt), meldet die App als letzten Ausweg den Service Worker ab und lädt die
+  Seite vom Server. Meldet das Abmelden „nicht gefunden“, kennt der Browser die Registrierung aber
+  nicht mehr (sie wurde schon früher abgemeldet, ein anderer Tab hält sie nur noch), lädt die App
+  ebenfalls neu: Neue Seiten kommen dann ohnehin vom Server. Während des Wechsels steht oben „Neue
+  Version wird geladen …“. Beim Zurück-Knopf landet die neue Version auf der richtigen Seite.
+- Eine Seite, die nicht unter dem Service Worker steht (vom Server: erster Besuch, Strg+F5, nach
+  „Neu laden“), aktiviert einen wartenden neuen Service Worker selbst, wenn sie die aktuelle Version
+  ist (Kennung wie `build.json`); sie lädt dabei nicht neu. Andere offene Tabs der alten Version
+  übernimmt er; sie laden wie immer erst beim nächsten Seitenwechsel neu, mit angefangener Eingabe
+  erscheint dort der Hinweis mit Knopf, die Eingabe bleibt. Grund (Live-Test 31.10.2026, Chrome):
+  Ein zweiter Tab (Gerätedetail) hielt den alten Service Worker. „Neu laden“ meldete ihn ab, die
+  Seite kam vom Server, aber Chrome holte beim erneuten Registrieren die abgemeldete Registrierung
+  samt altem Service Worker zurück; die neue Version wartete weiter, und das nächste gewöhnliche
+  Neuladen lieferte wieder die alte. Firefox und WebKit verhalten sich nicht so.
+- Schleifensperre (10 Minuten je Tab) nach jedem automatischen Neuladen, danach nur der Hinweis mit
+  Knopf. Der Knopf „Neu laden“ setzt sie nicht (ein Klick ist keine Schleife); sonst bliebe eine
+  danach erneut alte Seite beim Hinweis, statt sich selbst zu aktualisieren (Live-Test 31.10.2026:
+  erst „Jetzt aktualisieren“ half).
+- Zeitleiste zur Diagnose: Was die App beim Start und beim Aktualisieren mit dem Service Worker
+  erlebt (Registrierung, Kennung des Servers, Prüfungen, Installation, Aktivierung, Übernahme,
+  Abmelden, Neuladen), steht je Tab in sessionStorage, höchstens 50 Einträge, und übersteht so ein
+  Neuladen. In der Konsole der Entwicklerwerkzeuge (Reiter „Konsole“, auf einer Seite der Stadt):
+  `JSON.parse(sessionStorage['ff-update-trace'])`. Je Eintrag Zeit (`at`, UTC), Ereignis
+  (`event`, z. B. `start`, `build`, `update`, `skip-waiting`, `controllerchange`, `unregister`,
+  `reload`, `reload-needed`) und Einzelheit (`detail`, z. B. `build=b6a25b03573c` oder
+  `controlled, waiting`). Nur feste Ereignisse und Build-Kennungen, keine Adressen und keine
+  persönlichen Daten.
 - Ist ein Formular angefangen (z. B. Umbuchung, Registrierung), erscheint oben der Hinweis „Neue
   Version verfügbar – nach dem Speichern wird aktualisiert“ mit dem Knopf „Jetzt aktualisieren“.
   Aktualisiert wird beim nächsten Seitenwechsel (nach dem Speichern führt die App in der Regel auf
@@ -232,7 +255,10 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   des Service Workers; Seite per Strg+F5 geladen, neue Version übernimmt sie; zwei Tabs, einer
   aktualisiert und der andere folgt beim nächsten Seitenwechsel; zwei Tabs, einer geschlossen;
   Mail-Link mit alter Version im Service Worker (neue Version lädt sofort, Token bleibt erhalten und
-  wird verarbeitet); „Seite nicht gefunden“ nach einem Deploy; Zurück-Knopf nach einem Deploy. Die
+  wird verarbeitet); „Seite nicht gefunden“ nach einem Deploy; Zurück-Knopf nach einem Deploy;
+  „Neu laden“ mit einem zweiten alten Tab (Gerätedetail mit offenem „Bearbeiten“): danach steuert
+  die neue Version die Seite, auch nach erneutem Neuladen, der andere Tab behält seine Eingabe und
+  wechselt beim nächsten Seitenwechsel auf die neue Version, obwohl die Dateien der alten fehlen. Die
   sporadischen Fälle (zusammengelegte Prüfung, hängende Übernahme) prüfen Unit-Tests und ein
   Prüflauf unter Last (3 × 480 Läufe).
 - Veraltete App gegen geänderte API: Die App nennt bei jedem Aufruf ihre Vertragsnummer

@@ -20,6 +20,7 @@ import {
     type UpdateWorker,
 } from '../../src/runtime/appUpdate';
 import { registerUnsavedInput } from '../../src/runtime/unsavedInput';
+import { UPDATE_TRACE_KEY, UPDATE_TRACE_MAX, UpdateTrace } from '../../src/runtime/updateTrace';
 
 type Listener = (event: Event) => void;
 
@@ -69,10 +70,12 @@ class FakeRegistration extends FakeTarget {
     updates = 0;
     failUpdate = false;
     unregistered = false;
+    /** Ergebnis von unregister() (false: der Browser kennt die Registrierung nicht mehr). */
+    unregisterResult = true;
 
     unregister(): Promise<boolean> {
         this.unregistered = true;
-        return Promise.resolve(true);
+        return Promise.resolve(this.unregisterResult);
     }
 
     update(): Promise<unknown> {
@@ -82,8 +85,15 @@ class FakeRegistration extends FakeTarget {
 }
 
 class FakeContainer extends FakeTarget {
+    /** Registrierung, die der Browser für die Seite kennt (getRegistration); undefined = keine. */
+    registered: unknown = undefined;
+
     constructor(public controller: unknown) {
         super();
+    }
+
+    getRegistration(): Promise<unknown> {
+        return Promise.resolve(this.registered);
     }
 }
 
@@ -142,13 +152,23 @@ async function flush(): Promise<void> {
     }
 }
 
-function setup(options: { controller?: unknown; storage?: MemoryStorage | null } = {}): Setup {
+function setup(
+    options: {
+        controller?: unknown;
+        storage?: MemoryStorage | null;
+        /** Zustand der Registrierung, bevor die App sie verfolgt (attach). */
+        beforeAttach?: (registration: FakeRegistration) => void;
+    } = {},
+): Setup {
     const container = new FakeContainer(
         'controller' in options ? options.controller : { scriptURL: 'sw.js' },
     );
+    const registration = new FakeRegistration();
+    container.registered = registration;
+    options.beforeAttach?.(registration);
     const storage = new MemoryStorage();
     const state: Omit<Setup, 'updater'> = {
-        registration: new FakeRegistration(),
+        registration,
         container,
         storage,
         navigated: [],
@@ -542,6 +562,35 @@ describe('AppUpdater: aktualisieren', () => {
         expect(s.registration.unregistered).toBe(true);
         expect(s.navigated).toEqual(['https://x/a']);
         expect(s.storage.getItem(RELOAD_STORAGE_KEY)).toBe(String(s.now));
+    });
+
+    it('Aktivierung bleibt stehen, Registrierung war schon abgemeldet: trotzdem neu laden (vom Server)', async () => {
+        // Live 31.10.2026: unregister() liefert false, wenn die Registrierung schon früher abgemeldet
+        // wurde und nur ein anderer Tab sie noch hält. Der Browser kennt sie dann für neue Seiten
+        // nicht mehr, die Seite kommt beim Neuladen vom Server.
+        const s = setup();
+        installNewVersion(s);
+        s.registration.unregisterResult = false;
+        s.container.registered = undefined;
+        const done = s.updater.apply('https://x/a');
+        await flush();
+        s.timers.at(-1)?.callback();
+        expect(await done).toBe(true);
+        expect(s.navigated).toEqual(['https://x/a']);
+        // Automatisches Neuladen: die Sperre gegen Schleifen gilt.
+        expect(s.storage.getItem(RELOAD_STORAGE_KEY)).toBe(String(s.now));
+    });
+
+    it('Aktivierung bleibt stehen, Abmelden meldet false, Registrierung noch bekannt: nicht neu laden', async () => {
+        const s = setup();
+        installNewVersion(s);
+        s.registration.unregisterResult = false;
+        const done = s.updater.apply('https://x/a');
+        await flush();
+        s.timers.at(-1)?.callback();
+        expect(await done).toBe(false);
+        expect(s.navigated).toEqual([]);
+        expect(s.storage.getItem(RELOAD_STORAGE_KEY)).toBeNull();
     });
 
     it('Aktivierung bleibt stehen und Abmelden scheitert: nicht neu laden, Sperre unberührt', async () => {
@@ -941,6 +990,183 @@ describe('AppUpdater: Start mit veralteter Version und „Seite nicht gefunden�
         expect(s.registration.unregistered).toBe(true);
         expect(s.navigated).toEqual([START_URL]);
         expect(s.updater.switching.value).toBe(true);
+    });
+
+    it('Knopf „Neu laden“ setzt keine Sperre: ein Klick ist keine Schleife', async () => {
+        const s = setup();
+        await s.updater.reloadFromServer(START_URL);
+        expect(s.storage.getItem(RELOAD_STORAGE_KEY)).toBeNull();
+    });
+});
+
+describe('AppUpdater: Seite ohne Kontrolle in der aktuellen Version', () => {
+    // Live 31.10.2026: Nach „Neu laden“ kam die Seite vom Server, die neue Version wartete aber
+    // weiter, solange ein anderer Tab den alten Service Worker hielt; Chrome holte beim register()
+    // die alte Registrierung zurück, das nächste Neuladen lieferte wieder die alte Version.
+    const START_URL = 'https://x/firefighting/test/standorte';
+
+    it('neuer Service Worker wartet schon beim Start: aktivieren, nicht neu laden', async () => {
+        const worker = new FakeWorker('installed');
+        const s = setup({
+            controller: null,
+            beforeAttach: (registration) => {
+                registration.waiting = worker;
+            },
+        });
+        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        await flush();
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual([]);
+        expect(s.updater.ready.value).toBe(false);
+        expect(s.updater.loadingPage.value).toBe(false);
+    });
+
+    it('neuer Service Worker wird erst nach dem Start fertig: dann aktivieren', async () => {
+        const s = setup({ controller: null });
+        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        const worker = installNewVersion(s);
+        await flush();
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual([]);
+        expect(s.updater.ready.value).toBe(false);
+    });
+
+    it('Installation lief schon, als die App die Registrierung bekam: ebenso aktivieren', async () => {
+        // Chrome installiert die zurückgeholte Registrierung sofort neu (Zustand „installing“,
+        // updatefound kam vor attach).
+        const worker = new FakeWorker('installing');
+        const s = setup({
+            controller: null,
+            beforeAttach: (registration) => {
+                registration.installing = worker;
+            },
+        });
+        s.registration.installing = null;
+        s.registration.waiting = worker;
+        worker.setState('installed');
+        await flush();
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+    });
+
+    it('Server liefert eine andere Version: nicht aktivieren, sondern Update bereit', async () => {
+        const worker = new FakeWorker('installed');
+        const s = setup({
+            controller: null,
+            beforeAttach: (registration) => {
+                registration.waiting = worker;
+            },
+        });
+        s.served = NEW_BUILD;
+        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        await flush();
+        expect(worker.messages).toEqual([]);
+        expect(s.updater.ready.value).toBe(true);
+    });
+
+    it('Build-Kennung nicht lesbar: nicht aktivieren', async () => {
+        const worker = new FakeWorker('installed');
+        const s = setup({
+            controller: null,
+            beforeAttach: (registration) => {
+                registration.waiting = worker;
+            },
+        });
+        s.served = null;
+        await s.updater.checkOnStart(START_URL);
+        await flush();
+        expect(worker.messages).toEqual([]);
+    });
+
+    it('ohne wartenden Service Worker keine Abfrage beim Start (erster Besuch)', async () => {
+        const s = setup({ controller: null });
+        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        await flush();
+        expect(s.buildFetches).toBe(0);
+    });
+
+    it('Seite unter Kontrolle: wartende Version nicht nebenbei aktivieren', async () => {
+        const worker = new FakeWorker('installed');
+        const s = setup({
+            beforeAttach: (registration) => {
+                registration.waiting = worker;
+            },
+        });
+        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        await flush();
+        expect(worker.messages).toEqual([]);
+    });
+});
+
+describe('Zeitleiste der Updates (sessionStorage)', () => {
+    function trace(s: Setup): { at: string; event: string; detail?: string }[] {
+        return JSON.parse(s.storage.getItem(UPDATE_TRACE_KEY) ?? '[]') as {
+            at: string;
+            event: string;
+            detail?: string;
+        }[];
+    }
+
+    it('Start mit veralteter Version: Einträge bis zum Neuladen, lesbar per JSON.parse', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        const worker = findsNewVersionOnUpdate(s, 1);
+        activatesOnMessage(s, worker);
+        expect(await s.updater.checkOnStart('https://x/firefighting/test/a#token=geheim')).toBe(
+            true,
+        );
+        const events = trace(s).map((entry) => entry.event);
+        expect(events).toEqual(
+            expect.arrayContaining([
+                'register',
+                'start',
+                'build',
+                'update',
+                'skip-waiting',
+                'controllerchange',
+                'reload',
+            ]),
+        );
+        const start = trace(s).find((entry) => entry.event === 'start');
+        expect(start).toEqual({
+            at: new Date(s.now).toISOString(),
+            event: 'start',
+            detail: `build=${RUNNING_BUILD}`,
+        });
+        // Keine Adressen (Token im Fragment), keine personenbezogenen Daten.
+        expect(s.storage.getItem(UPDATE_TRACE_KEY)).not.toContain('geheim');
+        expect(s.storage.getItem(UPDATE_TRACE_KEY)).not.toContain('https://');
+    });
+
+    it('höchstens UPDATE_TRACE_MAX Einträge, die ältesten fallen weg', () => {
+        const storage = new MemoryStorage();
+        const updateTrace = new UpdateTrace(storage, () => 0);
+        for (let i = 0; i < UPDATE_TRACE_MAX + 10; i += 1) {
+            updateTrace.record('test', String(i));
+        }
+        const entries = JSON.parse(storage.getItem(UPDATE_TRACE_KEY) ?? '[]') as {
+            detail: string;
+        }[];
+        expect(UPDATE_TRACE_MAX).toBe(50);
+        expect(entries).toHaveLength(50);
+        expect(entries[0]?.detail).toBe('10');
+        expect(entries.at(-1)?.detail).toBe(String(UPDATE_TRACE_MAX + 9));
+    });
+
+    it('ohne oder mit kaputtem Speicher keine Fehler', () => {
+        expect(() => {
+            new UpdateTrace(null, () => 0).record('test');
+        }).not.toThrow();
+        const broken = new MemoryStorage();
+        broken.setItem(UPDATE_TRACE_KEY, '{kein json');
+        new UpdateTrace(broken, () => 0).record('test');
+        expect(JSON.parse(broken.getItem(UPDATE_TRACE_KEY) ?? '')).toHaveLength(1);
+        const throwing = new MemoryStorage();
+        throwing.getItem = () => {
+            throw new Error('SecurityError');
+        };
+        expect(() => {
+            new UpdateTrace(throwing, () => 0).record('test');
+        }).not.toThrow();
     });
 });
 
