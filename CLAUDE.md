@@ -15,9 +15,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Commits (seit 31.10.2026): Nach „✅ FERTIG“ committet der Agent selbst, ein Commit je Schritt mit
   allen Dateien des Schritts, Betreff wie in der Meldung genannt, mit der üblichen Attribution
   (`Co-Authored-By`). Vorher immer `git status` prüfen: keine fremden, temporären oder nicht zum
-  Schritt gehörenden Dateien (Testausgaben, Notizen, Konfiguration mit Zugangsdaten). Pushen tut nur
-  der Nutzer, gesammelt (mehrere Commits); Agenten pushen nie und ändern keine schon gepushten
-  Commits.
+  Schritt gehörenden Dateien (Testausgaben, Notizen, Konfiguration mit Zugangsdaten). Pushen,
+  CI verfolgen und deployen ebenfalls der Agent (seit 31.10.2026, siehe "Autonomer Ablauf"); schon
+  gepushte Commits ändert er nie (kein `--amend`, kein `--force`).
 - Muss ein Schritt vor dem nächsten unbedingt live geprüft werden oder durch CI laufen (z. B. neue
   Abläufe auf dem Server, Migrationen, Änderungen am Workflow), sagt die „✅ FERTIG“-Meldung das
   ausdrücklich.
@@ -70,6 +70,40 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   feste Zeitgrenze setzen.
 - Live-Tests (gegen den Server www.prodad.de) nur in der Test-Stadt `/firefighting/test/`, nie in
   echten Städten.
+
+## Autonomer Ablauf
+Seit 31.10.2026 arbeitet der Agent eine Runde selbstständig durch: programmieren, testen,
+committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pushen tut nur der Nutzer“.
+- Werkzeuge (eingerichtet vom Nutzer): `gh` ist angemeldet (Konto `HolgerBurkarth`, Rechte `repo`
+  und `workflow`; unter Windows `C:\Program Files\GitHub CLI\gh.exe`, falls nicht im PATH der Shell).
+  Deploy: `ssh -T strato-ff` startet auf dem Server ausschließlich `scripts/deploy.sh` (erzwungener
+  Befehl im Schlüssel, keine Shell, kein Passwort). Andere Befehle auf dem Server gibt es so nicht.
+- Ablauf je Schritt:
+  1. Programmieren, lokal prüfen (siehe "Arbeitsweise", "Prüfen vor „✅ FERTIG“"), committen.
+  2. `git push`, dann den CI-Lauf dieses Commits verfolgen (`gh run list`, `gh run watch <id>`).
+     Ändert der Push nur `.md`-Dateien, läuft keine CI und es gibt nichts zu deployen.
+  3. Rot: `gh run view <id> --log-failed` lesen, Ursache in der „✅ FERTIG“-Meldung erklären,
+     beheben, committen, pushen. Höchstens 3 Reparaturversuche je Fehler, danach anhalten und
+     berichten („⛔ ABGEBROCHEN“). Nie einfach neu starten; einzige Ausnahme: Ein Lauf, der
+     AUSSCHLIESSLICH am bekannten Firefox-Fehler #43413 scheitert (siehe "GitHub Actions (CI)"),
+     darf einmal mit `gh run rerun <id> --failed` wiederholt werden.
+  4. Grün (auch der Job `deploy`, der den Branch `deploy` schreibt): `ssh -T strato-ff`. Danach
+     prüfen: Die Ausgabe endet mit „Deployment erfolgreich“,
+     `https://www.prodad.de/firefighting/test/build.json` liefert als `build` die ersten 12 Zeichen
+     des gepushten main-Commits, und `https://www.prodad.de/firefighting/service/api/v1/health`
+     liefert `{"status":"ok","database":"ok"}`. Scheitert das Deploy: NICHTS zurückspielen,
+     anhalten, die Ausgabe berichten.
+  5. „✅ FERTIG“ zusätzlich mit: was live ist (Commit, Build-Kennung), Laufzeit der CI, Reparaturen
+     (Ursache je roten Lauf) und was im Chat live im Browser geprüft werden soll.
+- Vorher anhalten und fragen („❓ RÜCKFRAGE“):
+  - Migrationen, die bestehende Daten ändern oder löschen (`UPDATE`, `DELETE`, `DROP`, Spalten
+    entfernen oder umbenennen). Reine Erweiterungen (neue Tabellen oder Spalten) gehen ohne.
+  - Änderungen an `scripts/deploy.sh`, am Deploy im Workflow (Job `deploy`,
+    `scripts/publish-deploy-branch.sh`) oder an Sicherungen (`bin/db-dump.php`, `src/Backup/`,
+    Aufräumregeln).
+  - Alles, was echte Städte (nicht `test`) betrifft.
+- Weiterhin: keine Live-Tests in echten Städten, nie `purge-device-data`, nie Zugangsdaten
+  committen.
 
 ## Zielumgebung (STRATO, Shared Hosting)
 - PHP 8.5 (CGI), MariaDB 10.11, Apache mit `.htaccess` und mod_rewrite.
@@ -2501,7 +2535,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 
 ## Deployment
 - Ablauf: lokal prüfen (siehe "Arbeitsweise"), committen, nach `main` pushen → GitHub Actions testet und legt Code plus Frontend-Build im Branch
-  `deploy` ab (siehe "GitHub Actions (CI)") → von Hand auf dem Server per SSH:
+  `deploy` ab (siehe "GitHub Actions (CI)") → auf dem Server `scripts/deploy.sh`: durch den Agenten
+  per `ssh -T strato-ff` (siehe "Autonomer Ablauf"), von Hand per SSH mit
   `cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh`. Erst deployen, wenn der
   CI-Lauf grün ist und `deploy` den gewünschten Stand hat.
 - Der Server steht auf dem Branch `deploy` (nie `main`: dort fehlt der Frontend-Build; auf STRATO
