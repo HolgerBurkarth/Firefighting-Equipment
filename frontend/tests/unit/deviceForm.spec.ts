@@ -17,6 +17,7 @@ import {
     reinstateIdentifierTaken,
     reinstateRequest,
     sameNewDeviceForm,
+    sameReinstateForm,
     scanCodeProblem,
     textProblem,
     textValue,
@@ -191,6 +192,14 @@ describe('Wieder aufnehmen', () => {
         status_label: 'ausgesondert',
         scan_code: 'ABC',
         version: 7,
+    });
+
+    it('ungespeichert nur, wenn die Angaben vom Vorschlag abweichen (sameReinstateForm)', () => {
+        const form = reinstateFormFromDevice(device);
+        expect(sameReinstateForm(form, reinstateFormFromDevice(device))).toBe(true);
+        expect(sameReinstateForm(form, { ...form, status: 'defective' })).toBe(false);
+        expect(sameReinstateForm(form, { ...form, keepScanCode: false })).toBe(false);
+        expect(sameReinstateForm(form, { ...form, identifier: 'M 5' })).toBe(false);
     });
 
     it('Vorschlag: einsatzbereit an bisherigem Standort, nur der Status wird gesendet', () => {

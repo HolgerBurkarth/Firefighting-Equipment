@@ -96,10 +96,8 @@ function setField(field: keyof InvitationForm, value: string): void {
 const fresh = shallowRef<CreatedInvitationCode | null>(null);
 const feedback = ref<{ readonly ok: boolean; readonly text: string } | null>(null);
 
-useUnsavedInput(() => {
-    if (fresh.value !== null) {
-        return true;
-    }
+/** Ungespeicherte Eingaben im Fenster „Neuer Einladungscode“ (auch für FormDialog). */
+const dialogUnsaved = computed(() => {
     const initial = newInvitationForm();
     return (
         dialogOpen.value &&
@@ -108,6 +106,7 @@ useUnsavedInput(() => {
             form.value.maxUses !== initial.maxUses)
     );
 });
+useUnsavedInput(() => fresh.value !== null || dialogUnsaved.value);
 
 async function submit(): Promise<void> {
     touched.value = true;
@@ -374,6 +373,7 @@ function retry(): void {
 
     <FormDialog
         v-model:open="dialogOpen"
+        :unsaved="dialogUnsaved"
         title="Neuer Einladungscode"
         description="Der Code ist nur direkt nach dem Erzeugen zu sehen. Danach drucken Sie einen Aushang oder teilen den Link."
         submit-label="Code erzeugen"

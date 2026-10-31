@@ -654,7 +654,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `device_count_total`); Knöpfe „Fach in … anlegen“ (nur aktive Ebene 1) und „… bearbeiten“
   (Stift). Fenster `FormDialog` (Reka UI `Dialog`, Slot `extra` für Sperren/Deaktivieren abseits,
   `returnFocus` = öffnender Knopf, da WebKit beim Klick nicht fokussiert; `variant="danger"` = roter
-  Knopf, z. B. Aussondern). Sperren nur leer
+  Knopf, z. B. Aussondern; `unsaved` siehe „Fenster mit Eingaben“ unten). Sperren nur leer
   (`lockBlocker` aus dem Baum: Geräte direkt dort und aktive Fächer; Knopf gesperrt mit Hinweis), dann
   `ConfirmDialog`; 409 des Servers als Meldung auf der Seite. Entsperren eines Fachs erst nach dem
   übergeordneten Standort. Gerätetypen als Tabelle (`deviceTypeRows`: Name natürlich per
@@ -1071,6 +1071,23 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Regel für ALLE Formulare: ungespeicherte Eingaben über `useUnsavedInput(() => …)`
   (`src/runtime/unsavedInput.ts`) melden: true, solange etwas eingegeben und nicht gespeichert ist;
   nach dem Speichern oder Leeren false. Nur so lädt die App nie mitten in einer Eingabe neu.
+- Fenster mit Eingaben NUR über `FormDialog` (eigene Reka-UI-Fenster gibt es nur für das Menü
+  `AdminMenu` und Rückfragen `ConfirmDialog`, per Test `formDialogs.spec.ts`), immer mit
+  `:unsaved` = derselbe Wert wie für `useUnsavedInput` (`const unsaved = computed(…)`, per Test).
+  Mit ungespeicherten Eingaben schließt ein Klick bzw. Fokus daneben (`interact-outside`) das
+  Fenster nicht, Escape fragt nach (`ConfirmDialog` „Eingaben verwerfen?“, „Weiter bearbeiten“
+  Standard, „Verwerfen“); ohne Eingaben schließen beide wie gewohnt, „Abbrechen“ immer ohne
+  Rückfrage; während `busy` weder Klick daneben noch Escape. Flächen mit `data-dialog-passthrough`
+  (Update-Hinweise in `AppNotices`) zählen nie als Klick daneben; `base.css` stellt sie bei offenem
+  Fenster (`body:has([data-form-dialog])`) fest oben über die Abdunklung und macht sie trotz
+  `pointer-events: none` von Reka UI bedienbar (auch am Handy und bei gescrollter Seite, Reka UI
+  sperrt das Scrollen); das Fenster rückt um `--app-notice-height` nach unten (Höhe des Hinweises,
+  `ResizeObserver` in `AppNotices`, per CSSOM). Schichten: Abdunklung 10, Hinweis 20, Fenster 30,
+  `ConfirmDialog` 40/45, Auswahllisten (`AppSelect`) 50. Der Hinweis ist dabei für Bildschirmleser
+  verborgen (Reka UI setzt `aria-hidden` außerhalb des Fensters), Browser-Tests klicken ihn über
+  den Text. Grund: Live-Test 31.10.2026, ein Klick auf „Jetzt aktualisieren“ bei offenem Fenster
+  schloss es und verwarf die Eingabe ohne Rückfrage. Tests: `deviceAdmin.spec.ts`,
+  `locations.spec.ts`, `appUpdate.spec.ts` (zweiter alter Tab), Unit-Test `formDialogs.spec.ts`.
 - Build-Kennung `__APP_BUILD_ID__` (`vite.config.ts`: `FF_BUILD_ID`, sonst `GITHUB_SHA` gekürzt,
   sonst `dev`; nur `A-Za-z0-9._-`, 1–40) an `<html data-build>`; derselbe Stand ergibt denselben
   Build.

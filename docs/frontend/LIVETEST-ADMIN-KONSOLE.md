@@ -30,10 +30,25 @@ Prüfung des Updates am PC (A1). Ergebnisse je Punkt bitte hier eintragen (☑ b
   ☑ PC (31.10.2026, Build `b3438d44f157`): neuer Tab direkt auf `dashboard` mit älterer Version im
   Service Worker → von selbst die neue Version, keine Meldung „konnte nicht geladen werden“, Seite
   vom neuen Service Worker gesteuert. Offen für Holger: iPhone als App.
+  ☑ PC nach der Behebung (Claude per Chrome, 31.10.2026, Deploy `51d4b304a3f9`, beim Start die neue
+  Logik von `ba0943209602`): neuer Tab direkt auf `standorte`, Tab B mit M90 offen → nach rund 7 s
+  die neue Version (Installation 5,2 s, dann `skip-waiting`, Übernahme, Neuladen), nie „konnte
+  nicht geladen werden“; Zeitleiste vollständig (`start` … `reload automatic`, danach `start
+  build=51d4b304a3f9`). Ebenso schon beim Deploy davor (`ba0943209602`, siehe unten).
 - ☐ A2 Nur, falls ohnehin ein weiterer Deploy ansteht: am PC in einem offenen Formular (z. B.
   „Bearbeiten“ eines Geräts) etwas eintippen, dann deployen und zum Tab zurückkehren: Hinweis mit „Jetzt aktualisieren“, die Eingabe bleibt, bis Sie selbst
   aktualisieren (Rückfrage „Ihre Eingaben … gehen verloren“).
-  Offen für Holger; im Browser durch Claude nicht prüfbar bzw. nicht geprüft.
+  ☒ PC (Claude per Chrome, 31.10.2026, Deploy `51d4b304a3f9`): Tab B mit offenem „M90 bearbeiten“
+  und Seriennummer „LT-A2“ (nicht gespeichert). Nach dem Deploy aktivierte ein anderer Tab die neue
+  Version: Tab B lud nicht neu, „LT-A2“ blieb, oben „Neue Version verfügbar – nach dem Speichern
+  wird aktualisiert.“ mit „Jetzt aktualisieren“ (☑). Fund: Ein Klick auf „Jetzt aktualisieren“,
+  solange das Fenster offen ist, gilt als Klick neben das modale Fenster (Reka UI `DialogContent`
+  schließt dann, `FormDialog` fängt das nicht ab): Das Fenster ging zu, „LT-A2“ war ohne Rückfrage
+  verworfen, der Hinweis verschwand (keine Eingabe mehr), die Rückfrage erschien nie. Betrifft jedes
+  Fenster mit Eingaben (auch ein Klick irgendwo daneben). M90 unverändert. Danach wechselte Tab B
+  mit „Zurück“ fehlerfrei auf die neue Version. Noch nicht behoben (Vorschlag in der Meldung); die
+  Rückfrage selbst prüfen die Browser-Tests (Formular ohne Fenster).
+  Offen für Holger: A2 am iPhone.
 
 ## B Menü und Dashboard (Schritt 1)
 - ☐ B1 Fensterbreite ab 1024 px: Menü links mit Text; 768–1023 px: nur Symbole, Name beim Darüberfahren;

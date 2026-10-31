@@ -70,7 +70,9 @@ const preview = computed(() => {
     return /[\u0004\u001d\u001e]/.test(trimmed) ? scanCodeDisplay(trimmed) : null;
 });
 
-useUnsavedInput(() => (open.value || scannerOpen.value) && trimCode(code.value) !== '');
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(() => (open.value || scannerOpen.value) && trimCode(code.value) !== '');
+useUnsavedInput(() => unsaved.value);
 
 const description = computed(() =>
     props.device.scanCode === null
@@ -153,6 +155,7 @@ async function submit(): Promise<void> {
 <template>
     <FormDialog
         v-model:open="open"
+        :unsaved="unsaved"
         :title="`Code zuordnen: ${device.identifier}`"
         :description="description"
         submit-label="Code speichern"

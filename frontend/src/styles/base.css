@@ -250,6 +250,27 @@ h2 {
     opacity: 0.8;
 }
 
+/*
+ * Update-Hinweis bei offenem Fenster mit Formular (FormDialog): fest oben über der Abdunklung (10)
+ * und bedienbar, obwohl Reka UI die Seite dahinter für Zeiger und Scrollen sperrt
+ * (`pointer-events: none` am body); so auch am Handy und bei gescrollter Seite. Das Fenster (30) rückt
+ * um die Höhe des Hinweises (`--app-notice-height`, AppNotices.vue) nach unten. Ein Klick darauf
+ * zählt nicht als Klick neben das Fenster.
+ */
+body:has([data-form-dialog]) [data-dialog-passthrough] {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 20;
+    pointer-events: auto;
+}
+
+body:has([data-dialog-passthrough]) [data-form-dialog] {
+    top: calc(50% + var(--app-notice-height, 0px) / 2);
+    max-height: calc(100dvh - 32px - var(--app-notice-height, 0px));
+}
+
 /* Formularprüfung: Fehler rot umrandet mit kurzem Tipp darunter */
 .input[aria-invalid='true'] {
     border-color: var(--danger);

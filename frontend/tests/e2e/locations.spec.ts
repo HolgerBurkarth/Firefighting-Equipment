@@ -155,6 +155,23 @@ test.describe('Standorte (PC)', () => {
         await expect(page.getByText('Kein Standort passt zu „Drehleiter“.')).toBeVisible();
     });
 
+    test('neuer Standort mit Eingabe: Klick daneben schließt nicht, Escape fragt nach', async ({
+        page,
+    }) => {
+        await open(page);
+        await page.getByRole('button', { name: 'Neuer Standort' }).click();
+        const name = dialog(page).getByLabel('Name');
+        await name.fill('Werkstatt');
+        await page.mouse.click(5, 5);
+        await expect(dialog(page)).toBeVisible();
+        await expect(name).toHaveValue('Werkstatt');
+        await page.keyboard.press('Escape');
+        const discard = page.getByRole('alertdialog', { name: 'Eingaben verwerfen?' });
+        await expect(discard.getByRole('button', { name: 'Weiter bearbeiten' })).toBeFocused();
+        await discard.getByRole('button', { name: 'Verwerfen' }).click();
+        await expect(dialog(page)).toHaveCount(0);
+    });
+
     test('neuer Standort mit Art; gleicher Name fällt beim Tippen auf', async ({
         page,
         apiRequests,

@@ -47,7 +47,9 @@ const changed = computed(
     () => (parseDateInput(due.value) ?? null) !== props.device.nextInspectionDue,
 );
 
-useUnsavedInput(() => open.value && (changed.value || comment.value.trim() !== ''));
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(() => open.value && (changed.value || comment.value.trim() !== ''));
+useUnsavedInput(() => unsaved.value);
 
 const currentText = computed(() =>
     props.device.nextInspectionDue === null
@@ -101,6 +103,7 @@ async function submit(): Promise<void> {
 <template>
     <FormDialog
         v-model:open="open"
+        :unsaved="unsaved"
         :title="`Prüfdatum von ${device.identifier}`"
         :description="currentText"
         submit-label="Speichern"

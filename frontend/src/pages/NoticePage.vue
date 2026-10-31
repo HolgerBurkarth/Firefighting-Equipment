@@ -98,7 +98,9 @@ const dialogError = ref<ApiError | null>(null);
 const opener = ref<HTMLElement | null>(null);
 const liveProblem = computed(() => noticeNoteProblem(note.value));
 
-useUnsavedInput(() => dialogOpen.value && note.value.trim() !== '');
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(() => dialogOpen.value && note.value.trim() !== '');
+useUnsavedInput(() => unsaved.value);
 
 function openResolve(event: Event): void {
     opener.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
@@ -349,6 +351,7 @@ onMounted(() => {
 
         <FormDialog
             v-model:open="dialogOpen"
+            :unsaved="unsaved"
             title="Hinweis erledigen"
             :description="`${notice.kindLabel} · ${notice.device.identifier}`"
             submit-label="Erledigen"

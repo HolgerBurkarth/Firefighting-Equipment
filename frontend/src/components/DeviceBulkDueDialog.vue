@@ -48,9 +48,11 @@ const dialogOpen = computed({
 const problem = computed(() => dateProblem(due.value));
 const shownProblem = computed(() => (touched.value ? problem.value : null));
 
-useUnsavedInput(
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(
     () => busy.value || (open.value && (due.value !== '' || comment.value.trim() !== '')),
 );
+useUnsavedInput(() => unsaved.value);
 
 async function submit(): Promise<void> {
     touched.value = true;
@@ -76,6 +78,7 @@ async function submit(): Promise<void> {
 <template>
     <FormDialog
         v-model:open="dialogOpen"
+        :unsaved="unsaved"
         :title="`Prüfdatum für ${devices.length === 1 ? '1 Gerät' : `${String(devices.length)} Geräte`}`"
         description="Gilt für alle ausgewählten Geräte; jedes erhält einen eigenen Eintrag im Verlauf."
         submit-label="Prüfdatum setzen"

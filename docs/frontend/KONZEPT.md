@@ -234,7 +234,15 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   Aktualisiert wird beim nächsten Seitenwechsel (nach dem Speichern führt die App in der Regel auf
   eine andere Seite) oder per Knopf. Die Eingaben bleiben bis dahin unverändert stehen. Der Knopf
   fragt vorher nach: „Ihre Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?“ mit
-  „Abbrechen“ (Standard) und „Aktualisieren“.
+  „Abbrechen“ (Standard) und „Aktualisieren“. Das gilt auch, wenn gerade ein Fenster mit Eingaben
+  offen ist (z. B. „Bearbeiten“): Der Hinweis bleibt darüber bedienbar, ein Klick darauf schließt
+  das Fenster nicht.
+- Fenster mit Eingaben (Bearbeiten, Prüfdatum, Code zuordnen, Aussondern, Wieder aufnehmen,
+  Standort, Gerätetyp, Benutzer, Einladungscode, Sammelaktionen, Hinweis erledigen) verlieren nie
+  unbemerkt etwas: Mit Eingaben schließt ein Klick neben das Fenster es nicht, Escape fragt „Eingaben
+  verwerfen?“ mit „Weiter bearbeiten“ (Standard) und „Verwerfen“; „Abbrechen“ schließt ohne
+  Rückfrage. Ohne Eingaben schließen Klick daneben und Escape sofort. Grund (Live-Test 31.10.2026):
+  Ein Klick auf „Jetzt aktualisieren“ bei offenem Fenster schloss es und verwarf die Eingabe.
 - Jedes Formular meldet „ungespeicherte Eingaben“ an einer zentralen Stelle: etwas eingegeben und
   noch nicht gespeichert. Nach dem Speichern oder Leeren gilt es nicht mehr als angefangen.
 - Keine Schleife: Nach einem automatischen Neuladen lädt die App 10 Minuten lang nicht erneut von
