@@ -70,7 +70,9 @@ const confirmOpen = ref(false);
 
 const initialName = computed(() => editing.value?.name ?? '');
 
-useUnsavedInput(() => dialogOpen.value && name.value !== initialName.value);
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(() => dialogOpen.value && name.value !== initialName.value);
+useUnsavedInput(() => unsaved.value);
 
 const liveProblem = computed(() => {
     const problem = nameProblem(name.value, DEVICE_TYPE_NAME_MAX_LENGTH);
@@ -343,6 +345,7 @@ onMounted(() => {
 
     <FormDialog
         v-model:open="dialogOpen"
+        :unsaved="unsaved"
         :title="editing === null ? 'Neuer Gerätetyp' : `${editing.name} bearbeiten`"
         :submit-label="editing === null ? 'Anlegen' : 'Speichern'"
         :busy="busy"

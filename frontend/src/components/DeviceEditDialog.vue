@@ -63,9 +63,11 @@ watch(open, (value) => {
 const problems = computed(() => editFormProblems(form.value));
 const changes = computed(() => editFormChanges(base.value, form.value));
 
-useUnsavedInput(
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(
     () => open.value && (Object.keys(changes.value).length > 0 || comment.value.trim() !== ''),
 );
+useUnsavedInput(() => unsaved.value);
 
 function shownProblem(field: EditField): string | null {
     if (field === 'identifier' && identifierTaken.value !== null) {
@@ -154,6 +156,7 @@ async function submit(): Promise<void> {
 <template>
     <FormDialog
         v-model:open="open"
+        :unsaved="unsaved"
         :title="`${base.identifier} bearbeiten`"
         submit-label="Speichern"
         :busy="busy"

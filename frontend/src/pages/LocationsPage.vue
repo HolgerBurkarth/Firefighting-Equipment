@@ -66,7 +66,9 @@ const initialName = computed(() =>
     editing.value?.mode === 'edit' ? editing.value.target.name : '',
 );
 
-useUnsavedInput(() => dialogOpen.value && name.value !== initialName.value);
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(() => dialogOpen.value && name.value !== initialName.value);
+useUnsavedInput(() => unsaved.value);
 
 /** Namen, mit denen der neue nicht übereinstimmen darf (auch gesperrte; ohne den eigenen). */
 const siblingNames = computed((): readonly string[] => {
@@ -442,6 +444,7 @@ onMounted(() => {
 
     <FormDialog
         v-model:open="dialogOpen"
+        :unsaved="unsaved"
         :title="dialogTitle"
         :description="dialogDescription"
         :submit-label="editing?.mode === 'edit' ? 'Speichern' : 'Anlegen'"

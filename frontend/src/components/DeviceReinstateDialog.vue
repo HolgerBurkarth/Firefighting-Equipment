@@ -15,6 +15,7 @@ import {
     reinstateFormFromDevice,
     reinstateIdentifierTaken,
     reinstateRequest,
+    sameReinstateForm,
     type ReinstateForm,
 } from '../data/deviceForm';
 import { scanCodeDisplay } from '../data/eventDisplay';
@@ -41,6 +42,8 @@ const emit = defineEmits<{
 
 const id = useId();
 const form = ref<ReinstateForm>(reinstateFormFromDevice(props.device));
+/** Vorschlag beim Öffnen: Was davon abweicht, ist eine Eingabe. */
+const suggested = ref<ReinstateForm>(form.value);
 const comment = ref('');
 const busy = ref(false);
 const identifierError = ref<string | null>(null);
@@ -51,6 +54,7 @@ const conflict = ref(false);
 watch(open, (value) => {
     if (value) {
         form.value = reinstateFormFromDevice(props.device);
+        suggested.value = form.value;
         comment.value = '';
         identifierError.value = null;
         scanCodeError.value = null;
@@ -59,7 +63,13 @@ watch(open, (value) => {
     }
 });
 
-useUnsavedInput(() => open.value);
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(
+    () =>
+        open.value &&
+        (!sameReinstateForm(form.value, suggested.value) || comment.value.trim() !== ''),
+);
+useUnsavedInput(() => unsaved.value);
 
 /** Standorte mit Pfad und ob sie Ziel sein dürfen (Fach nur unter aktivem Standort). */
 const locations = computed(() => {
@@ -192,6 +202,7 @@ async function submit(): Promise<void> {
 <template>
     <FormDialog
         v-model:open="open"
+        :unsaved="unsaved"
         :title="`${device.identifier} wieder aufnehmen`"
         description="Das Gerät erscheint danach wieder in Suche, Listen und Prüffristen."
         submit-label="Wieder aufnehmen"

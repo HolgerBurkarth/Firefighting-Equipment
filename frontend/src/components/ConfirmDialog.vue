@@ -47,14 +47,17 @@ const emit = defineEmits<{ confirm: [] }>();
 </template>
 
 <style scoped>
+/* Über einem offenen FormDialog (Abdunklung 10, Fenster 30), z. B. „Eingaben verwerfen?“. */
 .confirm-overlay {
     position: fixed;
+    z-index: 40;
     inset: 0;
     background: var(--overlay);
 }
 
 .confirm-dialog {
     position: fixed;
+    z-index: 45;
     top: 50%;
     left: 50%;
     width: min(440px, calc(100vw - 32px));

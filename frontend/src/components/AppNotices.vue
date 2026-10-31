@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { errorMessage } from '../auth/errorMessages';
 import { sessionCheckError } from '../auth/session';
 import { updateNotice, type AppUpdater } from '../runtime/appUpdate';
@@ -32,6 +32,34 @@ function applyUpdate(): void {
 function reloadFromServer(): void {
     void props.updater.reloadFromServer(window.location.href);
 }
+
+/**
+ * Höhe des Update-Hinweises als CSS-Variable `--app-notice-height` (CSSOM, kein style-Attribut):
+ * Bei offenem Fenster steht der Hinweis fest oben und das Fenster rückt darunter (base.css), damit
+ * er auch am Handy und bei gescrollter Seite bedienbar bleibt.
+ */
+const NOTICE_HEIGHT = '--app-notice-height';
+const passthrough = ref<HTMLElement | null>(null);
+let observer: ResizeObserver | null = null;
+
+watch(passthrough, (element) => {
+    observer?.disconnect();
+    observer = null;
+    const root = document.documentElement;
+    if (element === null) {
+        root.style.removeProperty(NOTICE_HEIGHT);
+        return;
+    }
+    observer = new ResizeObserver(() => {
+        root.style.setProperty(NOTICE_HEIGHT, `${String(element.offsetHeight)}px`);
+    });
+    observer.observe(element);
+});
+
+onBeforeUnmount(() => {
+    observer?.disconnect();
+    document.documentElement.style.removeProperty(NOTICE_HEIGHT);
+});
 </script>
 
 <template>
@@ -51,11 +79,14 @@ function reloadFromServer(): void {
         <small>({{ sessionCheckError.code }})</small>
     </p>
 
+    <!-- data-dialog-passthrough: auch bei offenem Fenster bedienbar (FormDialog, base.css). -->
     <div
         v-if="updater.reloadNeeded.value"
+        ref="passthrough"
         class="app-update"
         role="status"
         data-testid="update-reload-needed"
+        data-dialog-passthrough
     >
         <span>Die neue Version konnte nicht geladen werden.</span>
         <button class="btn app-update-button" type="button" @click="reloadFromServer">
@@ -73,7 +104,14 @@ function reloadFromServer(): void {
     </p>
 
     <!-- Neue Version, aber gerade nicht automatisch: Formular angefangen oder kurz zuvor neu geladen. -->
-    <div v-else-if="notice !== null" class="app-update" role="status" data-testid="update-notice">
+    <div
+        v-else-if="notice !== null"
+        ref="passthrough"
+        class="app-update"
+        role="status"
+        data-testid="update-notice"
+        data-dialog-passthrough
+    >
         <span>
             {{
                 notice === 'unsaved'

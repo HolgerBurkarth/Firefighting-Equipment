@@ -123,11 +123,13 @@ const initial = computed((): { displayName: string; role: ManagedRole } => ({
     role: target.value?.role === 'admin' ? 'admin' : 'user',
 }));
 
-useUnsavedInput(
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(
     () =>
         dialogOpen.value &&
         (displayName.value !== initial.value.displayName || role.value !== initial.value.role),
 );
+useUnsavedInput(() => unsaved.value);
 
 const liveProblem = computed(() =>
     editsName.value ? displayNameProblem(displayName.value) : null,
@@ -523,6 +525,7 @@ onMounted(() => {
 
     <FormDialog
         v-model:open="dialogOpen"
+        :unsaved="unsaved"
         :title="dialogTitle"
         :description="dialogDescription"
         :submit-label="mode === 'approve' ? 'Freischalten' : 'Speichern'"

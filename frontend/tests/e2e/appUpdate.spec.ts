@@ -510,6 +510,23 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
             await other.evaluate(() => (window as unknown as { ffMarker?: boolean }).ffMarker),
         ).toBe(true);
         await expect(other.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+        // Der Hinweis bleibt bei offenem Fenster bedienbar (ein Klick darauf ist kein Klick neben das
+        // Fenster) und fragt wegen der Eingabe nach; „Abbrechen“ lässt Fenster und Eingabe stehen.
+        // Live-Test 31.10.2026: Der Klick schloss das Fenster und verwarf die Eingabe. Der Hinweis
+        // liegt hinter dem modalen Fenster (aria-hidden), daher über den Text statt die Rolle.
+        await other
+            .getByTestId('update-notice')
+            .getByText('Jetzt aktualisieren')
+            .click({ timeout: 5000 });
+        const confirm = other.getByRole('alertdialog', { name: 'Jetzt aktualisieren?' });
+        await expect(confirm).toContainText('Ihre Eingaben auf dieser Seite gehen verloren.');
+        await confirm.getByRole('button', { name: 'Abbrechen' }).click();
+        await expect(confirm).toBeHidden();
+        await expect(dialog).toBeVisible();
+        await expect(dialog.getByLabel('Seriennummer')).toHaveValue('SN-neu');
+        expect(
+            await other.evaluate(() => (window as unknown as { ffMarker?: boolean }).ffMarker),
+        ).toBe(true);
         // Seitenwechsel dort: Die Dateien der alten Version gibt es nicht mehr; die App lädt die neue
         // Version mit der Zielseite, statt an einem fehlenden Teil zu scheitern.
         await dialog.getByRole('button', { name: 'Abbrechen' }).click();

@@ -93,12 +93,14 @@ const targetProblem = computed(() => (touched.value ? bulkStateProblem(form.valu
 const commentProblem = computed(() => (touched.value ? bulkCommentProblem(form.value) : null));
 const commentRequired = computed(() => bulkCommentRequired(form.value));
 
-useUnsavedInput(
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(
     () =>
         busy.value ||
         (open.value &&
             (location.value !== KEEP || status.value !== KEEP || comment.value.trim() !== '')),
 );
+useUnsavedInput(() => unsaved.value);
 
 async function submit(): Promise<void> {
     touched.value = true;
@@ -130,6 +132,7 @@ async function submit(): Promise<void> {
 <template>
     <FormDialog
         v-model:open="dialogOpen"
+        :unsaved="unsaved"
         :title="`Umbuchen / Status ändern (${devices.length === 1 ? '1 Gerät' : `${String(devices.length)} Geräte`})`"
         description="Gilt für alle ausgewählten Geräte; jedes erhält einen eigenen Eintrag im Verlauf."
         submit-label="Speichern"

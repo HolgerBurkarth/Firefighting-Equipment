@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { ApiError } from '../api/client';
 import { conflictDeviceDetail, type DeviceDetail } from '../api/devices';
 import { retireDevice } from '../data';
@@ -35,7 +35,9 @@ watch(open, (value) => {
     }
 });
 
-useUnsavedInput(() => open.value && comment.value.trim() !== '');
+/** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
+const unsaved = computed(() => open.value && comment.value.trim() !== '');
+useUnsavedInput(() => unsaved.value);
 
 async function submit(): Promise<void> {
     if (busy.value) {
@@ -73,6 +75,7 @@ async function submit(): Promise<void> {
 <template>
     <FormDialog
         v-model:open="open"
+        :unsaved="unsaved"
         :title="`${device.identifier} (${device.deviceType.name}) aussondern?`"
         description="Das Gerät verschwindet aus Suche, Prüffristen und Gerätezahlen und lässt sich nicht mehr umbuchen. Kennung und Scan-Code werden frei. Der Verlauf bleibt; über „Ausgesonderte anzeigen“ in der Geräteliste können Sie es wieder aufnehmen."
         :submit-label="`${device.identifier} aussondern`"

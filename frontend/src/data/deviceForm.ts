@@ -255,6 +255,11 @@ export function reinstateFormFromDevice(device: DeviceDetail): ReinstateForm {
     };
 }
 
+/** Gleiche Angaben (z. B. noch der Vorschlag beim Öffnen, also nichts eingegeben). */
+export function sameReinstateForm(a: ReinstateForm, b: ReinstateForm): boolean {
+    return (Object.keys(a) as (keyof ReinstateForm)[]).every((key) => a[key] === b[key]);
+}
+
 /** Body von POST devices/{id}/reinstate: nur geänderte Angaben (sonst gelten die bisherigen). */
 export function reinstateRequest(
     device: DeviceDetail,

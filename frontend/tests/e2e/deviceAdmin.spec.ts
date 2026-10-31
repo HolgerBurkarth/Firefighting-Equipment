@@ -321,6 +321,64 @@ test.describe('Gerätedetail', () => {
         await expect(page.getByRole('button', { name: 'Bearbeiten' })).toBeFocused();
     });
 
+    test('Fenster mit Eingabe: Klick daneben schließt nicht, Escape fragt nach, „Abbrechen“ schließt', async ({
+        page,
+        apiRequests,
+    }) => {
+        // Live-Test 31.10.2026: Ein Klick neben das Fenster (z. B. auf „Jetzt aktualisieren“)
+        // schloss es und verwarf die Eingabe ohne Rückfrage.
+        await open(page);
+        await page.getByRole('button', { name: 'Bearbeiten' }).click();
+        const serial = dialog(page).getByLabel('Seriennummer (optional)');
+        await serial.fill('SN-neu');
+        await page.mouse.click(5, 5);
+        await expect(dialog(page)).toBeVisible();
+        await expect(serial).toHaveValue('SN-neu');
+
+        // Escape: Rückfrage, Standard „Weiter bearbeiten“ (Fokus, Enter).
+        await page.keyboard.press('Escape');
+        const discard = page.getByRole('alertdialog', { name: 'Eingaben verwerfen?' });
+        await expect(discard).toContainText('Ihre Eingaben in diesem Fenster gehen verloren.');
+        await expect(discard.getByRole('button', { name: 'Weiter bearbeiten' })).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect(discard).toBeHidden();
+        await expect(dialog(page)).toBeVisible();
+        await expect(serial).toHaveValue('SN-neu');
+        // Escape in der Rückfrage schließt nur die Rückfrage.
+        await page.keyboard.press('Escape');
+        await expect(discard).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(discard).toBeHidden();
+        await expect(serial).toHaveValue('SN-neu');
+
+        // Bewusst verworfen: Fenster zu, nichts gesendet; neu geöffnet mit dem gespeicherten Stand.
+        await page.keyboard.press('Escape');
+        await discard.getByRole('button', { name: 'Verwerfen' }).click();
+        await expect(dialog(page)).toHaveCount(0);
+        await page.getByRole('button', { name: 'Bearbeiten' }).click();
+        await expect(serial).toHaveValue('SN-1');
+
+        // „Abbrechen“ schließt ohne Rückfrage.
+        await serial.fill('SN-anders');
+        await dialog(page).getByRole('button', { name: 'Abbrechen' }).click();
+        await expect(dialog(page)).toHaveCount(0);
+        await expect(discard).toHaveCount(0);
+        expect(apiRequests.filter((r) => r.method === 'POST')).toHaveLength(0);
+    });
+
+    test('Fenster ohne Eingabe: Klick daneben und Escape schließen sofort', async ({ page }) => {
+        await open(page);
+        await page.getByRole('button', { name: 'Bearbeiten' }).click();
+        await expect(dialog(page)).toBeVisible();
+        await page.mouse.click(5, 5);
+        await expect(dialog(page)).toHaveCount(0);
+        await page.getByRole('button', { name: 'Prüfdatum ändern' }).click();
+        await expect(dialog(page)).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(dialog(page)).toHaveCount(0);
+        await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    });
+
     test('Bearbeiten ohne Änderung schließt ohne Anfrage', async ({ page, apiRequests }) => {
         await open(page);
         await page.getByRole('button', { name: 'Bearbeiten' }).click();
