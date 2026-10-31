@@ -195,7 +195,10 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   geladen werden“, obwohl der neue Service Worker kurz danach bereitstand. Die Installation (alle
   Dateien der App vorab laden) dauerte live länger als die 5 Sekunden, die ein gewöhnlicher
   Seitenwechsel abwartet; diese Frist galt auch beim Start. Ein Seitenwechsel wartet weiter
-  höchstens 5 Sekunden und bleibt sonst bei der laufenden Version.
+  höchstens 5 Sekunden und bleibt sonst bei der laufenden Version. Nachgeprüft live (31.10.2026,
+  Build `b3438d44f157`): ein neuer Tab direkt auf `dashboard` mit älterer Version im Service Worker
+  wechselte von selbst auf die neue Version, ohne „konnte nicht geladen werden“, die Seite danach
+  vom neuen Service Worker gesteuert.
 - Neu geladen wird nur, wenn danach sicher die neue Version kommt (der neue Service Worker hat die
   Seite übernommen). Hängt die Übernahme (Chrome hält sie an, wenn der alte Service Worker genau
   dann eine Anfrage bekommt), meldet die App den Service Worker ab und lädt die Seite vom Server.
@@ -273,9 +276,12 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   (wie `AccentColor::DEFAULT` und das Standard-App-Symbol), nicht das Dunkelblau aus dem Mockup.
 
 ## Admin-Konsole
-Umgesetzt am 31.10.2026 (Schritte 1–12, Entscheidung 29); offen ist nur noch der abschließende
-Live-Test (Schritt 13, Liste in `LIVETEST-ADMIN-KONSOLE.md`). Danach gilt der Abschnitt als
-abgeschlossen; Wünsche aus den Live-Tests stehen in `docs/TODO-SPAETER.md` (T9–T13).
+Umgesetzt und abgeschlossen am 31.10.2026 (Schritte 1–13, Entscheidung 29). Live geprüft in der
+Test-Stadt: jeder Schritt nach seiner Umsetzung (Ergebnisse der Schritte 9–12 unter "Bereiche des
+Admins" und in Entscheidung 31), dazu am 31.10.2026 das Update der App nach dem letzten Deploy
+(siehe "Updates der App"). Der abschließende Durchlauf nach `LIVETEST-ADMIN-KONSOLE.md` läuft danach
+im Browser; Fehler daraus werden behoben, Wünsche kommen nach `docs/TODO-SPAETER.md` (bisher
+T9–T14).
 
 Super-Admin und Admin: Menü links, Inhalt rechts; links unten Einstellungen, Profil, Abmelden.
 Startseite ist ein Dashboard mit großen, antippbaren Kacheln, die zur gefilterten Liste führen.
@@ -408,7 +414,9 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
   Home-Bildschirm“ mit Logo, 31.10.2026): sauber, das `apple-touch-icon` (180 px) ist schon deckend
   weiß. Die Symbole des Manifests (192 und 512 px) sind durchsichtig und nur `any`; Android setzt
   sie verkleinert in einen weißen Kreis. Deckende `maskable`-Symbole sind T13 in
-  `docs/TODO-SPAETER.md`.
+  `docs/TODO-SPAETER.md`. Außerdem (eigene Beobachtung beim Umsetzen): Wählt man während des
+  Speicherns der Akzentfarbe eine andere Farbe, setzt die App das Feld nach der Antwort auf die
+  gespeicherte zurück (T14, Randfall).
 
 ### Admin-Konsole – Entscheidungen
 29. **Reihenfolge:** Die Admin-Konsole kommt vor dem Offline-Modus, damit Immendingen starten kann.

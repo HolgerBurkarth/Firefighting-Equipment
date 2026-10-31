@@ -2426,11 +2426,12 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Umbuchen und Status, Standortwahl, Details und Verlauf, Prüffristen, Profil, komprimierte
   Auslieferung; siehe "Frontend" und KONZEPT.md "User am Handy"). Wünsche für später in
   `docs/TODO-SPAETER.md`.
-- Admin-Konsole (umgesetzt am 31.10.2026, Schritte 1–12: Menü und Dashboard, Standorte und
+- Admin-Konsole (abgeschlossen am 31.10.2026, Schritte 1–13: Menü und Dashboard, Standorte und
   Gerätetypen, Geräteliste mit Sammelaktionen, Gerätedetail, neues Gerät, CSV-Import, Benutzer und
-  Einladungscodes, Protokoll, Einstellungen; siehe "Frontend" und KONZEPT.md "Admin-Konsole").
-  Abgeschlossen erst nach dem Live-Test (Schritt 13, `docs/frontend/LIVETEST-ADMIN-KONSOLE.md`);
-  danach das Ergebnis in KONZEPT.md eintragen.
+  Einladungscodes, Protokoll, Einstellungen, Live-Tests; siehe "Frontend" und KONZEPT.md
+  "Admin-Konsole"). Der abschließende Durchlauf nach `docs/frontend/LIVETEST-ADMIN-KONSOLE.md` läuft
+  danach im Browser; Ergebnisse dort und kurz in KONZEPT.md, Fehler beheben, Wünsche nach
+  `docs/TODO-SPAETER.md`.
 - Nicht in Version 1: Mengenartikel, Etiketten mit QR-/Barcodes erzeugen oder drucken,
   Prüfprotokolle.
 

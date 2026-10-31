@@ -8,9 +8,13 @@ kommen nach `docs/TODO-SPAETER.md`, Fehler werden vor dem Abschluss behoben.
 Was in den Schritten 3 und 9–12 schon live geprüft ist (KONZEPT.md, "Bereiche des Admins"), steht
 hier nur noch als kurzer Durchlauf (☐ kurz).
 
+Stand 31.10.2026: Die Admin-Konsole ist als abgeschlossen markiert (KONZEPT.md); diesen Durchlauf
+macht danach Claude im Browser. Schon erledigt (☑): die Live-Tests der Schritte 9–12 und die
+Prüfung des Updates am PC (A1). Ergebnisse je Punkt bitte hier eintragen (☑ bzw. ☒ mit Fund).
+
 ## Vorbereitung
-- Stand: der aktuelle `main` nach grünem CI-Lauf deployt (`bash scripts/deploy.sh`). Darin ist auch
-  die Korrektur „Updates: Start wartet bis rund 30 s …“ (wegen der roten CI bisher nicht live).
+- Stand: der aktuelle `main` nach grünem CI-Lauf deployt. Live seit 31.10.2026: Build
+  `b3438d44f157`, darin auch die Korrektur „Updates: Start wartet bis rund 30 s …“.
 - Geräte: PC mit Chrome oder Edge (Entwicklerwerkzeuge offen, Reiter „Konsole“), iPhone mit Safari,
   wenn vorhanden ein Android-Handy; ein USB-Handscanner, wenn vorhanden.
 - Konten der Test-Stadt: Admin A (Sie), Admin B mit „Mail bei jeder Änderung an Geräten“ (Postfach
@@ -23,6 +27,9 @@ hier nur noch als kurzer Durchlauf (☐ kurz).
 - ☐ A1 Vor dem Deploy die Test-Stadt am iPhone als App (Homescreen) und am PC offen lassen. Nach dem
   Deploy die App am iPhone neu öffnen: höchstens rund 30 s „Seite wird geladen …“, dann die neue
   Version, nie „Die neue Version konnte nicht geladen werden.“
+  ☑ PC (31.10.2026, Build `b3438d44f157`): neuer Tab direkt auf `dashboard` mit älterer Version im
+  Service Worker → von selbst die neue Version, keine Meldung „konnte nicht geladen werden“, Seite
+  vom neuen Service Worker gesteuert. Offen: iPhone als App.
 - ☐ A2 Nur, falls ohnehin ein weiterer Deploy ansteht: am PC in einem offenen Formular (z. B.
   „Bearbeiten“ eines Geräts) etwas eintippen, dann deployen und zum Tab zurückkehren: Hinweis mit „Jetzt aktualisieren“, die Eingabe bleibt, bis Sie selbst
   aktualisieren (Rückfrage „Ihre Eingaben … gehen verloren“).
@@ -98,12 +105,12 @@ hier nur noch als kurzer Durchlauf (☐ kurz).
 - ☐ I2 Wegwerf-Konto: Rolle ändern, sperren (Anmeldung danach abgelehnt), entsperren, löschen
   („Gelöschter Benutzer #ID“ im Verlauf).
 - ☐ I3 Eigenes Konto: Hinweis, Rolle gesperrt, kein Sperren oder Löschen.
-- ☐ I4 kurz: neuer Einladungscode, „Code kopieren“, danach „Widerrufen …“; der Code gilt nicht mehr.
+- ☑ I4 (Schritt 9, live geprüft 31.10.2026) kurz: neuer Einladungscode, „Code kopieren“, danach „Widerrufen …“; der Code gilt nicht mehr.
 
 ## J Sammelaktionen, Protokoll, Einstellungen (Schritte 10–12, kurz)
-- ☐ J1 kurz: drei Geräte auswählen, „Prüfdatum setzen …“, Ergebnis über der Leiste.
-- ☐ J2 kurz: Protokoll mit Filter Offen/Erledigt/Alle, ein Hinweis erledigen und wieder öffnen.
-- ☐ J3 kurz: Akzentfarbe ändern und wieder auf Standard; Logo bleibt im Menü, auf der Anmeldeseite und
+- ☑ J1 (Schritt 10, live geprüft 31.10.2026) kurz: drei Geräte auswählen, „Prüfdatum setzen …“, Ergebnis über der Leiste.
+- ☑ J2 (Schritt 11, live geprüft 31.10.2026) kurz: Protokoll mit Filter Offen/Erledigt/Alle, ein Hinweis erledigen und wieder öffnen.
+- ☑ J3 (Schritt 12, live geprüft 31.10.2026; Fund T14) kurz: Akzentfarbe ändern und wieder auf Standard; Logo bleibt im Menü, auf der Anmeldeseite und
   als Symbol im Tab. Homescreen am iPhone ist geprüft (sauber); Android siehe T13.
 
 ## K Übergreifend
@@ -118,5 +125,6 @@ hier nur noch als kurzer Durchlauf (☐ kurz).
 - ☐ K5 Abmelden aus dem Menü, danach führt Zurück im Browser nicht in die Konsole.
 
 ## Abschluss
-Wenn alles grün ist (oder die Funde behoben bzw. in `docs/TODO-SPAETER.md` eingetragen sind), trägt
-der Agent das Ergebnis in KONZEPT.md ein und markiert die Admin-Konsole als abgeschlossen.
+Die Admin-Konsole ist seit 31.10.2026 abgeschlossen (KONZEPT.md). Nach dem Durchlauf trägt der
+Agent das Ergebnis hier und kurz in KONZEPT.md ("Admin-Konsole") ein; Fehler werden behoben, Wünsche
+kommen nach `docs/TODO-SPAETER.md`.
