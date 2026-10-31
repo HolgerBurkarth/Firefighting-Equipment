@@ -257,15 +257,15 @@ test.describe('Abmelden löscht „Zuletzt benutzt“', () => {
         await expect(
             page.getByRole('heading', { level: 1, name: 'M2 · Atemschutzmaske' }),
         ).toBeVisible();
-        expect(await page.evaluate((key) => window.localStorage.getItem(key), RECENT_KEY)).toBe(
-            '[2]',
-        );
+        await expect
+            .poll(() => page.evaluate((key) => window.localStorage.getItem(key), RECENT_KEY))
+            .toBe('[2]');
         await page.goto('/firefighting/test/profil');
         await page.getByRole('button', { name: 'Abmelden' }).click();
         await expect(page).toHaveURL(/\/anmelden$/);
-        expect(
-            await page.evaluate((key) => window.localStorage.getItem(key), RECENT_KEY),
-        ).toBeNull();
+        await expect
+            .poll(() => page.evaluate((key) => window.localStorage.getItem(key), RECENT_KEY))
+            .toBeNull();
     });
 });
 

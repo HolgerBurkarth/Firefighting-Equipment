@@ -156,9 +156,9 @@ test.describe('Prüffristen (lokal)', () => {
             apiRequests.filter((r) => r.method === 'POST' && r.path === 'api/v1/devices/1/state'),
         ).toHaveLength(1);
         // Zurück wie der Knopf des Browsers: „Prüffristen“ steht nicht zweimal in der Historie.
-        expect(await page.evaluate(() => window.history.state as unknown)).toMatchObject({
-            forward: '/geraete/1',
-        });
+        await expect
+            .poll(() => page.evaluate(() => window.history.state as unknown))
+            .toMatchObject({ forward: '/geraete/1' });
 
         // Die Bestätigung gilt nur für diesen Besuch, auch „Suchen“ zeigt sie nicht mehr.
         const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
