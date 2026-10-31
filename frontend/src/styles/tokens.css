@@ -74,6 +74,10 @@
     /* Kamera-Scanner: Bild auf Schwarz, Rahmen hell (in beiden Modi gleich) */
     --camera-bg: #000000;
     --camera-frame: rgb(255 255 255 / 85%);
+    /* Papier: QR-Code und Aushang dunkel auf hell (in beiden Modi gleich, Kameras und Drucker) */
+    --paper: #ffffff;
+    --ink: #000000;
+    --ink-muted: #3a4655;
 
     /* Bedienelemente: mindestens 44 px (Konzept), große Tasten 56 px */
     --touch-min: 44px;

@@ -310,7 +310,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   bisher: `script-src 'self' 'wasm-unsafe-eval'` für den Kamera-Scanner (erlaubt nur das Übersetzen
   von WebAssembly, kein eval von JavaScript; WASM aus `assets/`, kein Worker, kein `blob:`, kein CDN;
   per Test genau so). Spätere Bausteine ergänzen gezielt nur, was sie brauchen, mit Begründung im
-  Kommentar (z. B. QR-Code/Logo-Vorschau: `img-src data: blob:`).
+  Kommentar (z. B. Logo-Vorschau: `img-src data: blob:`). Der QR-Code der Einladungscodes braucht
+  nichts: `uqr` liefert nur das Raster, Vue zeichnet es als SVG im DOM (`QrCode`).
   Daher im Frontend keine Inline-Skripte, keine `<style>`-Elemente und kein `style=""` im HTML;
   Schriften liegen im Build (kein Google Fonts). Kein natives `<select>`: Auswahllisten (Gerätetyp,
   Standort, Rolle …) mit `Select` bzw. `Combobox` von Reka UI, kurze feste Auswahlen (z. B.
@@ -335,7 +336,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
   `client.ts`; `devices.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
-  `deviceTypes.ts`, `inspections.ts`, `locations.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
+  `deviceTypes.ts`, `inspections.ts`, `invitationCodes.ts`, `locations.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
   Gerätetypen, Benutzer und das Dashboard),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
   Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
@@ -343,13 +344,15 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung,
   `appUpdate.ts` Updates, `unsavedInput.ts` ungespeicherte Eingaben, `build.ts` Build-Kennung,
   `now.ts` `useNow` für Zeitangaben: alle 30 s und bei `visibilitychange` neu, `countdown.ts`
-  `useCountdown` Sperre nach 429 bis `Retry-After`, `download.ts` `saveDownload`), `src/scanner/` (Kamera-Scanner:
+  `useCountdown` Sperre nach 429 bis `Retry-After`, `download.ts` `saveDownload`, `share.ts`
+  `shareLink`/`copyText`), `src/scanner/` (Kamera-Scanner:
   `barcodeReader.ts` Lesemodul, `camera.ts` Kamera und Meldungen), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
   `build/compress.ts` (Vite-Plugin: `.br`/`.gz` neben jede Datei, siehe "Frontend ausliefern"),
   `tests/unit/` (Vitest), `tests/e2e/` (Playwright). Build nach `frontend/dist/` (in `.gitignore`).
 - Design-Variablen nur in `src/styles/tokens.css` (Farben hell/dunkel aus dem Mockup, Statusfarben,
-  Radien, Schatten, Mindestgröße 44 px); Komponenten verwenden nur `var(--…)`. Anzeigemodus: ohne
+  Radien, Schatten, Mindestgröße 44 px; `--paper`, `--ink`, `--ink-muted` für QR-Code und Druck, in
+  beiden Modi gleich); Komponenten verwenden nur `var(--…)`. Anzeigemodus: ohne
   `data-theme` gilt `prefers-color-scheme`, `data-theme="light"`/`"dark"` erzwingt; die beiden
   Dunkel-Blöcke müssen gleich sein, Text- und Statusfarben mindestens 4,5:1 (beides per Test).
   Stadtfarbe zur Laufzeit als `--accent` aus `GET api/v1/tenant`, Standard `#b71c1c`
@@ -717,6 +720,35 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   es ohnehin mit 409 ab). Fehler des Servers im Fenster (400 am Anzeigenamen) bzw. auf der Seite,
   Erfolg als `success-notice`. Browser-Tests `tests/e2e/users.spec.ts` (zustandsbehafteter Server je
   Test über `delegate`); Unit-Tests `users.spec.ts`, `router.spec.ts`.
+- Einladungscodes (KONZEPT.md Entscheidung 30; API siehe "Einladung, Registrierung und
+  E-Mail-Bestätigung", unverändert): zweiter Reiter der Benutzerverwaltung (Reka UI `Tabs`, Reiter
+  „Konten“ mit Zahl der wartenden und „Einladungscodes“; in der Adresse als
+  `benutzer?ansicht=einladungscodes` per `router.replace`, gleicher Pfad), Baustein
+  `InvitationCodesPanel` (Inhalt bleibt beim Wechsel erhalten, `unmount-on-hide` aus; geladen erst,
+  wenn der Reiter sichtbar ist). Store `invitationCodeStore` (`InvitationCodeStore`, `GET
+  invitation-codes`, in `installDataLayer`), Ändern über `src/data/index.ts`
+  (`createInvitationCode`, `revokeInvitationCode`; danach lädt die Liste neu, abgewartet), Logik in
+  `src/data/invitations.ts`. Liste: aktive Codes (Bezeichnung, Status, „3 von 50 Registrierungen“,
+  gültig bis, angelegt am/von), andere nur mit „Abgelaufene, aufgebrauchte und widerrufene anzeigen
+  (N)“; „Widerrufen …“ nach `ConfirmDialog`. „Neuer Einladungscode“ (`FormDialog`): Bezeichnung
+  (freiwillig, wie `InvitationCodeLabel`), „Gültig (Tage)“ 1–90 (Standard 30) und „Registrierungen
+  höchstens“ 1–500 (Standard 50), Grenzen per Test gleich mit PHP (`MAX_VALID_DAYS`, `MAX_USES`,
+  `MAX_LENGTH`). Danach erscheint der Code genau einmal (nur in der Antwort im Klartext; zählt als
+  ungespeicherte Eingabe, bis „Schließen“ oder Widerrufen): groß, QR-Code (`QrCode`, `qrShape` in
+  `src/components/qrCode.ts`: `uqr`, Fehlerkorrektur M, ein SVG-Pfad, Ruhezone 4 Module, dunkel auf
+  hell über `--ink`/`--paper`) mit dem Link `registerLink` = `registrieren#code=XXXX-XXXX-XXXX`
+  (Code nur im Fragment), „Aushang drucken“ (`window.print()`), „Link teilen“ (`shareLink`: Web Share
+  API, abgebrochen = nichts, sonst oder ohne API Link in die Zwischenablage) und „Code kopieren“
+  (`copyText`). Aushang `InvitationPoster` (Teleport nach `body`, auf dem Bildschirm unsichtbar;
+  solange er besteht, trägt `<html>` die Klasse `has-print-poster`, und das Druck-CSS in `base.css`
+  blendet alles andere aus, A4 mit 12 mm Rand): Logo (512 px oder Standard-Symbol) und Name der
+  Stadt, „Jetzt registrieren“, QR-Code 100 mm, drei Schritte, Code in Klarschrift, Adresse ohne Code
+  zum Abtippen (`registerAddress`), „Gültig bis …“ und Spam-Hinweis. Kein Nachdruck ohne neuen Code
+  (der Server kennt nur den Hash). Browser-Tests `tests/e2e/invitationCodes.spec.ts` (Drucken,
+  Teilen und Zwischenablage per Init-Skript in allen Browsern gleich ersetzt; Druckansicht über
+  `emulateMedia`; in Chromium zusätzlich `page.pdf`: genau eine A4-Seite); Unit-Tests
+  `invitations.spec.ts` (auch: der gezeichnete QR-Code, gelesen mit zxing-wasm, ergibt genau den
+  Link), `invitationCodesApi.spec.ts`, `tokens.spec.ts`.
 - CSV-Import der Admin-Konsole (`DeviceImportPage`, `geraete/import`, Route `device-import`, nur
   `admin`, `layout: 'admin'`, im Menü unter „Geräte“; KONZEPT.md Entscheidung 32): „1. Vorlage
   ausfüllen“ mit „Vorlage herunterladen“ und „Gültige Werte herunterladen“ (`downloadImportTemplate`,

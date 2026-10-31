@@ -56,6 +56,16 @@ describe('Design-Variablen', () => {
         expect(contrast(DEFAULT_ACCENT, hex(light, '--on-accent'))).toBeGreaterThanOrEqual(4.5);
     });
 
+    it('Papier (QR-Code, Aushang) ist in beiden Modi gleich und gut lesbar', () => {
+        for (const name of ['--paper', '--ink', '--ink-muted']) {
+            expect(darkForced.has(name), name).toBe(false);
+        }
+        expect(contrast(hex(light, '--ink'), hex(light, '--paper'))).toBeGreaterThanOrEqual(15);
+        expect(contrast(hex(light, '--ink-muted'), hex(light, '--paper'))).toBeGreaterThanOrEqual(
+            4.5,
+        );
+    });
+
     it('übernimmt die Farben des Mockups', () => {
         expect(light.get('--bg')).toBe('#f3f4f6');
         expect(light.get('--text')).toBe('#1b2430');

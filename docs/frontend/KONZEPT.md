@@ -63,8 +63,8 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 1. **Einladung per QR-Code:** Der QR-Code eines Einladungscodes enthält einen fertigen Link
    `/firefighting/<stadt>/registrieren#code=XXXX-XXXX-XXXX`. Die Seite übernimmt den Code aus dem
    Fragment (er erreicht nie die Server-Adresse), entfernt ihn danach aus der Adresszeile und
-   funktioniert auch ohne Code (Feld leer). Die Anmeldeseite hat keinen Registrieren-Link. Die
-   Erzeugung des QR-Codes kommt später mit der Benutzerverwaltung des Admins.
+   funktioniert auch ohne Code (Feld leer). Die Anmeldeseite hat keinen Registrieren-Link. Den
+   QR-Code erzeugt die Benutzerverwaltung des Admins (Reiter „Einladungscodes“, Entscheidung 30).
 2. **Nach der Anmeldung:** User → `suchen`, Admin → immer `dashboard` (PC und Handy), Super-Admin
    → `dashboard` unter `/service/`. Läuft die Sitzung ab (401), geht es zur Anmeldung und danach
    zurück zur vorherigen Seite (`anmelden?weiter=…`; nur Pfade innerhalb der App, die die Rolle
@@ -339,6 +339,15 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
   Löschen (Rückfrage). Unbestätigte Registrierungen lassen sich ablehnen. Das eigene Konto lässt sich
   nicht sperren, herabstufen oder löschen. Die Kachel „Offene Hinweise“ auf dem Dashboard führt mit
   „Freischaltungen ansehen“ hierher.
+  Umgesetzt in Schritt 9: Reiter „Konten“ und „Einladungscodes“ (`benutzer?ansicht=einladungscodes`).
+  Die Liste zeigt die aktiven Codes mit Nutzungen („12 von 50 Registrierungen“) und „gültig bis“,
+  abgelaufene, aufgebrauchte und widerrufene auf Wunsch; „Widerrufen“ mit Rückfrage (auch ein
+  gedruckter Aushang gilt danach nicht mehr). „Neuer Einladungscode“: Bezeichnung (freiwillig, nur
+  für den Admin), Gültigkeit in Tagen (Standard 30) und höchstens so viele Registrierungen (Standard
+  50). Danach steht der Code einmal groß da mit QR-Code, Link, „Aushang drucken“, „Link teilen“ und
+  „Code kopieren“; „Schließen“ (oder Widerrufen) entfernt ihn. Der Aushang zeigt zusätzlich „Jetzt
+  registrieren“ und den Satz, dass danach ein Admin das Konto freischaltet; die Bezeichnung steht
+  nicht darauf.
 - **Protokoll:** Hinweise zu Konflikten (siehe oben).
 - **Einstellungen:** Anzeigemodus, Erscheinungsbild der Feuerwehr mit Vorschau, Mail-Benachrichtigung,
   Passwort und angemeldete Geräte.
