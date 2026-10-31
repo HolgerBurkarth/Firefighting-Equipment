@@ -1,4 +1,4 @@
-import type { ManagedTenant } from '../api/tenants';
+import type { CreatedTenant, ManagedTenant } from '../api/tenants';
 import type { AdminUser } from '../api/users';
 import { searchKey, searchTokens } from './deviceSearch';
 import { compareNames, phpTrim } from './masterData';
@@ -9,6 +9,8 @@ export const TENANT_SLUG_MAX_LENGTH = 50;
 export const TENANT_SLUG_RESERVED: readonly string[] = ['service'];
 /** Höchstlänge des Namens wie TenantName::MAX_LENGTH. */
 export const TENANT_NAME_MAX_LENGTH = 100;
+/** Wartezeit nach dem letzten Tastendruck, bevor die App fragt, ob ein Kürzel frei ist. */
+export const SLUG_CHECK_DELAY_MS = 300;
 /** Höchstlänge der E-Mail wie EmailAddress::MAX_LENGTH. */
 export const EMAIL_MAX_LENGTH = 254;
 
@@ -242,4 +244,18 @@ export function tenantUserRows(users: readonly AdminUser[], query: string): Admi
             return tokens.every((token) => key.includes(token));
         })
         .sort((a, b) => compareNames(a.label, b.label) || a.id - b.id);
+}
+
+/** Meldung nach „Stadt anlegen und einladen“ (Entscheidung 43). */
+export function createdTenantText(result: CreatedTenant): { text: string; ok: boolean } {
+    const email = result.user.email ?? result.user.label;
+    return result.mailSent
+        ? {
+              text: `„${result.tenant.name}“ ist angelegt. Die Einladung an ${email} ist unterwegs (Link 24 Stunden gültig).`,
+              ok: true,
+          }
+        : {
+              text: `„${result.tenant.name}“ ist angelegt, aber die Einladung an ${email} konnte nicht gesendet werden. Bitte unter „Offene Admin-Einladungen“ erneut senden.`,
+              ok: false,
+          };
 }

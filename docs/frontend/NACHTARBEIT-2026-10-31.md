@@ -70,7 +70,17 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
 - 31.10. S1 Super-Admin: Menü, Dashboard, Städte-Liste, Einstellungen. Commit „Super-Admin S1:
   Menü, Dashboard, Städte-Liste und Einstellungen“. Lokal: Lint, Typprüfung, 1100 Unit-Tests,
   Browser-Tests (6 Dateien Chromium/WebKit 171, `superAdmin.spec.ts` alle fünf Profile 50) grün.
-  CI/Deploy/live: siehe nächster Eintrag.
+  CI 5:06 grün (Browser-Tests in 8 Teilen, PHP übersprungen), Deploy ok, Build `c99efc2b76c4`,
+  Health ok. Live (lesend, Super-Admin-Sitzung): ☑ Dashboard (2 aktiv, 0 gesperrt, 0 Einladungen,
+  5 Benutzer, Städte-Tabelle), ☑ Städte, ☑ Einstellungen, ☑ keine Konsolenfehler.
+  Fund: Der seit Schritt 0 offene Tab zeigte beim Öffnen „Die neue Version konnte nicht geladen
+  werden“ (Zeitleiste: register() kam erst nach 6,7 s, der Start gab ohne Registrierung sofort auf).
+- 31.10. Korrektur Updates: Commit „Updates: Start wartet auf eine späte Registrierung des Service
+  Workers“. Unit-Tests (2 neu), `appUpdate.spec.ts`/`serviceWorker.spec.ts` in allen fünf Profilen
+  und unter WSL grün.
+- 31.10. S2 „Neue Stadt“: Commit „Super-Admin S2: Neue Stadt mit Kürzel-Vorschlag und Prüfung“.
+  Lokal: Lint, Typprüfung, Unit-Tests, `superAdmin.spec.ts` alle fünf Profile grün. Schreibend live
+  nicht geprüft (nur Test-Stadt erlaubt) → `LIVETEST-SUPER-ADMIN.md`.
 
 # Zur Prüfung durch Holger
 

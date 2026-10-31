@@ -158,6 +158,8 @@ function setup(
         storage?: MemoryStorage | null;
         /** Zustand der Registrierung, bevor die App sie verfolgt (attach). */
         beforeAttach?: (registration: FakeRegistration) => void;
+        /** false: attach erst im Test (die Registrierung kommt spät). */
+        attach?: boolean;
     } = {},
 ): Setup {
     const container = new FakeContainer(
@@ -193,7 +195,9 @@ function setup(
         },
     };
     const updater = new AppUpdater(env);
-    updater.attach(state.registration);
+    if (options.attach !== false) {
+        updater.attach(state.registration);
+    }
     return Object.assign(state, { updater });
 }
 
@@ -940,6 +944,38 @@ describe('AppUpdater: Start mit veralteter Version und „Seite nicht gefunden�
         expect(fired).toContain(START_LOAD_TIMEOUT_MS - 10_000);
         expect(fired).not.toContain(ACTIVATION_TIMEOUT_MS);
         expect(START_LOAD_TIMEOUT_MS).toBe(START_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0));
+        expect(state.done).toBe(false);
+        expect(s.updater.reloadNeeded.value).toBe(true);
+        expect(s.navigated).toEqual([]);
+    });
+
+    it('Registrierung kommt erst nach START_CHECK_TIMEOUT_MS (register wartet auf eine Installation): Start wartet darauf', async () => {
+        // Live 31.10.2026: Die vorige Seite begann nach einem Deploy die Installation; register()
+        // der neuen Seite endete erst danach (fast 7 s). Vorher gab der Start sofort auf.
+        const s = setup({ attach: false });
+        s.served = NEW_BUILD;
+        const start = s.updater.checkOnStart(START_URL);
+        const state = settled(start);
+        // Fristen der Startprüfung (Registrierung, build.json) laufen ab, die Registrierung fehlt.
+        await runShortTimers(s, START_CHECK_TIMEOUT_MS);
+        expect(s.updater.loadingPage.value).toBe(true);
+        expect(s.updater.reloadNeeded.value).toBe(false);
+        expect(state.done).toBe(false);
+
+        const worker = new FakeWorker('installed');
+        activatesOnMessage(s, worker);
+        s.registration.waiting = worker;
+        s.updater.attach(s.registration);
+        expect(await start).toBe(true);
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual([START_URL]);
+    });
+
+    it('Registrierung kommt gar nicht: nach rund 30 s Knopf „Neu laden“', async () => {
+        const s = setup({ attach: false });
+        s.served = NEW_BUILD;
+        const state = settled(s.updater.checkOnStart(START_URL));
+        await runTimers(s);
         expect(state.done).toBe(false);
         expect(s.updater.reloadNeeded.value).toBe(true);
         expect(s.navigated).toEqual([]);

@@ -115,6 +115,8 @@ export class AppUpdater {
     /** Die neue Version ließ sich beim Start nicht laden: Hinweis mit Knopf „Neu laden“. */
     readonly reloadNeeded = shallowRef(false);
     private registration: UpdateRegistration | null = null;
+    /** Warten auf attach (siehe registrationAttached). */
+    private readonly attachWaiters = new Set<() => void>();
     private applying = false;
     /**
      * Ein Service Worker einer neueren Version hat diese Seite übernommen (sie läuft noch mit altem
@@ -169,6 +171,10 @@ export class AppUpdater {
     attach(registration: UpdateRegistration): void {
         this.registration = registration;
         this.trace.record('register', this.workerSummary(registration));
+        for (const resolve of this.attachWaiters) {
+            resolve();
+        }
+        this.attachWaiters.clear();
         if (registration.waiting !== null) {
             this.markReady();
         }
@@ -463,6 +469,18 @@ export class AppUpdater {
         this.applying = true;
         this.switching.value = true;
         this.trace.record('apply', this.workerSummary(this.registration));
+        // Die Registrierung fehlt noch, obwohl ein Service Worker die Seite liefert: register()
+        // wartet auf eine Installation, die z. B. die vorige Seite nach einem Deploy begann (live
+        // 31.10.2026: fast 7 s, länger als START_CHECK_TIMEOUT_MS). Darauf warten (Frist wie die
+        // Installation), sonst gäbe die App ohne Versuch auf.
+        if (this.registration === null && this.env.container.controller !== null) {
+            await this.registrationAttached(
+                installDeadline === null
+                    ? ACTIVATION_TIMEOUT_MS
+                    : Math.max(ACTIVATION_TIMEOUT_MS, installDeadline - this.env.now()),
+            );
+            this.trace.record('registration-late', this.workerSummary(this.registration));
+        }
         // Kennt der Service Worker die neue Version noch nicht (nur die Build-Kennung zeigte sie),
         // erst danach fragen. Wird sie gerade installiert, darauf warten: Sonst lieferte der alte
         // Service Worker beim Neuladen wieder die alte Seite.
@@ -617,6 +635,21 @@ export class AppUpdater {
     }
 
     /** Fertig, wenn die Installation endet (installiert oder gescheitert), spätestens nach `ms`. */
+    /** Wartet höchstens `ms` auf attach (sofort, wenn die Registrierung schon da ist). */
+    private registrationAttached(ms: number): Promise<void> {
+        if (this.registration !== null) {
+            return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+            const done = (): void => {
+                this.attachWaiters.delete(done);
+                resolve();
+            };
+            this.attachWaiters.add(done);
+            this.env.setTimeout(done, ms);
+        });
+    }
+
     private installed(ms: number): Promise<void> {
         const installing = this.registration?.installing;
         if (installing?.state !== 'installing') {

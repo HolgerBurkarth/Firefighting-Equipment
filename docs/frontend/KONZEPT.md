@@ -201,6 +201,10 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   Build `b3438d44f157`): ein neuer Tab direkt auf `dashboard` mit älterer Version im Service Worker
   wechselte von selbst auf die neue Version, ohne „konnte nicht geladen werden“, die Seite danach
   vom neuen Service Worker gesteuert.
+  Ebenso wartet der Start auf die Registrierung des Service Workers, wenn sie länger als 2 Sekunden
+  dauert (bis zu derselben Frist). Grund (Live-Test 31.10.2026, Nacht): Ein offener Tab hatte nach
+  dem Deploy die Installation begonnen; beim Neuladen endete `register()` erst danach (fast 7 s),
+  und der Start gab ohne Registrierung sofort mit „konnte nicht geladen werden“ auf.
 - Neu geladen wird nur, wenn danach sicher die neue Version kommt (der neue Service Worker hat die
   Seite übernommen). Hängt die Übernahme (Chrome hält sie an, wenn der alte Service Worker genau
   dann eine Anfrage bekommt), meldet die App als letzten Ausweg den Service Worker ab und lädt die
@@ -601,8 +605,9 @@ prüft Holger). API: `CLAUDE.md`, "Städte verwalten und Admins einladen" (ferti
     keine Geräte, keine Benutzerverwaltung einer Stadt außer dem Ansehen. Konten einer Stadt sehen
     keine Seite des Super-Admins (es gibt sie unter einer Stadt nicht).
 
-Stand: S1 umgesetzt (31.10.2026, Nacht): Menü, Dashboard (Kacheln, offene Einladungen mit „Erneut
-senden“, Städte), `staedte` mit Suche und Sortierung (am Handy Karten), Einstellungen.
+Stand (31.10.2026, Nacht): S1 umgesetzt und live geprüft (lesend): Menü, Dashboard (Kacheln, offene
+Einladungen mit „Erneut senden“, Städte), `staedte` mit Suche und Sortierung (am Handy Karten),
+Einstellungen. S2 umgesetzt: „Neue Stadt“ auf Dashboard und Städte-Liste.
 
 ## User am Handy
 Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Live-Tests stehen in

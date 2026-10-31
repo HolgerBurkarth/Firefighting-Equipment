@@ -16,6 +16,7 @@ import {
 import type { AdminUser } from '../../src/api/users';
 import { ListStore } from '../../src/data/service';
 import {
+    createdTenantText,
     EMAIL_MAX_LENGTH,
     TENANT_NAME_MAX_LENGTH,
     TENANT_SLUG_MAX_LENGTH,
@@ -338,6 +339,23 @@ describe('Liste und Kacheln', () => {
         expect(tenantUserRows(users, '').map((u) => u.id)).toEqual([2, 1]);
         expect(tenantUserRows(users, 'zoe').map((u) => u.id)).toEqual([1]);
         expect(tenantUserRows(users, 'x@y').map((u) => u.id)).toEqual([2]);
+    });
+});
+
+describe('createdTenantText', () => {
+    it('grün mit Einladung, sonst rot mit Hinweis auf „Erneut senden“', () => {
+        const base = {
+            tenant: tenant({ name: 'Neustadt' }),
+            user: user(9, { email: 'a@neustadt.de' }),
+        };
+        expect(createdTenantText({ ...base, mailSent: true })).toEqual({
+            text: '„Neustadt“ ist angelegt. Die Einladung an a@neustadt.de ist unterwegs (Link 24 Stunden gültig).',
+            ok: true,
+        });
+        const failed = createdTenantText({ ...base, mailSent: false });
+        expect(failed.ok).toBe(false);
+        expect(failed.text).toContain('konnte nicht gesendet werden');
+        expect(failed.text).toContain('„Offene Admin-Einladungen“');
     });
 });
 

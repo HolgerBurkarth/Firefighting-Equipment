@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef, watch } from 'vue';
 import type { ApiError } from '../api/client';
-import { fetchTenantUsers, type ManagedTenant } from '../api/tenants';
+import { fetchTenantUsers, type CreatedTenant, type ManagedTenant } from '../api/tenants';
 import ErrorNotice from '../components/ErrorNotice.vue';
+import NewTenantDialog from '../components/NewTenantDialog.vue';
 import TenantTable from '../components/TenantTable.vue';
 import { resendInvitation, tenantList } from '../data/service';
-import { countText, openInvitations, serviceTiles, type OpenInvitation } from '../data/tenants';
+import {
+    countText,
+    createdTenantText,
+    openInvitations,
+    serviceTiles,
+    type OpenInvitation,
+} from '../data/tenants';
 import { createdText } from '../data/users';
 
 /**
@@ -20,6 +27,21 @@ const tiles = computed(() => (state.value.items === null ? null : serviceTiles(t
 const invitations = shallowRef<OpenInvitation[] | null>(null);
 const invitationError = shallowRef<ApiError | null>(null);
 const success = ref<string | null>(null);
+/** Meldung nach dem Anlegen einer Stadt (grün, sonst als Fehler mit Hinweis). */
+const created = ref<{ text: string; ok: boolean } | null>(null);
+const newOpen = ref(false);
+const opener = ref<HTMLElement | null>(null);
+
+function openNew(event: Event): void {
+    opener.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    success.value = null;
+    created.value = null;
+    newOpen.value = true;
+}
+
+function onCreated(result: CreatedTenant): void {
+    created.value = createdTenantText(result);
+}
 const actionError = shallowRef<ApiError | null>(null);
 const busyId = ref<number | null>(null);
 let loadGeneration = 0;
@@ -61,6 +83,7 @@ watch(
 async function resend(invitation: OpenInvitation): Promise<void> {
     busyId.value = invitation.user.id;
     success.value = null;
+    created.value = null;
     actionError.value = null;
     const result = await resendInvitation(invitation.tenant.id, invitation.user.id);
     busyId.value = null;
@@ -86,7 +109,18 @@ onMounted(() => {
 <template>
     <div class="page-head">
         <h1>Dashboard</h1>
+        <button class="btn btn-accent" type="button" @click="openNew">Neue Stadt</button>
     </div>
+
+    <p
+        v-if="created !== null"
+        class="notice"
+        :class="created.ok ? 'notice-success' : 'notice-error'"
+        :role="created.ok ? 'status' : 'alert'"
+        data-testid="created-notice"
+    >
+        {{ created.text }}
+    </p>
 
     <ErrorNotice v-if="state.error !== null" :error="state.error">
         <button class="btn retry" type="button" :disabled="state.loading" @click="retry">
@@ -177,6 +211,8 @@ onMounted(() => {
             <TenantTable v-else :tenants="tenants" query="" />
         </section>
     </template>
+
+    <NewTenantDialog v-model:open="newOpen" :return-focus="opener" @created="onCreated" />
 </template>
 
 <style scoped>

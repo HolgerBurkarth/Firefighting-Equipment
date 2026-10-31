@@ -2,7 +2,15 @@ import type { Locator, Page } from '@playwright/test';
 import { DATABASE_UNAVAILABLE, expect, HTTP_ERROR_CONSOLE, meBody, test } from './fixtures';
 import { horizontalOverflow } from './support/layout';
 import { CURRENT_SESSION_ONLY } from './support/profile';
-import { accountJson, SERVICE_OVERVIEW, TENANTS, tenantJson } from './support/service';
+import { delegate } from './support/masterData';
+import {
+    accountJson,
+    SERVICE_OVERVIEW,
+    serviceServer,
+    TENANTS,
+    tenantJson,
+    type ServiceServer,
+} from './support/service';
 
 /**
  * Bereich des Super-Admins unter `service` (KONZEPT.md, "Super-Admin – Entscheidungen"): Menü wie
@@ -256,6 +264,145 @@ test.describe('Super-Admin', () => {
                 /menu-link-active/,
             );
         });
+    });
+});
+
+test.describe('Neue Stadt', () => {
+    let server: ServiceServer = serviceServer();
+    test.use({
+        api: { 'GET api/v1/auth/me': ME, ...delegate(() => server.handlers) },
+    });
+
+    test.beforeEach(() => {
+        server = serviceServer();
+    });
+
+    async function openDialog(page: Page): Promise<Locator> {
+        await page.goto('/firefighting/service/staedte');
+        await page.getByRole('button', { name: 'Neue Stadt' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Neue Stadt anlegen' });
+        await expect(dialog).toBeVisible();
+        return dialog;
+    }
+
+    test('Kürzel aus dem Namen, frei laut Server, anlegen und einladen', async ({
+        page,
+        apiRequests,
+    }) => {
+        const dialog = await openDialog(page);
+        await dialog.getByLabel('Name der Stadt').fill('Feuerwehr Bad Säckingen');
+        await expect(dialog.getByLabel('Kürzel für die Adresse')).toHaveValue('bad-saeckingen');
+        await expect(dialog.getByTestId('tenant-slug-status')).toHaveText(
+            '✓ Frei. Adresse: www.prodad.de/firefighting/bad-saeckingen/',
+        );
+        await dialog.getByLabel('E-Mail des ersten Admins').fill('kdt@bad-saeckingen');
+        await expect(dialog.getByText(/vollständige E-Mail-Adresse/)).toBeVisible();
+        await expect(
+            dialog.getByRole('button', { name: 'Stadt anlegen und einladen' }),
+        ).toBeDisabled();
+        await dialog.getByLabel('E-Mail des ersten Admins').fill(' Kdt@Bad-Saeckingen.de ');
+        await dialog.getByRole('button', { name: 'Stadt anlegen und einladen' }).click();
+
+        await expect(dialog).toBeHidden();
+        await expect(page.getByTestId('created-notice')).toHaveText(
+            '„Feuerwehr Bad Säckingen“ ist angelegt. Die Einladung an Kdt@Bad-Saeckingen.de ist unterwegs (Link 24 Stunden gültig).',
+        );
+        await expect(page.getByTestId('tenant-bad-saeckingen')).toContainText('Einladung offen');
+        const posted = apiRequests.filter((request) => request.method === 'POST');
+        expect(posted.map((request) => request.body)).toEqual([
+            {
+                slug: 'bad-saeckingen',
+                name: 'Feuerwehr Bad Säckingen',
+                admin_email: 'Kdt@Bad-Saeckingen.de',
+            },
+        ]);
+        // Die Vorabprüfung fragte nur nach gültigen Kürzeln.
+        const checks = apiRequests
+            .filter((request) => request.path === 'api/v1/tenants/slug-available')
+            .map((request) => new URL(request.url).searchParams.get('slug'));
+        expect(checks.at(-1)).toBe('bad-saeckingen');
+        expect(checks.every((slug) => slug !== null && /^[a-z0-9-]+$/.test(slug))).toBe(true);
+    });
+
+    test('vergebenes Kürzel, von Hand geändert, folgt dem Namen nicht mehr', async ({ page }) => {
+        const dialog = await openDialog(page);
+        const slug = dialog.getByLabel('Kürzel für die Adresse');
+        await dialog.getByLabel('Name der Stadt').fill('Test');
+        await expect(slug).toHaveValue('test');
+        await expect(dialog.getByTestId('tenant-slug-status')).toHaveText(
+            'Das Kürzel ist bereits vergeben.',
+        );
+        await expect(slug).toHaveAttribute('aria-invalid', 'true');
+        await expect(
+            dialog.getByRole('button', { name: 'Stadt anlegen und einladen' }),
+        ).toBeDisabled();
+
+        await slug.fill('test-2');
+        await expect(dialog.getByTestId('tenant-slug-status')).toContainText('✓ Frei.');
+        await dialog.getByLabel('Name der Stadt').fill('Test Nord');
+        await expect(slug).toHaveValue('test-2');
+    });
+
+    test('Regeln des Kürzels prüft die App ohne den Server', async ({ page, apiRequests }) => {
+        const dialog = await openDialog(page);
+        const slug = dialog.getByLabel('Kürzel für die Adresse');
+        await slug.fill('Service');
+        await expect(dialog.getByTestId('tenant-slug-status')).toHaveText(
+            'Das Kürzel „service“ ist reserviert.',
+        );
+        await slug.fill('Bad-Duerrheim');
+        await expect(dialog.getByTestId('tenant-slug-status')).toHaveText(
+            'Bitte nur Kleinbuchstaben, z. B. „bad-duerrheim“.',
+        );
+        await slug.fill('bad--duerrheim');
+        await expect(dialog.getByTestId('tenant-slug-status')).toContainText(
+            'Nur Kleinbuchstaben a–z',
+        );
+        expect(apiRequests.filter((r) => r.path === 'api/v1/tenants/slug-available')).toEqual([]);
+    });
+
+    test('Mail nicht gesendet: Hinweis auf „Erneut senden“', async ({ page }) => {
+        server.mailSent = false;
+        const dialog = await openDialog(page);
+        await dialog.getByLabel('Name der Stadt').fill('Neustadt');
+        await dialog.getByLabel('E-Mail des ersten Admins').fill('a@neustadt.de');
+        await expect(dialog.getByTestId('tenant-slug-status')).toContainText('✓ Frei.');
+        await dialog.getByRole('button', { name: 'Stadt anlegen und einladen' }).click();
+        await expect(page.getByTestId('created-notice')).toContainText(
+            'konnte nicht gesendet werden',
+        );
+        await expect(page.getByTestId('created-notice')).toHaveClass(/notice-error/);
+    });
+
+    test.describe('Kürzel inzwischen vergeben', () => {
+        test.use({ allowedConsoleError: HTTP_ERROR_CONSOLE });
+
+        test('409 slug_taken steht am Feld', async ({ page }) => {
+            const dialog = await openDialog(page);
+            await dialog.getByLabel('Name der Stadt').fill('Neustadt');
+            await dialog.getByLabel('E-Mail des ersten Admins').fill('a@neustadt.de');
+            await expect(dialog.getByTestId('tenant-slug-status')).toContainText('✓ Frei.');
+            // Ein anderer Super-Admin legt die Stadt gerade an.
+            server.tenants.push(tenantJson(50, { slug: 'neustadt' }));
+            await dialog.getByRole('button', { name: 'Stadt anlegen und einladen' }).click();
+            await expect(dialog.getByTestId('tenant-slug-status')).toHaveText(
+                'Das Kürzel „test“ ist bereits vergeben.',
+            );
+            await expect(dialog).toBeVisible();
+        });
+    });
+
+    test('vom Dashboard aus, danach mit offener Einladung', async ({ page }) => {
+        await page.goto('/firefighting/service/dashboard');
+        await page.getByRole('button', { name: 'Neue Stadt' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Neue Stadt anlegen' });
+        await dialog.getByLabel('Name der Stadt').fill('Neustadt');
+        await dialog.getByLabel('E-Mail des ersten Admins').fill('a@neustadt.de');
+        await expect(dialog.getByTestId('tenant-slug-status')).toContainText('✓ Frei.');
+        await dialog.getByRole('button', { name: 'Stadt anlegen und einladen' }).click();
+        await expect(page.getByTestId('created-notice')).toContainText('„Neustadt“ ist angelegt.');
+        await expect(page.getByTestId('tile-invitations')).toContainText('2');
+        await expect(page.getByTestId('invitation-101')).toContainText('a@neustadt.de');
     });
 });
 
