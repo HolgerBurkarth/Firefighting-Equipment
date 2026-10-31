@@ -51,6 +51,15 @@ Prüfung des Updates am PC (A1). Ergebnisse je Punkt bitte hier eintragen (☑ b
   Behoben mit `c08ae0348824` (Fenster mit Eingaben schließen bei Klick daneben nicht, Escape fragt
   nach, der Hinweis bleibt bei offenem Fenster bedienbar); live geprüft beim folgenden Deploy, weil
   der alte Tab dafür schon den neuen Code braucht.
+  ☑ PC komplett (Claude per Chrome, 31.10.2026, Deploy `9db091bee881`, Tab B mit `c08ae0348824`):
+  „M90 bearbeiten“ offen, Seriennummer „LT-A2“. Vor dem Deploy: Klick neben das Fenster → bleibt
+  offen, Eingabe bleibt; Escape → „Eingaben verwerfen?“, Fokus auf „Weiter bearbeiten“, Enter →
+  Fenster und Eingabe bleiben. Nach dem Deploy (ein anderer Tab aktivierte die neue Version, siehe
+  unten): Tab B lud nicht neu, oben fest „Neue Version verfügbar – nach dem Speichern wird
+  aktualisiert.“, das Fenster darunter; „Jetzt aktualisieren“ → Rückfrage „Jetzt aktualisieren?“
+  über dem weiter offenen Fenster; „Abbrechen“ → Fenster und „LT-A2“ bleiben; erneut, dann
+  „Aktualisieren“ → neue Version auf derselben Seite (M90), vom neuen Service Worker gesteuert. M90
+  unverändert (nichts gespeichert).
   Offen für Holger: A2 am iPhone.
 
 ## B Menü und Dashboard (Schritt 1)
@@ -226,6 +235,11 @@ Prüfung des Updates am PC (A1). Ergebnisse je Punkt bitte hier eintragen (☑ b
   vom Server in der neuen Version, danach vom neuen Service Worker gesteuert, keiner wartet. Hier
   aktivierte Chrome ihn selbst (kein anderer Tab hielt den alten; Zeitleiste `controllerchange
   first` ohne `activate-waiting`); den Weg mit zweitem alten Tab prüft der nächste Deploy.
+- ☑ Deploy `9db091bee881` (Claude per Chrome, 31.10.2026): Tab B (M90, `c08ae0348824`) hielt den
+  alten Service Worker, die neue Version wartete; Strg+Umschalt+R im Tab auf `dashboard` → Seite vom
+  Server in der neuen Version, Zeitleiste `register uncontrolled, waiting` → `activate-waiting
+  uncontrolled current page` → `controllerchange first`; danach vom neuen Service Worker gesteuert,
+  keiner wartet. Tab B bekam den Hinweis (Eingabe offen, siehe A2).
 - Notiz (kein Fehler): „Letzte Aktivitäten“ ist nach Eingang beim Server sortiert, zeigt aber die
   Zeit der Aktion (bei Offline-Buchungen können die Zeiten daher nicht absteigend wirken).
 - Testdaten in der Test-Stadt (bleiben vorerst): M90, M91 (neu), M92 (früheres M91), M93 (HLF 20),
