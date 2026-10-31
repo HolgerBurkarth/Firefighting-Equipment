@@ -1057,7 +1057,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   per Strg+F5 geladene Seite, die der neue Service Worker übernimmt, dauerhaft alt). Eine neu
   installierte Version unter einem Service Worker fragt `build.json` NICHT (die Anfrage liefe über den
   alten Service Worker; aktiviert ein anderer Tab gerade die neue Version, hält Chrome die Aktivierung
-  an). Beim Aktualisieren (`apply`) fragt die App den Service Worker (`update()`, bei Bedarf die Suche
+  an). Fehlt beim Aktualisieren unter einem Service Worker noch die Registrierung (`register()` wartet
+  auf eine Installation, die z. B. die vorige Seite begann; live 31.10.2026 fast 7 s), wartet `apply`
+  zuerst auf `attach` (`registrationAttached`, Frist wie die Installation). Beim Aktualisieren (`apply`) fragt die App den Service Worker (`update()`, bei Bedarf die Suche
   wie oben), wartet auf die Installation (beim Seitenwechsel höchstens `ACTIVATION_TIMEOUT_MS` = 5 s;
   beim Start und vor „nicht gefunden“ bis zur Frist `START_LOAD_TIMEOUT_MS` = Summe von
   `START_RETRY_DELAYS_MS` ab Beginn, für Suche und Installation zusammen, mindestens 5 s; endet die
