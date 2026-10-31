@@ -94,8 +94,17 @@ describe('lockBlocker', () => {
         ).toBe(
             'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 1 Gerät und 2 aktive Fächer.',
         );
+    });
+
+    it('Einzahl nur bei genau einem Gerät bzw. Fach', () => {
         expect(lockBlocker(location(10, 'HLF 20', [sub(11, 'G1')]))).toBe(
-            'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 1 aktives Fach.',
+            'Sperren geht nur, wenn der Standort leer ist. Hier liegt noch 1 aktives Fach.',
+        );
+        expect(lockBlocker(sub(11, 'G1', 1))).toBe(
+            'Sperren geht nur, wenn der Standort leer ist. Hier liegt noch 1 Gerät.',
+        );
+        expect(lockBlocker(location(10, 'HLF 20', [sub(11, 'G1')], { deviceCount: 1 }))).toBe(
+            'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 1 Gerät und 1 aktives Fach.',
         );
     });
 });

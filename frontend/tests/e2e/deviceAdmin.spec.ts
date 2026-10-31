@@ -580,3 +580,77 @@ test.describe('Gerätedetail: Wieder aufnehmen', () => {
         await expect(page.getByTestId('master-data')).toContainText('Scan-Code–');
     });
 });
+
+test.describe('Gerätedetail: Wieder aufnehmen, Kennung und Scan-Code vergeben', () => {
+    test.use({ allowedConsoleError: HTTP_ERROR_CONSOLE });
+    // Wie der Server: Kennung bzw. Scan-Code inzwischen vergeben, Meldung mit Feldern der API.
+    useServer(
+        {
+            ...M1,
+            status: 'retired',
+            status_label: 'ausgesondert',
+            location: PATHS[11],
+            scan_code: 'ABC',
+            version: 4,
+        },
+        (request) => {
+            const sent = request.body as Record<string, unknown>;
+            if (!('identifier' in sent)) {
+                return {
+                    status: 409,
+                    body: {
+                        error: 'identifier_taken',
+                        message:
+                            'Die Kennung „M1“ ist inzwischen an ein anderes Gerät vergeben. Bitte beim Wiederaufnehmen eine neue Kennung angeben (Feld "identifier").',
+                    },
+                };
+            }
+            if (!('scan_code' in sent)) {
+                return {
+                    status: 409,
+                    body: {
+                        error: 'scan_code_taken',
+                        message:
+                            'Der Scan-Code „ABC“ ist inzwischen an ein anderes Gerät vergeben. Bitte beim Wiederaufnehmen einen neuen Scan-Code angeben (Feld "scan_code") oder ihn mit null entfernen.',
+                    },
+                };
+            }
+            return null;
+        },
+    );
+
+    test('eigene Meldungen am Feld ohne Felder der API', async ({ page, apiRequests }) => {
+        await open(page);
+        await page.getByRole('button', { name: 'Wieder aufnehmen' }).click();
+        const form = dialog(page);
+        await form.getByRole('button', { name: 'Wieder aufnehmen' }).click();
+        await expect(
+            form.getByText(
+                'Die Kennung „M1“ ist inzwischen an ein anderes Gerät vergeben. Bitte geben Sie eine andere Kennung ein.',
+            ),
+        ).toBeVisible();
+        await expect(form.getByLabel('Kennung')).toHaveAttribute('aria-invalid', 'true');
+        await expect(form).not.toContainText('Feld "');
+
+        await form.getByLabel('Kennung').fill('M1a');
+        await expect(form.getByText('ist inzwischen an ein anderes Gerät vergeben')).toHaveCount(0);
+        await form.getByRole('button', { name: 'Wieder aufnehmen' }).click();
+        await expect(form.getByTestId('scan-code-error')).toHaveText(
+            'Dieser Scan-Code ist inzwischen einem anderen Gerät zugeordnet. Entfernen Sie das Häkchen, um das Gerät ohne Scan-Code wieder aufzunehmen.',
+        );
+        await expect(form).not.toContainText('null');
+
+        await form.getByLabel('Scan-Code ABC behalten').uncheck();
+        await expect(form.getByTestId('scan-code-error')).toHaveCount(0);
+        await form.getByRole('button', { name: 'Wieder aufnehmen' }).click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'M1a ist wieder aufgenommen: HLF 20 / G1 · einsatzbereit.',
+        );
+        expect(lastBody(apiRequests, 'api/v1/devices/1/reinstate')).toEqual({
+            version: 4,
+            status: 'ready',
+            identifier: 'M1a',
+            scan_code: null,
+        });
+    });
+});

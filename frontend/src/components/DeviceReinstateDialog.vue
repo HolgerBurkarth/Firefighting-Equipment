@@ -11,7 +11,9 @@ import { adminLocationStore, deviceTypeStore, reinstateDevice } from '../data';
 import { MAX_COMMENT_LENGTH } from '../data/booking';
 import {
     identifierProblem,
+    REINSTATE_SCAN_CODE_TAKEN,
     reinstateFormFromDevice,
+    reinstateIdentifierTaken,
     reinstateRequest,
     type ReinstateForm,
 } from '../data/deviceForm';
@@ -25,7 +27,7 @@ import FormDialog from './FormDialog.vue';
  * Ein ausgesondertes Gerät wieder aufnehmen (Admin, POST devices/{id}/reinstate): Status Pflicht,
  * Standort, Kennung und Gerätetyp vorbelegt mit den bisherigen. Ein inzwischen gesperrter Standort
  * bzw. deaktivierter Typ fällt schon beim Öffnen auf; ist die Kennung oder der Scan-Code
- * inzwischen vergeben, meldet es der Server am Feld.
+ * inzwischen vergeben, meldet es der Server (409), die Seite zeigt eine eigene Meldung am Feld.
  */
 const props = defineProps<{
     device: DeviceDetail;
@@ -178,9 +180,9 @@ async function submit(): Promise<void> {
         conflict.value = true;
         emit('conflict', latest);
     } else if (result.error.code === 'identifier_taken') {
-        identifierError.value = result.error.message;
+        identifierError.value = reinstateIdentifierTaken(form.value.identifier);
     } else if (result.error.code === 'scan_code_taken') {
-        scanCodeError.value = result.error.message;
+        scanCodeError.value = REINSTATE_SCAN_CODE_TAKEN;
     } else {
         error.value = result.error;
     }
