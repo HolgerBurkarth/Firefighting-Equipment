@@ -78,6 +78,9 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
 - 31.10. Korrektur Updates: Commit „Updates: Start wartet auf eine späte Registrierung des Service
   Workers“. Unit-Tests (2 neu), `appUpdate.spec.ts`/`serviceWorker.spec.ts` in allen fünf Profilen
   und unter WSL grün.
+- 31.10. S2 „Neue Stadt“: Commit „Super-Admin S2: Neue Stadt mit Kürzel-Vorschlag und Prüfung“.
+  Lokal: Lint, Typprüfung, Unit-Tests, `superAdmin.spec.ts` alle fünf Profile grün. Schreibend live
+  nicht geprüft (nur Test-Stadt erlaubt) → `LIVETEST-SUPER-ADMIN.md`.
 
 # Zur Prüfung durch Holger
 

@@ -607,7 +607,7 @@ prüft Holger). API: `CLAUDE.md`, "Städte verwalten und Admins einladen" (ferti
 
 Stand (31.10.2026, Nacht): S1 umgesetzt und live geprüft (lesend): Menü, Dashboard (Kacheln, offene
 Einladungen mit „Erneut senden“, Städte), `staedte` mit Suche und Sortierung (am Handy Karten),
-Einstellungen.
+Einstellungen. S2 umgesetzt: „Neue Stadt“ auf Dashboard und Städte-Liste.
 
 ## User am Handy
 Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Live-Tests stehen in

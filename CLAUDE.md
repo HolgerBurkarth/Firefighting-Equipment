@@ -938,12 +938,18 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Einladungen über `GET tenants/{id}/users?status=invited` je Stadt mit Einladungen (nur nicht
   gesperrte, älteste zuerst) mit „Erneut senden“; darunter `TenantTable` (Name, Adresse als Text,
   Status, Admins, Benutzer; Spaltenköpfe mit `aria-sort`, am Handy Karten mit Knöpfen „Sortieren“).
-  `staedte` (`TenantsPage`, Route `tenants`): Suche in Name und Kürzel und `TenantTable`.
+  `staedte` (`TenantsPage`, Route `tenants`): Suche in Name und Kürzel und `TenantTable`. „Neue
+  Stadt“ auf Dashboard und `staedte` (`NewTenantDialog`, `FormDialog`): Name, Kürzel (folgt
+  `suggestSlug` des Namens, bis von Hand geändert), E-Mail; Prüfung beim Tippen, dann nach
+  `SLUG_CHECK_DELAY_MS` (300 ms) `GET tenants/slug-available` (nur gültige Kürzel, ältere Antworten
+  verworfen; Fehler der Vorabprüfung nur als Hinweis); `createTenant` → Meldung `createdTenantText`
+  (grün bzw. rot, wenn `mail_sent` false), 409 `slug_taken` am Feld.
   `einstellungen` (`ServiceSettingsPage`, Route `settings` wie unter Städten): Anzeigemodus,
   `NotificationSetting` mit `all-tenants`, Passwort, angemeldete Geräte; kein Erscheinungsbild.
   Keine Links in eine Stadt. Browser-Tests `tests/e2e/superAdmin.spec.ts` (Hilfen `tenantJson`,
   `accountJson`, `superAdminJson`, `SERVICE_OVERVIEW` in `tests/e2e/support/service.ts`; Tests, die als
-  Super-Admin auf dem Dashboard landen, simulieren dessen Abfragen damit); Unit-Tests
+  Super-Admin auf dem Dashboard landen, simulieren dessen Abfragen damit; zustandsbehafteter Server
+  `serviceServer` über `delegate`); Unit-Tests
   `tenants.spec.ts`, `router.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
