@@ -1,4 +1,4 @@
-import type { CreatedTenant, ManagedTenant } from '../api/tenants';
+import type { CreatedTenant, InvitationResult, ManagedTenant } from '../api/tenants';
 import type { AdminUser } from '../api/users';
 import { searchKey, searchTokens } from './deviceSearch';
 import { compareNames, phpTrim } from './masterData';
@@ -256,6 +256,17 @@ export function createdTenantText(result: CreatedTenant): { text: string; ok: bo
           }
         : {
               text: `„${result.tenant.name}“ ist angelegt, aber die Einladung an ${email} konnte nicht gesendet werden. Bitte unter „Offene Admin-Einladungen“ erneut senden.`,
+              ok: false,
+          };
+}
+
+/** Meldung nach „Admin einladen“ bzw. „Einladung erneut senden“ (Entscheidung 44). */
+export function invitationText(result: InvitationResult): { text: string; ok: boolean } {
+    const email = result.user.email ?? result.user.label;
+    return result.mailSent
+        ? { text: `Einladung an ${email} gesendet (Link 24 Stunden gültig).`, ok: true }
+        : {
+              text: `Die Einladung an ${email} konnte nicht gesendet werden. Bitte später erneut senden.`,
               ok: false,
           };
 }

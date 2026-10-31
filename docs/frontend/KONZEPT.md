@@ -57,6 +57,7 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts; `?standortwahl=1` öffnet die Standortwahl, `?details=1` „Details und Verlauf“ |
 | `dashboard` | Stadt und `service` | Startseite der Admin-Konsole bzw. des Super-Admins |
 | `staedte` | nur `service` | Städte des Super-Admins (Entscheidung 42) |
+| `staedte/<id>` | nur `service` | Stadtdetail des Super-Admins (Entscheidung 44) |
 | `einstellungen` | Stadt und `service` | Einstellungen des Admins bzw. des Super-Admins (Entscheidung 46) |
 
 `/` ist nur eine Weiche: ohne Sitzung zur Anmeldung, sonst zur Startseite der Rolle.
@@ -607,7 +608,9 @@ prüft Holger). API: `CLAUDE.md`, "Städte verwalten und Admins einladen" (ferti
 
 Stand (31.10.2026, Nacht): S1 umgesetzt und live geprüft (lesend): Menü, Dashboard (Kacheln, offene
 Einladungen mit „Erneut senden“, Städte), `staedte` mit Suche und Sortierung (am Handy Karten),
-Einstellungen. S2 umgesetzt: „Neue Stadt“ auf Dashboard und Städte-Liste.
+Einstellungen. S2 umgesetzt und live geprüft (nur Prüfung beim Tippen, ohne Anlegen): „Neue Stadt“ auf
+Dashboard und Städte-Liste. S3 umgesetzt: Stadtdetail `staedte/<id>` (der Name in der Liste führt
+hin).
 
 ## User am Handy
 Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Live-Tests stehen in

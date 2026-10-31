@@ -86,6 +86,13 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { roles: ['superadmin'], layout: 'admin' },
         });
         routes.push({
+            // Stadtdetail (Entscheidung 44); ID wie die Platzhalter im Backend.
+            path: '/staedte/:id([1-9]\\d{0,17})',
+            name: 'tenant',
+            component: () => import('../pages/TenantDetailPage.vue'),
+            meta: { roles: ['superadmin'], layout: 'admin' },
+        });
+        routes.push({
             path: '/einstellungen',
             name: 'settings',
             component: () => import('../pages/ServiceSettingsPage.vue'),

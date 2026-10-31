@@ -23,6 +23,7 @@ import {
     TENANT_SLUG_PATTERN,
     TENANT_SLUG_RESERVED,
     emailProblem,
+    invitationText,
     openInvitations,
     serviceTiles,
     slugProblem,
@@ -356,6 +357,17 @@ describe('createdTenantText', () => {
         expect(failed.ok).toBe(false);
         expect(failed.text).toContain('konnte nicht gesendet werden');
         expect(failed.text).toContain('„Offene Admin-Einladungen“');
+    });
+});
+
+describe('invitationText', () => {
+    it('nennt die Adresse, ohne Versand als Fehler', () => {
+        const invited = user(9, { email: 'a@b.de' });
+        expect(invitationText({ user: invited, mailSent: true })).toEqual({
+            text: 'Einladung an a@b.de gesendet (Link 24 Stunden gültig).',
+            ok: true,
+        });
+        expect(invitationText({ user: invited, mailSent: false }).ok).toBe(false);
     });
 });
 

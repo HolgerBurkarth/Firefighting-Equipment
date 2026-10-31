@@ -178,12 +178,25 @@ export function serviceServer(): ServiceServer {
         status: 404,
         body: { error: 'not_found', message: 'Diese Stadt gibt es nicht.' },
     };
-    /** Zähler aus den Konten, soweit für die Stadt bekannt (sonst wie angegeben). */
+    /**
+     * Zähler aus den Konten; Immendingen und Test haben mehr Konten als hier aufgeführt, dort zählen
+     * nur die Einladungen aus der Liste.
+     */
     const withCounts = (tenant: Record<string, unknown>): Record<string, unknown> => {
         const list = users.get(tenant['id'] as number);
-        return list === undefined || tenant['id'] === 1 || tenant['id'] === 2
-            ? tenant
-            : { ...tenant, counts: counts(list) };
+        if (list === undefined) {
+            return tenant;
+        }
+        const listed = counts(list);
+        return tenant['id'] === 1 || tenant['id'] === 2
+            ? {
+                  ...tenant,
+                  counts: {
+                      ...(tenant['counts'] as Record<string, number>),
+                      admins_invited: listed['admins_invited'],
+                  },
+              }
+            : { ...tenant, counts: listed };
     };
 
     Object.assign(server.handlers, {
@@ -240,9 +253,79 @@ export function serviceServer(): ServiceServer {
             return find(request) === undefined ? notFound : { status: 200, body: { users: list } };
         };
     }
-    server.handlers['POST api/v1/tenants/3/users/31/resend-invitation'] = () => ({
-        status: 200,
-        body: { user: users.get(3)?.[0], mail_sent: server.mailSent },
-    });
+    // Stadtdetail: lesen, umbenennen, sperren/entsperren, Admin einladen, erneut senden.
+    const update = (request: MockRequest, change: Record<string, unknown>): MockResponse => {
+        const tenant = find(request);
+        if (tenant === undefined) {
+            return notFound;
+        }
+        Object.assign(tenant, change, { updated_at: '2026-10-31T21:00:00Z' });
+        return { status: 200, body: { tenant: withCounts(tenant) } };
+    };
+    for (const id of [1, 2, 3, 100]) {
+        const base = `api/v1/tenants/${String(id)}`;
+        server.handlers[`GET ${base}`] = (request) => {
+            const tenant = find(request);
+            return tenant === undefined
+                ? notFound
+                : { status: 200, body: { tenant: withCounts(tenant) } };
+        };
+        server.handlers[`POST ${base}/rename`] = (request) => {
+            const name = (request.body as { name: string }).name;
+            return name.trim() === ''
+                ? {
+                      status: 400,
+                      body: { error: 'invalid_request', message: 'Der Name darf nicht leer sein.' },
+                  }
+                : update(request, { name: name.trim() });
+        };
+        server.handlers[`POST ${base}/lock`] = (request) => update(request, { active: false });
+        server.handlers[`POST ${base}/unlock`] = (request) => update(request, { active: true });
+        server.handlers[`POST ${base}/admins`] = (request) => {
+            const tenant = find(request);
+            if (tenant === undefined) {
+                return notFound;
+            }
+            if (tenant['active'] !== true) {
+                return {
+                    status: 409,
+                    body: {
+                        error: 'rule_violation',
+                        message: 'In eine gesperrte Stadt kann niemand eingeladen werden.',
+                    },
+                };
+            }
+            const email = (request.body as { email: string }).email.toLowerCase();
+            const list = users.get(id) ?? [];
+            if (list.some((user) => user['email'] === email)) {
+                return {
+                    status: 409,
+                    body: {
+                        error: 'email_taken',
+                        message: 'Diese Adresse hat in der Stadt schon ein Konto.',
+                    },
+                };
+            }
+            const user = accountJson(nextId++, { email, label: email });
+            users.set(id, [...list, user]);
+            return { status: 201, body: { user, mail_sent: server.mailSent } };
+        };
+    }
+    // Erneut senden: das eingeladene Konto 31 und das erste neu eingeladene (ID 100).
+    for (const [tenantId, userId] of [
+        [3, 31],
+        [2, 100],
+        [100, 101],
+    ] as const) {
+        server.handlers[
+            `POST api/v1/tenants/${String(tenantId)}/users/${String(userId)}/resend-invitation`
+        ] = () => ({
+            status: 200,
+            body: {
+                user: users.get(tenantId)?.find((user) => user['id'] === userId),
+                mail_sent: server.mailSent,
+            },
+        });
+    }
     return server;
 }
