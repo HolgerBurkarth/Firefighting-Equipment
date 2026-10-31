@@ -16,6 +16,12 @@ namespace FirefightingEquipment\Http\Frontend;
  * Übersetzen von WebAssembly (WebAssembly.instantiateStreaming), kein eval von JavaScript. Die
  * WASM-Datei kommt aus assets/ ('self', connect-src), kein Worker, kein blob:, kein CDN. Das
  * Kamerabild (video.srcObject) braucht keine Quelle.
+ *
+ * Logo in den Einstellungen (frontend/src/runtime/logoImage.ts): img-src blob: erlaubt nur Bilder
+ * aus Dateien, die der Admin selbst wählt bzw. die die App daraus zeichnet (URL.createObjectURL):
+ * Der Browser liest das Bild (PNG, JPG, SVG …) in ein <img>, die Canvas bringt es auf 512 × 512 PNG,
+ * die Vorschau zeigt dieses PNG. Kein data:, keine fremde Herkunft; SVG in <img> führt keine Skripte
+ * aus.
  */
 final class ContentSecurityPolicy
 {
@@ -24,7 +30,7 @@ final class ContentSecurityPolicy
         'default-src' => ["'self'"],
         'script-src' => ["'self'", "'wasm-unsafe-eval'"],
         'style-src' => ["'self'"],
-        'img-src' => ["'self'"],
+        'img-src' => ["'self'", 'blob:'],
         'font-src' => ["'self'"],
         'connect-src' => ["'self'"],
         'manifest-src' => ["'self'"],

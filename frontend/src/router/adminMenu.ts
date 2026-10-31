@@ -1,6 +1,14 @@
 /** Symbole des Menüs (src/components/AdminMenuIcon.vue). */
 export type AdminMenuIconName =
-    'dashboard' | 'search' | 'devices' | 'location' | 'tag' | 'account' | 'list' | 'logout';
+    | 'dashboard'
+    | 'search'
+    | 'devices'
+    | 'location'
+    | 'tag'
+    | 'account'
+    | 'list'
+    | 'settings'
+    | 'logout';
 
 /** Zähler an einem Eintrag (aus dem Dashboard-Stand, src/data/adminOverview.ts). */
 export type AdminMenuBadge = 'pendingUsers' | 'openNotices';
@@ -18,7 +26,7 @@ export interface AdminMenuEntry {
 /**
  * Menü der Admin-Konsole (KONZEPT.md, "Admin-Konsole – Entscheidungen", 34), in dieser
  * Reihenfolge: Dashboard, Suchen, Geräte, Standorte, Gerätetypen, Benutzer, Protokoll. Jeder
- * Eintrag kommt mit seiner Seite hinzu; unten stehen immer „Einstellungen“ (mit der Seite) und
+ * Eintrag kommt mit seiner Seite hinzu; unten stehen „Einstellungen“ (ADMIN_SETTINGS) und
  * „Abmelden“.
  */
 export const ADMIN_MENU: readonly AdminMenuEntry[] = [
@@ -41,3 +49,10 @@ export const ADMIN_MENU: readonly AdminMenuEntry[] = [
         sections: ['notice'],
     },
 ];
+
+/** Unten im Menü über dem Namen des Kontos: Einstellungen (Anzeigemodus, Erscheinungsbild …). */
+export const ADMIN_SETTINGS: AdminMenuEntry = {
+    route: 'settings',
+    label: 'Einstellungen',
+    icon: 'settings',
+};

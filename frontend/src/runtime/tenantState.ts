@@ -1,5 +1,6 @@
 import { readonly, shallowRef } from 'vue';
-import type { ApiError } from '../api/client';
+import { deleteLogo, postAccentColor, postLogo } from '../api/appearance';
+import type { ApiError, ApiResult } from '../api/client';
 import { fetchTenant, type TenantInfo } from '../api/tenant';
 import type { AppBase } from './appBase';
 import { applyTenantAppearance } from './appearance';
@@ -38,4 +39,36 @@ export async function loadTenant(
     } else {
         state.value = { loading: false, tenant: null, error: result.error };
     }
+}
+
+/** Übernimmt einen neuen Stand der Stadt (Antwort einer Änderung) samt Erscheinungsbild. */
+export function setTenant(tenant: TenantInfo, doc: Document = document): void {
+    applyTenantAppearance(doc, tenant);
+    state.value = { loading: false, tenant, error: null };
+}
+
+async function update(request: Promise<ApiResult<TenantInfo>>): Promise<ApiResult<TenantInfo>> {
+    const result = await request;
+    if (result.ok) {
+        setTenant(result.data);
+    }
+    return result;
+}
+
+/**
+ * Erscheinungsbild der Stadt ändern (Einstellungen, nur Admins): Bei Erfolg gelten Farbe, Logo und
+ * App-Symbol sofort in Menü, Kopfleiste und Titel (`null` = Standardfarbe).
+ */
+export function saveAccentColor(accentColor: string | null): Promise<ApiResult<TenantInfo>> {
+    return update(postAccentColor(accentColor));
+}
+
+/** Logo hochladen (PNG 512 × 512 als Base64). */
+export function saveLogo(base64: string): Promise<ApiResult<TenantInfo>> {
+    return update(postLogo(base64));
+}
+
+/** Logo entfernen: zurück zum Standard-Symbol. */
+export function removeLogo(): Promise<ApiResult<TenantInfo>> {
+    return update(deleteLogo());
 }

@@ -306,11 +306,14 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - CSP (`ContentSecurityPolicy::DIRECTIVES`, eine Liste je Direktive): `default-src`, `script-src`,
   `style-src`, `img-src`, `font-src`, `connect-src`, `manifest-src`, `worker-src`, `base-uri`,
   `form-action` je `'self'`; `object-src` und `frame-ancestors` `'none'`. Nie `'unsafe-inline'`,
-  `'unsafe-eval'`, `'unsafe-hashes'`, `*`, `http:` oder `https:` (per Test). Einzige Ergänzung
-  bisher: `script-src 'self' 'wasm-unsafe-eval'` für den Kamera-Scanner (erlaubt nur das Übersetzen
-  von WebAssembly, kein eval von JavaScript; WASM aus `assets/`, kein Worker, kein `blob:`, kein CDN;
-  per Test genau so). Spätere Bausteine ergänzen gezielt nur, was sie brauchen, mit Begründung im
-  Kommentar (z. B. Logo-Vorschau: `img-src data: blob:`). Der QR-Code der Einladungscodes braucht
+  `'unsafe-eval'`, `'unsafe-hashes'`, `*`, `http:` oder `https:` (per Test). Ergänzungen bisher (je per
+  Test genau so): `script-src 'self' 'wasm-unsafe-eval'` für den Kamera-Scanner (erlaubt nur das
+  Übersetzen von WebAssembly, kein eval von JavaScript; WASM aus `assets/`, kein Worker, kein
+  `blob:`, kein CDN) und `img-src 'self' blob:` für das Logo in den Einstellungen (die selbst
+  gewählte Datei und das daraus gezeichnete PNG über `URL.createObjectURL`; kein `data:`). Spätere
+  Bausteine ergänzen gezielt nur, was sie brauchen, mit Begründung im Kommentar. Dynamische Farben
+  (Farbkreise, Vorschau der Akzentfarbe) nur als CSS-Variable über `:style="{ '--name': wert }"`
+  (Vue setzt sie per CSSOM, kein `style=""` im HTML). Der QR-Code der Einladungscodes braucht
   nichts: `uqr` liefert nur das Raster, Vue zeichnet es als SVG im DOM (`QrCode`).
   Daher im Frontend keine Inline-Skripte, keine `<style>`-Elemente und kein `style=""` im HTML;
   Schriften liegen im Build (kein Google Fonts). Kein natives `<select>`: Auswahllisten (Gerätetyp,
@@ -335,11 +338,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
-  `client.ts`; `devices.ts`, `deviceBulk.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
+  `client.ts`; `appearance.ts`, `devices.ts`, `deviceBulk.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
   `deviceTypes.ts`, `inspections.ts`, `invitationCodes.ts`, `locations.ts`, `notices.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
   Gerätetypen, Benutzer, Hinweise und das Dashboard),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
-  Stadt für Kopfleiste und Formulare, `appBase.ts` Bereich und
+  Stadt für Kopfleiste und Formulare, Änderungen des Erscheinungsbilds `saveAccentColor`, `saveLogo`,
+  `removeLogo` über `setTenant`, `logoImage.ts` Logo auf 512 × 512 PNG, `appBase.ts` Bereich und
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
   `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung,
   `appUpdate.ts` Updates, `unsavedInput.ts` ungespeicherte Eingaben, `build.ts` Build-Kennung,
@@ -356,7 +360,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `data-theme` gilt `prefers-color-scheme`, `data-theme="light"`/`"dark"` erzwingt; die beiden
   Dunkel-Blöcke müssen gleich sein, Text- und Statusfarben mindestens 4,5:1 (beides per Test).
   Stadtfarbe zur Laufzeit als `--accent` aus `GET api/v1/tenant`, Standard `#b71c1c`
-  (= `AccentColor::DEFAULT`).
+  (= `AccentColor::DEFAULT`); nach einer Änderung in den Einstellungen aus deren Antwort.
 - API-Zugriffe nur über `apiRequest` (`src/api/client.ts`): JSON-Body (ohne Angabe `{}`),
   `credentials: same-origin`, wirft nie; Ergebnis `{ok, status, data}` oder `ApiError {code,
   message, status, retryAfterSeconds, details}` (Netzwerkfehler `network`, unerwartete Antwort
@@ -556,7 +560,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   auf Symbole (Text nur für Bildschirmleser, Tooltip über `title`), darunter Kopfleiste in der
   Stadtfarbe mit „Menü öffnen“ (☰) und einer Schublade (Reka UI `Dialog` „Menü“, Escape und „Menü
   schließen“, ein Seitenwechsel schließt sie). Oben Logo (192 px) bzw. Standard-Symbol und Name der
-  Stadt, unten der Name des Kontos als Text und „Abmelden“; Zähler an Einträgen (`badge`:
+  Stadt, unten „Einstellungen“ (`ADMIN_SETTINGS`), der Name des Kontos als Text und „Abmelden“;
+  Zähler an Einträgen (`badge`:
   `pendingUsers`, `openNotices`) aus `adminOverview`; `sections` hebt einen Eintrag auch auf
   Unterseiten hervor („Geräte“ auf dem Gerätedetail). Auf den Handy-Seiten behält der Admin die Leiste
   unten mit „Dashboard“. Dashboard (`AdminDashboardPage`, Mockup „Main“) aus `adminOverview`
@@ -833,6 +838,35 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   andere Fehler als `ErrorNotice` mit der Meldung des Servers. Browser-Tests
   `tests/e2e/notices.spec.ts` (zustandsbehafteter Server je Test über `delegate`, `noticeJson` in
   `tests/e2e/support/admin.ts`); Unit-Tests `notices.spec.ts`, `router.spec.ts`.
+- Einstellungen der Admin-Konsole (`SettingsPage`, `einstellungen`, Route `settings`, nur `admin`,
+  `layout: 'admin'`, im Menü unten `ADMIN_SETTINGS`; Mockup „Einstellungen“, KONZEPT.md "Bereiche des
+  Admins", Einstellungen, und Entscheidung 37; API siehe "Erscheinungsbild (API)" und
+  "Benachrichtigung „Log“", unverändert): `ThemeModeSetting`, `AppearanceSettings`,
+  `NotificationSetting` und `PasswordChangeForm` (ab 1100 px nebeneinander), `SessionList` (Bausteine
+  in `src/components/`, die übrigen wie im Profil). `AppearanceSettings`: einzige Quelle der Auswahl
+  ist das Feld „Farbe als Hex-Wert“, die Farbkreise (`ACCENT_SWATCHES`, Radiogruppe, erster =
+  Standard `null`) schreiben hinein; Prüfung beim Tippen `checkAccent` (`src/data/appearance.ts`:
+  Format wie `AccentColor::fromString` mit `trim()` wie PHP, Kontrast `contrastWithWhite` wie
+  `AccentColor::contrastOf`, abgerundet `contrastText`, Grenzfälle `#ec1400`/`#ea1c05` per Test; die
+  Standardfarbe gilt als „Standard“ und wird als `null` gesendet, `accentSelection`/`accentRequest`).
+  Vorschau (`appearance-preview`: Kopfleiste mit Logo und Name, Gerät mit Status, Knopf) über
+  `--preview-accent`, die App erst nach „Farbe speichern“ (`saveAccentColor` → `POST
+  tenant/appearance`); „Verwerfen“ stellt den gespeicherten Stand her. Logo: verstecktes `<input
+  type="file">` (`LOGO_ACCEPT`, danach geleert), vorher `logoSourceProblem` (leer, über 10 MB), dann
+  `renderLogo` (`src/runtime/logoImage.ts`: `blob:` in ein `<img>`, `decode()`, Canvas `LOGO_EDGE`
+  512 mit `placeLogo`: Rand `LOGO_MARGIN` 16 px, Seitenverhältnis bleibt, ohne Maße quadratisch;
+  `toBlob('image/png')`), dann `logoSizeProblem` (über `MAX_LOGO_BYTES` = `PngInspector::MAX_BYTES`,
+  per Test); unlesbar → `LOGO_UNREADABLE`. Das PNG steht als `blob:`-Adresse in Logo und Vorschau,
+  gespeichert erst mit „Logo speichern“ (`saveLogo`, Base64 per `toBase64`), „Logo entfernen …“ nach
+  `ConfirmDialog` (`removeLogo` → `DELETE tenant/logo`). Nach Erfolg `setTenant`
+  (`applyTenantAppearance`: Farbe, Titel, `icon`/`apple-touch-icon` mit Logo bzw. ohne Logo wieder
+  `DEFAULT_ICON_HREFS` wie in `index.html`, per Test) und `success-notice`; Fehler als `ErrorNotice`.
+  Ungespeichert = Farbe geändert oder neues Logo noch nicht gespeichert. `NotificationSetting`:
+  `fetchNotifications`/`saveNotifications` (`src/api/auth.ts`, `GET`/`POST auth/notifications`),
+  Kästchen wirkt sofort, Fehler → bisheriger Stand und `ErrorNotice`. Browser-Tests
+  `tests/e2e/settings.spec.ts` (zustandsbehafteter Server über `delegate`; Logo als SVG über
+  `filechooser`, das gesendete PNG wird im Test entfiltert und geprüft); Unit-Tests
+  `appearanceSettings.spec.ts`, `appearanceApi.spec.ts`, `appearance.spec.ts`, `router.spec.ts`.
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
@@ -2306,9 +2340,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
     `frontend/src/runtime/appearance.ts`; unter `service` gibt es kein Manifest).
   - Nach `GET api/v1/tenant` (`applyTenantAppearance`): `--accent` und
     `<meta name="theme-color">` = `accent_color`, Titel „<Stadtname> – Geräteverwaltung“ (wie
-    `NAME_FORMAT`), und nur mit Logo `icon` = `logo_urls["192"]`, `apple-touch-icon` =
-    `logo_urls["180"]` (versioniert). Ohne Logo bleibt das Standard-Symbol; bei einem Fehler
-    (z. B. unbekannte Stadt) bleiben alle Standardwerte.
+    `NAME_FORMAT`), mit Logo `icon` = `logo_urls["192"]`, `apple-touch-icon` = `logo_urls["180"]`
+    (versioniert), ohne Logo das Standard-Symbol wie in `index.html` (auch nach dem Entfernen in
+    den Einstellungen); bei einem Fehler (z. B. unbekannte Stadt) bleiben alle Standardwerte.
 
 ## Fachliche Entscheidungen (Version 1)
 - Rollen, Anmeldung, Registrierung und Löschen von Benutzern: siehe "Benutzer und Anmeldung".
