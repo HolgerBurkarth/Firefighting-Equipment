@@ -1,4 +1,5 @@
 import { test as base, expect, type Page, type Route } from '@playwright/test';
+import { isAbortedFontDownload } from './support/consoleErrors';
 import { startPhpServer, workerPorts, type PhpServer } from './support/phpServer';
 
 /** Antwort von GET api/v1/tenant wie im Backend (TenantHandler). */
@@ -200,14 +201,25 @@ async function fulfillApi(
     return path;
 }
 
+/**
+ * Sammelt Konsolenfehler, Skriptfehler und CSP-Verletzungen. Ausgenommen sind nur `allowed` und für
+ * alle Tests abgebrochene Schrift-Downloads in Firefox (isAbortedFontDownload: nur Dateien aus
+ * assets/ des eigenen Testservers `origin`).
+ */
 async function watchProblems(
     page: Page,
     problems: string[],
     allowed: RegExp | null,
+    browserName: string,
+    origin: string,
 ): Promise<void> {
     page.on('console', (message) => {
         const text = message.text();
-        if (message.type() === 'error' && allowed?.test(text) !== true) {
+        if (
+            message.type() === 'error' &&
+            allowed?.test(text) !== true &&
+            !isAbortedFontDownload(text, browserName, origin)
+        ) {
             problems.push(`Konsolenfehler: ${text}`);
         }
     });
@@ -262,9 +274,13 @@ export const test = base.extend<Options & Fixtures, WorkerFixtures>({
         await use([]);
     },
     guard: [
-        async ({ page, tenant, allowedConsoleError, api, apiCalls, apiRequests }, use) => {
+        async (
+            { page, browserName, baseURL, tenant, allowedConsoleError, api, apiCalls, apiRequests },
+            use,
+        ) => {
             const problems: string[] = [];
-            await watchProblems(page, problems, allowedConsoleError);
+            // baseURL ist der Origin des Testservers (appServer bzw. updateServer).
+            await watchProblems(page, problems, allowedConsoleError, browserName, baseURL ?? '');
             await page.route(
                 /\/firefighting\/[a-z0-9-]+\/(api\/|manifest\.webmanifest)/,
                 async (route) => {

@@ -3,8 +3,10 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
+import { START_LOAD_TIMEOUT_MS } from '../../src/runtime/appUpdate';
 import { expect, test as base } from './fixtures';
 import { NEXT_BUILD_ID } from './globalSetup';
+import { isAbortedFontDownload } from './support/consoleErrors';
 
 /**
  * Updates mit zwei echten Builds: Der Update-Testserver des Workers (tests/e2e/support/
@@ -295,13 +297,6 @@ test.describe('Updates der App: Seiten ohne Kontrolle des Service Workers, mehre
     });
 });
 
-/**
- * Firefox meldet einen Schrift-Download, den das Neuladen abbricht, als Konsolenfehler (Status
- * 2152398850 = NS_BINDING_ABORTED). Nur dieser Fall ist erwartet; andere Schriftfehler (z. B. 404)
- * haben einen anderen Status und lassen den Test weiter scheitern.
- */
-const FONT_ABORTED_BY_RELOAD = /downloadable font: download failed .*status=2152398850 /;
-
 /** Token wie in tests/e2e/support/update-server.php (nur dieses gilt). */
 const MAIL_TOKEN = 'Upd8-Token_aus-der-Mail_0123456789abcdefghijk';
 
@@ -309,18 +304,24 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
     test('Mail-Link mit alter Version im Service Worker: neue Version lädt, Token bleibt', async ({
         page,
         context,
+        browserName,
+        baseURL,
     }, testInfo) => {
         const area = newArea(testInfo.project.name);
         await openOldVersion(page, area);
         // Deploy, ohne dass die geöffnete App es bemerkt; dann öffnet das Mailprogramm den Link in
         // einem neuen Tab (die alte Version liegt im Service Worker). Fehler dieses Tabs prüft der
-        // Test selbst; seine API-Aufrufe beantwortet der Update-Testserver.
+        // Test selbst (wie der Wächter in fixtures.ts, mit derselben Ausnahme für abgebrochene
+        // Schrift-Downloads in Firefox); seine API-Aufrufe beantwortet der Update-Testserver.
         deploy(area);
         const mail = await context.newPage();
         const problems: string[] = [];
         mail.on('pageerror', (error) => problems.push(`Skriptfehler: ${error.message}`));
         mail.on('console', (message) => {
-            if (message.type() === 'error' && !FONT_ABORTED_BY_RELOAD.test(message.text())) {
+            if (
+                message.type() === 'error' &&
+                !isAbortedFontDownload(message.text(), browserName, baseURL ?? '')
+            ) {
                 problems.push(`Konsolenfehler: ${message.text()}`);
             }
         });
@@ -377,6 +378,8 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
     test('neuer Service Worker installiert langsam: Start wartet und aktiviert ihn sofort danach', async ({
         page,
     }, testInfo) => {
+        // Die Installation darf bis zur Frist der App dauern (siehe unten), dazu der Rest des Tests.
+        testInfo.setTimeout(testInfo.timeout + START_LOAD_TIMEOUT_MS);
         const area = newArea(testInfo.project.name);
         await openOldVersion(page, area);
         // Wie live (31.10.2026): Der Start erkennt die neue Version, ihr Service Worker braucht für
@@ -387,6 +390,9 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         await page.clock.install();
         await page.reload();
         await expect(page.getByTestId('update-loading')).toBeVisible();
+        // Frist der App für Suche und Installation (START_LOAD_TIMEOUT_MS ab Beginn des Starts). Die
+        // Uhr läuft nach clock.install() weiter (Timer feuern), runFor springt zusätzlich vor.
+        const deadline = (await page.evaluate(() => Date.now())) + START_LOAD_TIMEOUT_MS;
         writeFileSync(join(STATE, area), 'next-held');
         const installing = (): Promise<boolean> =>
             page.evaluate(async () => {
@@ -412,9 +418,17 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         await expect(page.getByTestId('update-reload-needed')).toBeHidden();
         await expect(page.getByTestId('update-loading')).toBeVisible();
 
-        // Installation fertig: Die App aktiviert die neue Version sofort und lädt sie.
+        // Freigabe: Der Service Worker lädt noch alle übrigen Dateien des Builds, nacheinander
+        // (Workbox, index.html ist die erste; lokal rund 1 s, in CI unter Last waren 5 s zu kurz,
+        // 31.10.2026). Sobald die Installation endet, aktiviert die App die neue Version und lädt sie.
+        // Der Test wartet so lange wie die App (bis zu ihrer Frist), nicht länger: Verpasste die App
+        // das Ende der Installation, zeigte sie nach der Frist „Neu laden“, und der Test scheitert.
         writeFileSync(join(STATE, area), 'next');
-        await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        const remaining = deadline - (await page.evaluate(() => Date.now()));
+        expect(remaining).toBeGreaterThan(0);
+        await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID, {
+            timeout: remaining,
+        });
         await expect(page).toHaveURL(`/firefighting/${area}/anmelden`);
         await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
         await expect(page.getByTestId('update-reload-needed')).toBeHidden();

@@ -1034,7 +1034,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `NETWORK_ERROR_CONSOLE` (zusätzlich abgebrochene Anfragen), beide nur per `allowedConsoleError`. Tests auf öffentlichen
   Seiten (z. B. `anmelden`) brauchen kein `auth/me`. Jeder Konsolenfehler, Skriptfehler,
   jede CSP-Verletzung und jede nicht simulierte API-Anfrage lässt den Test scheitern (erwartete
-  Browsermeldung nur per Option `allowedConsoleError`, nie für CSP). Service Worker sind gesperrt
+  Browsermeldung nur per Option `allowedConsoleError`, nie für CSP). Einzige feste Ausnahme für alle
+  Tests (`isAbortedFontDownload`, `tests/e2e/support/consoleErrors.ts`, Unit-Test
+  `consoleErrors.spec.ts`): Firefox meldet einen Schrift-Download, den Neuladen oder Schließen
+  abbricht, als „downloadable font: download failed … status=2152398850“ (`NS_BINDING_ABORTED`);
+  zugelassen nur in Firefox, nur mit diesem Status und nur für `.woff2`/`.woff` aus `assets/` des
+  eigenen Testservers (`baseURL`). Andere Schriftfehler bleiben Fehler. Service Worker sind gesperrt
   außer in `serviceWorker.spec.ts` und `appUpdate.spec.ts`; der Offline-Test läuft nur in Chromium (`setOffline` umgeht in
   Firefox/WebKit den Service Worker). Update-Tests (`appUpdate.spec.ts`) mit zwei echten Builds: `globalSetup.ts` baut
   die neue Version (`FF_BUILD_ID=e2e-next`) nach `frontend/test-builds/` (in `.gitignore`), der
@@ -1049,9 +1054,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   neuen Service Worker übernommen (nur Chromium: `Page.reload` mit `ignoreCache` über CDP), zwei Tabs
   (einer aktualisiert, der andere folgt; einer geschlossen), Mail-Link mit alter Version, „Seite nicht
   gefunden“, Zurück-Knopf nach erkannter neuer Version, neue Kennung ohne neuen Service Worker (nach
-  rund 30 s „Neu laden“), Installation beim Start länger als 5 s (`next-held`). Firefox meldet einen Schrift-Download, den das
-  Neuladen abbricht (Status 2152398850 = `NS_BINDING_ABORTED`), als Konsolenfehler; nur diesen lässt
-  der Mail-Link-Test zu. Sporadische Fehler der Update-Logik nie mit längeren Wartezeiten
+  rund 30 s „Neu laden“), Installation beim Start länger als 5 s (`next-held`; nach der Freigabe
+  lädt Workbox die übrigen Dateien nacheinander, `index.html` zuerst; der Test wartet darauf bis zur
+  Frist der App, `START_LOAD_TIMEOUT_MS` ab Beginn des Starts, nicht länger; die Uhr läuft nach
+  `clock.install()` weiter, Timer feuern, `runFor` springt nur vor). Der Mail-Link-Test (eigener Tab)
+  prüft Konsolenfehler selbst, mit derselben Ausnahme `isAbortedFontDownload`. Sporadische Fehler der Update-Logik nie mit längeren Wartezeiten
   überdecken: unter Last wiederholen (`npm run test:load -- [Datei] [--project=…] [--runs=N]`,
   `tests/e2e/support/loadRun.ts`: alle fünf Profile, ohne Angabe `--repeat-each=10`, je Durchgang
   `--output=test-results/load/<Zeit>-<n>`, damit die Traces bleiben; der nächste normale Lauf leert
