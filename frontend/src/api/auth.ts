@@ -133,6 +133,39 @@ export function changePassword(
     });
 }
 
+/** Benachrichtigungen des eigenen Kontos (NotificationSettingsHandler::json). */
+export interface NotificationSettings {
+    /** Mail „Log“ bei jedem Vorgang der Geräte-Historie (eigene ausgenommen). */
+    readonly deviceLog: boolean;
+}
+
+export function parseNotifications(json: unknown): NotificationSettings | null {
+    if (!isRecord(json) || !isRecord(json['notifications'])) {
+        return null;
+    }
+    const deviceLog = json['notifications']['device_log'];
+    return typeof deviceLog === 'boolean' ? { deviceLog } : null;
+}
+
+/** GET auth/notifications (Admins unter ihrer Stadt, Super-Admins unter service). */
+export function fetchNotifications(
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<NotificationSettings>> {
+    return apiRequest('auth/notifications', parseNotifications, { ...(fetchFn && { fetchFn }) });
+}
+
+/** POST auth/notifications {device_log} (wiederholbar); Antwort mit dem Stand danach. */
+export function saveNotifications(
+    deviceLog: boolean,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<NotificationSettings>> {
+    return apiRequest('auth/notifications', parseNotifications, {
+        method: 'POST',
+        body: { device_log: deviceLog },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
 /** Sitzung des eigenen Kontos wie AuthJson::session (Zeiten in UTC, `…Z`). */
 export interface AccountSession {
     readonly id: number;

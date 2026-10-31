@@ -47,8 +47,9 @@ const OVERVIEW = adminOverview({
 });
 
 /**
- * Einträge des Menüs (ADMIN_MENU in src/router/adminMenu.ts), ohne Abmelden; „Benutzer“ mit dem
- * Zähler der beiden wartenden Freischaltungen, „Protokoll“ mit dem offenen Hinweis aus OVERVIEW.
+ * Einträge des Menüs (ADMIN_MENU in src/router/adminMenu.ts) und unten „Einstellungen“
+ * (ADMIN_SETTINGS), ohne Abmelden; „Benutzer“ mit dem Zähler der beiden wartenden Freischaltungen,
+ * „Protokoll“ mit dem offenen Hinweis aus OVERVIEW.
  */
 const MENU_LABELS = [
     'Dashboard',
@@ -58,6 +59,7 @@ const MENU_LABELS = [
     'Gerätetypen',
     /^Benutzer\s*2$/,
     /^Protokoll\s*1$/,
+    'Einstellungen',
 ];
 
 function menu(page: Page): Locator {

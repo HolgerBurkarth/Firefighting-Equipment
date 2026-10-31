@@ -179,6 +179,14 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { roles: ['admin'], layout: 'admin' },
         });
         routes.push({
+            // Einstellungen: Anzeigemodus, Erscheinungsbild der Stadt, Benachrichtigung „Log“,
+            // Passwort und angemeldete Geräte (KONZEPT.md, "Bereiche des Admins").
+            path: '/einstellungen',
+            name: 'settings',
+            component: () => import('../pages/SettingsPage.vue'),
+            meta: { roles: ['admin'], layout: 'admin' },
+        });
+        routes.push({
             // Ein Hinweis (Ziel der Hinweis-Mails, AppUrls::notice).
             path: '/protokoll/:id([1-9]\\d{0,17})',
             name: 'notice',

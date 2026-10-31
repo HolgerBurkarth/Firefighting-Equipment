@@ -5,14 +5,15 @@ import { userLabel } from '../api/auth';
 import type { ApiError } from '../api/client';
 import { logout, session } from '../auth/session';
 import { adminOverview } from '../data';
-import { ADMIN_MENU, type AdminMenuBadge } from '../router/adminMenu';
+import { ADMIN_MENU, ADMIN_SETTINGS, type AdminMenuBadge } from '../router/adminMenu';
 import { tenantState } from '../runtime/tenantState';
 import AdminMenuIcon from './AdminMenuIcon.vue';
 import ErrorNotice from './ErrorNotice.vue';
 
 /**
  * Inhalt des Menüs der Admin-Konsole: links am PC (`sidebar`, am Tablet eingeklappt auf Symbole)
- * bzw. in der Schublade am Handy (`drawer`). Unten der Name des Kontos als Text und „Abmelden“.
+ * bzw. in der Schublade am Handy (`drawer`). Unten „Einstellungen“, der Name des Kontos als Text und
+ * „Abmelden“.
  */
 defineProps<{ variant: 'sidebar' | 'drawer' }>();
 const emit = defineEmits<{ navigate: [] }>();
@@ -105,6 +106,16 @@ async function onLogout(): Promise<void> {
         <div class="menu-spacer" />
 
         <div class="menu-footer">
+            <RouterLink
+                class="menu-link"
+                active-class="menu-link-active"
+                :to="{ name: ADMIN_SETTINGS.route }"
+                :title="ADMIN_SETTINGS.label"
+                @click="emit('navigate')"
+            >
+                <AdminMenuIcon :name="ADMIN_SETTINGS.icon" />
+                <span class="menu-label">{{ ADMIN_SETTINGS.label }}</span>
+            </RouterLink>
             <p class="menu-account" :title="accountName">
                 <AdminMenuIcon name="account" />
                 <span class="menu-label" data-testid="account-name">{{ accountName }}</span>

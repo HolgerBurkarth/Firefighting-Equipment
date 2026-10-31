@@ -368,8 +368,27 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
   Standard die letzten 90 Tage, höchstens 366), Gerätetyp, Standort samt Fächern und Reihenfolge,
   Download als CSV wie der Export der Geräteliste; zu viele Einträge meldet der Server mit der Bitte,
   den Zeitraum zu verkleinern. Die Kachel „Offene Hinweise“ führt mit „Hinweise ansehen“ hierher.
+  Live geprüft (31.10.2026, Test-Stadt): Hinweis über eine bestätigte Offline-Buchung an M6 erzeugt;
+  Liste, Hinweis, „Erledigen …“ mit Notiz, „Wieder öffnen“, Zähler im Menü und „Verlauf exportieren“
+  (UTF-8 mit BOM, Spalten, Inhalte) in Ordnung, keine Fehler in der Konsole.
 - **Einstellungen:** Anzeigemodus, Erscheinungsbild der Feuerwehr mit Vorschau, Mail-Benachrichtigung,
   Passwort und angemeldete Geräte.
+  Umgesetzt in Schritt 12 (`einstellungen`, im Menü unten über dem Namen des Kontos): von oben nach
+  unten Anzeigemodus (wie im Profil, gilt für dieses Gerät), „Erscheinungsbild der Feuerwehr“,
+  „Benachrichtigung“ und „Passwort“ (am breiten Bildschirm nebeneinander), „Angemeldete Geräte“.
+  Akzentfarbe: sechs Farbkreise (Feuerwehrrot als Standard, Dunkelblau, Blau, Grün, Violett,
+  Anthrazit) und ein Feld für eine eigene Farbe (#RRGGBB oder Kurzform #RGB); die Prüfung beim
+  Tippen rechnet den Kontrast wie der Server („✓ … gut lesbar (Kontrast 6,57:1)“ bzw. „✕ Zu hell …“).
+  Die Vorschau (Kopfleiste mit Logo und Name, Gerät, Knopf „Speichern“) zeigt die gewählte Farbe
+  sofort, die App selbst erst nach „Farbe speichern“; „Verwerfen“ stellt den gespeicherten Stand
+  her. Logo: „Logo hochladen …“ nimmt PNG, JPG, SVG (auch WebP, GIF); die App zeichnet das Bild auf
+  512 × 512 PNG (Rand 16 px, nicht quadratische mittig mit durchsichtigem Rand, Entscheidung 37),
+  zeigt es in Logo und Vorschau und speichert erst mit „Logo speichern“; zu detailreiche Bilder (PNG
+  über 500 KB) und unlesbare Dateien meldet sie vorher. „Logo entfernen …“ mit Rückfrage. Nach dem
+  Speichern gelten Farbe und Logo sofort in Menü, Titel und App-Symbol. Benachrichtigung: ein
+  Kästchen „Mail bei jeder Änderung an Geräten“ (mit der Adresse; eigene Änderungen ausgenommen),
+  wirkt sofort. Passwort und angemeldete Geräte wie im Profil. Die Einstellungen des Super-Admins
+  (seine Benachrichtigung) kommen mit dessen Bereich.
 
 ### Admin-Konsole – Entscheidungen
 29. **Reihenfolge:** Die Admin-Konsole kommt vor dem Offline-Modus, damit Immendingen starten kann.
@@ -450,6 +469,8 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
     Benutzerverwaltung, `protokoll/<id>` seit Schritt 11 der Hinweis (vorher das Dashboard).
 37. **Logo:** Die App bringt jedes Bild (PNG, JPG, SVG …) selbst auf 512 × 512 PNG (quadratisch, mit
     Rand) und zeigt die Vorschau per Canvas; der Server prüft weiter genau 512 × 512.
+    Umgesetzt in Schritt 12: Der Browser liest die Datei über eine `blob:`-Adresse; dafür erlaubt die
+    CSP `img-src 'self' blob:` (kein `data:`, keine fremde Herkunft).
 38. **Live-Test der Benutzerverwaltung** (Test-Stadt): „Freischalten“ mit dem vorhandenen Konto
     `holger.burkarth@live.de` (wartet auf Freischaltung); die Registrierung über den Aushang mit
     `holger.burkarth+user1@live.de`.

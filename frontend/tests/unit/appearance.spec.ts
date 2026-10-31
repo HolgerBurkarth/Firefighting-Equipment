@@ -1,6 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { TenantInfo } from '../../src/api/tenant';
-import { applyTenantAppearance, linkManifest, TITLE_SUFFIX } from '../../src/runtime/appearance';
+import {
+    applyTenantAppearance,
+    DEFAULT_ICON_HREFS,
+    linkManifest,
+    TITLE_SUFFIX,
+} from '../../src/runtime/appearance';
 
 const TENANT: TenantInfo = {
     slug: 'test',
@@ -51,6 +58,21 @@ describe('Erscheinungsbild der Stadt', () => {
 
         expect(href('icon')).toBe(LOGO_URLS['192']);
         expect(href('apple-touch-icon')).toBe(LOGO_URLS['180']);
+    });
+
+    it('setzt nach dem Entfernen des Logos das Standard-Symbol wie in index.html zurück', () => {
+        applyTenantAppearance(document, { ...TENANT, logoUrls: LOGO_URLS });
+        applyTenantAppearance(document, TENANT);
+
+        expect(href('icon')).toBe(DEFAULT_ICON_HREFS.icon);
+        expect(href('apple-touch-icon')).toBe(DEFAULT_ICON_HREFS['apple-touch-icon']);
+        const indexHtml = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+        expect(indexHtml).toContain(
+            `rel="icon" type="image/png" href="${DEFAULT_ICON_HREFS.icon}"`,
+        );
+        expect(indexHtml).toContain(
+            `rel="apple-touch-icon" href="${DEFAULT_ICON_HREFS['apple-touch-icon']}"`,
+        );
     });
 
     it('Titel wie der Name im Manifest (ManifestHandler::NAME_FORMAT)', () => {

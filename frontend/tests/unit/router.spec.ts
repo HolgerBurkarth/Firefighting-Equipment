@@ -11,7 +11,7 @@ import {
     takeLoginNotice,
 } from '../../src/auth/session';
 import { createAppRouter } from '../../src/router';
-import { ADMIN_MENU } from '../../src/router/adminMenu';
+import { ADMIN_MENU, ADMIN_SETTINGS } from '../../src/router/adminMenu';
 import { parseAppBase, type AppBase } from '../../src/runtime/appBase';
 import { respond } from './support/fetch';
 import { meBody } from './support/me';
@@ -124,6 +124,7 @@ describe('Wächter', () => {
         ['/benutzer', 'users'],
         ['/protokoll', 'notices'],
         ['/protokoll/7', 'notice'],
+        ['/einstellungen', 'settings'],
     ] as const)('Seite %s der Admin-Konsole nur für Admins', async (path, name) => {
         setSession(state('admin'));
         const route = (await routerAt(path)).currentRoute.value;
@@ -146,7 +147,7 @@ describe('Wächter', () => {
     it('jeder Eintrag im Menü der Admin-Konsole hat eine Seite mit deren Darstellung', async () => {
         setSession(state('admin'));
         const router = await routerAt('/dashboard');
-        for (const entry of ADMIN_MENU) {
+        for (const entry of [...ADMIN_MENU, ADMIN_SETTINGS]) {
             const route = router.resolve({ name: entry.route });
             // Suchen ist eine Handy-Seite (Leiste unten), alle anderen gehören zur Konsole.
             expect(route.meta.layout, entry.route).toBe(

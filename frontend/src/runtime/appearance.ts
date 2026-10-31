@@ -18,18 +18,26 @@ export function linkManifest(doc: Document): void {
     doc.head.append(link);
 }
 
+/** Verweise auf das Standard-Symbol wie in index.html (relativ zu <base>). */
+export const DEFAULT_ICON_HREFS = {
+    icon: 'api/v1/app-icon/192',
+    'apple-touch-icon': 'api/v1/app-icon/180',
+} as const;
+
 /**
- * Erscheinungsbild nach GET api/v1/tenant: Stadtfarbe (--accent, theme-color), Titel und – nur mit
- * Logo – Symbol und apple-touch-icon (versionierte Adressen des Logos). Ohne Logo bleiben die
- * Verweise aus index.html auf das Standard-Symbol (api/v1/app-icon/…).
+ * Erscheinungsbild nach GET api/v1/tenant (und nach jeder Änderung in den Einstellungen):
+ * Stadtfarbe (--accent, theme-color), Titel und Symbol mit apple-touch-icon – mit Logo dessen
+ * versionierte Adressen, ohne Logo das Standard-Symbol wie in index.html.
  */
 export function applyTenantAppearance(doc: Document, tenant: TenantInfo): void {
     applyAccent(doc.documentElement, tenant.accentColor);
     doc.title = tenant.name + TITLE_SUFFIX;
-    if (tenant.logoUrls !== null) {
-        setLinkHref(doc, 'icon', tenant.logoUrls['192']);
-        setLinkHref(doc, 'apple-touch-icon', tenant.logoUrls['180']);
-    }
+    setLinkHref(doc, 'icon', tenant.logoUrls?.['192'] ?? DEFAULT_ICON_HREFS.icon);
+    setLinkHref(
+        doc,
+        'apple-touch-icon',
+        tenant.logoUrls?.['180'] ?? DEFAULT_ICON_HREFS['apple-touch-icon'],
+    );
 }
 
 function setLinkHref(doc: Document, rel: string, href: string): void {
