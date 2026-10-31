@@ -78,6 +78,7 @@ export class DeviceStore {
     private readonly current = shallowRef<DeviceListState>(EMPTY);
     private readonly refresher: Refresher;
     private generation = 0;
+    private readonly loadedListeners = new Set<(state: DeviceListState) => void>();
 
     constructor(
         private readonly fetchPage: FetchPage = (query) => fetchDevicePage(query),
@@ -228,6 +229,24 @@ export class DeviceStore {
         this.current.value = { ...state, devices };
     }
 
+    /**
+     * Stand aus der lokalen Kopie (Offline-Modus, src/data/offline.ts), nur solange noch nichts vom
+     * Server geladen ist; das nächste Laden ersetzt ihn. true = übernommen.
+     */
+    restore(devices: readonly DeviceListItem[], total: number): boolean {
+        if (this.current.value.mode !== null) {
+            return false;
+        }
+        this.current.value = { ...this.current.value, mode: 'local', devices, total };
+        return true;
+    }
+
+    /** Nach jedem vollständigen Laden aller Geräte (Modus `local`), z. B. für die lokale Kopie. */
+    onLoaded(listener: (state: DeviceListState) => void): () => void {
+        this.loadedListeners.add(listener);
+        return () => this.loadedListeners.delete(listener);
+    }
+
     /** Vergisst alle Geräte (Abmelden, Sitzung abgelaufen). */
     clear(): void {
         this.generation += 1;
@@ -261,6 +280,11 @@ export class DeviceStore {
                       loading: false,
                       error: null,
                   };
+        if (result.mode === 'local') {
+            for (const listener of this.loadedListeners) {
+                listener(this.current.value);
+            }
+        }
         return true;
     }
 

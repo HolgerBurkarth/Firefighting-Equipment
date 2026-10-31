@@ -1,18 +1,35 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { errorMessage } from '../auth/errorMessages';
-import { sessionCheckError } from '../auth/session';
+import { sessionCheckError, usingStoredSession } from '../auth/session';
+import { offlineData, syncedAtText } from '../data/offline';
+import { isOffline } from '../runtime/connectivity';
 import { updateNotice, type AppUpdater } from '../runtime/appUpdate';
 import { tenantState } from '../runtime/tenantState';
 import ConfirmDialog from './ConfirmDialog.vue';
 
 /**
- * Hinweise oben auf jeder Seite: Fehler der Stadt, gestörte Sitzungsprüfung, Updates der App (siehe
- * KONZEPT.md, "Updates der App"). In allen Darstellungen gleich (App.vue).
+ * Hinweise oben auf jeder Seite: Fehler der Stadt, offline bzw. gestörte Sitzungsprüfung, Updates
+ * der App (siehe KONZEPT.md, "Updates der App"). In allen Darstellungen gleich (App.vue).
  */
 const props = defineProps<{ updater: AppUpdater }>();
 
 const notice = computed(() => updateNotice(props.updater));
+
+/**
+ * Grauer Streifen (KONZEPT.md, "Offline-Modus – Entscheidungen", 51): offline bzw. mit der
+ * gespeicherten Sitzung, solange der Server nicht antwortet; mit dem Stand der lokalen Kopie.
+ */
+const offlineText = computed(() => {
+    if (!isOffline.value && !usingStoredSession.value) {
+        return null;
+    }
+    const head = isOffline.value ? 'Offline' : 'Keine Verbindung zum Server';
+    const synced = offlineData.syncedAt;
+    return synced === null
+        ? `${head} – neuer Versuch läuft automatisch.`
+        : `${head} – angezeigt wird der Stand vom ${syncedAtText(synced)}.`;
+});
 const confirmOpen = ref(false);
 
 /** Mit ungespeicherten Eingaben erst nachfragen (sie gingen beim Neuladen verloren). */
@@ -68,15 +85,26 @@ onBeforeUnmount(() => {
         <small>({{ tenantState.error.code }})</small>
     </p>
 
-    <!-- Sitzungsprüfung gestört (keine Verbindung, 5xx): nie zur Anmeldung, sondern erneut versuchen. -->
+    <!--
+        Sitzungsprüfung gestört ohne gespeicherte Sitzung: nie zur Anmeldung, erneut versuchen. Sonst
+        offline (bzw. mit gespeicherter Sitzung) der graue Streifen mit dem Stand der Daten.
+    -->
     <p
-        v-if="sessionCheckError !== null"
+        v-if="sessionCheckError !== null && !usingStoredSession"
         class="app-error app-offline"
         role="status"
         data-testid="connection-notice"
     >
         Keine Verbindung zum Server, neuer Versuch läuft automatisch.
         <small>({{ sessionCheckError.code }})</small>
+    </p>
+    <p
+        v-else-if="offlineText !== null"
+        class="app-error app-offline"
+        role="status"
+        data-testid="offline-notice"
+    >
+        {{ offlineText }}
     </p>
 
     <!-- data-dialog-passthrough: auch bei offenem Fenster bedienbar (FormDialog, base.css). -->

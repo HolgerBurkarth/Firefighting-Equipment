@@ -1,6 +1,6 @@
 import { readonly, shallowRef } from 'vue';
 import type { ApiError } from '../api/client';
-import { fetchMe, logout as apiLogout, type AuthState } from '../api/auth';
+import { fetchMe, logout as apiLogout, parseAuthState, type AuthState } from '../api/auth';
 
 /** Hinweis für die Anmeldeseite nach Abmelden, Ablauf der Sitzung, neuem Passwort oder Einladung. */
 export type LoginNotice =
@@ -28,6 +28,82 @@ let generation = 0;
 
 /** Angemeldetes Konto (null = nicht angemeldet oder noch unbekannt). */
 export const session = readonly(current);
+
+/** Speicher für die letzte bestätigte Sitzung (localStorage), nur unter Städten. */
+export interface StoredSessionStorage {
+    getItem(key: string): string | null;
+    setItem(key: string, value: string): void;
+    removeItem(key: string): void;
+}
+
+let storedKey: string | null = null;
+let storedStorage: StoredSessionStorage | null = null;
+const usingStored = shallowRef(false);
+let storedRejectedHandler: (() => void) | null = null;
+
+/**
+ * true, solange die App mit der gespeicherten Sitzung arbeitet, weil der Server (noch) nicht
+ * antwortet (KONZEPT.md, "Offline-Modus – Entscheidungen", 50).
+ */
+export const usingStoredSession = readonly(usingStored);
+
+/**
+ * Die letzte vom Server bestätigte Sitzung unter `key` merken (main.ts, nur unter Städten; nie das
+ * Cookie, nur Konto, Rolle und Stadt). Ohne Aufruf merkt sich die App keine Sitzung.
+ */
+export function configureStoredSession(
+    key: string | null,
+    storage: StoredSessionStorage | null = null,
+): void {
+    storedKey = key;
+    storedStorage = storage;
+}
+
+/** Wird aufgerufen, wenn der Server eine gespeicherte Sitzung mit einer echten Antwort ablehnt. */
+export function onStoredSessionRejected(handler: (() => void) | null): void {
+    storedRejectedHandler = handler;
+}
+
+/** Gespeichert im Format von auth/me, damit beim Lesen dieselbe Prüfung gilt. */
+function storedJson(state: AuthState): Record<string, unknown> {
+    return {
+        user: {
+            id: state.user.id,
+            email: state.user.email,
+            name: state.user.name,
+            display_name: state.user.displayName,
+            role: state.user.role,
+        },
+        tenant: state.tenant,
+    };
+}
+
+function saveStored(state: AuthState | null): void {
+    if (storedKey === null || storedStorage === null) {
+        return;
+    }
+    try {
+        if (state === null) {
+            storedStorage.removeItem(storedKey);
+        } else {
+            storedStorage.setItem(storedKey, JSON.stringify(storedJson(state)));
+        }
+    } catch {
+        // Ohne Speicher gibt es offline keine Sitzung (wie bisher).
+    }
+}
+
+function loadStored(): AuthState | null {
+    if (storedKey === null || storedStorage === null) {
+        return null;
+    }
+    try {
+        const text = storedStorage.getItem(storedKey);
+        return text === null ? null : parseAuthState(JSON.parse(text));
+    } catch {
+        return null;
+    }
+}
 
 /**
  * Warum eine Sitzung endet: `logout` (Abmelden beim Server erfolgreich), `ended` (vergessen, z. B.
@@ -71,9 +147,17 @@ export function setSession(state: AuthState | null): void {
 }
 
 function applySession(state: AuthState | null, reason: 'logout' | 'ended'): void {
+    // Eine laufende Prüfung im Hintergrund (gespeicherte Sitzung) ist damit erledigt.
+    if (usingStored.value) {
+        generation += 1;
+        pending = null;
+        checkError.value = null;
+        usingStored.value = false;
+    }
     notifyIfEnded(state, reason);
     current.value = state;
     known = true;
+    saveStored(state);
 }
 
 /** Vergisst die Sitzung (z. B. nach 401); der nächste Wächter fragt auth/me erneut. */
@@ -84,6 +168,8 @@ export function resetSession(): void {
     checkError.value = null;
     known = false;
     pending = null;
+    usingStored.value = false;
+    saveStored(null);
 }
 
 /**
@@ -113,7 +199,10 @@ export interface EnsureSessionOptions {
     readonly wait?: (ms: number) => Promise<void>;
 }
 
-async function check(options: EnsureSessionOptions): Promise<AuthState | null> {
+async function check(
+    options: EnsureSessionOptions,
+    early: (state: AuthState | null) => void,
+): Promise<AuthState | null> {
     const own = generation;
     const wait = options.wait ?? waitForRetry;
     for (let attempt = 0; ; attempt += 1) {
@@ -122,11 +211,26 @@ async function check(options: EnsureSessionOptions): Promise<AuthState | null> {
             return current.value;
         }
         if (result.ok || !isTransientError(result.error)) {
+            const rejected = usingStored.value && !result.ok;
             checkError.value = null;
+            usingStored.value = false;
             setSession(result.ok ? result.data : null);
+            if (rejected) {
+                storedRejectedHandler?.();
+            }
             return current.value;
         }
         checkError.value = result.error;
+        // Offline: mit der gespeicherten Sitzung weiterarbeiten, im Hintergrund weiter fragen.
+        if (!usingStored.value && current.value === null) {
+            const stored = loadStored();
+            if (stored !== null) {
+                current.value = stored;
+                known = true;
+                usingStored.value = true;
+                early(stored);
+            }
+        }
         await wait(RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)] ?? 15000);
         if (own !== generation) {
             return current.value;
@@ -137,19 +241,27 @@ async function check(options: EnsureSessionOptions): Promise<AuthState | null> {
 /**
  * Liefert die Sitzung; fragt auth/me höchstens einmal, bis sie bekannt ist. Bei einer Störung
  * (siehe isTransientError) wird automatisch erneut gefragt, bis eine Antwort kommt; solange steht
- * der Fehler in `sessionCheckError`. Nur eine echte Antwort führt zur Anmeldung.
+ * der Fehler in `sessionCheckError`. Nur eine echte Antwort führt zur Anmeldung. Gibt es eine
+ * gespeicherte Sitzung (configureStoredSession), gilt sie bei einer Störung sofort; die Prüfung läuft
+ * im Hintergrund weiter (`usingStoredSession`).
  */
 export function ensureSession(options: EnsureSessionOptions = {}): Promise<AuthState | null> {
     if (known) {
         return Promise.resolve(current.value);
     }
     if (pending === null) {
-        const started = check(options).finally(() => {
-            if (pending === started) {
-                pending = null;
-            }
+        let resolveFirst: (state: AuthState | null) => void = () => undefined;
+        const first = new Promise<AuthState | null>((resolve) => {
+            resolveFirst = resolve;
         });
-        pending = started;
+        void check(options, resolveFirst)
+            .then(resolveFirst)
+            .finally(() => {
+                if (pending === first) {
+                    pending = null;
+                }
+            });
+        pending = first;
     }
     return pending;
 }

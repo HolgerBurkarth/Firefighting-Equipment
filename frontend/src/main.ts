@@ -6,7 +6,9 @@ import './styles/base.css';
 
 import { createApp } from 'vue';
 import App from './App.vue';
-import { installDataLayer } from './data';
+import { configureStoredSession } from './auth/session';
+import { deviceStore, installDataLayer, locationStore } from './data';
+import { installOfflineCopy } from './data/offline';
 import { installServiceDataLayer } from './data/service';
 import { createAppRouter } from './router';
 import { currentAppBase } from './runtime/appBase';
@@ -19,6 +21,7 @@ import {
     startUpdateChecks,
 } from './runtime/appUpdate';
 import { BUILD_ID } from './runtime/build';
+import { installConnectivity } from './runtime/connectivity';
 import { registerServiceWorker } from './runtime/serviceWorker';
 import { applyThemeMode, browserStorage, loadThemeMode } from './runtime/theme';
 
@@ -33,7 +36,12 @@ if (base.isService) {
 } else {
     linkManifest(document);
     installDataLayer();
+    // Offline-Modus (KONZEPT.md, "Offline-Modus – Entscheidungen", 49 und 50): letzte bestätigte
+    // Sitzung und lokale Kopie der Daten je Stadt und Konto.
+    configureStoredSession(`ff-session:${base.area}`, browserStorage());
+    installOfflineCopy({ area: base.area, devices: deviceStore, locations: locationStore });
 }
+installConnectivity();
 
 // Kennung des Builds (Support, Browser-Tests der Updates).
 document.documentElement.dataset['build'] = BUILD_ID;

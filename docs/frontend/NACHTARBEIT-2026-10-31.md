@@ -94,6 +94,15 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
 - 31.10. S4 Super-Admins und Live-Test-Liste: Commit „Super-Admin S4: Super-Admins sperren und
   entsperren; Live-Test-Liste“. Lokal: Lint, Typprüfung, 1109 Unit-Tests, `superAdmin.spec.ts` alle
   fünf Profile (140) grün.
+  CI 6:57 grün, Deploy ok, Build `27cae0051e1a`, Health ok. Live: ☑ Super-Admins (lesend). Beim
+  Wechsel griff die Schleifensperre (10 Minuten nach dem automatischen Neuladen): „Seite nicht
+  gefunden“ mit Hinweis „Jetzt aktualisieren“, danach die neue Version – wie vorgesehen.
+  Teil A damit umgesetzt; schreibende Prüfungen offen für Holger (`LIVETEST-SUPER-ADMIN.md`, B1–B9).
+- 31.10. Teil B geplant: KONZEPT.md „Offline-Modus – Entscheidungen“ 48–56 (O1–O4).
+- 31.10. O1 Grundlage: Commit „Offline O1: lokale Kopie, gespeicherte Sitzung und Streifen
+  „Offline““. Lokal: Lint, Typprüfung, 1119 Unit-Tests, alle Browser-Tests Chromium/WebKit (nach
+  Korrektur: 27 rote durch ein zusätzliches Laden der Standorte, entfernt), `offline`,
+  `serviceWorker`, `appUpdate`, `scanner` in allen fünf Profilen (139) und unter WSL (139) grün.
 
 # Zur Prüfung durch Holger
 
@@ -104,3 +113,7 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
 - Entscheidung 43: Kürzel-Vorschlag ohne „Freiwillige Feuerwehr“, „Feuerwehr“, „FF“, „Stadt“,
   „Gemeinde“ am Anfang.
 - Das Konto-Feld „(Super-Admin)“ des alten Platzhalter-Dashboards entfällt; Abmelden steht im Menü.
+- Offline 49: nur bis 2.000 Geräte; Standorte kommen in die Kopie, sobald Umbuchen oder
+  Standortwahl sie laden (kein eigenes Laden).
+- Offline 50: Die gespeicherte Sitzung (Konto mit E-Mail und Name, ohne Cookie) liegt im
+  localStorage des Handys, bis Abmelden oder eine echte Ablehnung (401).

@@ -30,8 +30,9 @@ Probe-Stadt bleibt danach gesperrt stehen.
 - ☑ A5 Stadtdetail der Test-Stadt: Angaben (Adresse, Kürzel, 2 Admins, 4 Benutzer, angelegt
   26.10.2026), 4 Konten nur zum Ansehen, Knöpfe „Admin einladen …“, „Umbenennen …“, „… sperren …“
   (nicht betätigt); keine Konsolenfehler (31.10.2026, Build `d4a4bcdc0ca8`).
-- ☐ A6 Super-Admins: Liste, eigenes Konto „Sie“ ohne Knopf, geschütztes Konto „geschützt“ ohne
-  Knopf.
+- ☑ A6 Super-Admins: Liste, eigenes Konto „Sie“ ohne Knopf, geschütztes Konto „geschützt“ ohne
+  Knopf. (31.10.2026, Build `27cae0051e1a`: nur ein Super-Admin, eigenes und geschütztes Konto,
+  „Ihr eigenes Konto“ statt Knopf.)
 
 ## B Schreibend (Holger)
 - ☐ B1 „Neue Stadt“ mit Name „Feuerwehr Probe“: Kürzel `probe` vorgeschlagen und frei, E-Mail des
