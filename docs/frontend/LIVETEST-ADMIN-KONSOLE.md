@@ -195,6 +195,14 @@ Prüfung des Updates am PC (A1). Ergebnisse je Punkt bitte hier eintragen (☑ b
   Worker selbst, `unregister()` mit false gilt als abgemeldet, wenn der Browser die Registrierung
   nicht mehr kennt, „Neu laden“ setzt keine Sperre; neu die Zeitleiste
   `JSON.parse(sessionStorage['ff-update-trace'])` (KONZEPT.md "Updates der App").
+- ☑ Deploy der Behebung (Claude per Chrome, 31.10.2026, Build `ba0943209602`, beim Start lief noch
+  die Logik von `b6a25b03573c`): Tab B auf dem Gerätedetail von M90 (alte Version) offen, ein neuer
+  Tab direkt auf `standorte` → von selbst die neue Version, vom neuen Service Worker gesteuert, ohne
+  „konnte nicht geladen werden“; normales Neuladen danach: weiter die neue Version, kein Service
+  Worker wartet. Tab B lief ohne Hinweis (keine Eingabe) weiter und wechselte mit „Zurück“ auf
+  `geraete` in der neuen Version, ohne Fehler. Die Zeitleiste der neuen Version füllt sich
+  (`start`, `register`, `build`, `update`). Der Start mit der neuen Logik und A2 folgen beim
+  nächsten Deploy.
 - Notiz (kein Fehler): „Letzte Aktivitäten“ ist nach Eingang beim Server sortiert, zeigt aber die
   Zeit der Aktion (bei Offline-Buchungen können die Zeiten daher nicht absteigend wirken).
 - Testdaten in der Test-Stadt (bleiben vorerst): M90, M91 (neu), M92 (früheres M91), M93 (HLF 20),
