@@ -66,6 +66,18 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
   638 Browser-Tests gelistet, WSL und Composer vorhanden). Commit „Nachtarbeit 31.10.: Auftrag und
   Fortschritt“ (nur `.md`, keine CI).
 
+- 31.10. 16:25 – Teil A geplant: KONZEPT.md „Super-Admin – Entscheidungen“ 39–47 (Schritte S1–S5).
+- 31.10. S1 Super-Admin: Menü, Dashboard, Städte-Liste, Einstellungen. Commit „Super-Admin S1:
+  Menü, Dashboard, Städte-Liste und Einstellungen“. Lokal: Lint, Typprüfung, 1100 Unit-Tests,
+  Browser-Tests (6 Dateien Chromium/WebKit 171, `superAdmin.spec.ts` alle fünf Profile 50) grün.
+  CI/Deploy/live: siehe nächster Eintrag.
+
 # Zur Prüfung durch Holger
 
-(noch nichts)
+- Entscheidung 40: keine Zähler im Menü des Super-Admins.
+- Entscheidung 41: Ablaufzeit einer Einladung („läuft in 6 Std. ab“) wird nicht angezeigt (API kennt
+  sie nicht), stattdessen „Ein Einladungslink gilt 24 Stunden ab dem Senden.“; „eingeladen seit“ ist
+  das Anlagedatum des Kontos (ein erneutes Senden ändert es nicht).
+- Entscheidung 43: Kürzel-Vorschlag ohne „Freiwillige Feuerwehr“, „Feuerwehr“, „FF“, „Stadt“,
+  „Gemeinde“ am Anfang.
+- Das Konto-Feld „(Super-Admin)“ des alten Platzhalter-Dashboards entfällt; Abmelden steht im Menü.

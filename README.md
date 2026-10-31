@@ -1281,7 +1281,8 @@ Fürs Ansehen mit echter API: `npm run build`, dann im Hauptordner
 `http.allowed_origins` eintragen.
 
 Anmeldung: `/firefighting/<bereich>/` leitet ohne Sitzung zur Anmeldung, sonst zur Startseite der
-Rolle (User `suchen`, Admin und Super-Admin `dashboard`; unter `service` vorerst ein Platzhalter).
+Rolle (User `suchen`, Admin und Super-Admin `dashboard`; unter `service` das Dashboard des
+Super-Admins mit Städten und offenen Einladungen).
 Die Handy-Seiten für User und Admins: `suchen` (Suche, „Code scannen“, „Zuletzt benutzt“),
 `prueffristen`, `profil` und `geraete/<id>` (Umbuchen und Status, Standortwahl, Details und Verlauf);
 Entscheidungen in `docs/frontend/KONZEPT.md`, "User am Handy". Die Admin-Konsole (nur Admins einer

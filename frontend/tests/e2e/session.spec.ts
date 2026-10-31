@@ -10,6 +10,7 @@ import {
 import { ADMIN_OVERVIEW } from './support/admin';
 import { NO_DEVICES } from './support/devices';
 import { CURRENT_SESSION_ONLY } from './support/profile';
+import { SERVICE_OVERVIEW } from './support/service';
 
 test.describe('Weiche „/“ und Wächter', () => {
     test.describe('ohne Sitzung', () => {
@@ -71,13 +72,19 @@ test.describe('Weiche „/“ und Wächter', () => {
     });
 
     test.describe('als Super-Admin', () => {
-        test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('superadmin') } } });
+        test.use({
+            api: {
+                'GET api/v1/auth/me': { status: 200, body: meBody('superadmin') },
+                ...SERVICE_OVERVIEW,
+            },
+        });
 
         test('„/service/“ führt zum Dashboard', async ({ page }) => {
+            await page.setViewportSize({ width: 1280, height: 800 });
             await page.goto('/firefighting/service/');
             await expect(page).toHaveURL(/\/firefighting\/service\/dashboard$/);
             await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
-            await expect(page.getByText('(Super-Admin)')).toBeVisible();
+            await expect(page.getByTestId('account-name')).toHaveText('Anna');
         });
     });
 

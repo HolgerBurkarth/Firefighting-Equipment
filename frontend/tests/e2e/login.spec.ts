@@ -11,6 +11,7 @@ import {
 } from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
 import { NO_DEVICES } from './support/devices';
+import { SERVICE_OVERVIEW } from './support/service';
 
 const LOGIN = 'POST api/v1/auth/login';
 
@@ -158,6 +159,7 @@ test.describe('Erfolgreiche Anmeldung', () => {
                     [LOGIN]: { status: 200, body: meBody(role) },
                     ...NO_DEVICES,
                     ...ADMIN_OVERVIEW,
+                    ...SERVICE_OVERVIEW,
                 },
             });
 

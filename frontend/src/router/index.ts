@@ -25,7 +25,7 @@ declare module 'vue-router' {
          * Darstellung (App.vue): ohne Angabe Kopfleiste und Inhalt; `user` Handy-Seiten mit Leiste
          * unten (Suchen, Prüffristen, Profil); `focus` bildschirmfüllend ohne Kopfleiste der App
          * und ohne Leiste, die Seite zeigt ihre eigene Kopfzeile mit Zurück-Knopf; `admin` Seiten
-         * der Admin-Konsole mit deren Menü (src/components/AdminMenu.vue).
+         * der Admin-Konsole bzw. des Super-Admins mit Menü (src/components/AdminMenu.vue).
          */
         layout?: PageLayout;
     }
@@ -67,15 +67,31 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
         {
             path: '/dashboard',
             name: 'dashboard',
-            // Unter einer Stadt die Startseite der Admin-Konsole, unter service vorerst ein Platzhalter.
+            // Unter einer Stadt die Startseite der Admin-Konsole, unter service die des Super-Admins.
             component: base.isService
-                ? () => import('../pages/DashboardPage.vue')
+                ? () => import('../pages/ServiceDashboardPage.vue')
                 : () => import('../pages/AdminDashboardPage.vue'),
             meta: base.isService
-                ? { roles: ['superadmin'] }
+                ? { roles: ['superadmin'], layout: 'admin' }
                 : { roles: ['admin'], layout: 'admin' },
         },
     ];
+    if (base.isService) {
+        // Bereich des Super-Admins (KONZEPT.md, "Super-Admin – Entscheidungen"); unter einer Stadt
+        // gibt es diese Seiten nicht.
+        routes.push({
+            path: '/staedte',
+            name: 'tenants',
+            component: () => import('../pages/TenantsPage.vue'),
+            meta: { roles: ['superadmin'], layout: 'admin' },
+        });
+        routes.push({
+            path: '/einstellungen',
+            name: 'settings',
+            component: () => import('../pages/ServiceSettingsPage.vue'),
+            meta: { roles: ['superadmin'], layout: 'admin' },
+        });
+    }
     if (!base.isService) {
         routes.push({
             // Link im QR-Code des Einladungscodes: registrieren#code=XXXX-XXXX-XXXX.

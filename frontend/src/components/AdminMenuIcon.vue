@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AdminMenuIconName } from '../router/adminMenu';
 
-/** Symbole des Menüs der Admin-Konsole (Mockup „Main“). */
+/** Symbole des Menüs der Admin-Konsole und des Super-Admins (Mockups „Main“, „SuperAdmin“). */
 defineProps<{ name: AdminMenuIconName }>();
 </script>
 
@@ -59,6 +59,17 @@ defineProps<{ name: AdminMenuIconName }>();
             <path d="M17 17l2.1 2.1" />
             <path d="M4.9 19.1L7 17" />
             <path d="M17 7l2.1-2.1" />
+        </template>
+        <template v-else-if="name === 'city'">
+            <path d="M3 21h18" />
+            <path d="M5 21V9l5-3v15" />
+            <path d="M10 21V4l9 4v13" />
+            <path d="M14 11h2" />
+            <path d="M14 15h2" />
+        </template>
+        <template v-else-if="name === 'shield'">
+            <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />
+            <path d="M9 12l2 2 4-4" />
         </template>
         <template v-else>
             <path d="M15 4h4v16h-4" />

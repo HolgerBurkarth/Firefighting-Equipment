@@ -28,9 +28,9 @@ onMounted(() => {
 </script>
 
 <template>
-    <!-- Admin-Konsole: Menü links (am Handy Kopfleiste mit ☰), Inhalt rechts. -->
+    <!-- Admin-Konsole und Super-Admin: Menü links (am Handy Kopfleiste mit ☰), Inhalt rechts. -->
     <div v-if="layout === 'admin'" class="admin-shell">
-        <AdminMenu />
+        <AdminMenu :service="base.isService" />
         <div class="admin-column">
             <AppNotices :updater="updater" />
             <main class="app-main app-main-admin">

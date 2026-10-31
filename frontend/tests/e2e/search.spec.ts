@@ -16,6 +16,7 @@ import {
     manyDevices,
 } from './support/devices';
 import { CURRENT_SESSION_ONLY } from './support/profile';
+import { SERVICE_OVERVIEW } from './support/service';
 
 const ME = { status: 200, body: meBody('user') } as const;
 const RECENT_KEY = 'ff-recent-devices:test:7';
@@ -377,14 +378,20 @@ test.describe('Liste nicht ladbar', () => {
 });
 
 // Dashboard und Menü des Admins: adminConsole.spec.ts.
+// Menü und Dashboard des Super-Admins: superAdmin.spec.ts.
 test.describe('Dashboard des Super-Admins', () => {
-    test.use({ api: { 'GET api/v1/auth/me': { status: 200, body: meBody('superadmin') } } });
+    test.use({
+        api: {
+            'GET api/v1/auth/me': { status: 200, body: meBody('superadmin') },
+            ...SERVICE_OVERVIEW,
+        },
+    });
 
-    test('keine Leiste, auch bei Handy-Breite', async ({ page }) => {
+    test('keine Leiste unten, auch bei Handy-Breite', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto('/firefighting/service/dashboard');
         await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
-        await expect(page.getByRole('navigation', { name: 'Hauptmenü' })).toHaveCount(0);
+        await expect(page.locator('.tab-bar')).toHaveCount(0);
     });
 });
 

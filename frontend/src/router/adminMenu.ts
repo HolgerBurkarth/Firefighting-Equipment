@@ -8,7 +8,9 @@ export type AdminMenuIconName =
     | 'account'
     | 'list'
     | 'settings'
-    | 'logout';
+    | 'logout'
+    | 'city'
+    | 'shield';
 
 /** Zähler an einem Eintrag (aus dem Dashboard-Stand, src/data/adminOverview.ts). */
 export type AdminMenuBadge = 'pendingUsers' | 'openNotices';
@@ -56,3 +58,13 @@ export const ADMIN_SETTINGS: AdminMenuEntry = {
     label: 'Einstellungen',
     icon: 'settings',
 };
+
+/**
+ * Menü des Super-Admins unter `service` (KONZEPT.md, "Super-Admin – Entscheidungen", 40):
+ * Dashboard, Städte, Super-Admins (jeder Eintrag kommt mit seiner Seite); unten ebenfalls
+ * „Einstellungen“ (ADMIN_SETTINGS, eigene Seite unter service) und „Abmelden“.
+ */
+export const SERVICE_MENU: readonly AdminMenuEntry[] = [
+    { route: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { route: 'tenants', label: 'Städte', icon: 'city' },
+];

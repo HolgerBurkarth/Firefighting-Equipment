@@ -8,8 +8,10 @@ import ErrorNotice from './ErrorNotice.vue';
 /**
  * Benachrichtigung „Log“ des eigenen Kontos (GET/POST auth/notifications): Mail bei jedem Vorgang
  * der Geräte-Historie und zu jedem Hinweis, eigene ausgenommen. Wirkt sofort beim Umschalten;
- * scheitert das Speichern, bleibt der bisherige Stand.
+ * scheitert das Speichern, bleibt der bisherige Stand. Super-Admins erhalten die Mails aller Städte
+ * (`allTenants`, ohne Links: sie sehen keine Geräte).
  */
+defineProps<{ allTenants?: boolean }>();
 const enabled = ref<boolean | null>(null);
 const busy = ref(false);
 const loadError = shallowRef<ApiError | null>(null);
@@ -73,7 +75,8 @@ async function onChange(event: Event): Promise<void> {
                 <span class="notification-label">Mail bei jeder Änderung an Geräten</span>
                 <span id="notification-hint" class="hint">
                     Umbuchen, Status, Prüfdatum, Stammdaten und Import, dazu die Hinweise im
-                    Protokoll<template v-if="email !== null"> – an {{ email }}</template
+                    Protokoll<template v-if="allTenants === true"> – aus allen Städten</template
+                    ><template v-if="email !== null"> – an {{ email }}</template
                     >. Eigene Änderungen sind ausgenommen.
                 </span>
             </span>

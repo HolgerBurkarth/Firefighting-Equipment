@@ -55,7 +55,9 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `prueffristen` | nur Stadt | Prüffristen am Handy: überfällig und in den nächsten 30 Tagen fällig |
 | `profil` | nur Stadt | Profil am Handy: Konto mit Abmelden, Anzeigemodus, Passwort ändern, angemeldete Geräte |
 | `geraete/<id>` | nur Stadt | Umbuchen/Status eines Geräts; `?standortwahl=1` öffnet die Standortwahl, `?details=1` „Details und Verlauf“ |
-| `dashboard` | Stadt und `service` | Startseite der Admin-Konsole bzw. des Super-Admins (unter `service` vorerst Platzhalter) |
+| `dashboard` | Stadt und `service` | Startseite der Admin-Konsole bzw. des Super-Admins |
+| `staedte` | nur `service` | Städte des Super-Admins (Entscheidung 42) |
+| `einstellungen` | Stadt und `service` | Einstellungen des Admins bzw. des Super-Admins (Entscheidung 46) |
 
 `/` ist nur eine Weiche: ohne Sitzung zur Anmeldung, sonst zur Startseite der Rolle.
 
@@ -550,6 +552,57 @@ als 2.000 Geräten.
   Kürzel (aus dem Namen vorgeschlagen, Umlaute umgewandelt, Prüfung „frei“ beim Tippen), E-Mail des
   ersten Admins.
 - **Super-Admins:** Liste mit Sperren und Entsperren; das geschützte Konto ohne Button.
+
+### Super-Admin – Entscheidungen
+Geplant in der Nacht vom 31.10.2026 (Agent, ohne Rückfrage; alle mit „Vorläufig“ markierten Punkte
+prüft Holger). API: `CLAUDE.md`, "Städte verwalten und Admins einladen" (fertig und live).
+
+39. **Schritte:** S1 Menü, Dashboard, Städte-Liste und Einstellungen; S2 „Neue Stadt“; S3
+    Stadtdetail (umbenennen, sperren/entsperren, Admin einladen, Einladung erneut senden, Benutzer
+    ansehen); S4 Super-Admins; S5 Abschluss mit Live-Test (lesend) und `LIVETEST-SUPER-ADMIN.md` für
+    die schreibenden Prüfungen. Die Anmeldung unter `/service/` gibt es schon (Entscheidung 2).
+40. **Gerüst:** dieselbe Darstellung wie die Admin-Konsole (Menü in drei Breiten, Entscheidung 34),
+    Einträge Dashboard, Städte, Super-Admins; unten Einstellungen, der Name des Kontos und Abmelden.
+    Oben „Service“ mit „Super-Admin“ und dem Standard-Symbol (unter `service` gibt es keine Stadt,
+    daher immer Feuerwehrrot). Vorläufig (Agent, Nacht 31.10.): keine Zähler im Menü.
+41. **Dashboard** (Mockup „SuperAdmin“): Kacheln „Städte“ (N aktiv, M gesperrt; führt zu `staedte`),
+    „Offene Admin-Einladungen“ (Summe der eingeladenen Admins aller Städte) und „Benutzer gesamt“
+    (aktive, nicht gesperrte Konten aller Städte). Darunter die offenen Einladungen (Stadt, E-Mail,
+    eingeladen am) mit „Erneut senden“, dann die Städte wie in der Liste. Vorläufig (Agent, Nacht
+    31.10.): Die Ablaufzeit einer Einladung („läuft in 6 Std. ab“ im Mockup) zeigt die App nicht, die
+    API kennt sie nicht; stattdessen der Satz „Ein Einladungslink gilt 24 Stunden ab dem Senden.“
+    Die eingeladenen Konten holt die App je Stadt mit Einladungen (`GET tenants/{id}/users?status=invited`).
+42. **Städte-Liste** (`staedte`): Spalten Name, Adresse (`/firefighting/<kürzel>/`), Status, Admins
+    und Benutzer; Suche in Name und Kürzel, Spaltenköpfe sortieren, am Handy Karten mit Knöpfen
+    „Sortieren“ (wie bei den Gerätetypen). Status: „gesperrt“, sonst „Einladung offen“, solange die
+    Stadt keinen aktiven Admin, aber eine offene Einladung hat (wie im Mockup), sonst „aktiv“.
+    Admins: aktive, dazu klein „N eingeladen“. Der Name führt zum Stadtdetail.
+43. **Neue Stadt** (Fenster `FormDialog`, Knopf „Neue Stadt“ auf Dashboard und Städte-Liste): Name,
+    Kürzel und E-Mail des ersten Admins. Das Kürzel folgt dem Namen, bis es von Hand geändert wird.
+    Vorläufig (Agent, Nacht 31.10.): Vorschlag ohne „Freiwillige Feuerwehr“, „Feuerwehr“, „FF“,
+    „Stadt“, „Gemeinde“ am Anfang (wie im Mockup „Feuerwehr Bad Dürrheim“ → `bad-duerrheim`),
+    ä/ö/ü/ß → ae/oe/ue/ss, andere Akzente ohne Zeichen, alles andere wird Bindestrich, höchstens 50
+    Zeichen. Prüfung beim Tippen wie `TenantSlug` (Format, Länge, `service`), danach (300 ms) der
+    Server (`GET tenants/slug-available`): „Frei. Adresse: www.prodad.de/firefighting/<kürzel>/“
+    bzw. „Bereits vergeben“. Knopf „Stadt anlegen und einladen“; danach das Stadtdetail mit grüner
+    Meldung (bzw. Hinweis, wenn die Mail nicht gesendet werden konnte: „Einladung erneut senden“).
+44. **Stadtdetail** (`staedte/<id>`): Name, Adresse (nur als Text, Entscheidung 47), Status, Zahlen
+    und angelegt am; „Umbenennen …“ (Fenster), „Stadt sperren …“ bzw. „Stadt entsperren …“ (je mit
+    Rückfrage; Sperren meldet alle Konten der Stadt ab, die Daten bleiben), „Admin einladen …“
+    (Fenster mit E-Mail). Darunter die Konten der Stadt nur zum Ansehen (Name, E-Mail, Rolle, Status,
+    registriert; Suche, ohne gelöschte); eingeladene Admins mit „Einladung erneut senden“.
+45. **Super-Admins** (`super-admins`): Liste mit Name, E-Mail, Status; „Sperren …“ (Rückfrage, meldet
+    das Konto überall ab) bzw. „Entsperren …“. Das geschützte Konto trägt „geschützt“ und hat keinen
+    Knopf, das eigene Konto „Sie“ und keinen Knopf (der Server lehnt beides ohnehin ab). Anlegen,
+    Passwort und Schutz bleiben Sache der Kommandozeile (Hinweis unter der Liste).
+46. **Einstellungen** (`einstellungen`): Anzeigemodus, Benachrichtigung (Mails zu Geräten aller Städte,
+    ohne Links), Passwort und angemeldete Geräte; kein Erscheinungsbild.
+47. **Keine Geräte, kein Wechsel in eine Stadt:** keine Links in eine Stadt (Adressen nur als Text),
+    keine Geräte, keine Benutzerverwaltung einer Stadt außer dem Ansehen. Konten einer Stadt sehen
+    keine Seite des Super-Admins (es gibt sie unter einer Stadt nicht).
+
+Stand: S1 umgesetzt (31.10.2026, Nacht): Menü, Dashboard (Kacheln, offene Einladungen mit „Erneut
+senden“, Städte), `staedte` mit Suche und Sortierung (am Handy Karten), Einstellungen.
 
 ## User am Handy
 Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Live-Tests stehen in

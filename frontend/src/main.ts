@@ -7,6 +7,7 @@ import './styles/base.css';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { installDataLayer } from './data';
+import { installServiceDataLayer } from './data/service';
 import { createAppRouter } from './router';
 import { currentAppBase } from './runtime/appBase';
 import { linkManifest } from './runtime/appearance';
@@ -25,8 +26,11 @@ const base = currentAppBase();
 
 // Gespeicherten Anzeigemodus vor dem ersten Zeichnen der App setzen.
 applyThemeMode(document.documentElement, loadThemeMode(browserStorage()));
-// Web-App-Manifest und Gerätedaten nur unter Städten (unter service gibt es beides nicht).
-if (!base.isService) {
+// Web-App-Manifest und Gerätedaten nur unter Städten (unter service gibt es beides nicht), dort
+// stattdessen die Listen des Super-Admins.
+if (base.isService) {
+    installServiceDataLayer();
+} else {
     linkManifest(document);
     installDataLayer();
 }

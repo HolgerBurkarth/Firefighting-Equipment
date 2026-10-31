@@ -5,7 +5,7 @@ import { userLabel } from '../api/auth';
 import type { ApiError } from '../api/client';
 import { logout, session } from '../auth/session';
 import { adminOverview } from '../data';
-import { ADMIN_MENU, ADMIN_SETTINGS, type AdminMenuBadge } from '../router/adminMenu';
+import { ADMIN_MENU, ADMIN_SETTINGS, SERVICE_MENU, type AdminMenuBadge } from '../router/adminMenu';
 import { tenantState } from '../runtime/tenantState';
 import AdminMenuIcon from './AdminMenuIcon.vue';
 import ErrorNotice from './ErrorNotice.vue';
@@ -15,7 +15,11 @@ import ErrorNotice from './ErrorNotice.vue';
  * bzw. in der Schublade am Handy (`drawer`). Unten „Einstellungen“, der Name des Kontos als Text und
  * „Abmelden“.
  */
-defineProps<{ variant: 'sidebar' | 'drawer' }>();
+const props = defineProps<{
+    variant: 'sidebar' | 'drawer';
+    /** Bereich des Super-Admins: Einträge SERVICE_MENU, oben „Service“ statt der Stadt. */
+    service: boolean;
+}>();
 const emit = defineEmits<{ navigate: [] }>();
 
 const router = useRouter();
@@ -29,11 +33,14 @@ const busy = ref(false);
 const error = ref<ApiError | null>(null);
 
 const accountName = computed(() => (session.value === null ? '' : userLabel(session.value.user)));
-const logo = computed(() => tenantState.value.tenant?.logoUrls?.['192'] ?? null);
+const entries = computed(() => (props.service ? SERVICE_MENU : ADMIN_MENU));
+const logo = computed(() =>
+    props.service ? null : (tenantState.value.tenant?.logoUrls?.['192'] ?? null),
+);
 
 function badgeCount(badge: AdminMenuBadge | undefined): number {
     const overview = adminOverview.state.overview;
-    if (badge === undefined || overview === null) {
+    if (badge === undefined || overview === null || props.service) {
         return 0;
     }
     return badge === 'pendingUsers' ? overview.pendingUsers : (overview.summary.openNotices ?? 0);
@@ -75,14 +82,16 @@ async function onLogout(): Promise<void> {
             </div>
             <div class="menu-brand-text">
                 <span class="menu-brand-name" data-testid="menu-tenant">
-                    {{ tenantState.tenant?.name ?? 'Feuerwehr' }}
+                    {{ service ? 'Service' : (tenantState.tenant?.name ?? 'Feuerwehr') }}
                 </span>
-                <span class="menu-brand-sub">Geräteverwaltung</span>
+                <span class="menu-brand-sub">{{
+                    service ? 'Super-Admin' : 'Geräteverwaltung'
+                }}</span>
             </div>
         </div>
 
         <RouterLink
-            v-for="entry in ADMIN_MENU"
+            v-for="entry in entries"
             :key="entry.route"
             class="menu-link"
             :class="{ 'menu-link-active': inSection(entry.sections) }"
