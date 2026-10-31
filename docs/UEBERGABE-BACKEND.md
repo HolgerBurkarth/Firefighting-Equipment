@@ -4,8 +4,24 @@ Jede Änderung an der REST-API (auch neue Felder) wird hier zusätzlich eingetra
 mit Datum und Betreff des Commits. Verbindlich bleibt `CLAUDE.md`; diese Datei sagt dem
 Backend-Chat, was sich seit seinem letzten Stand geändert hat.
 
-Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff ein, den er für den Commit vorschlägt;
-der Nutzer verwendet ihn), was sich geändert hat, warum, Tests, Stelle in `CLAUDE.md`.
+Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein; seit 31.10.2026
+committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
+`CLAUDE.md`.
+
+## 2026-10-31 – „CI: je Push nur betroffene Tests, nachts alles; Agenten committen selbst“
+
+Keine Änderung an der API. Für den Backend-Chat wichtig:
+
+- PHP-Tests laufen in CI nur noch, wenn ein Push PHP-Code, PHP-Tests oder Fixtures, Migrationen,
+  `bin/`, `scripts/`, `config/`, `resources/`, `public/`, Composer oder die vom Backend abgeglichenen
+  Dateien des Frontends ändert (Regeln in `frontend/build/ciScope.ts`); Browser-Tests nur bei
+  Änderungen an der App, an der Auslieferung (`src/Http/`, `public/`, Composer) oder an
+  `tests/Fixtures/*.json`. Jede Nacht läuft alles (`schedule`), ohne `deploy` zu ändern.
+- Lokal `composer test` nur bei solchen Änderungen (CLAUDE.md, "Arbeitsweise").
+- Agenten committen nach „✅ FERTIG“ selbst; gepusht wird gesammelt vom Nutzer.
+- Tests: `frontend/tests/unit/ciScope.spec.ts`.
+- Dokumentiert in `CLAUDE.md`, "Arbeitsweise" und "GitHub Actions (CI)", README "GitHub Actions und
+  Branch deploy".
 
 ## 2026-10-30 – „Admin-Konsole: CSV-Import mit Vorlage, Vorschau und Vorschlägen (Schritt 7); CI in acht Teilen“
 

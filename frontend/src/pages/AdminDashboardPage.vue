@@ -113,6 +113,12 @@ onMounted(() => {
                 <span class="tile-label">Offene Hinweise</span>
                 <span class="tile-value">{{ tiles.open.value }}</span>
                 <span class="tile-detail">{{ tiles.open.detail }}</span>
+                <RouterLink
+                    v-if="overview.pendingUsers > 0"
+                    class="tile-action"
+                    :to="{ name: 'users' }"
+                    >Freischaltungen ansehen</RouterLink
+                >
             </div>
         </div>
 
@@ -285,6 +291,15 @@ onMounted(() => {
 
 .tile-detail {
     font-size: var(--font-size-md);
+}
+
+/* Link in der Kachel „Offene Hinweise“ (die Kachel selbst führt noch nirgends hin). */
+.tile-action {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    color: var(--line);
+    font-weight: var(--font-weight-semibold);
 }
 
 /* Balken ohne style="" (CSP): ein <progress> mit eigenen Farben. */

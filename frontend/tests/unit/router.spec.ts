@@ -121,6 +121,7 @@ describe('Wächter', () => {
         ['/geraete/12/details', 'device-details'],
         ['/geraete/neu', 'device-new'],
         ['/geraete/import', 'device-import'],
+        ['/benutzer', 'users'],
     ] as const)('Seite %s der Admin-Konsole nur für Admins', async (path, name) => {
         setSession(state('admin'));
         const route = (await routerAt(path)).currentRoute.value;
@@ -132,7 +133,7 @@ describe('Wächter', () => {
         expect((await routerAt(path, SERVICE)).currentRoute.value.name).toBe('not-found');
     });
 
-    it.each(['/benutzer', '/protokoll', '/protokoll/7'])(
+    it.each(['/protokoll', '/protokoll/7'])(
         'Mail-Link %s führt vorerst auf das Dashboard',
         async (path) => {
             setSession(state('admin'));

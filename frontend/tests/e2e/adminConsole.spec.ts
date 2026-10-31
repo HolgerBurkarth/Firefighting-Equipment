@@ -46,8 +46,11 @@ const OVERVIEW = adminOverview({
     ],
 });
 
-/** Einträge des Menüs (ADMIN_MENU in src/router/adminMenu.ts), ohne Abmelden. */
-const MENU_LABELS = ['Dashboard', 'Suchen', 'Geräte', 'Standorte', 'Gerätetypen'];
+/**
+ * Einträge des Menüs (ADMIN_MENU in src/router/adminMenu.ts), ohne Abmelden; „Benutzer“ mit dem
+ * Zähler der beiden wartenden Freischaltungen aus OVERVIEW.
+ */
+const MENU_LABELS = ['Dashboard', 'Suchen', 'Geräte', 'Standorte', 'Gerätetypen', /^Benutzer\s*2$/];
 
 function menu(page: Page): Locator {
     return page.getByRole('navigation', { name: 'Hauptmenü' });
@@ -74,6 +77,10 @@ test.describe('Admin-Konsole', () => {
             'page',
         );
         await expect(nav.getByTestId('account-name')).toHaveText('Thomas Keller');
+        await expect(nav.getByTestId('menu-count')).toHaveAttribute(
+            'aria-label',
+            '2 warten auf Freischaltung',
+        );
         await expect(nav.getByRole('button', { name: 'Abmelden' })).toBeVisible();
         expect((await size(nav)).width).toBeGreaterThan(200);
         for (const link of await nav.getByRole('link').all()) {
@@ -190,17 +197,21 @@ test.describe('Dashboard', () => {
         expect(new URL(events?.url ?? '').searchParams.get('limit')).toBe('8');
     });
 
-    test('Mail-Links auf Benutzer und Hinweis führen vorerst auf das Dashboard', async ({
-        page,
-    }) => {
-        // AppUrls::users und AppUrls::notice; die Seiten folgen in den Schritten 8 und 12.
-        for (const path of ['benutzer', 'protokoll/7']) {
-            await page.goto(`/firefighting/test/${path}`);
-            await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
-            await expect(page.getByTestId('tile-open')).toContainText(
-                '1 Hinweis · 2 Freischaltungen',
-            );
-        }
+    test('Mail-Link auf einen Hinweis führt vorerst auf das Dashboard', async ({ page }) => {
+        // AppUrls::notice; die Seite Protokoll folgt in Schritt 12.
+        await page.goto('/firefighting/test/protokoll/7');
+        await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
+        await expect(page.getByTestId('tile-open')).toContainText('1 Hinweis · 2 Freischaltungen');
+    });
+
+    test('Kachel „Offene Hinweise“ führt zu den Freischaltungen', async ({ page }) => {
+        await page.goto('/firefighting/test/dashboard');
+        await page
+            .getByTestId('tile-open')
+            .getByRole('link', { name: 'Freischaltungen ansehen' })
+            .click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/benutzer$/);
+        await expect(page.getByRole('heading', { level: 1, name: 'Benutzer' })).toBeVisible();
     });
 
     test('Liste „Nicht einsatzbereit“ öffnet das Gerät', async ({ page }) => {
