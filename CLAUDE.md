@@ -1007,8 +1007,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `START_RETRY_DELAYS_MS` ab Beginn, für Suche und Installation zusammen, mindestens 5 s; endet die
   Installation früher, sofort weiter; live dauerte sie länger als 5 s, der Start gab nach rund 6 s
   auf, 31.10.2026; Browser-Test mit hängender Installation: Schaltdatei `next-held` des
-  Update-Testservers hält die Anfrage nach `index.html?__WB_REVISION__=…`, bis der Test auf `next`
-  umstellt), sendet `SKIP_WAITING` und lädt NUR
+  Update-Testservers hält die Anfrage nach `index.html` (nur das Vorab-Laden des Service Workers
+  fragt so; Workbox lädt ohne `__WB_REVISION__`, der steht nur im Cache-Schlüssel), bis der Test auf
+  `next` umstellt; eine leere oder unbekannte Schaltdatei liest der Server kurz erneut, da
+  `writeFileSync` sie erst leert), sendet `SKIP_WAITING` und lädt NUR
   nach der Übernahme (`controllerchange`, höchstens `TAKEOVER_TIMEOUT_MS`) neu; bleibt sie aus
   (Chrome hält die Aktivierung an, wenn der alte Service Worker beim Wechsel eine Anfrage bekommt),
   meldet sie den Service Worker ab und lädt dann neu (Seite vom Server). Ohne neue Version oder wenn
