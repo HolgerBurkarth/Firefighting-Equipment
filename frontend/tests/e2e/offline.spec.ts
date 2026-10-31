@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import {
+    DATABASE_UNAVAILABLE,
     expect,
     meBody,
     NETWORK_ERROR_CONSOLE,
@@ -63,6 +64,11 @@ async function storedDeviceIds(page: Page): Promise<number[] | null> {
         () =>
             new Promise<number[] | null>((resolve) => {
                 const open = indexedDB.open('ff-offline');
+                // Gibt es die Datenbank noch nicht, nicht anlegen (sonst fehlten der App die
+                // Tabellen, siehe IndexedDbStore.openVersion).
+                open.onupgradeneeded = () => {
+                    open.transaction?.abort();
+                };
                 open.onerror = () => {
                     resolve(null);
                 };
@@ -172,5 +178,279 @@ test.describe('Offline-Modus: Grundlage', () => {
             'Keine Verbindung zum Server',
         );
         await expect(page.getByTestId('offline-notice')).toHaveCount(0);
+    });
+});
+
+/** Antwort auf POST devices/{id}/state wie DeviceBookingJson (übernommen). */
+function bookedResponse(request: MockRequest): MockResponse {
+    const body = request.body as Record<string, unknown>;
+    const device = DEVICES.find((d) => request.path === `api/v1/devices/${String(d['id'])}/state`);
+    return {
+        status: 200,
+        body: {
+            device: {
+                ...device,
+                version: Number(body['version']) + 1,
+                status: body['status'] ?? device?.['status'],
+                status_label: body['status'] === 'defective' ? 'defekt' : device?.['status_label'],
+            },
+            result: {
+                outcome: 'applied',
+                outcome_label: 'übernommen',
+                reason: null,
+                reason_label: null,
+                message: 'Die Buchung wurde übernommen.',
+                stale_confirmed: body['confirmed_stale'] === true,
+                client_ref: body['client_ref'],
+                replayed: false,
+                notice_id: null,
+            },
+        },
+    };
+}
+
+const CLIENT_CONFIG: MockResponse = {
+    status: 200,
+    body: {
+        server_time: '2026-10-31T12:00:00Z',
+        offline: { max_age_days: 7, queue_max_age_days: 7 },
+        max_clock_skew_seconds: 300,
+    },
+};
+
+/** Liest die Warteschlange des Kontos 7 der Stadt `test` aus IndexedDB. */
+async function storedQueue(page: Page): Promise<Record<string, unknown>[] | null> {
+    return page.evaluate(
+        () =>
+            new Promise<Record<string, unknown>[] | null>((resolve) => {
+                const open = indexedDB.open('ff-offline');
+                open.onupgradeneeded = () => {
+                    open.transaction?.abort();
+                };
+                open.onerror = () => {
+                    resolve(null);
+                };
+                open.onsuccess = () => {
+                    const db = open.result;
+                    const get = db.transaction('queue').objectStore('queue').get('test:7');
+                    get.onsuccess = () => {
+                        db.close();
+                        resolve((get.result as Record<string, unknown>[] | undefined) ?? null);
+                    };
+                };
+            }),
+    );
+}
+
+test.describe('Offline-Modus: Buchungen in der Warteschlange', () => {
+    const state: { mode: 'online' | 'offline' | 'expired'; failBooking: boolean } = {
+        mode: 'online',
+        failBooking: false,
+    };
+    test.use({
+        api: {
+            ...switchable(state),
+            'GET api/v1/client-config': () => (state.mode === 'offline' ? 'abort' : CLIENT_CONFIG),
+            'POST api/v1/devices/1/state': (request) => {
+                if (state.mode === 'offline') {
+                    return 'abort';
+                }
+                return state.failBooking ? DATABASE_UNAVAILABLE : bookedResponse(request);
+            },
+        },
+        allowedConsoleError: NETWORK_ERROR_CONSOLE,
+    });
+
+    test.beforeEach(() => {
+        state.mode = 'online';
+        state.failBooking = false;
+    });
+
+    /** Online einmal laden (Kopie mit Standorten), dann ohne Verbindung M1 als defekt buchen. */
+    async function bookOffline(page: Page): Promise<void> {
+        await page.goto('/firefighting/test/suchen');
+        await page.getByRole('searchbox').fill('M1');
+        await page.getByTestId('device-card').click();
+        await expect(page.getByText('Jetzt: HLF 20 / G1 · einsatzbereit')).toBeVisible();
+        await expect.poll(() => storedDeviceIds(page)).toEqual([1, 2, 3]);
+        await page.getByRole('button', { name: 'Zurück' }).click();
+        state.mode = 'offline';
+        await page.reload();
+        await expect(page.getByTestId('offline-notice')).toBeVisible();
+        await page.getByRole('searchbox').fill('M1');
+        await page.getByTestId('device-card').click();
+        await page.getByRole('button', { name: 'defekt', exact: true }).click();
+        await page.getByLabel('Was ist defekt?').fill('Riss im Sichtfenster');
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
+    }
+
+    test('offline gebucht: wartet mit Uhr, Liste zeigt den Wunsch, bei Verbindung gesendet', async ({
+        page,
+        apiRequests,
+    }) => {
+        await bookOffline(page);
+        await expect(page.getByTestId('booking-notice')).toContainText(
+            'Gespeichert – wird gesendet, sobald eine Verbindung besteht: M1 → defekt',
+        );
+        const queue = page.getByTestId('booking-queue');
+        await expect(queue).toContainText('1 Buchung wartet auf Verbindung');
+        await expect(queue.getByTestId('queued-waiting')).toContainText('M1 → defekt');
+        await expect(queue.getByTestId('queued-waiting')).toContainText('wartet auf Verbindung');
+        await page.getByRole('searchbox').fill('M1');
+        await expect(page.getByTestId('device-card')).toContainText('defekt');
+        expect(await storedQueue(page)).toHaveLength(1);
+
+        state.mode = 'online';
+        await page.evaluate(() => window.dispatchEvent(new Event('online')));
+        await expect(queue.getByTestId('queued-done')).toContainText(
+            'Die Buchung wurde übernommen.',
+        );
+        await expect(queue).toContainText('beim Server angekommen');
+        const posted = apiRequests.filter((r) => r.path === 'api/v1/devices/1/state');
+        expect(posted).toHaveLength(1);
+        const body = posted[0]?.body as Record<string, unknown>;
+        expect(body['status']).toBe('defective');
+        expect(body['comment']).toBe('Riss im Sichtfenster');
+        expect(body['version']).toBe(1);
+        expect(body['occurred_at']).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
+        expect(body['client_ref']).toMatch(/^[0-9a-f-]{36}$/);
+        expect(body['confirmed_stale']).toBeUndefined();
+
+        await queue.getByRole('button', { name: 'Angekommene ausblenden' }).click();
+        await expect(queue).toBeHidden();
+        await expect.poll(() => storedQueue(page)).toEqual([]);
+    });
+
+    test('Abmelden mit ungesendeter Buchung fragt nach und löscht dann alles', async ({ page }) => {
+        await bookOffline(page);
+        state.mode = 'online';
+        state.failBooking = true;
+        await page.goto('/firefighting/test/profil');
+        await page.getByRole('button', { name: 'Abmelden' }).click();
+        const confirm = page.getByTestId('confirm-dialog');
+        await expect(confirm).toContainText(
+            '1 Buchung wurde noch nicht gesendet und geht beim Abmelden verloren.',
+        );
+        await confirm.getByRole('button', { name: 'Abbrechen' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/profil$/);
+
+        await page.getByRole('button', { name: 'Abmelden' }).click();
+        await confirm.getByRole('button', { name: 'Abmelden' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/anmelden$/);
+        await expect.poll(() => storedQueue(page)).toBeNull();
+        await expect.poll(() => storedDeviceIds(page)).toBeNull();
+    });
+
+    test('Daten zu alt: offline buchen gesperrt', async ({ page }) => {
+        await page.goto('/firefighting/test/suchen');
+        await expect.poll(() => storedDeviceIds(page)).toEqual([1, 2, 3]);
+        // Letzte Synchronisierung vor 8 Tagen (Grenze 7).
+        await page.evaluate(
+            () =>
+                new Promise<void>((resolve) => {
+                    const open = indexedDB.open('ff-offline');
+                    open.onsuccess = () => {
+                        const store = open.result
+                            .transaction('snapshots', 'readwrite')
+                            .objectStore('snapshots');
+                        const get = store.get('test:7');
+                        get.onsuccess = () => {
+                            const snapshot = get.result as Record<string, unknown>;
+                            snapshot['syncedAt'] = new Date(
+                                Date.now() - 8 * 86_400_000,
+                            ).toISOString();
+                            store.put(snapshot, 'test:7').onsuccess = () => {
+                                resolve();
+                            };
+                        };
+                    };
+                }),
+        );
+        state.mode = 'offline';
+        await page.reload();
+        await page.getByRole('searchbox').fill('M1');
+        await page.getByTestId('device-card').click();
+        await page.getByRole('button', { name: 'in Wartung', exact: true }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page.getByTestId('offline-problem')).toHaveText(
+            'Daten zu alt, bitte mit dem Internet verbinden.',
+        );
+        await expect(page).toHaveURL(/\/firefighting\/test\/geraete\/1$/);
+        expect(await storedQueue(page)).toBeNull();
+    });
+
+    test('alte Buchung: erst „Trotzdem senden“, dann mit confirmed_stale', async ({
+        page,
+        apiRequests,
+    }) => {
+        await bookOffline(page);
+        // Die Buchung wartet seit 8 Tagen (Grenze 7).
+        await page.evaluate(
+            () =>
+                new Promise<void>((resolve) => {
+                    const open = indexedDB.open('ff-offline');
+                    open.onsuccess = () => {
+                        const store = open.result
+                            .transaction('queue', 'readwrite')
+                            .objectStore('queue');
+                        const get = store.get('test:7');
+                        get.onsuccess = () => {
+                            const queue = get.result as Record<string, unknown>[];
+                            const old = new Date(Date.now() - 8 * 86_400_000);
+                            for (const entry of queue) {
+                                entry['occurredAt'] = `${old.toISOString().slice(0, 19)}Z`;
+                            }
+                            store.put(queue, 'test:7').onsuccess = () => {
+                                resolve();
+                            };
+                        };
+                    };
+                }),
+        );
+        state.mode = 'online';
+        await page.reload();
+        const queue = page.getByTestId('booking-queue');
+        await expect(queue.getByTestId('queued-stale')).toContainText(
+            'Diese Buchung wartet seit mehr als 7 Tagen.',
+        );
+        expect(apiRequests.filter((r) => r.path === 'api/v1/devices/1/state')).toHaveLength(0);
+        await queue.getByRole('button', { name: 'Trotzdem senden' }).click();
+        await expect(queue.getByTestId('queued-done')).toBeVisible();
+        const posted = apiRequests.filter((r) => r.path === 'api/v1/devices/1/state');
+        expect((posted[0]?.body as Record<string, unknown>)['confirmed_stale']).toBe(true);
+    });
+
+    test('Verbindung bricht beim Speichern ab: Buchung kommt in die Warteschlange', async ({
+        page,
+    }) => {
+        await page.goto('/firefighting/test/suchen');
+        await expect.poll(() => storedDeviceIds(page)).toEqual([1, 2, 3]);
+        await page.getByRole('searchbox').fill('M1');
+        await page.getByTestId('device-card').click();
+        await expect(page.getByText('Jetzt: HLF 20 / G1 · einsatzbereit')).toBeVisible();
+        state.mode = 'offline';
+        await page.getByRole('button', { name: 'in Wartung', exact: true }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
+        await expect(page.getByTestId('booking-queue')).toContainText('M1 → in Wartung');
+    });
+
+    test('Datenbank ohne Tabellen (von anderer Stelle angelegt): die App legt sie an', async ({
+        page,
+    }) => {
+        await page.goto('/firefighting/test/anmelden');
+        await page.evaluate(
+            () =>
+                new Promise<void>((resolve) => {
+                    const open = indexedDB.open('ff-offline');
+                    open.onsuccess = () => {
+                        open.result.close();
+                        resolve();
+                    };
+                }),
+        );
+        await page.goto('/firefighting/test/suchen');
+        await expect.poll(() => storedDeviceIds(page)).toEqual([1, 2, 3]);
     });
 });

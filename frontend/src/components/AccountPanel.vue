@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
 import { ROLE_LABELS, userLabel } from '../api/auth';
 import { logout, session } from '../auth/session';
+import { bookingQueue } from '../data';
+import { unsentWarning } from '../data/bookingQueue';
+import ConfirmDialog from './ConfirmDialog.vue';
 import ErrorNotice from './ErrorNotice.vue';
 
 const router = useRouter();
@@ -12,6 +15,18 @@ const error = ref<ApiError | null>(null);
 
 const label = computed(() => (session.value === null ? '' : userLabel(session.value.user)));
 const role = computed(() => (session.value === null ? '' : ROLE_LABELS[session.value.user.role]));
+
+/** Ungesendete Buchungen: erst fragen (KONZEPT.md, "Offline-Modus – Entscheidungen", 55). */
+const confirmOpen = ref(false);
+const warning = computed(() => unsentWarning(bookingQueue.unsent.length));
+
+function askLogout(): void {
+    if (warning.value !== null) {
+        confirmOpen.value = true;
+        return;
+    }
+    void onLogout();
+}
 
 async function onLogout(): Promise<void> {
     busy.value = true;
@@ -30,7 +45,14 @@ async function onLogout(): Promise<void> {
             <span class="account-role">({{ role }})</span>
         </p>
         <ErrorNotice v-if="error !== null" :error="error" />
-        <button class="btn" type="button" :disabled="busy" @click="onLogout">Abmelden</button>
+        <button class="btn" type="button" :disabled="busy" @click="askLogout">Abmelden</button>
+        <ConfirmDialog
+            v-model:open="confirmOpen"
+            title="Trotzdem abmelden?"
+            :description="warning ?? ''"
+            confirm-label="Abmelden"
+            @confirm="onLogout"
+        />
     </section>
 </template>
 

@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router';
 import { userLabel } from '../api/auth';
 import type { ApiError } from '../api/client';
 import { logout, session } from '../auth/session';
-import { adminOverview } from '../data';
+import { adminOverview, bookingQueue } from '../data';
+import { unsentWarning } from '../data/bookingQueue';
 import { ADMIN_MENU, ADMIN_SETTINGS, SERVICE_MENU, type AdminMenuBadge } from '../router/adminMenu';
 import { tenantState } from '../runtime/tenantState';
 import AdminMenuIcon from './AdminMenuIcon.vue';
+import ConfirmDialog from './ConfirmDialog.vue';
 import ErrorNotice from './ErrorNotice.vue';
 
 /**
@@ -50,6 +52,18 @@ const BADGE_LABELS: Readonly<Record<AdminMenuBadge, (n: number) => string>> = {
     pendingUsers: (n) => `${String(n)} warten auf Freischaltung`,
     openNotices: (n) => (n === 1 ? '1 offener Hinweis' : `${String(n)} offene Hinweise`),
 };
+
+/** Ungesendete Buchungen: erst fragen (KONZEPT.md, "Offline-Modus – Entscheidungen", 55). */
+const confirmOpen = ref(false);
+const warning = computed(() => unsentWarning(bookingQueue.unsent.length));
+
+function askLogout(): void {
+    if (warning.value !== null) {
+        confirmOpen.value = true;
+        return;
+    }
+    void onLogout();
+}
 
 async function onLogout(): Promise<void> {
     busy.value = true;
@@ -134,12 +148,19 @@ async function onLogout(): Promise<void> {
                 type="button"
                 title="Abmelden"
                 :disabled="busy"
-                @click="onLogout"
+                @click="askLogout"
             >
                 <AdminMenuIcon name="logout" />
                 <span class="menu-label">Abmelden</span>
             </button>
             <ErrorNotice v-if="error !== null" :error="error" />
+            <ConfirmDialog
+                v-model:open="confirmOpen"
+                title="Trotzdem abmelden?"
+                :description="warning ?? ''"
+                confirm-label="Abmelden"
+                @confirm="onLogout"
+            />
         </div>
     </nav>
 </template>

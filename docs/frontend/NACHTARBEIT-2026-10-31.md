@@ -103,6 +103,15 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
   „Offline““. Lokal: Lint, Typprüfung, 1119 Unit-Tests, alle Browser-Tests Chromium/WebKit (nach
   Korrektur: 27 rote durch ein zusätzliches Laden der Standorte, entfernt), `offline`,
   `serviceWorker`, `appUpdate`, `scanner` in allen fünf Profilen (139) und unter WSL (139) grün.
+  CI 5:13 grün, Deploy ok, Build `15317cb2ba4c`, Health ok. Live (Test-Stadt, Admin-Konto): ☑ Suchen
+  wie bisher, ☑ Sitzung gespeichert (`ff-session:test`), ☑ kein Streifen online. Fund: Meine
+  Diagnose öffnete die Datenbank `ff-offline` ohne Version und legte sie so ohne Tabellen an; die
+  App legte ihre Tabellen danach nicht mehr an (Kopie fehlte). Behoben in O2
+  (`IndexedDbStore.openVersion`), Test-Helfer legen die Datenbank nicht mehr an.
+- 31.10. O2 Warteschlange: Commit „Offline O2: Warteschlange, Ergebnis je Buchung und Warnung beim
+  Abmelden“. Lokal: Lint, Typprüfung, 1128 Unit-Tests, alle Browser-Tests Chromium/WebKit (714),
+  `offline`, `booking`, `profile`, `adminConsole` in allen fünf Profilen (225), `offline`/`booking`
+  unter WSL (115) grün.
 
 # Zur Prüfung durch Holger
 
@@ -115,5 +124,7 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
 - Das Konto-Feld „(Super-Admin)“ des alten Platzhalter-Dashboards entfällt; Abmelden steht im Menü.
 - Offline 49: nur bis 2.000 Geräte; Standorte kommen in die Kopie, sobald Umbuchen oder
   Standortwahl sie laden (kein eigenes Laden).
+- Offline O2: `client-config` nur, wenn eine Buchung wartet; „Speichern“ online ohne Verbindung →
+  Warteschlange mit neuer `client_ref`; Abmelden mit Warnung schon in O2 (statt eigenem Schritt).
 - Offline 50: Die gespeicherte Sitzung (Konto mit E-Mail und Name, ohne Cookie) liegt im
   localStorage des Handys, bis Abmelden oder eine echte Ablehnung (401).

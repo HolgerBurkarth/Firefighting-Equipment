@@ -356,7 +356,10 @@ export function parseBookingResponse(json: unknown): BookingResponse | null {
     };
 }
 
-/** Body von POST devices/{id}/state (online, also ohne `occurred_at`). */
+/**
+ * Body von POST devices/{id}/state. Online ohne `occurredAt`; aus der Warteschlange des
+ * Offline-Modus mit Aktionszeit (CLAUDE.md, "Offline-Buchungen (API)").
+ */
 export interface StateChangeRequest {
     /** Version des Geräts, auf der die Änderung beruht (veraltet → 409 version_conflict). */
     readonly version: number;
@@ -365,6 +368,10 @@ export interface StateChangeRequest {
     readonly comment?: string;
     /** UUID v4 gegen doppelte Wirkung beim erneuten Senden. */
     readonly clientRef: string;
+    /** Aktionszeit auf dem Handy (`JJJJ-MM-TTTHH:MM:SSZ`), nur aus der Warteschlange. */
+    readonly occurredAt?: string;
+    /** Alte Buchung nach Rückfrage trotzdem senden (nur mit `occurredAt`). */
+    readonly confirmedStale?: boolean;
 }
 
 /** POST devices/{id}/state: Umbuchen und/oder Status setzen. */
@@ -381,6 +388,8 @@ export function postDeviceState(
             ...(request.status !== undefined && { status: request.status }),
             ...(request.comment !== undefined && { comment: request.comment }),
             client_ref: request.clientRef,
+            ...(request.occurredAt !== undefined && { occurred_at: request.occurredAt }),
+            ...(request.confirmedStale === true && { confirmed_stale: true }),
         },
         ...(fetchFn && { fetchFn }),
     });

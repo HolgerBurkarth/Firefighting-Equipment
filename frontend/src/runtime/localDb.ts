@@ -54,8 +54,22 @@ export class IndexedDbStore implements LocalDb {
     constructor(private readonly factory: IDBFactory) {}
 
     private open(): Promise<IDBDatabase> {
-        this.opened ??= new Promise<IDBDatabase>((resolve, reject) => {
-            const request = this.factory.open(LOCAL_DB_NAME, LOCAL_DB_VERSION);
+        this.opened ??= this.openVersion(LOCAL_DB_VERSION).catch((error: unknown) => {
+            // Beim nächsten Zugriff erneut versuchen.
+            this.opened = null;
+            throw error;
+        });
+        return this.opened;
+    }
+
+    /**
+     * Öffnet die Datenbank und legt fehlende Tabellen an. Fehlt eine Tabelle, obwohl die Version
+     * schon besteht (z. B. hat ein anderes Skript die Datenbank ohne Tabellen angelegt, live
+     * 31.10.2026), erneut mit der nächsten Version öffnen, damit sie angelegt wird.
+     */
+    private openVersion(version: number): Promise<IDBDatabase> {
+        return new Promise<IDBDatabase>((resolve, reject) => {
+            const request = this.factory.open(LOCAL_DB_NAME, version);
             request.onupgradeneeded = () => {
                 for (const store of STORES) {
                     if (!request.result.objectStoreNames.contains(store)) {
@@ -64,7 +78,14 @@ export class IndexedDbStore implements LocalDb {
                 }
             };
             request.onsuccess = () => {
-                resolve(request.result);
+                const db = request.result;
+                if (STORES.every((store) => db.objectStoreNames.contains(store))) {
+                    resolve(db);
+                    return;
+                }
+                const next = db.version + 1;
+                db.close();
+                resolve(this.openVersion(next));
             };
             request.onerror = () => {
                 reject(request.error ?? new Error('IndexedDB'));
@@ -72,12 +93,7 @@ export class IndexedDbStore implements LocalDb {
             request.onblocked = () => {
                 reject(new Error('IndexedDB blockiert'));
             };
-        }).catch((error: unknown) => {
-            // Beim nächsten Zugriff erneut versuchen.
-            this.opened = null;
-            throw error;
         });
-        return this.opened;
     }
 
     async get(store: LocalDbStore, key: string): Promise<unknown> {

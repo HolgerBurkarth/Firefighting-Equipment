@@ -11,6 +11,7 @@ import {
     conflictDevice,
     postDevice,
     postDeviceFields,
+    postDeviceState,
     postInspectionDue,
     postReinstate,
     postRetire,
@@ -67,6 +68,8 @@ import { InvitationCodeStore } from './invitationCodeStore';
 import { LocationStore } from './locationStore';
 import { NoticeList } from './noticeList';
 import { UserStore } from './userStore';
+import { BookingQueue } from './bookingQueue';
+import { browserLocalDb } from '../runtime/localDb';
 import { newClientRef, setBookingNotice } from './booking';
 import { runInBlocks, type BulkRun } from './deviceBulk';
 import { addRecent, clearRecent, loadRecent } from './recentDevices';
@@ -91,6 +94,17 @@ export const userStore = new UserStore();
 export const invitationCodeStore = new InvitationCodeStore();
 /** Hinweise des Protokolls (Admin). */
 export const noticeList = new NoticeList();
+/**
+ * Warteschlange der Offline-Buchungen (KONZEPT.md, "Offline-Modus – Entscheidungen", 52); eine
+ * angekommene Buchung übernimmt die Liste wie eine Buchung online.
+ */
+export const bookingQueue = new BookingQueue({
+    db: browserLocalDb(),
+    post: (id, request) => postDeviceState(id, request),
+    onSent: (response) => {
+        deviceStore.upsert(response.device);
+    },
+});
 
 /**
  * Nach einer Änderung an Standorten oder Gerätetypen lädt die Verwaltung neu (abgewartet), andere
