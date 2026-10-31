@@ -74,11 +74,42 @@ if (preg_match('#^/firefighting/[a-z0-9-]+/(api/.*|manifest\.webmanifest)$#', $p
 
 /*
  * Inhalt der Schaltdatei: `next` = alles aus der neuen Version; `build-json` = nur build.json (die
- * App erkennt die neue Version, der Browser findet aber keinen neuen Service Worker).
+ * App erkennt die neue Version, der Browser findet aber keinen neuen Service Worker); `next-held` =
+ * neue Version, aber die Installation des Service Workers hängt (live: viele Dateien über eine
+ * langsame Verbindung): Die Anfrage nach `index.html` wartet, bis der Test auf `next` umstellt,
+ * höchstens 20 s. So heißt sie nur beim Vorab-Laden des Service Workers (Workbox lädt die Adresse
+ * ohne `__WB_REVISION__`, der Parameter steht nur im Cache-Schlüssel); die Seiten der App haben
+ * eigene Pfade (`anmelden` …).
+ *
+ * Die Tests schreiben die Schaltdatei mit writeFileSync (leeren, dann schreiben). Eine leere oder
+ * unbekannte Angabe gilt daher als „wird gerade geschrieben“ und wird kurz erneut gelesen; sonst
+ * käme mitten im Umschalten die alte Version (Dateien der neuen: 404, Installation gescheitert;
+ * rote CI 31.10.2026).
  */
+const STATES = ['next', 'build-json', 'next-held'];
 $stateFile = $frontend . '/test-builds/state/' . $area;
-$state = $area !== '' && is_file($stateFile) ? trim((string) file_get_contents($stateFile)) : '';
-$next = $state === 'next'
+$readState = static function () use ($area, $stateFile): string {
+    for ($attempt = 0; $attempt < 40; $attempt += 1) {
+        clearstatcache(true, $stateFile);
+        if ($area === '' || !is_file($stateFile)) {
+            return '';
+        }
+        $state = trim((string) @file_get_contents($stateFile));
+        if (in_array($state, STATES, true)) {
+            return $state;
+        }
+        usleep(5_000);
+    }
+    throw new RuntimeException('Schaltdatei des Update-Testservers unlesbar: ' . $area);
+};
+$state = $readState();
+if ($state === 'next-held' && str_ends_with($path, '/index.html')) {
+    $until = microtime(true) + 20;
+    while ($readState() === 'next-held' && microtime(true) < $until) {
+        usleep(50_000);
+    }
+}
+$next = $state === 'next' || $state === 'next-held'
     || ($state === 'build-json' && str_ends_with($path, '/' . FrontendAssets::BUILD_INFO_FILE));
 $directory = $next ? $frontend . '/test-builds/next' : FrontendAssets::defaultDirectory();
 

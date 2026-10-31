@@ -18,7 +18,10 @@ import { hasUnsavedInput } from './unsavedInput';
 export const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 /** Nach einem automatischen Neuladen wird so lange nicht erneut automatisch neu geladen. */
 export const RELOAD_COOLDOWN_MS = 10 * 60 * 1000;
-/** So lange wird auf das Erscheinen und die Installation der neuen Version gewartet. */
+/**
+ * So lange wartet ein Seitenwechsel auf die Installation der neuen Version (danach weiter mit der
+ * laufenden). Beim Start und vor „Seite nicht gefunden“ gilt START_LOAD_TIMEOUT_MS.
+ */
 export const ACTIVATION_TIMEOUT_MS = 5000;
 /**
  * So lange wird nach SKIP_WAITING auf die Übernahme gewartet (gemessen: rund 10 ms). Bleibt sie aus,
@@ -43,6 +46,13 @@ export const UPDATE_RETRY_DELAYS_MS: readonly number[] = [500, 1000, 2000, 4000]
  * bleibt „Seite wird geladen …“ stehen, danach der Hinweis mit dem Knopf „Neu laden“.
  */
 export const START_RETRY_DELAYS_MS: readonly number[] = [...UPDATE_RETRY_DELAYS_MS, 8000, 15000];
+/**
+ * Start und „Seite nicht gefunden“: Frist ab Beginn für Suche UND Installation des neuen Service
+ * Workers (= Summe der Pausen, rund 30 s). Live dauert die Installation (alle Dateien vorab laden)
+ * länger als ACTIVATION_TIMEOUT_MS; mit dieser Frist gab der Start nach rund 6 s auf, obwohl der neue
+ * Service Worker kurz danach bereitstand (31.10.2026).
+ */
+export const START_LOAD_TIMEOUT_MS = START_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0);
 /**
  * Vor dem Neuladen wird höchstens so lange auf laufende Anfragen (update(), build.json) gewartet.
  * Bricht das Neuladen eine Anfrage an sw.js ab, meldet WebKit einen Fehler („… due to access control
@@ -288,7 +298,8 @@ export class AppUpdater {
      * `reloadNeeded` zeigt den Knopf „Neu laden“.
      */
     private async loadNewVersion(url: string): Promise<boolean> {
-        if (await this.applyNow(url, START_RETRY_DELAYS_MS)) {
+        const deadline = this.env.now() + START_LOAD_TIMEOUT_MS;
+        if (await this.applyNow(url, START_RETRY_DELAYS_MS, deadline)) {
             return true;
         }
         if (!this.ready.value || this.autoBlocked.value) {
@@ -328,10 +339,13 @@ export class AppUpdater {
      * Start und vor „Seite nicht gefunden“: neue Version laden, sofern eine da ist und die
      * Schleifensperre nicht greift. true = die App lädt neu (Navigation abbrechen); false = weiter
      * mit der laufenden Version (auch wenn die neue gerade nicht aktiviert werden konnte).
+     * `installDeadline` (wie env.now): bis dahin auf die Installation warten, sonst
+     * ACTIVATION_TIMEOUT_MS.
      */
     async applyNow(
         url: string,
         retryDelays: readonly number[] = UPDATE_RETRY_DELAYS_MS,
+        installDeadline: number | null = null,
     ): Promise<boolean> {
         if (this.applying) {
             return true;
@@ -343,7 +357,7 @@ export class AppUpdater {
             this.autoBlocked.value = true;
             return false;
         }
-        return this.apply(url, retryDelays);
+        return this.apply(url, retryDelays, installDeadline);
     }
 
     /**
@@ -357,6 +371,7 @@ export class AppUpdater {
     async apply(
         url: string,
         retryDelays: readonly number[] = UPDATE_RETRY_DELAYS_MS,
+        installDeadline: number | null = null,
     ): Promise<boolean> {
         if (this.applying) {
             return true;
@@ -378,7 +393,13 @@ export class AppUpdater {
                 await this.findNewWorker(registration, retryDelays);
             }
         }
-        await this.installed();
+        // Sobald die Installation endet, geht es weiter (statechange); eine wartende Version wird
+        // also sofort aktiviert, nicht erst nach Ablauf der Frist.
+        await this.installed(
+            installDeadline === null
+                ? ACTIVATION_TIMEOUT_MS
+                : Math.max(ACTIVATION_TIMEOUT_MS, installDeadline - this.env.now()),
+        );
         const waiting = this.registration?.waiting ?? null;
         if (waiting !== null) {
             await this.activate(waiting);
@@ -484,7 +505,8 @@ export class AppUpdater {
         });
     }
 
-    private installed(): Promise<void> {
+    /** Fertig, wenn die Installation endet (installiert oder gescheitert), spätestens nach `ms`. */
+    private installed(ms: number): Promise<void> {
         const installing = this.registration?.installing;
         if (installing?.state !== 'installing') {
             return Promise.resolve();
@@ -495,7 +517,7 @@ export class AppUpdater {
                     resolve();
                 }
             });
-            this.env.setTimeout(resolve, ACTIVATION_TIMEOUT_MS);
+            this.env.setTimeout(resolve, ms);
         });
     }
 

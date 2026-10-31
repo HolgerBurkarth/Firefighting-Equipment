@@ -147,9 +147,9 @@ test.describe('Standortwahl', () => {
             }),
         ]);
         // Die Standortwahl steht nicht zwischen „Suchen“ und dem Gerät in der Historie.
-        expect(await page.evaluate(() => window.history.state as unknown)).toMatchObject({
-            forward: '/geraete/1',
-        });
+        await expect
+            .poll(() => page.evaluate(() => window.history.state as unknown))
+            .toMatchObject({ forward: '/geraete/1' });
     });
 
     test('„Ganzes Fahrzeug, ohne Fach“ bucht auf das Fahrzeug', async ({ page, apiRequests }) => {
@@ -178,9 +178,11 @@ test.describe('Standortwahl', () => {
         await expect(page).toHaveURL(/\/suchen$/);
         expect(stateBodies(apiRequests)).toEqual([expect.objectContaining({ location_id: 20 })]);
         // Neues Ziel unter den zuletzt benutzten Standorten.
-        expect(
-            await page.evaluate(() => window.localStorage.getItem('ff-recent-locations:test:7')),
-        ).toBe('[20]');
+        await expect
+            .poll(() =>
+                page.evaluate(() => window.localStorage.getItem('ff-recent-locations:test:7')),
+            )
+            .toBe('[20]');
     });
 
     test('Suche: flache Trefferliste, Fächer mit ihrem Fahrzeug', async ({ page, apiRequests }) => {

@@ -1280,10 +1280,16 @@ Fürs Ansehen mit echter API: `npm run build`, dann im Hauptordner
 `http.allowed_origins` eintragen.
 
 Anmeldung: `/firefighting/<bereich>/` leitet ohne Sitzung zur Anmeldung, sonst zur Startseite der
-Rolle (User `suchen`, Admin und Super-Admin `dashboard`, das Dashboard vorerst als Platzhalter).
+Rolle (User `suchen`, Admin und Super-Admin `dashboard`; unter `service` vorerst ein Platzhalter).
 Die Handy-Seiten für User und Admins: `suchen` (Suche, „Code scannen“, „Zuletzt benutzt“),
 `prueffristen`, `profil` und `geraete/<id>` (Umbuchen und Status, Standortwahl, Details und Verlauf);
-Entscheidungen in `docs/frontend/KONZEPT.md`, "User am Handy". Registrieren
+Entscheidungen in `docs/frontend/KONZEPT.md`, "User am Handy". Die Admin-Konsole (nur Admins einer
+Stadt, Menü links bzw. ☰ am Handy): `dashboard`, `geraete` (Liste mit Filtern, Sammelaktionen,
+Export), `geraete/neu`, `geraete/import` (CSV mit Vorlage und Vorschau), `geraete/<id>/details`,
+`standorte`, `geraetetypen`, `benutzer` (Freischalten, Reiter Einladungscodes mit Aushang),
+`protokoll` (Hinweise, Export des Verlaufs) und `einstellungen` (Anzeigemodus, Farbe und Logo der
+Stadt, Benachrichtigung, Passwort, angemeldete Geräte); Entscheidungen in KONZEPT.md,
+"Admin-Konsole", Live-Test in `docs/frontend/LIVETEST-ADMIN-KONSOLE.md`. Registrieren
 unter `/firefighting/<stadt>/registrieren` (mit Code aus dem QR-Link `#code=…` oder von Hand),
 Bestätigungslink der Mail auf `email-bestaetigen` (Bestätigung per Knopf, dort auch neuer Link),
 neue Admins legen auf `einladung-annehmen` Name und Passwort fest. Abläufe und

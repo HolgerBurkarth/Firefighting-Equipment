@@ -135,9 +135,9 @@ test.describe('Umbuchen und Status', () => {
             client_ref: expect.stringMatching(UUID_V4) as unknown,
         });
         // Zurück wie der Knopf des Browsers: „Suchen“ steht nicht zweimal in der Historie.
-        expect(await page.evaluate(() => window.history.state as unknown)).toMatchObject({
-            forward: '/geraete/1',
-        });
+        await expect
+            .poll(() => page.evaluate(() => window.history.state as unknown))
+            .toMatchObject({ forward: '/geraete/1' });
         // Die Bestätigung verschwindet mit der nächsten Eingabe.
         await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('x');
         await expect(page.getByTestId('booking-notice')).toBeHidden();
@@ -163,9 +163,11 @@ test.describe('Umbuchen und Status', () => {
             { version: 1, location_id: 20, client_ref: expect.stringMatching(UUID_V4) as unknown },
         ]);
         // Neues Ziel vorn, höchstens 3.
-        expect(
-            await page.evaluate((key) => window.localStorage.getItem(key), RECENT_LOCATIONS_KEY),
-        ).toBe('[20,999,11]');
+        await expect
+            .poll(() =>
+                page.evaluate((key) => window.localStorage.getItem(key), RECENT_LOCATIONS_KEY),
+            )
+            .toBe('[20,999,11]');
     });
 
     test('nichts geändert: Hinweis, keine Anfrage', async ({ page, apiRequests }) => {

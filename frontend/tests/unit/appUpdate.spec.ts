@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import {
+    ACTIVATION_TIMEOUT_MS,
     TAKEOVER_TIMEOUT_MS,
     AppUpdater,
     fetchServedBuildId,
@@ -11,6 +12,7 @@ import {
     REQUEST_SETTLE_TIMEOUT_MS,
     SKIP_WAITING_MESSAGE,
     START_CHECK_TIMEOUT_MS,
+    START_LOAD_TIMEOUT_MS,
     START_RETRY_DELAYS_MS,
     UPDATE_RETRY_DELAYS_MS,
     updateNotice,
@@ -826,6 +828,83 @@ describe('AppUpdater: Start mit veralteter Version und „Seite nicht gefunden�
         expect(s.updater.loadingPage.value).toBe(true);
         expect(s.updater.reloadNeeded.value).toBe(true);
         expect(s.updater.switching.value).toBe(false);
+        expect(s.navigated).toEqual([]);
+    });
+
+    /** Fragt der Start, wird die neue Version gefunden und installiert noch (live: viele Dateien). */
+    function installsSlowly(s: Setup, elapsedMs = 0): FakeWorker {
+        const worker = new FakeWorker('installing');
+        activatesOnMessage(s, worker);
+        s.registration.update = () => {
+            s.registration.updates += 1;
+            s.now += elapsedMs;
+            s.registration.installing = worker;
+            s.registration.emit('updatefound');
+            return Promise.resolve();
+        };
+        return worker;
+    }
+
+    /** Löst nur Zeitgeber bis `maxMs` aus (die Zeit bis dahin vergeht), längere bleiben offen. */
+    async function runShortTimers(s: Setup, maxMs: number): Promise<number[]> {
+        const fired: number[] = [];
+        await flush();
+        for (let i = 0; i < s.timers.length; i += 1) {
+            const timer = s.timers[i];
+            if (timer !== undefined && timer.ms <= maxMs) {
+                timer.ms = Number.POSITIVE_INFINITY;
+                timer.callback();
+                fired.push(i);
+                await flush();
+            }
+        }
+        return fired;
+    }
+
+    it('Installation dauert länger als ACTIVATION_TIMEOUT_MS: weiter warten, dann sofort aktivieren', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        const worker = installsSlowly(s);
+        const start = s.updater.checkOnStart(START_URL);
+        const state = settled(start);
+        // Mehr als die Frist eines Seitenwechsels vergeht, die Installation läuft noch.
+        await runShortTimers(s, ACTIVATION_TIMEOUT_MS + 1000);
+        expect(s.updater.reloadNeeded.value).toBe(false);
+        expect(s.updater.loadingPage.value).toBe(true);
+        expect(state.done).toBe(false);
+
+        s.registration.installing = null;
+        s.registration.waiting = worker;
+        worker.setState('installed');
+        expect(await start).toBe(true);
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual([START_URL]);
+    });
+
+    it('Installation endet nicht: Knopf nach rund 30 s ab Start, nicht nach der Frist eines Seitenwechsels', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        // Bis der Browser die neue Version meldet, vergehen 10 s.
+        installsSlowly(s, 10_000);
+        const state = settled(s.updater.checkOnStart(START_URL));
+        const fired = await runTimers(s);
+        expect(fired).toContain(START_LOAD_TIMEOUT_MS - 10_000);
+        expect(fired).not.toContain(ACTIVATION_TIMEOUT_MS);
+        expect(START_LOAD_TIMEOUT_MS).toBe(START_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0));
+        expect(state.done).toBe(false);
+        expect(s.updater.reloadNeeded.value).toBe(true);
+        expect(s.navigated).toEqual([]);
+    });
+
+    it('Seitenwechsel: Installation höchstens ACTIVATION_TIMEOUT_MS abwarten, dann alte Version', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        await s.updater.check();
+        installsSlowly(s);
+        const done = s.updater.apply('https://x/a');
+        const fired = await runTimers(s);
+        expect(fired).toContain(ACTIVATION_TIMEOUT_MS);
+        expect(await done).toBe(false);
         expect(s.navigated).toEqual([]);
     });
 

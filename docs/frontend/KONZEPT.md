@@ -189,6 +189,13 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   nach der neuen Version (Pausen weiter 8 s, 15 s) und zeigt solange „Seite wird geladen …“, nie kurz
   „nicht gefunden“. Gelingt es nicht, erscheint „Die neue Version konnte nicht geladen werden.“ mit
   dem Knopf „Neu laden“: Die App lädt die Adresse samt `#token=…` bzw. `#code=…` direkt vom Server.
+  Die rund 30 Sekunden gelten für Suche UND Installation des neuen Service Workers zusammen; ist er
+  installiert, aktiviert die App ihn sofort. Grund (Live-Test 31.10.2026): Ein neuer Tab direkt auf
+  `einstellungen` (die alte Version kannte die Seite nicht) zeigte nach rund 6 s „konnte nicht
+  geladen werden“, obwohl der neue Service Worker kurz danach bereitstand. Die Installation (alle
+  Dateien der App vorab laden) dauerte live länger als die 5 Sekunden, die ein gewöhnlicher
+  Seitenwechsel abwartet; diese Frist galt auch beim Start. Ein Seitenwechsel wartet weiter
+  höchstens 5 Sekunden und bleibt sonst bei der laufenden Version.
 - Neu geladen wird nur, wenn danach sicher die neue Version kommt (der neue Service Worker hat die
   Seite übernommen). Hängt die Übernahme (Chrome hält sie an, wenn der alte Service Worker genau
   dann eine Anfrage bekommt), meldet die App den Service Worker ab und lädt die Seite vom Server.
@@ -266,6 +273,10 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   (wie `AccentColor::DEFAULT` und das Standard-App-Symbol), nicht das Dunkelblau aus dem Mockup.
 
 ## Admin-Konsole
+Umgesetzt am 31.10.2026 (Schritte 1–12, Entscheidung 29); offen ist nur noch der abschließende
+Live-Test (Schritt 13, Liste in `LIVETEST-ADMIN-KONSOLE.md`). Danach gilt der Abschnitt als
+abgeschlossen; Wünsche aus den Live-Tests stehen in `docs/TODO-SPAETER.md` (T9–T13).
+
 Super-Admin und Admin: Menü links, Inhalt rechts; links unten Einstellungen, Profil, Abmelden.
 Startseite ist ein Dashboard mit großen, antippbaren Kacheln, die zur gefilterten Liste führen.
 Das Menü des Admins enthält „Suchen“ (die Handy-Seite `suchen`, Entscheidung 19). Umgesetzt
@@ -389,6 +400,15 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
   Kästchen „Mail bei jeder Änderung an Geräten“ (mit der Adresse; eigene Änderungen ausgenommen),
   wirkt sofort. Passwort und angemeldete Geräte wie im Profil. Die Einstellungen des Super-Admins
   (seine Benachrichtigung) kommen mit dessen Bereich.
+  Live geprüft (31.10.2026, Test-Stadt): Akzentfarbe mit Kontrastprüfung, Speichern (Stadtfarbe der
+  App und `theme-color`), Logo hochladen (breites Bild → 512 × 512, 5,9 KB, Menü und Symbol im Tab),
+  Logo entfernen, Benachrichtigung an/aus in Ordnung, keine Fehler in der Konsole. Dabei gefunden:
+  Der Start mit veralteter Version gab nach rund 6 s auf (siehe "Updates der App"), und das Symbol
+  auf dem Homescreen schien transparente Ränder zu haben. Nachgeprüft am iPhone („Zum
+  Home-Bildschirm“ mit Logo, 31.10.2026): sauber, das `apple-touch-icon` (180 px) ist schon deckend
+  weiß. Die Symbole des Manifests (192 und 512 px) sind durchsichtig und nur `any`; Android setzt
+  sie verkleinert in einen weißen Kreis. Deckende `maskable`-Symbole sind T13 in
+  `docs/TODO-SPAETER.md`.
 
 ### Admin-Konsole – Entscheidungen
 29. **Reihenfolge:** Die Admin-Konsole kommt vor dem Offline-Modus, damit Immendingen starten kann.
@@ -521,7 +541,7 @@ Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Li
   dem Ändern bleibt nur dieses Gerät angemeldet, die Seite sagt es. „Angemeldete Geräte“ zeigt
   dieses Gerät zuerst („Dieses Gerät“, seit wann angemeldet), dann die anderen mit „zuletzt aktiv“
   und Anmeldedatum, je mit „Abmelden“; darunter „Alle anderen Geräte abmelden“ mit Rückfrage. Die
-  Benachrichtigung „Log“ für Admins kommt mit der Admin-Konsole („Einstellungen“).
+  Benachrichtigung „Log“ für Admins steht in den Einstellungen der Admin-Konsole (Schritt 12).
 - **Darstellung:** Suchen, Prüffristen und Profil mit Kopfleiste in der Stadtfarbe (Name der Stadt,
   „Hallo <Anzeigename>“) und der Leiste unten; Umbuchen, Standortwahl und Details bildschirmfüllend
   mit weißer Kopfzeile und Zurück-Knopf, ohne Leiste. Zurück führt zur vorigen Seite der App, nach

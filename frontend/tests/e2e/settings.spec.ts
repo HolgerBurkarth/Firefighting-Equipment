@@ -166,6 +166,14 @@ function bodies(requests: readonly MockRequest[], key: string): unknown[] {
     return requests.filter((r) => `${r.method} ${r.path}` === key).map((r) => r.body);
 }
 
+/**
+ * --accent am Wurzelelement. Die App setzt es erst nach der Antwort des Servers, daher nur über
+ * expect.poll prüfen, nie mit einmaligem evaluate.
+ */
+function accentProperty(page: Page): Promise<string> {
+    return page.evaluate(() => document.documentElement.style.getPropertyValue('--accent'));
+}
+
 function swatch(page: Page, name: string) {
     return page.getByRole('radiogroup', { name: 'Akzentfarbe' }).getByRole('radio', { name });
 }
@@ -245,17 +253,13 @@ test.describe('Einstellungen', () => {
         );
         await expect(preview).toHaveCSS('background-color', 'rgb(29, 53, 87)');
         // Die App selbst bleibt in der gespeicherten Farbe.
-        expect(
-            await page.evaluate(() => document.documentElement.style.getPropertyValue('--accent')),
-        ).toBe('');
+        await expect.poll(() => accentProperty(page)).toBe('');
 
         await page.getByRole('button', { name: 'Farbe speichern' }).click();
         await expect(page.getByTestId('success-notice')).toHaveText(
             'Akzentfarbe gespeichert. Sie gilt ab jetzt für alle Benutzer der Stadt.',
         );
-        expect(
-            await page.evaluate(() => document.documentElement.style.getPropertyValue('--accent')),
-        ).toBe('#1d3557');
+        await expect.poll(() => accentProperty(page)).toBe('#1d3557');
         await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute(
             'content',
             '#1d3557',
@@ -279,10 +283,13 @@ test.describe('Einstellungen', () => {
 
         await pickSwatch(page, 'Feuerwehrrot (Standard)');
         await page.getByRole('button', { name: 'Farbe speichern' }).click();
+        // Der Knopf heißt beim Speichern „Wird gespeichert …“: Erst die Farbe zeigt die Antwort.
+        await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute(
+            'content',
+            '#b71c1c',
+        );
+        await expect.poll(() => accentProperty(page)).toBe('');
         await expect(page.getByRole('button', { name: 'Farbe speichern' })).toHaveCount(0);
-        expect(
-            await page.evaluate(() => document.documentElement.style.getPropertyValue('--accent')),
-        ).toBe('');
         expect(bodies(apiRequests, 'POST api/v1/tenant/appearance')).toEqual([
             { accent_color: '#1d3557' },
             { accent_color: '#aa3333' },

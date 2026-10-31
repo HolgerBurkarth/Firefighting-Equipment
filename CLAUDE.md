@@ -15,9 +15,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Commits (seit 31.10.2026): Nach „✅ FERTIG“ committet der Agent selbst, ein Commit je Schritt mit
   allen Dateien des Schritts, Betreff wie in der Meldung genannt, mit der üblichen Attribution
   (`Co-Authored-By`). Vorher immer `git status` prüfen: keine fremden, temporären oder nicht zum
-  Schritt gehörenden Dateien (Testausgaben, Notizen, Konfiguration mit Zugangsdaten). Pushen tut nur
-  der Nutzer, gesammelt (mehrere Commits); Agenten pushen nie und ändern keine schon gepushten
-  Commits.
+  Schritt gehörenden Dateien (Testausgaben, Notizen, Konfiguration mit Zugangsdaten). Pushen,
+  CI verfolgen und deployen ebenfalls der Agent (seit 31.10.2026, siehe "Autonomer Ablauf"); schon
+  gepushte Commits ändert er nie (kein `--amend`, kein `--force`).
 - Muss ein Schritt vor dem nächsten unbedingt live geprüft werden oder durch CI laufen (z. B. neue
   Abläufe auf dem Server, Migrationen, Änderungen am Workflow), sagt die „✅ FERTIG“-Meldung das
   ausdrücklich.
@@ -70,6 +70,40 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   feste Zeitgrenze setzen.
 - Live-Tests (gegen den Server www.prodad.de) nur in der Test-Stadt `/firefighting/test/`, nie in
   echten Städten.
+
+## Autonomer Ablauf
+Seit 31.10.2026 arbeitet der Agent eine Runde selbstständig durch: programmieren, testen,
+committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pushen tut nur der Nutzer“.
+- Werkzeuge (eingerichtet vom Nutzer): `gh` ist angemeldet (Konto `HolgerBurkarth`, Rechte `repo`
+  und `workflow`; unter Windows `C:\Program Files\GitHub CLI\gh.exe`, falls nicht im PATH der Shell).
+  Deploy: `ssh -T strato-ff` startet auf dem Server ausschließlich `scripts/deploy.sh` (erzwungener
+  Befehl im Schlüssel, keine Shell, kein Passwort). Andere Befehle auf dem Server gibt es so nicht.
+- Ablauf je Schritt:
+  1. Programmieren, lokal prüfen (siehe "Arbeitsweise", "Prüfen vor „✅ FERTIG“"), committen.
+  2. `git push`, dann den CI-Lauf dieses Commits verfolgen (`gh run list`, `gh run watch <id>`).
+     Ändert der Push nur `.md`-Dateien, läuft keine CI und es gibt nichts zu deployen.
+  3. Rot: `gh run view <id> --log-failed` lesen, Ursache in der „✅ FERTIG“-Meldung erklären,
+     beheben, committen, pushen. Höchstens 3 Reparaturversuche je Fehler, danach anhalten und
+     berichten („⛔ ABGEBROCHEN“). Nie einfach neu starten; einzige Ausnahme: Ein Lauf, der
+     AUSSCHLIESSLICH am bekannten Firefox-Fehler #43413 scheitert (siehe "GitHub Actions (CI)"),
+     darf einmal mit `gh run rerun <id> --failed` wiederholt werden.
+  4. Grün (auch der Job `deploy`, der den Branch `deploy` schreibt): `ssh -T strato-ff`. Danach
+     prüfen: Die Ausgabe endet mit „Deployment erfolgreich“,
+     `https://www.prodad.de/firefighting/test/build.json` liefert als `build` die ersten 12 Zeichen
+     des gepushten main-Commits, und `https://www.prodad.de/firefighting/service/api/v1/health`
+     liefert `{"status":"ok","database":"ok"}`. Scheitert das Deploy: NICHTS zurückspielen,
+     anhalten, die Ausgabe berichten.
+  5. „✅ FERTIG“ zusätzlich mit: was live ist (Commit, Build-Kennung), Laufzeit der CI, Reparaturen
+     (Ursache je roten Lauf) und was im Chat live im Browser geprüft werden soll.
+- Vorher anhalten und fragen („❓ RÜCKFRAGE“):
+  - Migrationen, die bestehende Daten ändern oder löschen (`UPDATE`, `DELETE`, `DROP`, Spalten
+    entfernen oder umbenennen). Reine Erweiterungen (neue Tabellen oder Spalten) gehen ohne.
+  - Änderungen an `scripts/deploy.sh`, am Deploy im Workflow (Job `deploy`,
+    `scripts/publish-deploy-branch.sh`) oder an Sicherungen (`bin/db-dump.php`, `src/Backup/`,
+    Aufräumregeln).
+  - Alles, was echte Städte (nicht `test`) betrifft.
+- Weiterhin: keine Live-Tests in echten Städten, nie `purge-device-data`, nie Zugangsdaten
+  committen.
 
 ## Zielumgebung (STRATO, Shared Hosting)
 - PHP 8.5 (CGI), MariaDB 10.11, Apache mit `.htaccess` und mod_rewrite.
@@ -968,7 +1002,15 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   installierte Version unter einem Service Worker fragt `build.json` NICHT (die Anfrage liefe über den
   alten Service Worker; aktiviert ein anderer Tab gerade die neue Version, hält Chrome die Aktivierung
   an). Beim Aktualisieren (`apply`) fragt die App den Service Worker (`update()`, bei Bedarf die Suche
-  wie oben), wartet auf die Installation (`ACTIVATION_TIMEOUT_MS`), sendet `SKIP_WAITING` und lädt NUR
+  wie oben), wartet auf die Installation (beim Seitenwechsel höchstens `ACTIVATION_TIMEOUT_MS` = 5 s;
+  beim Start und vor „nicht gefunden“ bis zur Frist `START_LOAD_TIMEOUT_MS` = Summe von
+  `START_RETRY_DELAYS_MS` ab Beginn, für Suche und Installation zusammen, mindestens 5 s; endet die
+  Installation früher, sofort weiter; live dauerte sie länger als 5 s, der Start gab nach rund 6 s
+  auf, 31.10.2026; Browser-Test mit hängender Installation: Schaltdatei `next-held` des
+  Update-Testservers hält die Anfrage nach `index.html` (nur das Vorab-Laden des Service Workers
+  fragt so; Workbox lädt ohne `__WB_REVISION__`, der steht nur im Cache-Schlüssel), bis der Test auf
+  `next` umstellt; eine leere oder unbekannte Schaltdatei liest der Server kurz erneut, da
+  `writeFileSync` sie erst leert), sendet `SKIP_WAITING` und lädt NUR
   nach der Übernahme (`controllerchange`, höchstens `TAKEOVER_TIMEOUT_MS`) neu; bleibt sie aus
   (Chrome hält die Aktivierung an, wenn der alte Service Worker beim Wechsel eine Anfrage bekommt),
   meldet sie den Service Worker ab und lädt dann neu (Seite vom Server). Ohne neue Version oder wenn
@@ -1028,7 +1070,12 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `NETWORK_ERROR_CONSOLE` (zusätzlich abgebrochene Anfragen), beide nur per `allowedConsoleError`. Tests auf öffentlichen
   Seiten (z. B. `anmelden`) brauchen kein `auth/me`. Jeder Konsolenfehler, Skriptfehler,
   jede CSP-Verletzung und jede nicht simulierte API-Anfrage lässt den Test scheitern (erwartete
-  Browsermeldung nur per Option `allowedConsoleError`, nie für CSP). Service Worker sind gesperrt
+  Browsermeldung nur per Option `allowedConsoleError`, nie für CSP). Einzige feste Ausnahme für alle
+  Tests (`isAbortedFontDownload`, `tests/e2e/support/consoleErrors.ts`, Unit-Test
+  `consoleErrors.spec.ts`): Firefox meldet einen Schrift-Download, den Neuladen oder Schließen
+  abbricht, als „downloadable font: download failed … status=2152398850“ (`NS_BINDING_ABORTED`);
+  zugelassen nur in Firefox, nur mit diesem Status und nur für `.woff2`/`.woff` aus `assets/` des
+  eigenen Testservers (`baseURL`). Andere Schriftfehler bleiben Fehler. Service Worker sind gesperrt
   außer in `serviceWorker.spec.ts` und `appUpdate.spec.ts`; der Offline-Test läuft nur in Chromium (`setOffline` umgeht in
   Firefox/WebKit den Service Worker). Update-Tests (`appUpdate.spec.ts`) mit zwei echten Builds: `globalSetup.ts` baut
   die neue Version (`FF_BUILD_ID=e2e-next`) nach `frontend/test-builds/` (in `.gitignore`), der
@@ -1043,9 +1090,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   neuen Service Worker übernommen (nur Chromium: `Page.reload` mit `ignoreCache` über CDP), zwei Tabs
   (einer aktualisiert, der andere folgt; einer geschlossen), Mail-Link mit alter Version, „Seite nicht
   gefunden“, Zurück-Knopf nach erkannter neuer Version, neue Kennung ohne neuen Service Worker (nach
-  rund 30 s „Neu laden“). Firefox meldet einen Schrift-Download, den das
-  Neuladen abbricht (Status 2152398850 = `NS_BINDING_ABORTED`), als Konsolenfehler; nur diesen lässt
-  der Mail-Link-Test zu. Sporadische Fehler der Update-Logik nie mit längeren Wartezeiten
+  rund 30 s „Neu laden“), Installation beim Start länger als 5 s (`next-held`; nach der Freigabe
+  lädt Workbox die übrigen Dateien nacheinander, `index.html` zuerst; der Test wartet darauf bis zur
+  Frist der App, `START_LOAD_TIMEOUT_MS` ab Beginn des Starts, nicht länger; die Uhr läuft nach
+  `clock.install()` weiter, Timer feuern, `runFor` springt nur vor). Der Mail-Link-Test (eigener Tab)
+  prüft Konsolenfehler selbst, mit derselben Ausnahme `isAbortedFontDownload`. Sporadische Fehler der Update-Logik nie mit längeren Wartezeiten
   überdecken: unter Last wiederholen (`npm run test:load -- [Datei] [--project=…] [--runs=N]`,
   `tests/e2e/support/loadRun.ts`: alle fünf Profile, ohne Angabe `--repeat-each=10`, je Durchgang
   `--output=test-results/load/<Zeit>-<n>`, damit die Traces bleiben; der nächste normale Lauf leert
@@ -1059,6 +1108,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `build.json` beim Start), erst vorspulen, wenn die Antwort sichtbar verarbeitet ist (z. B.
   `update-loading` sichtbar); sonst läuft der Timer unter Last vor der Antwort ab. Nur gezielt
   in diesen Tests, nicht global.
+- Zustände, die die App asynchron setzt (CSS-Variablen wie `--accent`, localStorage,
+  sessionStorage, Eigenschaften ohne Locator), in Browser-Tests nie mit einmaligem `page.evaluate`
+  + `toBe` prüfen, sondern wartend: Locator-Assertions (`toHaveAttribute`, `toHaveCSS`, …) bzw.
+  `expect.poll(() => page.evaluate(…))`. Auch nicht nach einem scheinbar passenden Merkmal: Ein
+  Knopf, der beim Speichern „Wird gespeichert …“ heißt, ist unter seinem alten Namen schon vor der
+  Antwort verschwunden (sporadisch rote CI in `settings.spec.ts`, 31.10.2026). Ausnahmen nur für
+  Werte, die sich nicht mehr ändern (z. B. `document.baseURI`).
 - Formatierung: Prettier (4 Leerzeichen laut `.editorconfig`, JSON 2), ESLint mit typgeprüften
   strikten Regeln, `no-console`, nur `<script setup lang="ts">`, kein `v-html`.
 
@@ -2370,6 +2426,11 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Umbuchen und Status, Standortwahl, Details und Verlauf, Prüffristen, Profil, komprimierte
   Auslieferung; siehe "Frontend" und KONZEPT.md "User am Handy"). Wünsche für später in
   `docs/TODO-SPAETER.md`.
+- Admin-Konsole (umgesetzt am 31.10.2026, Schritte 1–12: Menü und Dashboard, Standorte und
+  Gerätetypen, Geräteliste mit Sammelaktionen, Gerätedetail, neues Gerät, CSV-Import, Benutzer und
+  Einladungscodes, Protokoll, Einstellungen; siehe "Frontend" und KONZEPT.md "Admin-Konsole").
+  Abgeschlossen erst nach dem Live-Test (Schritt 13, `docs/frontend/LIVETEST-ADMIN-KONSOLE.md`);
+  danach das Ergebnis in KONZEPT.md eintragen.
 - Nicht in Version 1: Mengenartikel, Etiketten mit QR-/Barcodes erzeugen oder drucken,
   Prüfprotokolle.
 
@@ -2476,7 +2537,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 
 ## Deployment
 - Ablauf: lokal prüfen (siehe "Arbeitsweise"), committen, nach `main` pushen → GitHub Actions testet und legt Code plus Frontend-Build im Branch
-  `deploy` ab (siehe "GitHub Actions (CI)") → von Hand auf dem Server per SSH:
+  `deploy` ab (siehe "GitHub Actions (CI)") → auf dem Server `scripts/deploy.sh`: durch den Agenten
+  per `ssh -T strato-ff` (siehe "Autonomer Ablauf"), von Hand per SSH mit
   `cd ~/htdocs/apps/firefighting-equipment && bash scripts/deploy.sh`. Erst deployen, wenn der
   CI-Lauf grün ist und `deploy` den gewünschten Stand hat.
 - Der Server steht auf dem Branch `deploy` (nie `main`: dort fehlt der Frontend-Build; auf STRATO
