@@ -273,6 +273,10 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   (wie `AccentColor::DEFAULT` und das Standard-App-Symbol), nicht das Dunkelblau aus dem Mockup.
 
 ## Admin-Konsole
+Umgesetzt am 31.10.2026 (Schritte 1–12, Entscheidung 29); offen ist nur noch der abschließende
+Live-Test (Schritt 13, Liste in `LIVETEST-ADMIN-KONSOLE.md`). Danach gilt der Abschnitt als
+abgeschlossen; Wünsche aus den Live-Tests stehen in `docs/TODO-SPAETER.md` (T9–T13).
+
 Super-Admin und Admin: Menü links, Inhalt rechts; links unten Einstellungen, Profil, Abmelden.
 Startseite ist ein Dashboard mit großen, antippbaren Kacheln, die zur gefilterten Liste führen.
 Das Menü des Admins enthält „Suchen“ (die Handy-Seite `suchen`, Entscheidung 19). Umgesetzt
@@ -400,7 +404,11 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
   App und `theme-color`), Logo hochladen (breites Bild → 512 × 512, 5,9 KB, Menü und Symbol im Tab),
   Logo entfernen, Benachrichtigung an/aus in Ordnung, keine Fehler in der Konsole. Dabei gefunden:
   Der Start mit veralteter Version gab nach rund 6 s auf (siehe "Updates der App"), und das Symbol
-  auf dem Homescreen hat transparente Ränder.
+  auf dem Homescreen schien transparente Ränder zu haben. Nachgeprüft am iPhone („Zum
+  Home-Bildschirm“ mit Logo, 31.10.2026): sauber, das `apple-touch-icon` (180 px) ist schon deckend
+  weiß. Die Symbole des Manifests (192 und 512 px) sind durchsichtig und nur `any`; Android setzt
+  sie verkleinert in einen weißen Kreis. Deckende `maskable`-Symbole sind T13 in
+  `docs/TODO-SPAETER.md`.
 
 ### Admin-Konsole – Entscheidungen
 29. **Reihenfolge:** Die Admin-Konsole kommt vor dem Offline-Modus, damit Immendingen starten kann.
@@ -533,7 +541,7 @@ Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Li
   dem Ändern bleibt nur dieses Gerät angemeldet, die Seite sagt es. „Angemeldete Geräte“ zeigt
   dieses Gerät zuerst („Dieses Gerät“, seit wann angemeldet), dann die anderen mit „zuletzt aktiv“
   und Anmeldedatum, je mit „Abmelden“; darunter „Alle anderen Geräte abmelden“ mit Rückfrage. Die
-  Benachrichtigung „Log“ für Admins kommt mit der Admin-Konsole („Einstellungen“).
+  Benachrichtigung „Log“ für Admins steht in den Einstellungen der Admin-Konsole (Schritt 12).
 - **Darstellung:** Suchen, Prüffristen und Profil mit Kopfleiste in der Stadtfarbe (Name der Stadt,
   „Hallo <Anzeigename>“) und der Leiste unten; Umbuchen, Standortwahl und Details bildschirmfüllend
   mit weißer Kopfzeile und Zurück-Knopf, ohne Leiste. Zurück führt zur vorigen Seite der App, nach

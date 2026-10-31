@@ -1,0 +1,122 @@
+# Live-Test der Admin-Konsole (Schritt 13)
+
+Abschließender Test der Admin-Konsole (KONZEPT.md Entscheidung 29) nur in der Test-Stadt
+`https://www.prodad.de/firefighting/test/`, nie in einer echten Stadt. Ergebnisse bitte mit der
+Nummer melden (z. B. „B3 rot: …“, mit Bildschirmfoto bzw. Text aus der Konsole). Gefundene Wünsche
+kommen nach `docs/TODO-SPAETER.md`, Fehler werden vor dem Abschluss behoben.
+
+Was in den Schritten 3 und 9–12 schon live geprüft ist (KONZEPT.md, "Bereiche des Admins"), steht
+hier nur noch als kurzer Durchlauf (☐ kurz).
+
+## Vorbereitung
+- Stand: der aktuelle `main` nach grünem CI-Lauf deployt (`bash scripts/deploy.sh`). Darin ist auch
+  die Korrektur „Updates: Start wartet bis rund 30 s …“ (wegen der roten CI bisher nicht live).
+- Geräte: PC mit Chrome oder Edge (Entwicklerwerkzeuge offen, Reiter „Konsole“), iPhone mit Safari,
+  wenn vorhanden ein Android-Handy; ein USB-Handscanner, wenn vorhanden.
+- Konten der Test-Stadt: Admin A (Sie), Admin B mit „Mail bei jeder Änderung an Geräten“ (Postfach
+  im Blick), ein Konto mit Rolle Benutzer. Ein Wegwerf-Konto zum Sperren und Löschen (z. B. über
+  einen Einladungscode mit `holger.burkarth+user2@live.de` registriert).
+- Bei jedem Punkt nebenbei: keine roten Einträge in der Konsole, keine Meldung zur
+  Content-Security-Policy.
+
+## A Update der App (Korrektur vom 31.10.2026)
+- ☐ A1 Vor dem Deploy die Test-Stadt am iPhone als App (Homescreen) und am PC offen lassen. Nach dem
+  Deploy die App am iPhone neu öffnen: höchstens rund 30 s „Seite wird geladen …“, dann die neue
+  Version, nie „Die neue Version konnte nicht geladen werden.“
+- ☐ A2 Nur, falls ohnehin ein weiterer Deploy ansteht: am PC in einem offenen Formular (z. B.
+  „Bearbeiten“ eines Geräts) etwas eintippen, dann deployen und zum Tab zurückkehren: Hinweis mit „Jetzt aktualisieren“, die Eingabe bleibt, bis Sie selbst
+  aktualisieren (Rückfrage „Ihre Eingaben … gehen verloren“).
+
+## B Menü und Dashboard (Schritt 1)
+- ☐ B1 Fensterbreite ab 1024 px: Menü links mit Text; 768–1023 px: nur Symbole, Name beim Darüberfahren;
+  schmaler: Kopfleiste in der Stadtfarbe mit ☰, Schublade schließt mit Escape, „Menü schließen“ und
+  beim Seitenwechsel.
+- ☐ B2 Kacheln: Einsatzbereitschaft „N von M“ passt zur Geräteliste ohne Filter; „nicht
+  einsatzbereit“ passt zum Filter in Wartung + defekt; jede Kachel führt zur passenden Liste bzw. zu
+  Prüffristen, Protokoll und Benutzern.
+- ☐ B3 Eine Umbuchung am iPhone (Benutzer-Konto): erscheint nach dem Neuladen des Dashboards oben in
+  „Letzte Aktivitäten“ mit Wer, Von/Nach und Kommentar.
+- ☐ B4 Zähler im Menü (Benutzer, Protokoll) stimmen mit den Seiten überein.
+
+## C Standorte und Gerätetypen (Schritt 2)
+- ☐ C1 „Neuer Standort“ Fahrzeug „Live-Test“, darin „Fach anlegen“ „G1“; ein zweites „g1“ meldet
+  schon beim Tippen, dass der Name vergeben ist.
+- ☐ C2 Umbenennen; der Name führt zur Geräteliste mit diesem Standort (samt Fächern).
+- ☐ C3 Sperren von „HLF 20“: Knopf gesperrt mit Hinweis, was noch dort liegt. Sperren des leeren
+  „Live-Test“: erst Rückfrage, dann gesperrt; erscheint nur mit „Gesperrte anzeigen“ und nicht mehr
+  in der Standortwahl am Handy. Entsperren: das Fach erst nach dem Fahrzeug.
+- ☐ C4 Gerätetyp anlegen, umbenennen, deaktivieren (Rückfrage) und aktivieren; Sortierung über die
+  Spaltenköpfe, am Handy über die Knöpfe „Sortieren“.
+
+## D Geräteliste (Schritt 3, kurz)
+- ☐ D1 kurz: Filter Gerätetyp, Standort, Status, Suche; die Filter stehen in der Adresse und bleiben
+  nach Zurück aus dem Gerätedetail.
+- ☐ D2 „Ausgesonderte anzeigen“ zeigt M24; „Weitere laden“ nach 50 Geräten.
+- ☐ D3 „Export (CSV)“ mit Filter: Datei öffnet in Excel mit Umlauten und den gefilterten Geräten.
+- ☐ D4 Am iPhone: Karten, „Sortieren nach“ und Richtung, kein waagerechtes Wischen nötig.
+
+## E Gerätedetail (Schritt 4)
+- ☐ E1 Kennung in der Liste öffnet `geraete/<id>/details`: Standort, Status, nächste Prüfung (bald
+  fällig gelb, überfällig rot), Stammdaten, Verlauf; am breiten Bildschirm nebeneinander.
+- ☐ E2 „Bearbeiten“ (z. B. Seriennummer) mit Kommentar: grüne Meldung, neuer Eintrag im Verlauf.
+- ☐ E3 „Prüfdatum ändern“ und leeren.
+- ☐ E4 „Code zuordnen“ am PC mit dem USB-Handscanner (Enter speichert; ein GS1-Code zeigt „Erkannt:
+  …[GS]…“), am iPhone „Mit der Kamera scannen“: der Code steht danach im Fenster, gespeichert erst
+  mit „Code speichern“. Ein schon vergebener Code wird am Feld abgelehnt.
+- ☐ E5 „Umbuchen / Status ändern“ führt zum Umbuchen und danach mit Bestätigung zurück zum Detail.
+- ☐ E6 Dasselbe Gerät in zwei Tabs: in Tab 1 bearbeiten und speichern, in Tab 2 danach ändern →
+  Hinweis, dass es inzwischen geändert wurde, der neue Stand steht oben, eigene Eingaben bleiben.
+- ☐ E7 „Aussondern …“ eines Testgeräts (Rückfrage nennt das Gerät), dann „Wieder aufnehmen“ mit
+  Status und Standort. Zweiter Durchgang: nach dem Aussondern ein neues Gerät mit derselben Kennung
+  anlegen; die Wiederaufnahme verlangt dann eine andere Kennung.
+
+## F Links in den Mails (Schritt 5)
+- ☐ F1 Änderung an einem Gerät durch Admin A: Admin B erhält „Log Feuerwehr Test: …“, der Link öffnet
+  das Gerätedetail (vorher Anmeldung, danach genau diese Seite).
+- ☐ F2 CSV-Import (Teil H): eine Sammelmail, Link auf die Geräteliste.
+- ☐ F3 Hinweis-Mail (bestätigte alte Offline-Buchung wie in Schritt 11): Link auf `protokoll/<id>`.
+- ☐ F4 Neue Registrierung bestätigt: „Neue Registrierung wartet …“ mit Link auf die Benutzer.
+
+## G Neues Gerät (Schritt 6)
+- ☐ G1 „Neues Gerät“: Kennung M90, Typ, Standort, „Speichern und nächstes“ (auch Enter): grüne
+  Meldung mit „Gerät öffnen“, Typ, Standort und Prüfdatum bleiben, Kennung M91 ist markiert.
+- ☐ G2 Scan-Code am iPhone mit der Kamera; Enter des Handscanners im Feld Scan-Code speichert nicht.
+- ☐ G3 Schon vergebene Kennung bzw. vergebener Scan-Code: Fehler am Feld (bekannt: T10, T11).
+- ☐ G4 „Speichern“ öffnet das neue Gerät mit Bestätigung.
+
+## H CSV-Import (Schritt 7)
+- ☐ H1 „Vorlage herunterladen“ und „Gültige Werte herunterladen“ öffnen in Excel richtig.
+- ☐ H2 Vorlage mit zwei Geräten ausfüllen, eins mit Standort „HLF20“: Vorschau mit „Meinten Sie „HLF
+  20“?“ und Link auf die Standorte; Beispielzeilen stehen noch drin → Warnung.
+- ☐ H3 Datei in Excel korrigieren, gleiche Datei erneut wählen: Vorschau ohne Fehler, „Import
+  übernehmen (…)“ mit Kommentar; die Geräte stehen in der Liste mit Verlauf „Importiert“.
+- ☐ H4 Export der Geräteliste ändern (z. B. Prüfdatum) und importieren: nur geänderte Zeilen.
+
+## I Benutzer und Einladungscodes (Schritte 8 und 9, kurz)
+- ☐ I1 Wartende Anmeldung: „Freischalten …“ mit Anzeigename und Rolle bzw. „Ablehnen …“ (Mail an die
+  Person).
+- ☐ I2 Wegwerf-Konto: Rolle ändern, sperren (Anmeldung danach abgelehnt), entsperren, löschen
+  („Gelöschter Benutzer #ID“ im Verlauf).
+- ☐ I3 Eigenes Konto: Hinweis, Rolle gesperrt, kein Sperren oder Löschen.
+- ☐ I4 kurz: neuer Einladungscode, „Code kopieren“, danach „Widerrufen …“; der Code gilt nicht mehr.
+
+## J Sammelaktionen, Protokoll, Einstellungen (Schritte 10–12, kurz)
+- ☐ J1 kurz: drei Geräte auswählen, „Prüfdatum setzen …“, Ergebnis über der Leiste.
+- ☐ J2 kurz: Protokoll mit Filter Offen/Erledigt/Alle, ein Hinweis erledigen und wieder öffnen.
+- ☐ J3 kurz: Akzentfarbe ändern und wieder auf Standard; Logo bleibt im Menü, auf der Anmeldeseite und
+  als Symbol im Tab. Homescreen am iPhone ist geprüft (sauber); Android siehe T13.
+
+## K Übergreifend
+- ☐ K1 Mit dem Benutzer-Konto `…/test/geraete`, `…/test/benutzer`, `…/test/einstellungen` direkt
+  aufrufen: jeweils „Suchen“, keine Admin-Seite.
+- ☐ K2 Anzeigemodus Dunkel: alle Seiten der Konsole lesbar (Tabellen, Fenster, Auswahllisten,
+  Statusfarben).
+- ☐ K3 Am iPhone: jede Seite der Konsole einmal, Fenster lassen sich schließen, Auswahllisten scrollen,
+  die Tastatur verdeckt keine Knöpfe dauerhaft.
+- ☐ K4 Admin auf den Handy-Seiten: Leiste unten mit „Dashboard“; auf dem Umbuchen der Link
+  „Gerätedetail (Admin)“.
+- ☐ K5 Abmelden aus dem Menü, danach führt Zurück im Browser nicht in die Konsole.
+
+## Abschluss
+Wenn alles grün ist (oder die Funde behoben bzw. in `docs/TODO-SPAETER.md` eingetragen sind), trägt
+der Agent das Ergebnis in KONZEPT.md ein und markiert die Admin-Konsole als abgeschlossen.
