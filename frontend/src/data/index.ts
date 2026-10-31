@@ -44,6 +44,7 @@ import {
     type NewLocation,
     type SavedLocation,
 } from '../api/locations';
+import { fetchNotice, postReopenNotice, postResolveNotice, type Notice } from '../api/notices';
 import {
     approveUser as postApprove,
     changeUserDisplayName,
@@ -64,6 +65,7 @@ import { DeviceTypeStore } from './deviceTypeStore';
 import { INSPECTION_WINDOW_DAYS, SERVER_INSPECTION_LIMIT } from './inspections';
 import { InvitationCodeStore } from './invitationCodeStore';
 import { LocationStore } from './locationStore';
+import { NoticeList } from './noticeList';
 import { UserStore } from './userStore';
 import { newClientRef, setBookingNotice } from './booking';
 import { runInBlocks, type BulkRun } from './deviceBulk';
@@ -87,6 +89,8 @@ export const adminDeviceList = new AdminDeviceList();
 export const userStore = new UserStore();
 /** Einladungscodes der Stadt (Benutzerverwaltung, Reiter „Einladungscodes“). */
 export const invitationCodeStore = new InvitationCodeStore();
+/** Hinweise des Protokolls (Admin). */
+export const noticeList = new NoticeList();
 
 /**
  * Nach einer Änderung an Standorten oder Gerätetypen lädt die Verwaltung neu (abgewartet), andere
@@ -380,6 +384,35 @@ export async function revokeInvitationCode(id: number): Promise<ApiResult<Invita
     return result;
 }
 
+/** Ein Hinweis mit Verlauf (Seite `protokoll/<id>`). */
+export function loadNotice(id: number): Promise<ApiResult<Notice>> {
+    return fetchNotice(id);
+}
+
+/**
+ * Nach dem Erledigen bzw. Wiederöffnen: Liste und Zähler (Menü, Dashboard) laden neu, sofern schon
+ * geladen; ein unbekannter Hinweis (404) verschwindet so aus der Liste.
+ */
+function afterNoticeChange(result: ApiResult<Notice>): ApiResult<Notice> {
+    if (result.ok || result.error.code === 'not_found') {
+        void noticeList.refresh('changed');
+        if (adminOverview.state.overview !== null) {
+            void adminOverview.refresh('changed');
+        }
+    }
+    return result;
+}
+
+/** Hinweis erledigen (wiederholbar), Notiz optional. */
+export async function resolveNotice(id: number, note: string | null): Promise<ApiResult<Notice>> {
+    return afterNoticeChange(await postResolveNotice(id, note));
+}
+
+/** Erledigten Hinweis wieder öffnen (wiederholbar). */
+export async function reopenNotice(id: number): Promise<ApiResult<Notice>> {
+    return afterNoticeChange(await postReopenNotice(id));
+}
+
 /** Verlauf eines Geräts („Details und Verlauf“), je Ansicht neu. */
 export function deviceHistory(id: number): DeviceHistory {
     return new DeviceHistory(id);
@@ -441,6 +474,7 @@ export function installDataLayer(
         adminDeviceList,
         userStore,
         invitationCodeStore,
+        noticeList,
     ],
     storage = browserStorage(),
 ): () => void {

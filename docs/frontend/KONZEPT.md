@@ -274,8 +274,8 @@ Das Menü des Admins enthält „Suchen“ (die Handy-Seite `suchen`, Entscheidu
 einsatzbereit, Prüffristen und offene Hinweise (Hinweise im Protokoll plus wartende
 Freischaltungen), darunter „Nicht einsatzbereit“ (defekte zuerst, höchstens 10) und „Letzte
 Aktivitäten“ (die letzten 8 Einträge des Verlaufs der Stadt mit Zeit, Gerät, Wer und Von/Nach). Die
-Kachel „Prüffristen“ führt zu `prueffristen`; „Offene Hinweise“ führt zu Protokoll und Benutzern,
-sobald es sie gibt. Schritt 2: `standorte` als Baum (Fahrzeug, Raum oder Extern mit seinen Fächern,
+Kachel „Prüffristen“ führt zu `prueffristen`; „Offene Hinweise“ führt zu Protokoll (seit Schritt 11)
+und Benutzern (seit Schritt 8). Schritt 2: `standorte` als Baum (Fahrzeug, Raum oder Extern mit seinen Fächern,
 Symbol, Gerätezahl, Filter, gesperrte nur auf Wunsch) mit „Neuer Standort“ (Name und Art), „Fach
 anlegen“, Umbenennen, Sperren (nur leer: der Knopf nennt vorher, was noch dort liegt, dann
 Rückfrage) und Entsperren in kleinen Fenstern; `geraetetypen` als Liste mit Name und Gerätezahl
@@ -347,8 +347,27 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
   50). Danach steht der Code einmal groß da mit QR-Code, Link, „Aushang drucken“, „Link teilen“ und
   „Code kopieren“; „Schließen“ (oder Widerrufen) entfernt ihn. Der Aushang zeigt zusätzlich „Jetzt
   registrieren“ und den Satz, dass danach ein Admin das Konto freischaltet; die Bezeichnung steht
-  nicht darauf.
+  nicht darauf. Live geprüft (31.10.2026, Test-Stadt): Der Aushang passt auf genau eine A4-Seite;
+  QR-Code mit der iPhone-Kamera gescannt → Registrierung (Adresse aus Entscheidung 38) → Bestätigung
+  → Freischaltung → Anmeldung in Ordnung; „Link teilen“ in Ordnung.
 - **Protokoll:** Hinweise zu Konflikten (siehe oben).
+  Umgesetzt in Schritt 11 (`protokoll`, Menü „Protokoll“ mit der Zahl der offenen Hinweise): Reiter
+  „Hinweise“ und „Verlauf exportieren“ (`protokoll?ansicht=export`). Die Hinweise stehen als Karten,
+  neueste zuerst, mit Filter Offen (Standard), Erledigt und Alle (in der Adresse) und „Weitere
+  laden“ in Blöcken zu 50; jede Karte nennt Art, Status, Gerät, die Buchung (Stand, Person, Zeit) und
+  den anderen Stand. Ein Hinweis (`protokoll/<id>`, Ziel der Hinweis-Mails) erklärt in einem Satz,
+  was geschehen ist, und zeigt nebeneinander die Buchung (Person mit E-Mail, wann erfasst, wann beim
+  Server eingegangen, gewünschter Standort und Status, Kommentar), den anderen Stand („Überschriebener
+  Stand“ bzw. „Stand beim Eingang“, mit Person und Zeit) und das Gerät jetzt mit „Umbuchen / Status
+  ändern“ (danach zurück zum Hinweis mit Bestätigung). „Rückfrage per E-Mail“ öffnet das
+  Mailprogramm mit Betreff „Rückfrage zu Ihrer Buchung von Atemschutzmaske M1“ und dem Anfang des
+  Textes (Zeit und Stand der Buchung); gelöschte Konten haben keinen Link. „Erledigen …“ mit
+  freiwilliger Notiz (mehrzeilig, höchstens 500 Zeichen) bzw. „Wieder öffnen“; darunter der Verlauf
+  des Hinweises. Damit die Buchung vollständig ist, liefert die API zum Hinweis jetzt auch deren
+  Kommentar. „Verlauf exportieren“: Zeitraum (Schnellwahl 30, 90 oder 365 Tage, sonst Von/Bis;
+  Standard die letzten 90 Tage, höchstens 366), Gerätetyp, Standort samt Fächern und Reihenfolge,
+  Download als CSV wie der Export der Geräteliste; zu viele Einträge meldet der Server mit der Bitte,
+  den Zeitraum zu verkleinern. Die Kachel „Offene Hinweise“ führt mit „Hinweise ansehen“ hierher.
 - **Einstellungen:** Anzeigemodus, Erscheinungsbild der Feuerwehr mit Vorschau, Mail-Benachrichtigung,
   Passwort und angemeldete Geräte.
 
@@ -387,7 +406,10 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
     bleiben ausgewählt (mit dem aktuellen Stand), die übrigen verlassen die Auswahl. Die Sammelmail
     hat den Betreff „Log <Stadt>: 12 Geräte – Prüfdatum geändert“ (passend zu den übrigen Log-Mails)
     und verlinkt für Admins auf die Geräteliste; ändert eine Sammelaktion nur ein Gerät, kommt die
-    gewöhnliche Mail zum Gerät.
+    gewöhnliche Mail zum Gerät. Live geprüft (31.10.2026, Test-Stadt): Prüfdatum für 5 Masken und
+    Umbuchen/Status „defekt“ (mit Pflichtkommentar) für 2 Geräte in Ordnung, Verlauf je Gerät in
+    Ordnung; „Alle N Geräte der Liste auswählen“ erscheint bei mehr als 50 Geräten; der zweite Admin
+    erhielt genau 2 Sammelmails statt 7 einzelner.
 32. **Geräte erfassen:** CSV-Vorlage zum Herunterladen (Spalten wie der Import, Semikolon, UTF-8 mit
     BOM für Excel, zwei Beispielzeilen mit den Kennungen `BEISPIEL-1` und `BEISPIEL-2`; die Vorschau
     warnt, solange sie noch in der Datei stehen) und eine zweite Datei „Gültige Werte“ mit den
@@ -424,8 +446,8 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
     Hinweis-Mails auf `protokoll/<id>`; Super-Admins erhalten keinen Link auf ein Gerät (sie sehen
     keine Geräte). Die Mail „Neue Registrierung wartet auf Freischaltung“ verlinkt auf `benutzer`.
     Umgesetzt in Schritt 5: Super-Admins erhalten in Log- und Hinweis-Mails gar keinen Link, die
-    Sammelmail eines CSV-Imports verlinkt auf `geraete`. Bis die Seite Protokoll da ist, führt
-    `protokoll/<id>` auf das Dashboard; `benutzer` ist seit Schritt 8 die Benutzerverwaltung.
+    Sammelmail eines CSV-Imports verlinkt auf `geraete`. `benutzer` ist seit Schritt 8 die
+    Benutzerverwaltung, `protokoll/<id>` seit Schritt 11 der Hinweis (vorher das Dashboard).
 37. **Logo:** Die App bringt jedes Bild (PNG, JPG, SVG …) selbst auf 512 × 512 PNG (quadratisch, mit
     Rand) und zeigt die Vorschau per Canvas; der Server prüft weiter genau 512 × 512.
 38. **Live-Test der Benutzerverwaltung** (Test-Stadt): „Freischalten“ mit dem vorhandenen Konto

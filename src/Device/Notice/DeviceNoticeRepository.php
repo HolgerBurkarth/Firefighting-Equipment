@@ -19,7 +19,7 @@ final readonly class DeviceNoticeRepository
 {
     private const string SELECT = 'SELECT n.id, n.kind, n.status, n.stale_confirmed, n.device_id, d.identifier AS device_identifier,'
         . ' t.name AS type_name, b.client_ref, n.event_id, n.occurred_at, n.requested_status, n.other_occurred_at, n.other_status,'
-        . ' n.created_at, n.updated_at,'
+        . ' n.created_at, n.updated_at, e.comment AS booking_comment,'
         . ' u.id AS u_id, u.status AS u_status, u.display_name AS u_display_name, u.name AS u_name, u.email AS u_email,'
         . ' ou.id AS ou_id, ou.status AS ou_status, ou.display_name AS ou_display_name, ou.name AS ou_name, ou.email AS ou_email,'
         . ' n.requested_location_id, rl.name AS requested_name, rp.name AS requested_parent,'
@@ -34,6 +34,7 @@ final readonly class DeviceNoticeRepository
         . ' LEFT JOIN fe_locations rl ON rl.id = n.requested_location_id AND rl.tenant_id = n.tenant_id'
         . ' LEFT JOIN fe_locations rp ON rp.id = rl.parent_id AND rp.tenant_id = n.tenant_id'
         . ' JOIN fe_locations ol ON ol.id = n.other_location_id AND ol.tenant_id = n.tenant_id'
+        . ' LEFT JOIN fe_device_events e ON e.id = n.event_id AND e.tenant_id = n.tenant_id'
         . ' LEFT JOIN fe_locations op ON op.id = ol.parent_id AND op.tenant_id = n.tenant_id'
         . ' WHERE n.tenant_id = ?';
 
@@ -227,6 +228,7 @@ final readonly class DeviceNoticeRepository
             self::utc((string) $row['created_at']),
             self::utc((string) $row['updated_at']),
             $history,
+            $row['booking_comment'] === null ? null : (string) $row['booking_comment'],
         );
     }
 

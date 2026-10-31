@@ -41,6 +41,14 @@ defineProps<{ name: AdminMenuIconName }>();
             <circle cx="12" cy="8" r="4" />
             <path d="M4 21c1-4 4-6 8-6s7 2 8 6" />
         </template>
+        <template v-else-if="name === 'list'">
+            <path d="M8 6h13" />
+            <path d="M8 12h13" />
+            <path d="M8 18h13" />
+            <circle cx="4" cy="6" r="1" />
+            <circle cx="4" cy="12" r="1" />
+            <circle cx="4" cy="18" r="1" />
+        </template>
         <template v-else>
             <path d="M15 4h4v16h-4" />
             <path d="M10 8l-4 4 4 4" />

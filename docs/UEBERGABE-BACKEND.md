@@ -8,6 +8,23 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-10-31 – „Admin-Konsole: Protokoll mit Hinweisen und Export des Verlaufs (Schritt 11)“
+
+Ein neues Feld, sonst unverändert: Jeder Hinweis (`GET notices`, `GET notices/{id}`, Antworten von
+`resolve`/`reopen`, `NoticeJson::notice`) enthält in `booking` zusätzlich `comment`, den Kommentar
+der Buchung (aus ihrem Eintrag im Verlauf, `fe_device_events.comment` über `event_id`; `null` ohne
+Kommentar). `DeviceNoticeRepository` liest ihn per `LEFT JOIN fe_device_events` (mit Stadt),
+`DeviceNotice::$comment` (letzter Parameter, Standard `null`).
+
+- Warum: Die Seite `protokoll/<id>` der Admin-Konsole zeigt die Buchung vollständig wie die
+  Hinweis-Mail (dort stand der Kommentar schon); gerade bei „defekt“ erklärt er den Wunsch.
+- Die App nutzt außerdem erstmals `POST notices/{id}/resolve` und `reopen` sowie
+  `GET device-events/export` (Export des Verlaufs mit `from`, `to`, `device_type_id`, `location_id`
+  mit `include_sublocations=1` und `order`); beide unverändert.
+- Tests: `DeviceNoticeTest::testOverwrittenStateCreatesNoticeWithBothStates` (Kommentar),
+  `testWhichResultsCreateNotices` (ohne Kommentar `null`).
+- Dokumentiert in `CLAUDE.md`, "Hinweise (API)", und README "Hinweise (nur Admins)".
+
 ## 2026-10-31 – „Admin-Konsole: Sammelaktionen Prüfdatum und Umbuchen/Status (Schritt 10)“
 
 Zwei neue ändernde Endpunkte, nur Admins der Stadt (`Access::Admin`, in `AdminRoutesAccessTest`),

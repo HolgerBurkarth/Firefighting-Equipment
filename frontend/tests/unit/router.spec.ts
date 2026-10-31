@@ -122,6 +122,8 @@ describe('Wächter', () => {
         ['/geraete/neu', 'device-new'],
         ['/geraete/import', 'device-import'],
         ['/benutzer', 'users'],
+        ['/protokoll', 'notices'],
+        ['/protokoll/7', 'notice'],
     ] as const)('Seite %s der Admin-Konsole nur für Admins', async (path, name) => {
         setSession(state('admin'));
         const route = (await routerAt(path)).currentRoute.value;
@@ -133,23 +135,12 @@ describe('Wächter', () => {
         expect((await routerAt(path, SERVICE)).currentRoute.value.name).toBe('not-found');
     });
 
-    it.each(['/protokoll', '/protokoll/7'])(
-        'Mail-Link %s führt vorerst auf das Dashboard',
-        async (path) => {
-            setSession(state('admin'));
-            expect((await routerAt(path)).currentRoute.value.name).toBe('dashboard');
-            setSession(state('user'));
-            expect((await routerAt(path)).currentRoute.value.name).toBe('search');
-            setSession(state('superadmin'));
-            expect((await routerAt(path, SERVICE)).currentRoute.value.name).toBe('not-found');
-        },
-    );
-
-    it('Mail-Link ohne Sitzung: nach der Anmeldung auf das Dashboard', async () => {
+    it('Mail-Link auf einen Hinweis ohne Sitzung: nach der Anmeldung zum Hinweis', async () => {
         setSession(null);
         const route = (await routerAt('/protokoll/7')).currentRoute.value;
         expect(route.name).toBe('login');
-        expect(route.query['weiter']).toBe('/dashboard');
+        expect(route.query['weiter']).toBe('/protokoll/7');
+        expect((await routerAt('/protokoll/07')).currentRoute.value.name).toBe('not-found');
     });
 
     it('jeder Eintrag im Menü der Admin-Konsole hat eine Seite mit deren Darstellung', async () => {

@@ -335,6 +335,56 @@ h2 {
     accent-color: var(--accent);
 }
 
+/* Reiter einer Seite (Benutzer, Protokoll; Reka UI Tabs: Pfeiltasten, aria-selected). */
+.tabs-root {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--touch-min);
+    margin-bottom: -1px;
+    padding: 0 16px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: none;
+    color: var(--text-secondary);
+    font: inherit;
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+}
+
+.tab:hover {
+    background: var(--nav-hover);
+    color: var(--text);
+}
+
+.tab[data-state='active'] {
+    border-bottom-color: var(--line);
+    color: var(--text);
+}
+
+.tab-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.tab-panel[hidden] {
+    display: none;
+}
+
 /* „Zurück“ oben auf Unterseiten der Admin-Konsole (Gerätedetail, Neues Gerät). */
 .detail-nav {
     display: flex;
