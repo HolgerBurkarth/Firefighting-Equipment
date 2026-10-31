@@ -1,15 +1,24 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
-import { downloadDeviceExport, type DeviceSort } from '../api/devices';
+import { downloadDeviceExport, type DeviceListItem, type DeviceSort } from '../api/devices';
 import AppSelect, { type SelectOption } from '../components/AppSelect.vue';
 import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
+import DeviceBulkDueDialog from '../components/DeviceBulkDueDialog.vue';
+import DeviceBulkStateDialog from '../components/DeviceBulkStateDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { adminDeviceList, adminLocationStore, deviceTypeStore } from '../data';
 import { takeBookingNotice } from '../data/booking';
 import { germanDate, localDateKey } from '../data/changeTime';
+import {
+    bulkCounts,
+    bulkErrorText,
+    bulkResultText,
+    type BulkAction,
+    type BulkRun,
+} from '../data/deviceBulk';
 import {
     ACTIVE_STATUSES,
     DEFAULT_DEVICE_FILTER,
@@ -24,6 +33,7 @@ import {
     type ActiveStatus,
     type DeviceListFilter,
 } from '../data/deviceList';
+import { MAX_LOCAL_DEVICES } from '../data/deviceStore';
 import { compareNames } from '../data/masterData';
 import { saveDownload } from '../runtime/download';
 import { useNow } from '../runtime/now';
@@ -33,6 +43,8 @@ import { useNow } from '../runtime/now';
  * Standort (mit Fächern) und Status, „Ausgesonderte anzeigen“, Sortierung wie im Explorer, Export
  * der gefilterten Liste als CSV, „Import (CSV)“ (Seite `geraete/import`). Die Filter stehen in der Adresse (`geraete?status=defective`), so
  * führen Kacheln und Links direkt zur gefilterten Liste; der Server filtert und sortiert.
+ * Mehrfachauswahl (auch alle Geräte der gefilterten Liste) mit den Sammelaktionen „Prüfdatum setzen“
+ * und „Umbuchen / Status ändern“ (KONZEPT.md Entscheidung 31); ausgesonderte sind nicht wählbar.
  */
 const route = useRoute();
 const router = useRouter();
@@ -40,6 +52,25 @@ const now = useNow();
 const today = computed(() => localDateKey(now.value));
 
 const state = computed(() => adminDeviceList.state);
+
+/** Auswahl für die Sammelaktionen: ID → zuletzt bekannter Stand (die Version wird mitgesendet). */
+const selected = shallowRef<ReadonlyMap<number, DeviceListItem>>(new Map());
+/** Alle Geräte des Filters gewählt („Alle N … auswählen“); jede andere Änderung hebt es auf. */
+const allChosen = ref(false);
+
+function setSelection(next: ReadonlyMap<number, DeviceListItem>, all = false): void {
+    selected.value = next;
+    allChosen.value = all;
+}
+
+interface BulkResultView {
+    readonly action: BulkAction;
+    readonly run: BulkRun;
+    /** Kennungen beim Absenden (auch für Geräte, die es nicht mehr gibt). */
+    readonly identifiers: ReadonlyMap<number, string>;
+}
+
+const bulkResult = shallowRef<BulkResultView | null>(null);
 const filter = computed(() => filterFromQuery(route.query));
 const bookingNotice = takeBookingNotice();
 
@@ -51,6 +82,8 @@ function setFilter(change: Partial<DeviceListFilter>): void {
 watch(
     () => filterKey(filter.value),
     () => {
+        setSelection(new Map());
+        bulkResult.value = null;
         void adminDeviceList.show(filter.value);
     },
     { immediate: true },
@@ -209,6 +242,158 @@ function loadMore(): void {
     void adminDeviceList.more();
 }
 
+/** Ausgesonderte Geräte nehmen an keiner Sammelaktion teil. */
+function selectable(device: DeviceListItem): boolean {
+    return device.status !== 'retired';
+}
+
+function isSelected(device: DeviceListItem): boolean {
+    return selected.value.has(device.id);
+}
+
+function toggle(device: DeviceListItem): void {
+    const next = new Map(selected.value);
+    if (!next.delete(device.id)) {
+        next.set(device.id, device);
+    }
+    setSelection(next);
+}
+
+const visibleSelectable = computed(() => state.value.devices.filter(selectable));
+const allVisibleSelected = computed(
+    () => visibleSelectable.value.length > 0 && visibleSelectable.value.every(isSelected),
+);
+const someVisibleSelected = computed(
+    () => !allVisibleSelected.value && visibleSelectable.value.some(isSelected),
+);
+
+/** Kopf der Spalte: alle angezeigten wählen bzw. abwählen. */
+function toggleVisible(): void {
+    const next = new Map(selected.value);
+    const select = !allVisibleSelected.value;
+    for (const device of visibleSelectable.value) {
+        if (select) {
+            next.set(device.id, device);
+        } else {
+            next.delete(device.id);
+        }
+    }
+    setSelection(next);
+}
+
+function clearSelection(): void {
+    setSelection(new Map());
+}
+
+// Neuerer Stand in der Liste (Auffrischen): die Auswahl übernimmt die Version.
+watch(
+    () => state.value.devices,
+    (devices) => {
+        let next: Map<number, DeviceListItem> | null = null;
+        for (const device of devices) {
+            const known = selected.value.get(device.id);
+            if (known !== undefined && device.version > known.version) {
+                next ??= new Map(selected.value);
+                if (selectable(device)) {
+                    next.set(device.id, device);
+                } else {
+                    next.delete(device.id);
+                }
+            }
+        }
+        if (next !== null) {
+            setSelection(next, allChosen.value);
+        }
+    },
+);
+
+/** „Alle N Geräte der Liste auswählen“, wenn mehr passen als geladen (bis 2.000). */
+const canSelectAll = computed(
+    () =>
+        !allChosen.value &&
+        allVisibleSelected.value &&
+        state.value.total !== null &&
+        state.value.total > state.value.devices.length &&
+        state.value.total <= MAX_LOCAL_DEVICES,
+);
+const selectingAll = ref(false);
+const selectAllError = ref<ApiError | null>(null);
+
+async function selectAll(): Promise<void> {
+    selectingAll.value = true;
+    selectAllError.value = null;
+    const result = await adminDeviceList.all();
+    selectingAll.value = false;
+    if (!result.ok) {
+        selectAllError.value = result.error;
+        return;
+    }
+    setSelection(
+        new Map(result.data.filter(selectable).map((device) => [device.id, device] as const)),
+        true,
+    );
+}
+
+const selectedDevices = computed(() => [...selected.value.values()]);
+const selectedText = computed(() =>
+    selected.value.size === 1
+        ? '1 Gerät ausgewählt'
+        : `${String(selected.value.size)} Geräte ausgewählt`,
+);
+
+const dueOpen = ref(false);
+const stateOpen = ref(false);
+const dueButton = ref<HTMLButtonElement | null>(null);
+const stateButton = ref<HTMLButtonElement | null>(null);
+
+function openBulk(action: BulkAction): void {
+    bulkResult.value = null;
+    if (action === 'inspection-due') {
+        dueOpen.value = true;
+    } else {
+        stateOpen.value = true;
+    }
+}
+
+/**
+ * Nach einer Sammelaktion: übernommene und unveränderte Geräte verlassen die Auswahl, Geräte mit
+ * Fehler und nicht gesendete bleiben (mit dem aktuellen Stand, also erneut sendbar).
+ */
+function onBulkDone(action: BulkAction, run: BulkRun): void {
+    const identifiers = new Map(
+        [...selected.value.values()].map((device) => [device.id, device.identifier] as const),
+    );
+    const next = new Map(selected.value);
+    for (const result of run.results) {
+        if (result.outcome !== 'error' || result.device === null || !selectable(result.device)) {
+            next.delete(result.id);
+        } else {
+            next.set(result.id, result.device);
+        }
+    }
+    setSelection(next);
+    bulkResult.value = { action, run, identifiers };
+}
+
+const bulkFailures = computed(() =>
+    (bulkResult.value?.run.results ?? [])
+        .filter((result) => result.outcome === 'error')
+        .map((result) => ({
+            id: result.id,
+            identifier:
+                bulkResult.value?.identifiers.get(result.id) ??
+                result.device?.identifier ??
+                `#${String(result.id)}`,
+            text: bulkErrorText(result),
+        })),
+);
+const bulkClean = computed(
+    () =>
+        bulkResult.value !== null &&
+        bulkResult.value.run.error === null &&
+        bulkCounts(bulkResult.value.run).errors === 0,
+);
+
 function dueText(due: string | null): string {
     return due === null ? '–' : germanDate(due);
 }
@@ -362,6 +547,68 @@ onMounted(() => {
         </div>
     </div>
 
+    <section v-if="bulkResult !== null" class="bulk-result" data-testid="bulk-result">
+        <p
+            class="notice"
+            :class="bulkClean ? 'notice-success' : 'notice-info'"
+            role="status"
+            data-testid="bulk-summary"
+        >
+            {{ bulkResultText(bulkResult.action, bulkResult.run) }}
+        </p>
+        <ErrorNotice v-if="bulkResult.run.error !== null" :error="bulkResult.run.error" />
+        <div v-if="bulkFailures.length > 0" class="notice notice-info" data-testid="bulk-failures">
+            <p>Nicht geändert (bleiben ausgewählt):</p>
+            <ul class="failures">
+                <li v-for="failure in bulkFailures" :key="failure.id">
+                    <strong>{{ failure.identifier }}</strong
+                    >: {{ failure.text }}
+                </li>
+            </ul>
+        </div>
+        <p v-if="bulkResult.run.unsent.length > 0" class="hint">
+            Nicht gesendete Geräte bleiben ausgewählt; bitte erneut versuchen.
+        </p>
+    </section>
+
+    <div v-if="selected.size > 0" class="selection-bar" data-testid="selection-bar">
+        <span class="selection-count" role="status">{{ selectedText }}</span>
+        <button ref="dueButton" class="btn" type="button" @click="openBulk('inspection-due')">
+            Prüfdatum setzen …
+        </button>
+        <button ref="stateButton" class="btn btn-accent" type="button" @click="openBulk('state')">
+            Umbuchen / Status ändern …
+        </button>
+        <button class="link-button" type="button" @click="clearSelection">Auswahl aufheben</button>
+        <button
+            v-if="canSelectAll"
+            class="link-button"
+            type="button"
+            :disabled="selectingAll"
+            @click="selectAll"
+        >
+            {{
+                selectingAll
+                    ? 'Wird geladen …'
+                    : `Alle ${String(state.total)} Geräte der Liste auswählen${filter.showRetired ? ' (ohne ausgesonderte)' : ''}`
+            }}
+        </button>
+    </div>
+    <ErrorNotice v-if="selectAllError !== null" :error="selectAllError" />
+
+    <DeviceBulkDueDialog
+        v-model:open="dueOpen"
+        :devices="selectedDevices"
+        :return-focus="dueButton"
+        @done="(run) => onBulkDone('inspection-due', run)"
+    />
+    <DeviceBulkStateDialog
+        v-model:open="stateOpen"
+        :devices="selectedDevices"
+        :return-focus="stateButton"
+        @done="(run) => onBulkDone('state', run)"
+    />
+
     <p v-if="state.total === 0" class="hint">
         {{ filtered ? 'Kein Gerät passt zu den Filtern.' : 'Noch keine Geräte.' }}
     </p>
@@ -370,6 +617,18 @@ onMounted(() => {
         <table class="list-table" data-testid="device-table">
             <thead>
                 <tr>
+                    <th scope="col" class="cell-select">
+                        <label class="select-box">
+                            <input
+                                type="checkbox"
+                                :checked="allVisibleSelected"
+                                :indeterminate="someVisibleSelected"
+                                :disabled="visibleSelectable.length === 0"
+                                aria-label="Alle angezeigten Geräte auswählen"
+                                @change="toggleVisible"
+                            />
+                        </label>
+                    </th>
                     <th
                         v-for="column in COLUMNS"
                         :key="column.key"
@@ -392,6 +651,21 @@ onMounted(() => {
                     :class="{ 'row-retired': device.status === 'retired' }"
                     :data-testid="`device-row-${String(device.id)}`"
                 >
+                    <td class="cell-select">
+                        <label class="select-box">
+                            <input
+                                type="checkbox"
+                                :checked="isSelected(device)"
+                                :disabled="!selectable(device)"
+                                :aria-label="
+                                    selectable(device)
+                                        ? `${device.identifier} auswählen`
+                                        : `${device.identifier} (ausgesondert, nicht wählbar)`
+                                "
+                                @change="toggle(device)"
+                            />
+                        </label>
+                    </td>
                     <td class="cell-identifier">
                         <RouterLink
                             class="device-link"
@@ -586,6 +860,56 @@ onMounted(() => {
     font-size: var(--font-size-sm);
 }
 
+.bulk-result {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.failures {
+    margin: 0;
+    padding-left: 20px;
+    font-weight: var(--font-weight-normal);
+}
+
+.selection-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--selected-bg);
+}
+
+.selection-count {
+    flex-grow: 1;
+    font-weight: var(--font-weight-bold);
+}
+
+.list-table th.cell-select,
+.list-table td.cell-select {
+    width: 1%;
+    padding: 0 0 0 6px;
+}
+
+.select-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
+    cursor: pointer;
+}
+
+.select-box input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
 .more {
     display: flex;
     flex-wrap: wrap;
@@ -639,7 +963,7 @@ onMounted(() => {
 
     .list-table tbody tr {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: auto minmax(0, 1fr) auto;
         gap: 0 12px;
         padding: 6px 14px 10px;
         border: 1px solid var(--border);
@@ -658,16 +982,23 @@ onMounted(() => {
         box-shadow: none;
     }
 
+    .list-table td.cell-select {
+        grid-row: 1 / span 4;
+        grid-column: 1;
+        align-self: start;
+        padding: 0 4px 0 0;
+    }
+
     .cell-status {
         grid-row: 1;
-        grid-column: 2;
+        grid-column: 3;
         align-self: center;
     }
 
     .cell-type,
     .cell-location,
     .cell-due {
-        grid-column: 1 / -1;
+        grid-column: 2 / -1;
         font-size: var(--font-size-sm);
     }
 

@@ -1,4 +1,5 @@
 import type { ApiResult } from '../api/client';
+import { postBulkInspectionDue, postBulkState } from '../api/deviceBulk';
 import {
     postImport,
     postImportPreview,
@@ -14,8 +15,10 @@ import {
     postReinstate,
     postRetire,
     type DeviceActionBase,
+    type BookableStatus,
     type DeviceDetail,
     type DeviceFieldChanges,
+    type DeviceListItem,
     type NewDeviceRequest,
     type ReinstateRequest,
 } from '../api/devices';
@@ -62,7 +65,8 @@ import { INSPECTION_WINDOW_DAYS, SERVER_INSPECTION_LIMIT } from './inspections';
 import { InvitationCodeStore } from './invitationCodeStore';
 import { LocationStore } from './locationStore';
 import { UserStore } from './userStore';
-import { setBookingNotice } from './booking';
+import { newClientRef, setBookingNotice } from './booking';
+import { runInBlocks, type BulkRun } from './deviceBulk';
 import { addRecent, clearRecent, loadRecent } from './recentDevices';
 import { recentLocations } from './recentLocations';
 
@@ -218,6 +222,57 @@ export async function reinstateDevice(
     request: ReinstateRequest,
 ): Promise<ApiResult<DeviceDetail>> {
     return afterDeviceChange(await postReinstate(id, request));
+}
+
+/**
+ * Sammelaktion „Prüfdatum setzen“ (Admin): alle Geräte in Blöcken, je Gerät die bekannte Version.
+ * Danach übernimmt „Suchen“ die neuen Stände, die Listen laden neu.
+ */
+export async function bulkSetInspectionDue(
+    devices: readonly DeviceListItem[],
+    nextInspectionDue: string | null,
+    comment: string | undefined,
+    onProgress?: (done: number, total: number) => void,
+): Promise<BulkRun> {
+    const entries = devices.map((device) => ({
+        id: device.id,
+        version: device.version,
+        nextInspectionDue,
+    }));
+    return afterBulk(
+        await runInBlocks(entries, (block) => postBulkInspectionDue(block, comment), onProgress),
+    );
+}
+
+/** Sammelaktion „Umbuchen / Status ändern“ (Admin), je Gerät eine eigene `client_ref`. */
+export async function bulkChangeState(
+    devices: readonly DeviceListItem[],
+    target: { readonly locationId?: number; readonly status?: BookableStatus },
+    comment: string | undefined,
+    onProgress?: (done: number, total: number) => void,
+): Promise<BulkRun> {
+    const entries = devices.map((device) => ({
+        id: device.id,
+        version: device.version,
+        ...target,
+        clientRef: newClientRef(),
+    }));
+    return afterBulk(
+        await runInBlocks(entries, (block) => postBulkState(block, comment), onProgress),
+    );
+}
+
+function afterBulk(run: BulkRun): BulkRun {
+    for (const result of run.results) {
+        if (result.device !== null) {
+            deviceStore.upsert(result.device);
+        }
+    }
+    // Auch nach einem Fehler: Ein Block kann angekommen sein, ohne dass die Antwort kam.
+    if (run.error !== null || run.results.some((result) => result.outcome === 'applied')) {
+        refreshDeviceLists();
+    }
+    return run;
 }
 
 /** CSV-Import prüfen (Admin; speichert nichts). */

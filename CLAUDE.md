@@ -335,7 +335,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
-  `client.ts`; `devices.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
+  `client.ts`; `devices.ts`, `deviceBulk.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
   `deviceTypes.ts`, `inspections.ts`, `invitationCodes.ts`, `locations.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
   Gerätetypen, Benutzer und das Dashboard),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
@@ -637,6 +637,31 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Server-Attrappe `deviceServer` mit Status, Typ, Standort samt Fächern, `q` und Seiten; Download über
   `MockResponse.text`/`contentType`); Unit-Tests `deviceList.spec.ts`, `adminDeviceList.spec.ts`,
   `client.spec.ts` (`apiDownload`).
+- Sammelaktionen der Geräteliste (KONZEPT.md Entscheidung 31, Schritt 10): erste Spalte bzw. Karte mit
+  Kontrollkästchen („M1 auswählen“; ausgesonderte gesperrt, „… (ausgesondert, nicht wählbar)“), im
+  Kopf „Alle angezeigten Geräte auswählen“ (auch `indeterminate`). Auswahl = ID → zuletzt bekannter
+  Stand (`DeviceListItem`, die Version wird mitgesendet); ein neuerer Stand beim Auffrischen ersetzt
+  ihn, ein neuer Filter hebt die Auswahl auf. Sind alle angezeigten gewählt und passen mehr (bis
+  `MAX_LOCAL_DEVICES` = 2000), „Alle N Geräte der Liste auswählen“ (`adminDeviceList.all()`: alle
+  Seiten zu 200 des Filters, die angezeigte Liste bleibt). Leiste „N Geräte ausgewählt“ mit
+  „Prüfdatum setzen …“ (`DeviceBulkDueDialog`: Datum, leer = entfernen, Kommentar) und „Umbuchen /
+  Status ändern …“ (`DeviceBulkStateDialog`: „Neuer Standort“ als `AppSelect` mit „Standort nicht
+  ändern“ und nur aktiven Standorten bzw. Fächern unter aktiven, „Neuer Status“ als Radiogruppe mit
+  „Status nicht ändern“; mindestens eines, bei „defekt“ Kommentar „Was ist defekt?“ mit mindestens 5
+  Zeichen wie beim Umbuchen), „Auswahl aufheben“. Senden über `bulkSetInspectionDue` bzw.
+  `bulkChangeState` (`src/data/index.ts`; API `postBulkInspectionDue`, `postBulkState` in
+  `src/api/deviceBulk.ts`, `BULK_MAX_DEVICES` = 50 per Test gleich `DeviceBulkHandler::MAX_DEVICES`):
+  `runInBlocks` (`src/data/deviceBulk.ts`) sendet Blöcke zu 50 nacheinander, das Fenster zeigt „8
+  von 12 gesendet …“ und bleibt solange offen (`useUnsavedInput`); `bulk/state` mit neuer
+  `client_ref` je Gerät. Scheitert eine ganze Anfrage (z. B. Netzwerk), endet der Lauf, der Rest gilt
+  als nicht gesendet. Danach `deviceStore.upsert` je Gerät und Auffrischen der geladenen Listen.
+  Ergebnis über der Leiste (`bulkResultText`: „Prüfdatum: 10 Geräte geändert, 1 unverändert, 1 nicht
+  möglich.“, grün nur ohne Fehler), Liste „Nicht geändert (bleiben ausgewählt)“ mit `bulkErrorText`
+  (`version_conflict` „Inzwischen geändert – bitte prüfen und erneut senden.“); übernommene und
+  unveränderte verlassen die Auswahl, Fehler (mit aktuellem Stand) und nicht gesendete bleiben.
+  Browser-Tests `tests/e2e/deviceBulk.spec.ts` (Server-Attrappe bucht je Gerät mit Version, `bump`
+  simuliert eine fremde Änderung, `failNextRequest` einen Netzwerkfehler); Unit-Tests
+  `deviceBulk.spec.ts`.
 - Gerätedetail der Admin-Konsole (`DeviceDetailPage`, `geraete/<id>/details`, `<id>` wie die
   Platzhalter im Backend, nur `admin`, `layout: 'admin'`; KONZEPT.md "Bereiche des Admins", Geräte,
   und Entscheidung 33): „Zurück“ (`goBack`, sonst `geraete`), Kennung als Überschrift mit Typ, Karte
@@ -1785,6 +1810,22 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Ebenso der Scan-Code: `scan_code` angegeben (auch `null` = entfernen, `DeviceReinstatement::
   $hasScanCode`) ersetzt den bisherigen (`field_changed`); sonst bleibt er, und ist er inzwischen
   vergeben → 409 `scan_code_taken` mit Hinweis, einen neuen anzugeben oder ihn mit `null` zu entfernen.
+- Sammelaktionen (Admin, `DeviceBulkHandler` mit `DeviceBulkAction`, in `AdminRoutesAccessTest`;
+  KONZEPT.md Entscheidung 31): `POST devices/bulk/inspection-due {devices: [{id, version,
+  next_inspection_due}], comment?}` und `POST devices/bulk/state {devices: [{id, version,
+  location_id?, status?, client_ref?}], comment?}` (ohne `occurred_at`/`confirmed_stale`: nur online).
+  Exakte Pfade, Vorrang vor `devices/{id}`. 1 bis `DeviceBulkHandler::MAX_DEVICES` (50) Einträge
+  (bei 16 KiB Body); Felder je Eintrag wie bei der einzelnen Route (`DeviceFields::bulkEntries`,
+  `bulkInspectionDue`, `bulkStateChange`, `deviceId`; jeder Eintrag als eigener `RequestContext`),
+  unbekannte Felder 400. ALLE Einträge werden vor der ersten Änderung gelesen: ungültig → 400 mit
+  „Eintrag N in "devices": …“, Gerät doppelt → 400. Dann je Gerät eine eigene Transaktion
+  (`setInspectionDue` bzw. über `DeviceBooker` wie `POST devices/{id}/state` ohne Aktionszeit, mit
+  Wiederholung über `client_ref`), eigener Eintrag im Verlauf, gemeinsamer Kommentar; Teilerfolg
+  erlaubt. Antwort immer 200 `{results: [{id, outcome (applied|unchanged|error), replayed, device,
+  error}], summary {total, applied, unchanged, errors}}` in der Reihenfolge der Anfrage; `device` =
+  Stand danach bzw. bei Fehler der aktuelle (`null` bei fremder/unbekannter ID), `error` = `{error,
+  message, details?}` wie die Fehlerantwort der einzelnen Route (`DeviceErrors::http`). Danach EINE
+  Sammelmail „Log“ (siehe "Benachrichtigung „Log“"). Tests: `tests/Integration/Device/DeviceBulkTest`.
 - `GET devices/{id}/events` (angemeldet, auch ausgesonderte; fremd/unbekannt 404): neueste zuerst
   (nach `id`), `limit` 1–200 (Standard 50), `offset` 0–1000000; Antwort `{events, total, limit,
   offset}`. Je Eintrag immer `id`, `type`, `type_label`, `created_at`, `user {id, name}`
@@ -1829,7 +1870,9 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   Handler mit `Clock` und `OfflineSettings` aus `Routes::tenant`), `DeviceBookingJson` (Feld
   `result`), `src/Device/Booking/` (`ClientRef`, `BookingRequest` mit `hash()`, `BookingOutcome`,
   `BookingReason`, `BookingResult`, `StoredBooking`, `DeviceStateSnapshot`,
-  `DeviceBookingRepository`, `ClientRefConflictException`, `DuplicateClientRefException`),
+  `DeviceBookingRepository`, `DeviceBooker` (Wiederholung über die `client_ref` und gleichzeitig
+  vergebene `client_ref`, auch für `POST devices/bulk/state`), `ClientRefConflictException`,
+  `DuplicateClientRefException`),
   `src/Offline/` (`ActionTime`, `OfflineSettings`), `DeviceRepository::book` (`changeState` ruft es
   ohne Zusatzangaben). Tests: `tests/Integration/Device/DeviceBookingClientRefTest`,
   `DeviceOfflineBookingTest`, `DeviceBookingSchemaTest`, `DeviceStateColumnsTest`,
@@ -2114,17 +2157,21 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 - Auslöser: jeder Vorgang, der in der Geräte-Historie protokolliert wird (Anlegen, CSV-Import,
   Umbuchen/Status, Aussondern, Wiederaufnehmen, Prüfdatum, Stammdaten). Ohne neues Ereignis (nichts
   geändert, Fehler, Versionskonflikt) keine Mail.
-- Code: `src/Notification/DeviceLogNotifier.php` (`deviceChanged`, `imported`; `fromContext()`),
+- Code: `src/Notification/DeviceLogNotifier.php` (`deviceChanged`, `bulkChanged`, `imported`;
+  `fromContext()`),
   `DeviceEventRecorder` (IDs der Ereignisse der letzten erfolgreichen Transaktion von
   `DeviceRepository`; nach Rollback leer; nur der ungepufferte `DeviceEventWriter` meldet IDs),
-  `DeviceEventRepository::findForDevice`, Vorlagen `MailTemplates::deviceLog` und
-  `deviceImportLog`. Aufruf in `DeviceActionHandler` und `DeviceImportHandler` NACH der Rückkehr des
-  Repositorys (also nach dem Commit). Tests: `tests/Integration/Notification/DeviceLogNotificationTest`.
+  `DeviceEventRepository::findForDevice`, Vorlagen `MailTemplates::deviceLog`, `deviceBulkLog` und
+  `deviceImportLog`. Aufruf in `DeviceActionHandler`, `DeviceStateHandler`, `DeviceBulkHandler` und
+  `DeviceImportHandler` NACH der Rückkehr des Repositorys (also nach dem Commit). Tests: `tests/Integration/Notification/DeviceLogNotificationTest`.
 - Empfänger: `UserRepository::listDeviceLogRecipients` (Admins nur der Stadt des Vorgangs,
   Super-Admins aller Städte; aktiv, nicht gesperrt, Option an), nie der Auslöser. Eine Mail je
   Empfänger und Anfrage; ein CSV-Import ergibt EINE Sammelmail (Zusammenfassung, höchstens
   `MAX_IMPORT_LINES` = 50 Zeilen mit Einzelheiten, danach „… und N weitere“; ohne neue oder geänderte
-  Geräte keine Mail).
+  Geräte keine Mail), ebenso eine Sammelaktion (`bulkChanged`: alle geänderten Geräte der Anfrage, je
+  Gerät „Kennung (Typ)“ und eingerückt Von/Nach; Betreff „12 Geräte – Prüfdatum geändert“ bzw.
+  „… – umgebucht, Status defekt“, bei verschiedenen Zielstatus „Status geändert“; nur ein geändertes
+  Gerät → die gewöhnliche Mail `deviceChanged`; Link für Admins auf die Geräteliste).
 - Betreff „Log <Stadtname>: <Grund>“ (z. B. „MA-01 umgebucht, Status defekt“, „CSV-Import: 2 neu,
   1 geändert“, höchstens 200 Zeichen). Text: Vorgang, Gerät (Kennung, Typ), Wer (Anzeigename), Wann
   (Europe/Berlin), Von/Nach je Ereignis, Kommentar, Link (KONZEPT.md "Admin-Konsole –
@@ -2270,6 +2317,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Lint, Vitest) und `frontend-build` (Typprüfung und Build) immer; nach `changes` `php` und nach dem
   Build `e2e` (Browser-Tests in bis zu acht Teilen), beide nur, wenn betroffen; danach `e2e-report`
   (Bericht) und `deploy`.
+  Gemessen (vollständiger Lauf, 31.10.2026): 5:50 min; `changes` 1:00, `frontend-build` 46 s,
+  `frontend-checks` 1:31, `php` 1:28, `e2e` je Teil 2:22–3:41, `e2e-report` 58 s, `deploy` 11 s.
 - Bereiche (seit 31.10.2026, Regeln NUR in `frontend/build/ciScope.ts`, Tests
   `tests/unit/ciScope.spec.ts`): Job `changes` (ganze Historie, `npm ci`) bestimmt die Basis: Push
   auf `main` = `git merge-base HEAD origin/deploy` (der letzte main-Stand in `deploy`; nach einem

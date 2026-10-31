@@ -8,10 +8,14 @@ use FirefightingEquipment\Api\V1\Devices\DeviceBookingJson;
 use FirefightingEquipment\Api\V1\Devices\DeviceStateHandler;
 use FirefightingEquipment\Device\Booking\BookingRequest;
 use FirefightingEquipment\Device\Booking\ClientRef;
+use FirefightingEquipment\Device\Booking\ClientRefConflictException;
+use FirefightingEquipment\Device\Booking\DeviceBooker;
 use FirefightingEquipment\Device\Booking\DeviceBookingRepository;
 use FirefightingEquipment\Device\Booking\DuplicateClientRefException;
 use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\DeviceStateChange;
+use FirefightingEquipment\Device\DeviceStatus;
+use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
@@ -22,6 +26,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(DeviceBookingJson::class)]
 #[CoversClass(DeviceBookingRepository::class)]
 #[CoversClass(DeviceRepository::class)]
+#[CoversClass(DeviceBooker::class)]
 final class DeviceBookingClientRefTest extends DeviceApiTestCase
 {
     private const string REF = '3f2c8a1e-5b7d-4c9e-8f10-2a3b4c5d6e7f';
@@ -204,6 +209,30 @@ final class DeviceBookingClientRefTest extends DeviceApiTestCase
 
         self::assertSame($before, $this->deviceSnapshot());
         self::assertFalse($this->pdo()->inTransaction());
+    }
+
+    public function testBookerRepeatsResultOfConcurrentRequest(): void
+    {
+        $id = $this->createViaApi('MA-01')['id'];
+        // Unverändert: Die Version bleibt, die zweite Buchung kommt also bis zur Quittung.
+        $this->book($id, ['version' => 1, 'status' => 'ready', 'client_ref' => self::REF]);
+        $before = $this->deviceSnapshot();
+        $change = new DeviceStateChange(null, DeviceStatus::Ready);
+        $hash = BookingRequest::hash($id, 1, $change, null, null);
+        $booker = new DeviceBooker(
+            $this->tenant('immendingen'),
+            new DeviceRepository($this->pdo()),
+            new DeviceBookingRepository($this->pdo()),
+            new DeviceNoticeRepository($this->pdo()),
+        );
+
+        // Wie eine gleichzeitige Anfrage: Die Quittung entsteht erst nach der Prüfung mit previous().
+        $result = $booker->book($this->adminId, $id, 1, $change, null, new BookingRequest(ClientRef::fromString(self::REF), null, false, $hash));
+
+        self::assertSame([true, 'unchanged', 1], [$result->replayed, $result->outcome->value, $result->device->version]);
+        self::assertSame($before, $this->deviceSnapshot());
+        $this->expectException(ClientRefConflictException::class);
+        $booker->book($this->adminId, $id, 1, $change, 'Anderer Inhalt', new BookingRequest(ClientRef::fromString(self::REF), null, false, BookingRequest::hash($id, 1, $change, 'Anderer Inhalt', null)));
     }
 
     /**

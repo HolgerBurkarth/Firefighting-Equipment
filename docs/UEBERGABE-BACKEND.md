@@ -8,6 +8,39 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-10-31 – „Admin-Konsole: Sammelaktionen Prüfdatum und Umbuchen/Status (Schritt 10)“
+
+Zwei neue ändernde Endpunkte, nur Admins der Stadt (`Access::Admin`, in `AdminRoutesAccessTest`),
+KONZEPT.md Entscheidung 31; bestehende Routen und Felder unverändert:
+
+- `POST api/v1/devices/bulk/inspection-due {devices: [{id, version, next_inspection_due}], comment?}`
+  und `POST api/v1/devices/bulk/state {devices: [{id, version, location_id?, status?, client_ref?}],
+  comment?}` (`DeviceBulkHandler` mit `DeviceBulkAction`). Höchstens 50 Geräte je Anfrage
+  (`DeviceBulkHandler::MAX_DEVICES`, Body-Grenze bleibt 16 KiB). Felder je Eintrag wie bei
+  `devices/{id}/inspection-due` bzw. `devices/{id}/state` ohne `occurred_at`/`confirmed_stale`
+  (`DeviceFields::bulkEntries`, `bulkInspectionDue`, `bulkStateChange`, `deviceId`); alle Einträge
+  werden vor der ersten Änderung gelesen, ungültig (Meldung „Eintrag N in "devices": …“), leer, mehr
+  als 50 oder ein Gerät doppelt → 400, nichts geändert.
+- Je Gerät eine eigene Transaktion und ein eigener Eintrag im Verlauf (gemeinsamer Kommentar), Regeln
+  wie bei der einzelnen Route; Teilerfolg erlaubt. Antwort immer 200 `{results: [{id, outcome,
+  replayed, device, error}], summary: {total, applied, unchanged, errors}}`: `outcome` `applied`,
+  `unchanged` oder `error`; `device` = Stand danach (bei Fehler der aktuelle, `null` bei fremder oder
+  unbekannter ID); `error` = `{error, message, details?}` wie die Fehlerantwort der einzelnen Route
+  (z. B. `version_conflict` mit `details.device`, `rule_violation`, `not_found`, `invalid_request`
+  bei unbekanntem Ziel-Standort, `client_ref_conflict`); `replayed` = dieselbe `client_ref` war schon
+  angekommen (nur `state`).
+- Neu `src/Device/Booking/DeviceBooker` (Wiederholung über die `client_ref`, gleichzeitig vergebene
+  `client_ref`), jetzt auch von `DeviceStateHandler` benutzt (Verhalten unverändert).
+- Benachrichtigung „Log“: EINE Sammelmail je Empfänger und Anfrage (`DeviceLogNotifier::bulkChanged`,
+  `MailTemplates::deviceBulkLog`), Betreff „Log <Stadt>: 12 Geräte – Prüfdatum geändert“ bzw.
+  „… – umgebucht, Status defekt“, je Gerät Kennung (Typ) und Von/Nach, Link für Admins auf
+  `geraete`; nur ein geändertes Gerät → gewöhnliche Mail zum Gerät; nichts geändert → keine Mail.
+- Tests: `tests/Integration/Device/DeviceBulkTest`, `DeviceBookingClientRefTest`
+  (`testBookerRepeatsResultOfConcurrentRequest`), `DeviceLogNotificationTest` (Sammelmail),
+  `tests/Unit/Mail/MailTemplatesTest` (`testDeviceBulkLogListsEveryDevice`), `AdminRoutesAccessTest`.
+- Dokumentiert in `CLAUDE.md`, "Geräte (API)", "Offline-Buchungen (API)", "Benachrichtigung „Log“"
+  und "Frontend" (Sammelaktionen der Geräteliste); README "Geräte" und "Benachrichtigung".
+
 ## 2026-10-31 – „CI: je Push nur betroffene Tests, nachts alles; Agenten committen selbst“
 
 Keine Änderung an der API. Für den Backend-Chat wichtig:

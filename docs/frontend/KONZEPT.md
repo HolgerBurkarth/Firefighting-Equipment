@@ -375,6 +375,19 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
     je Anfrage legt das Backend fest; die App teilt größere Auswahlen in Blöcke und zeigt den
     Fortschritt („8 von 12“) und eine Ergebnisliste. Log-Mail: EINE Sammelmail je Empfänger und
     Anfrage („Log – <Stadt> – 12 Geräte: Prüfdatum gesetzt“ mit Liste), nicht je Gerät.
+    Umgesetzt in Schritt 10: In der Geräteliste hat jede Zeile (am Handy jede Karte) ein Kästchen,
+    der Spaltenkopf wählt alle angezeigten; sind alle angezeigten gewählt und passen mehr, „Alle N
+    Geräte der Liste auswählen“ (bis 2.000). Ausgesonderte sind nicht wählbar, ein neuer Filter hebt
+    die Auswahl auf. Die Leiste „N Geräte ausgewählt“ bietet „Prüfdatum setzen …“ (leer = entfernen)
+    und „Umbuchen / Status ändern …“ (neuer Standort und/oder Status, nur aktive Standorte; bei
+    „defekt“ wie beim Umbuchen eine kurze Beschreibung als Pflicht), jeweils mit Kommentar. Das
+    Backend nimmt höchstens 50 Geräte je Anfrage; die App sendet Blöcke nacheinander und zeigt „8 von
+    12 gesendet …“. Danach steht über der Leiste das Ergebnis („Prüfdatum: 10 Geräte geändert, 1
+    unverändert, 1 nicht möglich.“) mit den Geräten, die nicht geändert wurden, und warum; diese
+    bleiben ausgewählt (mit dem aktuellen Stand), die übrigen verlassen die Auswahl. Die Sammelmail
+    hat den Betreff „Log <Stadt>: 12 Geräte – Prüfdatum geändert“ (passend zu den übrigen Log-Mails)
+    und verlinkt für Admins auf die Geräteliste; ändert eine Sammelaktion nur ein Gerät, kommt die
+    gewöhnliche Mail zum Gerät.
 32. **Geräte erfassen:** CSV-Vorlage zum Herunterladen (Spalten wie der Import, Semikolon, UTF-8 mit
     BOM für Excel, zwei Beispielzeilen mit den Kennungen `BEISPIEL-1` und `BEISPIEL-2`; die Vorschau
     warnt, solange sie noch in der Datei stehen) und eine zweite Datei „Gültige Werte“ mit den
