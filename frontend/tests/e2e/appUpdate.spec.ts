@@ -510,6 +510,14 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
             await other.evaluate(() => (window as unknown as { ffMarker?: boolean }).ffMarker),
         ).toBe(true);
         await expect(other.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+        // Das Fenster beginnt unter dem Hinweis (am Handy deckte es ihn sonst zu).
+        await expect
+            .poll(async () => {
+                const notice = await other.getByTestId('update-notice').boundingBox();
+                const form = await dialog.boundingBox();
+                return notice !== null && form !== null && form.y >= notice.y + notice.height;
+            })
+            .toBe(true);
         // Der Hinweis bleibt bei offenem Fenster bedienbar (ein Klick darauf ist kein Klick neben das
         // Fenster) und fragt wegen der Eingabe nach; „Abbrechen“ lässt Fenster und Eingabe stehen.
         // Live-Test 31.10.2026: Der Klick schloss das Fenster und verwarf die Eingabe. Der Hinweis

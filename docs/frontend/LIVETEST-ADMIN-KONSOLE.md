@@ -48,6 +48,9 @@ Prüfung des Updates am PC (A1). Ergebnisse je Punkt bitte hier eintragen (☑ b
   Fenster mit Eingaben (auch ein Klick irgendwo daneben). M90 unverändert. Danach wechselte Tab B
   mit „Zurück“ fehlerfrei auf die neue Version. Noch nicht behoben (Vorschlag in der Meldung); die
   Rückfrage selbst prüfen die Browser-Tests (Formular ohne Fenster).
+  Behoben mit `c08ae0348824` (Fenster mit Eingaben schließen bei Klick daneben nicht, Escape fragt
+  nach, der Hinweis bleibt bei offenem Fenster bedienbar); live geprüft beim folgenden Deploy, weil
+  der alte Tab dafür schon den neuen Code braucht.
   Offen für Holger: A2 am iPhone.
 
 ## B Menü und Dashboard (Schritt 1)
@@ -218,6 +221,11 @@ Prüfung des Updates am PC (A1). Ergebnisse je Punkt bitte hier eintragen (☑ b
   `geraete` in der neuen Version, ohne Fehler. Die Zeitleiste der neuen Version füllt sich
   (`start`, `register`, `build`, `update`). Der Start mit der neuen Logik und A2 folgen beim
   nächsten Deploy.
+- ☑ Deploy `c08ae0348824` (Claude per Chrome, 31.10.2026): Tab auf `dashboard` (alte Version
+  `51d4b304a3f9`), neue Version per `update()` installiert und wartend, dann Strg+Umschalt+R → Seite
+  vom Server in der neuen Version, danach vom neuen Service Worker gesteuert, keiner wartet. Hier
+  aktivierte Chrome ihn selbst (kein anderer Tab hielt den alten; Zeitleiste `controllerchange
+  first` ohne `activate-waiting`); den Weg mit zweitem alten Tab prüft der nächste Deploy.
 - Notiz (kein Fehler): „Letzte Aktivitäten“ ist nach Eingang beim Server sortiert, zeigt aber die
   Zeit der Aktion (bei Offline-Buchungen können die Zeiten daher nicht absteigend wirken).
 - Testdaten in der Test-Stadt (bleiben vorerst): M90, M91 (neu), M92 (früheres M91), M93 (HLF 20),
