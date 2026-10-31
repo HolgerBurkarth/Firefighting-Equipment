@@ -11,9 +11,11 @@ import {
     setSession,
     usingStoredSession,
 } from '../../src/auth/session';
+import { BookingQueue } from '../../src/data/bookingQueue';
 import { DeviceStore } from '../../src/data/deviceStore';
 import { LocationStore } from '../../src/data/locationStore';
 import {
+    installBookingQueue,
     installOfflineCopy,
     offlineData,
     parseSnapshot,
@@ -335,5 +337,102 @@ describe('lokale Kopie (Entscheidung 49)', () => {
         expect(parseSnapshot({ format: 2 })).toBeNull();
         expect(parseSnapshot(null)).toBeNull();
         expect(syncedAtText('2026-10-31T13:02:00Z')).toMatch(/^31\.10\., \d\d:02$/);
+    });
+});
+
+describe('Warteschlange an Konto und Geräte gebunden (Entscheidung 52)', () => {
+    it('zeigt wartende Buchungen in der Liste, liest die Grenzen, sendet und lädt neu', async () => {
+        const db = new MemoryDb();
+        await db.put('queue', 'test:7', [
+            {
+                clientRef: '0b4d2a7c-1f3e-4c5a-9b8d-7e6f5a4b3c2d',
+                deviceId: 1,
+                identifier: 'M1',
+                deviceTypeName: 'Atemschutzmaske',
+                version: 1,
+                status: 'maintenance',
+                statusLabel: 'in Wartung',
+                occurredAt: '2026-10-31T11:00:00Z',
+                state: 'waiting',
+            },
+        ]);
+        const posted: unknown[] = [];
+        let releasePost: () => void = () => undefined;
+        const postDone = new Promise<void>((resolve) => {
+            releasePost = resolve;
+        });
+        const queue = new BookingQueue({
+            db,
+            now: () => new Date('2026-10-31T12:00:00Z'),
+            post: async (_id, request) => {
+                posted.push(request);
+                await postDone;
+                return {
+                    ok: false,
+                    error: {
+                        code: 'network',
+                        message: null,
+                        status: null,
+                        retryAfterSeconds: null,
+                        details: null,
+                    },
+                };
+            },
+        });
+        let loads = 0;
+        const devices = new DeviceStore(() => {
+            loads += 1;
+            return Promise.resolve({
+                ok: true,
+                status: 200,
+                data: { devices: [device(1)], total: 1, limit: 200, offset: 0 },
+            });
+        });
+        const storage = new MemoryStorage();
+        let limitReads = 0;
+        setSession(state());
+        const stop = installBookingQueue({
+            area: 'test',
+            queue,
+            devices,
+            storage,
+            doc: document,
+            fetchLimits: () => {
+                limitReads += 1;
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    data: {
+                        serverTime: '2026-10-31T12:00:00Z',
+                        maxAgeDays: 5,
+                        queueMaxAgeDays: 3,
+                        maxClockSkewSeconds: 300,
+                    },
+                });
+            },
+        });
+        await flush();
+        expect(queue.state.bookings).toHaveLength(1);
+        await devices.refresh('open');
+        await flush();
+        // Gewünschter Stand in der Liste, solange der Server das Gerät nicht geändert hat.
+        expect(devices.find(1)?.status).toBe('maintenance');
+        expect(posted).toHaveLength(1);
+        expect(limitReads).toBe(1);
+        expect(queue.currentLimits).toEqual({ maxAgeDays: 5, queueMaxAgeDays: 3 });
+        expect(JSON.parse(storage.getItem('ff-offline-limits:test') ?? 'null')).toEqual({
+            maxAgeDays: 5,
+            queueMaxAgeDays: 3,
+        });
+        releasePost();
+        await flush();
+        expect(queue.state.bookings[0]?.state).toBe('waiting');
+        expect(loads).toBe(1);
+
+        // Abmelden löscht die Warteschlange des Kontos.
+        expect(await logout(respond(200, { logged_out: true }).fetch)).toBeNull();
+        await flush();
+        expect(await db.get('queue', 'test:7')).toBeNull();
+        stop();
     });
 });

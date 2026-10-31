@@ -112,6 +112,14 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
   Abmelden“. Lokal: Lint, Typprüfung, 1128 Unit-Tests, alle Browser-Tests Chromium/WebKit (714),
   `offline`, `booking`, `profile`, `adminConsole` in allen fünf Profilen (225), `offline`/`booking`
   unter WSL (115) grün.
+  CI 5:31 grün, Deploy ok, Build `487cdffbb4bf`, Health ok. Live: ☑ Datenbank geheilt (Version 2 mit
+  beiden Tabellen, Kopie gespeichert), ☑ M90 online umgebucht und zurückgesetzt wie bisher, ☑ keine
+  Warteschlange, kein Streifen, keine Konsolenfehler. Echtes Offline offen für Holger
+  (`LIVETEST-OFFLINE.md`, B1–B10).
+- 31.10. O3 Abschluss: Commit „Offline O3: Tests für Browser offline und Anbindung der
+  Warteschlange; Live-Ergebnisse“. Neu: Browser-Test mit `context.setOffline` (alle fünf Profile und
+  WSL grün), Unit-Test `installBookingQueue`. Lokal: 1129 Unit-Tests, `offline.spec.ts` alle fünf
+  Profile (60) und WSL (60) grün.
 
 # Zur Prüfung durch Holger
 

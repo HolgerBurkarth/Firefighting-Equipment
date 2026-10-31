@@ -961,7 +961,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Super-Admin auf dem Dashboard landen, simulieren dessen Abfragen damit; zustandsbehafteter Server
   `serviceServer` bzw. `superAdminServer` über `delegate`); Unit-Tests
   `tenants.spec.ts`, `router.spec.ts`.
-- Offline-Modus (KONZEPT.md "Offline-Modus – Entscheidungen", 48–56; Schritte O1 und O2 umgesetzt):
+- Offline-Modus (KONZEPT.md "Offline-Modus – Entscheidungen", 48–56; Schritte O1–O3 umgesetzt):
   Erreichbarkeit `src/runtime/connectivity.ts` (`isOffline` = Browser offline oder die letzte
   Anfrage bekam keine Verbindung; `apiRequest`/`apiDownload` melden `reportServerReached`;
   `installConnectivity` in `main.ts`, `onBackOnline`). Gespeicherte Sitzung (`src/auth/session.ts`,
@@ -1002,8 +1002,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   bleiben, gleiche `client_ref`). Anzeige `BookingQueuePanel` auf „Suchen“ (Uhr, Haken, Ergebnis,
   „Angekommene ausblenden“). Abmelden (`AccountPanel`, `AdminMenuNav`) mit ungesendeten Buchungen erst
   nach `ConfirmDialog` (`unsentWarning`); Abmelden und ein anderes Konto löschen die Warteschlange,
-  eine abgelaufene Sitzung nicht. Tests `tests/e2e/offline.spec.ts`, `booking.spec.ts`
-  („Keine Verbindung beim Speichern“), Unit-Tests `bookingQueue.spec.ts`.
+  eine abgelaufene Sitzung nicht. Tests `tests/e2e/offline.spec.ts` (auch `context.setOffline`:
+  Streifen sofort, Buchung ohne Sendeversuch, bei `online` gesendet), `booking.spec.ts` („Keine
+  Verbindung beim Speichern“), Unit-Tests `bookingQueue.spec.ts`, `offline.spec.ts`
+  (`installBookingQueue`). Live-Test-Liste `docs/frontend/LIVETEST-OFFLINE.md` (echtes Offline nur
+  Holger am iPhone).
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
   `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und

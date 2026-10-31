@@ -12,10 +12,14 @@ Ergebnisse bitte mit der Nummer eintragen (☑ bzw. ☒ mit Fund).
 - Am PC als Admin die Geräteliste bzw. das Gerätedetail von M90 offen, um den Stand zu sehen.
 
 ## A Online unverändert (Claude per Chrome)
-- ☐ A1 Umbuchen eines Testgeräts (M90) online wie bisher: grüne Bestätigung, Verlauf ohne
-  „Eingang beim Server“, keine Warteschlange auf „Suchen“; danach zurückgesetzt.
-- ☐ A2 Kein grauer Streifen online; die Kopie liegt in IndexedDB (`ff-offline`, `snapshots`,
-  `test:<konto-id>`), die Sitzung in `localStorage['ff-session:test']`.
+- ☑ A1 Umbuchen eines Testgeräts (M90) online wie bisher: grüne Bestätigung, Verlauf ohne
+  „Eingang beim Server“, keine Warteschlange auf „Suchen“; danach zurückgesetzt. (31.10.2026, Build
+  `487cdffbb4bf`: M90 → „in Wartung“ „✓ M90 → Lager Gerätehaus · in Wartung“, dann zurück auf
+  „einsatzbereit“; keine Warteschlange, kein Streifen, keine Konsolenfehler.)
+- ☑ A2 Kein grauer Streifen online; die Kopie liegt in IndexedDB (`ff-offline`, `snapshots`,
+  `test:<konto-id>`), die Sitzung in `localStorage['ff-session:test']`. (31.10.2026: Datenbank
+  Version 2 mit `queue` und `snapshots`, Kopie `test:4`; die Version 2 entstand durch die
+  Selbstheilung nach meiner Diagnose, siehe Nachtarbeit-Datei.)
 
 ## B Offline am iPhone (Holger)
 - ☐ B1 Flugmodus an, App öffnen bzw. neu laden: grauer Streifen „Offline – angezeigt wird der Stand
