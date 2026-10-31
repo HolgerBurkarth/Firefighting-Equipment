@@ -104,7 +104,11 @@ const STATE_BADGES = {
                     :data-testid="`tenant-${tenant.slug}`"
                 >
                     <td class="col-name">
-                        <span class="tenant-name">{{ tenant.name }}</span>
+                        <RouterLink
+                            class="tenant-name"
+                            :to="{ name: 'tenant', params: { id: String(tenant.id) } }"
+                            >{{ tenant.name }}</RouterLink
+                        >
                     </td>
                     <td class="col-address">{{ tenantPath(tenant.slug) }}</td>
                     <td class="col-status">
@@ -198,7 +202,14 @@ const STATE_BADGES = {
 .tenant-name {
     color: var(--text);
     font-weight: var(--font-weight-bold);
+    text-decoration: none;
     overflow-wrap: anywhere;
+}
+
+/* Der Name öffnet das Stadtdetail (Entscheidung 44). */
+.tenant-name:hover {
+    color: var(--line);
+    text-decoration: underline;
 }
 
 .row-inactive .tenant-name {

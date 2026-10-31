@@ -64,8 +64,13 @@ test.describe('Super-Admin', () => {
         await expect(duerrheim).toContainText('Einladung offen');
         await expect(duerrheim).toContainText('(1 eingeladen)');
         await expect(page.getByTestId('tenant-immendingen')).toContainText('aktiv');
-        // Kein Link in eine Stadt (Entscheidung 47).
-        await expect(table.locator('a')).toHaveCount(0);
+        // Links nur zum Stadtdetail des Super-Admins, nie in eine Stadt (Entscheidung 47).
+        await expect(table.locator('a')).toHaveCount(3);
+        for (const href of await table
+            .locator('a')
+            .evaluateAll((links) => links.map((link) => link.getAttribute('href')))) {
+            expect(href).toMatch(/^\/firefighting\/service\/staedte\/\d+$/);
+        }
 
         await page.getByTestId('tile-tenants').click();
         await expect(page).toHaveURL(/\/firefighting\/service\/staedte$/);
@@ -403,6 +408,158 @@ test.describe('Neue Stadt', () => {
         await expect(page.getByTestId('created-notice')).toContainText('„Neustadt“ ist angelegt.');
         await expect(page.getByTestId('tile-invitations')).toContainText('2');
         await expect(page.getByTestId('invitation-101')).toContainText('a@neustadt.de');
+    });
+});
+
+test.describe('Stadtdetail', () => {
+    let server: ServiceServer = serviceServer();
+    test.use({
+        api: { 'GET api/v1/auth/me': ME, ...delegate(() => server.handlers) },
+    });
+
+    test.beforeEach(() => {
+        server = serviceServer();
+    });
+
+    test('aus der Liste: Angaben, Konten nur ansehen, Zurück', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await page.goto('/firefighting/service/staedte');
+        await page.getByRole('link', { name: 'Test-Feuerwehr' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/service\/staedte\/2$/);
+        await expect(page.getByRole('heading', { level: 1, name: 'Test-Feuerwehr' })).toBeVisible();
+        await expect(menu(page).getByRole('link', { name: 'Städte' })).toHaveClass(
+            /menu-link-active/,
+        );
+        const facts = page.getByTestId('tenant-facts');
+        await expect(facts).toContainText('www.prodad.de/firefighting/test/');
+        await expect(facts).toContainText('2 aktiv');
+        await expect(facts).toContainText('13 aktive Konten');
+        // Keine Links in die Stadt (Entscheidung 47).
+        await expect(facts.locator('a')).toHaveCount(0);
+
+        await expect(page.getByTestId('account-23')).toContainText('wartet auf Freischaltung');
+        await expect(page.getByTestId('account-21')).toContainText('Admin');
+        await expect(page.getByRole('button', { name: /erneut senden/ })).toHaveCount(0);
+        await page.getByRole('searchbox', { name: 'Konten filtern' }).fill('anna@');
+        await expect(page.locator('.user')).toHaveCount(1);
+
+        await page.getByRole('button', { name: 'Zurück' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/service\/staedte$/);
+    });
+
+    test('umbenennen: Kürzel bleibt, leerer Name geht nicht', async ({ page, apiRequests }) => {
+        await page.goto('/firefighting/service/staedte/2');
+        await page.getByRole('button', { name: 'Umbenennen …' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Test-Feuerwehr umbenennen' });
+        const field = dialog.getByLabel('Name der Stadt');
+        await expect(field).toHaveValue('Test-Feuerwehr');
+        await field.fill('  ');
+        await expect(dialog.getByText('Bitte den Namen der Stadt eingeben.')).toBeVisible();
+        await field.fill(' Feuerwehr Test ');
+        await dialog.getByRole('button', { name: 'Speichern' }).click();
+        await expect(dialog).toBeHidden();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            '„Test-Feuerwehr“ heißt jetzt „Feuerwehr Test“.',
+        );
+        await expect(page.getByRole('heading', { level: 1, name: 'Feuerwehr Test' })).toBeVisible();
+        await expect(page.getByTestId('tenant-facts')).toContainText('firefighting/test/');
+        expect(apiRequests.filter((r) => r.method === 'POST').map((r) => [r.path, r.body])).toEqual(
+            [['api/v1/tenants/2/rename', { name: 'Feuerwehr Test' }]],
+        );
+    });
+
+    test('sperren und entsperren mit Rückfrage', async ({ page, apiRequests }) => {
+        await page.goto('/firefighting/service/staedte/2');
+        await page.getByRole('button', { name: 'Test-Feuerwehr sperren …' }).click();
+        const confirm = page.getByTestId('confirm-dialog');
+        await expect(confirm).toContainText('Test-Feuerwehr sperren?');
+        await expect(confirm).toContainText('sofort abgemeldet');
+        // Standard ist „Abbrechen“: nichts gesendet.
+        await confirm.getByRole('button', { name: 'Abbrechen' }).click();
+        expect(apiRequests.filter((r) => r.method === 'POST')).toEqual([]);
+
+        await page.getByRole('button', { name: 'Test-Feuerwehr sperren …' }).click();
+        await confirm.getByRole('button', { name: 'Sperren' }).click();
+        await expect(page.getByTestId('success-notice')).toContainText('ist gesperrt');
+        await expect(page.locator('.title .badge')).toContainText('gesperrt');
+        await expect(page.getByRole('button', { name: 'Admin einladen …' })).toBeDisabled();
+
+        await page.getByRole('button', { name: 'Test-Feuerwehr entsperren …' }).click();
+        await confirm.getByRole('button', { name: 'Entsperren' }).click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            '„Test-Feuerwehr“ ist wieder entsperrt.',
+        );
+        expect(apiRequests.filter((r) => r.method === 'POST').map((r) => r.path)).toEqual([
+            'api/v1/tenants/2/lock',
+            'api/v1/tenants/2/unlock',
+        ]);
+    });
+
+    test('Admin einladen, dann erneut senden', async ({ page }) => {
+        await page.goto('/firefighting/service/staedte/2');
+        await page.getByRole('button', { name: 'Admin einladen …' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Admin einladen' });
+        await dialog.getByLabel('E-Mail-Adresse').fill('neu@');
+        await expect(dialog.getByText(/vollständige E-Mail-Adresse/)).toBeVisible();
+        await dialog.getByLabel('E-Mail-Adresse').fill('Neu@Example.org');
+        await dialog.getByRole('button', { name: 'Einladen' }).click();
+        await expect(dialog).toBeHidden();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Einladung an neu@example.org gesendet (Link 24 Stunden gültig).',
+        );
+        const invited = page.getByTestId('account-100');
+        await expect(invited).toContainText('eingeladen');
+        await expect(page.getByTestId('tenant-facts')).toContainText('1 eingeladen');
+
+        server.mailSent = false;
+        await invited
+            .getByRole('button', { name: 'Einladung an neu@example.org erneut senden' })
+            .click();
+        await expect(page.getByRole('alert')).toContainText('konnte nicht gesendet werden');
+    });
+
+    test.describe('Fehler', () => {
+        test.use({ allowedConsoleError: HTTP_ERROR_CONSOLE });
+
+        test('Adresse schon vergeben: Meldung am Feld', async ({ page }) => {
+            await page.goto('/firefighting/service/staedte/2');
+            await page.getByRole('button', { name: 'Admin einladen …' }).click();
+            const dialog = page.getByRole('dialog', { name: 'Admin einladen' });
+            await dialog.getByLabel('E-Mail-Adresse').fill('anna@example.org');
+            await dialog.getByRole('button', { name: 'Einladen' }).click();
+            await expect(
+                dialog.getByText('Diese Adresse hat in der Stadt schon ein Konto.'),
+            ).toBeVisible();
+            await expect(dialog.getByLabel('E-Mail-Adresse')).toHaveAttribute(
+                'aria-invalid',
+                'true',
+            );
+        });
+
+        test('unbekannte Stadt', async ({ page }) => {
+            await page.goto('/firefighting/service/staedte/100');
+            await expect(page.getByText('Diese Stadt gibt es nicht.')).toBeVisible();
+        });
+    });
+
+    test('offene Einladung im Detail erneut senden', async ({ page, apiRequests }) => {
+        await page.goto('/firefighting/service/staedte/3');
+        await page
+            .getByRole('button', { name: 'Einladung an kommandant@bad-duerrheim.de erneut senden' })
+            .click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Einladung an kommandant@bad-duerrheim.de gesendet (Link 24 Stunden gültig).',
+        );
+        expect(apiRequests.filter((r) => r.method === 'POST').map((r) => r.path)).toEqual([
+            'api/v1/tenants/3/users/31/resend-invitation',
+        ]);
+    });
+
+    test('Handy: kein waagerechter Überstand', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto('/firefighting/service/staedte/2');
+        await expect(page.getByTestId('account-21')).toBeVisible();
+        expect(await horizontalOverflow(page)).toBe(0);
     });
 });
 

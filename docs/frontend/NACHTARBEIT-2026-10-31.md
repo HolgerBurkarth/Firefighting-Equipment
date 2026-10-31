@@ -81,6 +81,13 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
 - 31.10. S2 „Neue Stadt“: Commit „Super-Admin S2: Neue Stadt mit Kürzel-Vorschlag und Prüfung“.
   Lokal: Lint, Typprüfung, Unit-Tests, `superAdmin.spec.ts` alle fünf Profile grün. Schreibend live
   nicht geprüft (nur Test-Stadt erlaubt) → `LIVETEST-SUPER-ADMIN.md`.
+  CI (Korrektur + S2) 5:24 grün, Deploy ok, Build `1e0bc9a58faa`, Health ok. Live: ☑ „Neue Stadt“
+  Prüfung beim Tippen („Feuerwehr Test“ → `test` vergeben, „… Probe Süd“ → `test-probe-sued` frei),
+  abgebrochen ohne Anlegen; ☑ keine Konsolenfehler. Korrektur Updates: Der Fund trat beim Wechsel
+  auf diese Version noch einmal auf (der alte Code lief noch); wirksam erst ab dem nächsten Deploy.
+- 31.10. S3 Stadtdetail: Commit „Super-Admin S3: Stadtdetail mit Umbenennen, Sperren und
+  Einladungen“. Lokal: Lint, Typprüfung, 1108 Unit-Tests, `superAdmin.spec.ts` alle fünf Profile
+  (120) grün.
 
 # Zur Prüfung durch Holger
 

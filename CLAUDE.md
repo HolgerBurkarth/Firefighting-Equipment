@@ -943,7 +943,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `suggestSlug` des Namens, bis von Hand geändert), E-Mail; Prüfung beim Tippen, dann nach
   `SLUG_CHECK_DELAY_MS` (300 ms) `GET tenants/slug-available` (nur gültige Kürzel, ältere Antworten
   verworfen; Fehler der Vorabprüfung nur als Hinweis); `createTenant` → Meldung `createdTenantText`
-  (grün bzw. rot, wenn `mail_sent` false), 409 `slug_taken` am Feld.
+  (grün bzw. rot, wenn `mail_sent` false), 409 `slug_taken` am Feld. Der Name in `TenantTable` führt
+  zum Stadtdetail `staedte/<id>` (`TenantDetailPage`, Route `tenant`, `<id>` wie die Platzhalter im
+  Backend; Menü „Städte“ mit `sections: ['tenant']`): zuerst aus `tenantList`, dann `GET
+  tenants/{id}` (404 „Diese Stadt gibt es nicht.“) und `GET tenants/{id}/users` (nur ansehen, Suche
+  `tenantUserRows`); „Umbenennen …“ und „Admin einladen …“ (`FormDialog`; 400 bzw. 409 `email_taken`
+  am Feld; gesperrte Stadt: Knopf gesperrt), „<Name> sperren …“/„entsperren …“ mit `ConfirmDialog`;
+  eingeladene, nicht gesperrte Konten mit „Einladung erneut senden“ (`invitationText`).
   `einstellungen` (`ServiceSettingsPage`, Route `settings` wie unter Städten): Anzeigemodus,
   `NotificationSetting` mit `all-tenants`, Passwort, angemeldete Geräte; kein Erscheinungsbild.
   Keine Links in eine Stadt. Browser-Tests `tests/e2e/superAdmin.spec.ts` (Hilfen `tenantJson`,

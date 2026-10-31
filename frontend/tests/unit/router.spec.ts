@@ -151,6 +151,7 @@ describe('Wächter', () => {
 
     it.each([
         ['/staedte', 'tenants'],
+        ['/staedte/7', 'tenant'],
         ['/einstellungen', 'settings'],
     ] as const)('Seite %s nur für Super-Admins unter service', async (path, name) => {
         setSession(state('superadmin'));
@@ -163,6 +164,9 @@ describe('Wächter', () => {
     it('Seiten des Super-Admins gibt es unter einer Stadt nicht', async () => {
         setSession(state('admin'));
         expect((await routerAt('/staedte')).currentRoute.value.name).toBe('not-found');
+        expect((await routerAt('/staedte/7')).currentRoute.value.name).toBe('not-found');
+        setSession(state('superadmin'));
+        expect((await routerAt('/staedte/07', SERVICE)).currentRoute.value.name).toBe('not-found');
     });
 
     it('jeder Eintrag im Menü des Super-Admins hat eine Seite unter service', async () => {
