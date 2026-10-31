@@ -74,11 +74,24 @@ if (preg_match('#^/firefighting/[a-z0-9-]+/(api/.*|manifest\.webmanifest)$#', $p
 
 /*
  * Inhalt der Schaltdatei: `next` = alles aus der neuen Version; `build-json` = nur build.json (die
- * App erkennt die neue Version, der Browser findet aber keinen neuen Service Worker).
+ * App erkennt die neue Version, der Browser findet aber keinen neuen Service Worker); `next-held` =
+ * neue Version, aber die Installation des Service Workers hängt (live: viele Dateien über eine
+ * langsame Verbindung): Die Anfrage nach index.html mit `__WB_REVISION__` (nur der Service Worker
+ * stellt sie beim Vorab-Laden) wartet, bis der Test auf `next` umstellt, höchstens 20 s.
  */
 $stateFile = $frontend . '/test-builds/state/' . $area;
-$state = $area !== '' && is_file($stateFile) ? trim((string) file_get_contents($stateFile)) : '';
-$next = $state === 'next'
+$readState = static function () use ($area, $stateFile): string {
+    clearstatcache(true, $stateFile);
+    return $area !== '' && is_file($stateFile) ? trim((string) file_get_contents($stateFile)) : '';
+};
+$state = $readState();
+if ($state === 'next-held' && str_contains(is_string($uri) ? $uri : '', '__WB_REVISION__')) {
+    $until = microtime(true) + 20;
+    while ($readState() === 'next-held' && microtime(true) < $until) {
+        usleep(50_000);
+    }
+}
+$next = $state === 'next' || $state === 'next-held'
     || ($state === 'build-json' && str_ends_with($path, '/' . FrontendAssets::BUILD_INFO_FILE));
 $directory = $next ? $frontend . '/test-builds/next' : FrontendAssets::defaultDirectory();
 

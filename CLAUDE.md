@@ -968,7 +968,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   installierte Version unter einem Service Worker fragt `build.json` NICHT (die Anfrage liefe über den
   alten Service Worker; aktiviert ein anderer Tab gerade die neue Version, hält Chrome die Aktivierung
   an). Beim Aktualisieren (`apply`) fragt die App den Service Worker (`update()`, bei Bedarf die Suche
-  wie oben), wartet auf die Installation (`ACTIVATION_TIMEOUT_MS`), sendet `SKIP_WAITING` und lädt NUR
+  wie oben), wartet auf die Installation (beim Seitenwechsel höchstens `ACTIVATION_TIMEOUT_MS` = 5 s;
+  beim Start und vor „nicht gefunden“ bis zur Frist `START_LOAD_TIMEOUT_MS` = Summe von
+  `START_RETRY_DELAYS_MS` ab Beginn, für Suche und Installation zusammen, mindestens 5 s; endet die
+  Installation früher, sofort weiter; live dauerte sie länger als 5 s, der Start gab nach rund 6 s
+  auf, 31.10.2026; Browser-Test mit hängender Installation: Schaltdatei `next-held` des
+  Update-Testservers hält die Anfrage nach `index.html?__WB_REVISION__=…`, bis der Test auf `next`
+  umstellt), sendet `SKIP_WAITING` und lädt NUR
   nach der Übernahme (`controllerchange`, höchstens `TAKEOVER_TIMEOUT_MS`) neu; bleibt sie aus
   (Chrome hält die Aktivierung an, wenn der alte Service Worker beim Wechsel eine Anfrage bekommt),
   meldet sie den Service Worker ab und lädt dann neu (Seite vom Server). Ohne neue Version oder wenn
@@ -1043,7 +1049,7 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   neuen Service Worker übernommen (nur Chromium: `Page.reload` mit `ignoreCache` über CDP), zwei Tabs
   (einer aktualisiert, der andere folgt; einer geschlossen), Mail-Link mit alter Version, „Seite nicht
   gefunden“, Zurück-Knopf nach erkannter neuer Version, neue Kennung ohne neuen Service Worker (nach
-  rund 30 s „Neu laden“). Firefox meldet einen Schrift-Download, den das
+  rund 30 s „Neu laden“), Installation beim Start länger als 5 s (`next-held`). Firefox meldet einen Schrift-Download, den das
   Neuladen abbricht (Status 2152398850 = `NS_BINDING_ABORTED`), als Konsolenfehler; nur diesen lässt
   der Mail-Link-Test zu. Sporadische Fehler der Update-Logik nie mit längeren Wartezeiten
   überdecken: unter Last wiederholen (`npm run test:load -- [Datei] [--project=…] [--runs=N]`,

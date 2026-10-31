@@ -374,6 +374,52 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         await expect(page.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
     });
 
+    test('neuer Service Worker installiert langsam: Start wartet und aktiviert ihn sofort danach', async ({
+        page,
+    }, testInfo) => {
+        const area = newArea(testInfo.project.name);
+        await openOldVersion(page, area);
+        // Wie live (31.10.2026): Der Start erkennt die neue Version, ihr Service Worker braucht für
+        // die Installation aber länger als die Frist eines Seitenwechsels (ACTIVATION_TIMEOUT_MS).
+        // Zuerst nur build.json neu, damit der Start sucht; dann hängt die Installation, bis der
+        // Test sie freigibt (update-server.php, `next-held`).
+        writeFileSync(join(STATE, area), 'build-json');
+        await page.clock.install();
+        await page.reload();
+        await expect(page.getByTestId('update-loading')).toBeVisible();
+        writeFileSync(join(STATE, area), 'next-held');
+        const installing = (): Promise<boolean> =>
+            page.evaluate(async () => {
+                const registration = await navigator.serviceWorker.getRegistration();
+                return registration?.installing !== null && registration?.installing !== undefined;
+            });
+        // Die Suche fragt nach ihren Pausen erneut (update() in Echtzeit), bis der Browser den neuen
+        // Service Worker installiert.
+        await expect
+            .poll(
+                async () => {
+                    await page.clock.runFor(500);
+                    return installing();
+                },
+                { intervals: [50], timeout: 20_000 },
+            )
+            .toBe(true);
+        // Mehr als die Frist eines Seitenwechsels vergeht, die Installation hängt noch.
+        for (let second = 0; second < 8; second += 1) {
+            await page.clock.runFor(1000);
+        }
+        expect(await installing()).toBe(true);
+        await expect(page.getByTestId('update-reload-needed')).toBeHidden();
+        await expect(page.getByTestId('update-loading')).toBeVisible();
+
+        // Installation fertig: Die App aktiviert die neue Version sofort und lädt sie.
+        writeFileSync(join(STATE, area), 'next');
+        await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(page).toHaveURL(`/firefighting/${area}/anmelden`);
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        await expect(page.getByTestId('update-reload-needed')).toBeHidden();
+    });
+
     test('„Seite nicht gefunden“ prüft zuerst auf eine neue Version', async ({
         page,
     }, testInfo) => {
