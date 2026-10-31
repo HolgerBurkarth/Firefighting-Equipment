@@ -1137,6 +1137,19 @@ describe('Zeitleiste der Updates (sessionStorage)', () => {
         expect(s.storage.getItem(UPDATE_TRACE_KEY)).not.toContain('https://');
     });
 
+    it('Start ohne Verbindung: Eintrag „offline“ (sonst bliebe unklar, warum nicht geprüft wurde)', async () => {
+        const s = setup();
+        s.online = false;
+        expect(await s.updater.checkOnStart('https://x/firefighting/test/a')).toBe(false);
+        expect(trace(s).map((entry) => entry.event)).toEqual([
+            'register',
+            'start',
+            'registered',
+            'offline',
+        ]);
+        expect(s.buildFetches).toBe(0);
+    });
+
     it('höchstens UPDATE_TRACE_MAX Einträge, die ältesten fallen weg', () => {
         const storage = new MemoryStorage();
         const updateTrace = new UpdateTrace(storage, () => 0);

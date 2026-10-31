@@ -282,6 +282,7 @@ export class AppUpdater {
         await this.withTimeout(registered);
         this.trace.record('registered', this.workerSummary(this.registration));
         if (!this.env.isOnline()) {
+            this.trace.record('offline');
             return false;
         }
         if (this.env.container.controller === null) {

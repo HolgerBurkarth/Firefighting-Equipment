@@ -225,7 +225,8 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   Neuladen. In der Konsole der Entwicklerwerkzeuge (Reiter „Konsole“, auf einer Seite der Stadt):
   `JSON.parse(sessionStorage['ff-update-trace'])`. Je Eintrag Zeit (`at`, UTC), Ereignis
   (`event`, z. B. `start`, `build`, `update`, `skip-waiting`, `controllerchange`, `unregister`,
-  `reload`, `reload-needed`) und Einzelheit (`detail`, z. B. `build=b6a25b03573c` oder
+  `reload`, `reload-needed`, `offline` beim Start ohne Verbindung) und Einzelheit (`detail`, z. B.
+  `build=b6a25b03573c` oder
   `controlled, waiting`). Nur feste Ereignisse und Build-Kennungen, keine Adressen und keine
   persönlichen Daten.
 - Ist ein Formular angefangen (z. B. Umbuchung, Registrierung), erscheint oben der Hinweis „Neue
