@@ -209,7 +209,8 @@ vollständig sind.
 56. **Scanner offline:** Das Lesemodul (WASM) kommt in den Cache des Service Workers.
 
 Stand (31.10.2026, Nacht): O1 umgesetzt und live (lokale Kopie, gespeicherte Sitzung, grauer
-Streifen, Lesemodul im Cache). O2 umgesetzt: Warteschlange, Ergebnis, Grenzen, Warnung beim Abmelden.
+Streifen, Lesemodul im Cache). O2 umgesetzt und live (online geprüft): Warteschlange, Ergebnis,
+Grenzen, Warnung beim Abmelden. O3: echtes Offline prüft Holger nach `LIVETEST-OFFLINE.md`.
 Vorläufig (Agent, Nacht 31.10.): `client-config` liest die App nur, wenn eine Buchung wartet (sonst
 gelten die zuletzt gelesenen bzw. 7 Tage); scheitert „Speichern“ online an der Verbindung, kommt die
 Buchung mit neuer `client_ref` in die Warteschlange (kam die erste doch an, ergibt die zweite

@@ -454,3 +454,47 @@ test.describe('Offline-Modus: Buchungen in der Warteschlange', () => {
         await expect.poll(() => storedDeviceIds(page)).toEqual([1, 2, 3]);
     });
 });
+
+test.describe('Offline-Modus: Browser meldet offline', () => {
+    const state: { mode: 'online' | 'offline' | 'expired' } = { mode: 'online' };
+    test.use({
+        api: {
+            ...switchable(state),
+            'GET api/v1/client-config': CLIENT_CONFIG,
+            'POST api/v1/devices/1/state': (request) =>
+                state.mode === 'offline' ? 'abort' : bookedResponse(request),
+        },
+        allowedConsoleError: NETWORK_ERROR_CONSOLE,
+    });
+
+    test.beforeEach(() => {
+        state.mode = 'online';
+    });
+
+    test('Streifen sofort, Buchung ohne Sendeversuch in die Warteschlange, bei online gesendet', async ({
+        page,
+        context,
+        apiRequests,
+    }) => {
+        await page.goto('/firefighting/test/suchen');
+        await expect.poll(() => storedDeviceIds(page)).toEqual([1, 2, 3]);
+        await page.getByRole('searchbox').fill('M1');
+        await page.getByTestId('device-card').click();
+        await expect(page.getByText('Jetzt: HLF 20 / G1 · einsatzbereit')).toBeVisible();
+
+        state.mode = 'offline';
+        await context.setOffline(true);
+        await expect(page.getByTestId('offline-notice')).toContainText('Offline – angezeigt');
+        await page.getByRole('button', { name: 'in Wartung', exact: true }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
+        await expect(page.getByTestId('queued-waiting')).toContainText('M1 → in Wartung');
+        expect(apiRequests.filter((r) => r.path === 'api/v1/devices/1/state')).toHaveLength(0);
+
+        state.mode = 'online';
+        await context.setOffline(false);
+        await expect(page.getByTestId('queued-done')).toBeVisible();
+        await expect(page.getByTestId('offline-notice')).toBeHidden();
+        expect(apiRequests.filter((r) => r.path === 'api/v1/devices/1/state')).toHaveLength(1);
+    });
+});
