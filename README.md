@@ -226,7 +226,9 @@ Ablauf (nur unter einer Stadt):
    `{"label":"Dienstabend März","valid_days":14,"max_uses":25}`; `label` optional, `valid_days`
    1–90, `max_uses` 1–500). Den Code (`XXXX-XXXX-XXXX`) gibt es nur in dieser Antwort; gespeichert
    wird nur sein Hash. Die Liste zeigt Status (`active`, `expired`, `exhausted`, `revoked`),
-   Nutzungen und Ersteller; `…/revoke` widerruft einen Code.
+   Nutzungen und Ersteller; `…/revoke` widerruft einen Code. In der App: Admin-Konsole, „Benutzer“,
+   Reiter „Einladungscodes“ (`benutzer?ansicht=einladungscodes`) mit QR-Code, „Link teilen“ und
+   „Aushang drucken“ (A4 über die Druckfunktion des Browsers).
 2. Die neue Person registriert sich: `POST api/v1/auth/register` mit
    `{"code":"…","email":"…","password":"…","name":"…"}`. Beim Code zählen Groß-/Kleinschreibung,
    Leerzeichen und Bindestriche nicht. Das Konto ist danach `unverified`, die Person bekommt einen
@@ -1238,6 +1240,9 @@ Kamera-Scanner („Code scannen“ auf „Suchen“): Bibliothek `zxing-wasm` (n
 WebAssembly-Datei (`assets/zxing_reader-<hash>.wasm`, rund 950 KB, mit Brotli rund 320 KB) lädt erst
 beim ersten Öffnen des Scanners, vom eigenen Server (nie vom CDN); dafür erlaubt die CSP
 `script-src 'wasm-unsafe-eval'`. Die Kamera braucht HTTPS (lokal genügt `localhost`).
+
+QR-Code der Einladungscodes (Benutzerverwaltung, Aushang): Bibliothek `uqr` (MIT, ohne weitere
+Abhängigkeiten) berechnet nur das Raster, die App zeichnet es als SVG; die CSP bleibt unverändert.
 
 ```
 cd frontend

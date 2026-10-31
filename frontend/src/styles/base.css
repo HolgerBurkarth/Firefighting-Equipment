@@ -358,3 +358,32 @@ h2 {
     color: var(--text);
     text-decoration: underline;
 }
+
+/*
+ * Aushang eines Einladungscodes (InvitationPoster, Teleport nach body): auf dem Bildschirm
+ * unsichtbar. Solange er auf der Seite steht (Klasse am <html>), druckt die Seite nur ihn; die App
+ * und offene Fenster bleiben beim Drucken weg.
+ */
+.print-poster {
+    display: none;
+}
+
+@media print {
+    html.has-print-poster body > :not(.print-poster) {
+        display: none !important;
+    }
+
+    html.has-print-poster body {
+        min-height: 0;
+        background: var(--paper);
+    }
+
+    html.has-print-poster .print-poster {
+        display: flex;
+    }
+
+    @page {
+        size: A4 portrait;
+        margin: 12mm;
+    }
+}

@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
 import { computed, onMounted, ref, useId } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import type { ApiError, ApiResult } from '../api/client';
 import type { AdminUser, ManagedRole } from '../api/users';
 import { session } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
+import InvitationCodesPanel from '../components/InvitationCodesPanel.vue';
 import { approveUser, deleteUser, rejectUser, saveUser, setUserLocked, userStore } from '../data';
 import { phpTrim } from '../data/masterData';
 import {
@@ -28,9 +31,26 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
  * wartenden Registrierungen mit „Freischalten“ (Anzeigename und Rolle) und „Ablehnen“, darunter alle
  * Konten der Stadt, sortierbar wie im Explorer (am Handy Karten mit Sortier-Knöpfen). Der Stift
  * öffnet Anzeigename und Rolle, abseits Sperren/Entsperren und Löschen (= anonymisieren). Das eigene
- * Konto lässt sich nicht sperren, herabstufen oder löschen; alle Regeln prüft der Server.
+ * Konto lässt sich nicht sperren, herabstufen oder löschen; alle Regeln prüft der Server. Zweiter
+ * Reiter „Einladungscodes“ (`?ansicht=einladungscodes`, InvitationCodesPanel).
  */
 const id = useId();
+const route = useRoute();
+const router = useRouter();
+
+type Tab = 'accounts' | 'codes';
+const CODES_VIEW = 'einladungscodes';
+/** Reiter in der Adresse (Neuladen und Zurück behalten ihn; gleicher Pfad, kein Update). */
+const tab = computed<Tab>({
+    get: () => (route.query['ansicht'] === CODES_VIEW ? 'codes' : 'accounts'),
+    set: (value) => {
+        void router.replace({ query: value === 'codes' ? { ansicht: CODES_VIEW } : {} });
+    },
+});
+
+function selectTab(value: string | number): void {
+    tab.value = value === 'codes' ? 'codes' : 'accounts';
+}
 const state = computed(() => userStore.state);
 const users = computed(() => state.value.users ?? []);
 const ownId = computed(() => session.value?.user.id ?? null);
@@ -291,197 +311,215 @@ onMounted(() => {
         <h1>Benutzer</h1>
     </div>
 
-    <p
-        v-if="success !== null"
-        class="notice notice-success"
-        role="status"
-        data-testid="success-notice"
-    >
-        {{ success }}
-    </p>
-    <ErrorNotice v-if="pageError !== null" :error="pageError" />
-
-    <ErrorNotice v-if="state.error !== null" :error="state.error">
-        <button class="btn retry" type="button" :disabled="state.loading" @click="retry">
-            Erneut versuchen
-        </button>
-    </ErrorNotice>
-
-    <p v-if="state.users === null && state.error === null" class="hint" role="status">
-        Wird geladen …
-    </p>
-
-    <section
-        v-if="pending.length > 0"
-        class="pending"
-        aria-labelledby="pending-heading"
-        data-testid="pending"
-    >
-        <h2 id="pending-heading">{{ pendingText(pending.length) }}</h2>
-        <ul class="pending-list">
-            <li
-                v-for="user in pending"
-                :key="user.id"
-                class="pending-card"
-                :data-testid="`pending-${String(user.id)}`"
-            >
-                <div class="pending-text">
-                    <strong class="user-name">{{ user.label }}</strong>
-                    <span class="user-email">{{ user.email }}</span>
-                    <span class="hint">Registriert am {{ createdText(user) }}</span>
-                </div>
-                <div class="pending-actions">
-                    <button
-                        class="btn btn-accent"
-                        type="button"
-                        :disabled="busy"
-                        :aria-label="`${user.label} freischalten`"
-                        @click="openDialog(user, 'approve', $event)"
-                    >
-                        Freischalten …
-                    </button>
-                    <button
-                        class="btn"
-                        type="button"
-                        :disabled="busy"
-                        :aria-label="`Registrierung von ${user.label} ablehnen`"
-                        @click="ask('reject', user, $event)"
-                    >
-                        Ablehnen …
-                    </button>
-                </div>
-            </li>
-        </ul>
-    </section>
-
-    <div v-if="others > 0" class="toolbar">
-        <label class="filter-field">
-            <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
-            >
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-4-4" />
-            </svg>
-            <span class="visually-hidden">Benutzer filtern</span>
-            <input v-model="query" type="search" placeholder="Name oder E-Mail" />
-        </label>
-        <div class="sort-buttons" role="group" aria-label="Sortieren">
-            <span class="sort-label" aria-hidden="true">Sortieren:</span>
-            <button
-                v-for="column in COLUMNS"
-                :key="column.key"
-                class="btn sort-button"
-                type="button"
-                :aria-pressed="sort === column.key"
-                @click="sortBy(column.key)"
-            >
-                {{ column.label }}
-                <span class="th-arrow" aria-hidden="true">{{
-                    sort === column.key ? (dir === 'asc' ? '▲' : '▼') : ''
+    <TabsRoot :model-value="tab" class="tabs-root" @update:model-value="selectTab">
+        <TabsList class="tabs" aria-label="Benutzerverwaltung">
+            <TabsTrigger class="tab" value="accounts">
+                Konten
+                <span v-if="pending.length > 0" class="badge badge-maintenance">{{
+                    pending.length
                 }}</span>
-            </button>
-        </div>
-    </div>
+            </TabsTrigger>
+            <TabsTrigger class="tab" value="codes">Einladungscodes</TabsTrigger>
+        </TabsList>
+        <TabsContent class="tab-panel" value="accounts">
+            <p
+                v-if="success !== null"
+                class="notice notice-success"
+                role="status"
+                data-testid="success-notice"
+            >
+                {{ success }}
+            </p>
+            <ErrorNotice v-if="pageError !== null" :error="pageError" />
 
-    <p v-if="state.users !== null && others > 0 && rows.length === 0" class="hint">
-        Kein Konto passt zu „{{ query.trim() }}“.
-    </p>
+            <ErrorNotice v-if="state.error !== null" :error="state.error">
+                <button class="btn retry" type="button" :disabled="state.loading" @click="retry">
+                    Erneut versuchen
+                </button>
+            </ErrorNotice>
 
-    <div v-if="rows.length > 0" class="table-card">
-        <table class="list-table" data-testid="user-table">
-            <thead>
-                <tr>
-                    <th
+            <p v-if="state.users === null && state.error === null" class="hint" role="status">
+                Wird geladen …
+            </p>
+
+            <section
+                v-if="pending.length > 0"
+                class="pending"
+                aria-labelledby="pending-heading"
+                data-testid="pending"
+            >
+                <h2 id="pending-heading">{{ pendingText(pending.length) }}</h2>
+                <ul class="pending-list">
+                    <li
+                        v-for="user in pending"
+                        :key="user.id"
+                        class="pending-card"
+                        :data-testid="`pending-${String(user.id)}`"
+                    >
+                        <div class="pending-text">
+                            <strong class="user-name">{{ user.label }}</strong>
+                            <span class="user-email">{{ user.email }}</span>
+                            <span class="hint">Registriert am {{ createdText(user) }}</span>
+                        </div>
+                        <div class="pending-actions">
+                            <button
+                                class="btn btn-accent"
+                                type="button"
+                                :disabled="busy"
+                                :aria-label="`${user.label} freischalten`"
+                                @click="openDialog(user, 'approve', $event)"
+                            >
+                                Freischalten …
+                            </button>
+                            <button
+                                class="btn"
+                                type="button"
+                                :disabled="busy"
+                                :aria-label="`Registrierung von ${user.label} ablehnen`"
+                                @click="ask('reject', user, $event)"
+                            >
+                                Ablehnen …
+                            </button>
+                        </div>
+                    </li>
+                </ul>
+            </section>
+
+            <div v-if="others > 0" class="toolbar">
+                <label class="filter-field">
+                    <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                    >
+                        <circle cx="11" cy="11" r="7" />
+                        <path d="M20 20l-4-4" />
+                    </svg>
+                    <span class="visually-hidden">Benutzer filtern</span>
+                    <input v-model="query" type="search" placeholder="Name oder E-Mail" />
+                </label>
+                <div class="sort-buttons" role="group" aria-label="Sortieren">
+                    <span class="sort-label" aria-hidden="true">Sortieren:</span>
+                    <button
                         v-for="column in COLUMNS"
                         :key="column.key"
-                        scope="col"
-                        :aria-sort="ariaSort(column.key)"
+                        class="btn sort-button"
+                        type="button"
+                        :aria-pressed="sort === column.key"
+                        @click="sortBy(column.key)"
                     >
-                        <button class="th" type="button" @click="sortBy(column.key)">
-                            {{ column.label }}
-                            <span class="th-arrow" aria-hidden="true">{{
-                                sort === column.key ? (dir === 'asc' ? '▲' : '▼') : ''
-                            }}</span>
-                        </button>
-                    </th>
-                    <th scope="col" class="col-actions">
-                        <span class="visually-hidden">Aktionen</span>
-                    </th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr
-                    v-for="user in rows"
-                    :key="user.id"
-                    :class="{ 'row-locked': user.locked }"
-                    :data-testid="`user-${String(user.id)}`"
-                >
-                    <td class="col-name">
-                        <div class="cell-name">
-                            <strong class="user-name">{{ user.label }}</strong>
-                            <span v-if="user.id === ownId" class="badge badge-ready">Sie</span>
-                        </div>
-                        <span v-if="nameHint(user) !== null" class="hint">{{
-                            nameHint(user)
+                        {{ column.label }}
+                        <span class="th-arrow" aria-hidden="true">{{
+                            sort === column.key ? (dir === 'asc' ? '▲' : '▼') : ''
                         }}</span>
-                    </td>
-                    <td class="col-email">{{ user.email }}</td>
-                    <td class="col-role">{{ user.roleLabel }}</td>
-                    <td class="col-status">
-                        <span
-                            class="status"
-                            :class="{
-                                'status-locked': user.locked,
-                                'status-open': !user.locked && user.status !== 'active',
-                            }"
-                            >{{ statusText(user) }}</span
-                        >
-                    </td>
-                    <td class="col-created">{{ createdText(user) }}</td>
-                    <td class="col-actions">
-                        <button
-                            v-if="user.status === 'unverified'"
-                            class="btn small-btn"
-                            type="button"
-                            :disabled="busy"
-                            :aria-label="`Registrierung von ${user.label} ablehnen`"
-                            title="Die E-Mail-Adresse ist noch nicht bestätigt. Ohne Bestätigung wird das Konto nach 7 Tagen gelöscht."
-                            @click="ask('reject', user, $event)"
-                        >
-                            Ablehnen …
-                        </button>
-                        <button
-                            v-else
-                            class="icon-btn"
-                            type="button"
-                            :aria-label="`${user.label} bearbeiten`"
-                            :title="`${user.label} bearbeiten`"
-                            @click="openDialog(user, 'edit', $event)"
-                        >
-                            <svg
-                                width="18"
-                                height="18"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                aria-hidden="true"
+                    </button>
+                </div>
+            </div>
+
+            <p v-if="state.users !== null && others > 0 && rows.length === 0" class="hint">
+                Kein Konto passt zu „{{ query.trim() }}“.
+            </p>
+
+            <div v-if="rows.length > 0" class="table-card">
+                <table class="list-table" data-testid="user-table">
+                    <thead>
+                        <tr>
+                            <th
+                                v-for="column in COLUMNS"
+                                :key="column.key"
+                                scope="col"
+                                :aria-sort="ariaSort(column.key)"
                             >
-                                <path d="M4 20h4L19 9l-4-4L4 16z" />
-                                <path d="M13.5 6.5l4 4" />
-                            </svg>
-                        </button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+                                <button class="th" type="button" @click="sortBy(column.key)">
+                                    {{ column.label }}
+                                    <span class="th-arrow" aria-hidden="true">{{
+                                        sort === column.key ? (dir === 'asc' ? '▲' : '▼') : ''
+                                    }}</span>
+                                </button>
+                            </th>
+                            <th scope="col" class="col-actions">
+                                <span class="visually-hidden">Aktionen</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="user in rows"
+                            :key="user.id"
+                            :class="{ 'row-locked': user.locked }"
+                            :data-testid="`user-${String(user.id)}`"
+                        >
+                            <td class="col-name">
+                                <div class="cell-name">
+                                    <strong class="user-name">{{ user.label }}</strong>
+                                    <span v-if="user.id === ownId" class="badge badge-ready"
+                                        >Sie</span
+                                    >
+                                </div>
+                                <span v-if="nameHint(user) !== null" class="hint">{{
+                                    nameHint(user)
+                                }}</span>
+                            </td>
+                            <td class="col-email">{{ user.email }}</td>
+                            <td class="col-role">{{ user.roleLabel }}</td>
+                            <td class="col-status">
+                                <span
+                                    class="status"
+                                    :class="{
+                                        'status-locked': user.locked,
+                                        'status-open': !user.locked && user.status !== 'active',
+                                    }"
+                                    >{{ statusText(user) }}</span
+                                >
+                            </td>
+                            <td class="col-created">{{ createdText(user) }}</td>
+                            <td class="col-actions">
+                                <button
+                                    v-if="user.status === 'unverified'"
+                                    class="btn small-btn"
+                                    type="button"
+                                    :disabled="busy"
+                                    :aria-label="`Registrierung von ${user.label} ablehnen`"
+                                    title="Die E-Mail-Adresse ist noch nicht bestätigt. Ohne Bestätigung wird das Konto nach 7 Tagen gelöscht."
+                                    @click="ask('reject', user, $event)"
+                                >
+                                    Ablehnen …
+                                </button>
+                                <button
+                                    v-else
+                                    class="icon-btn"
+                                    type="button"
+                                    :aria-label="`${user.label} bearbeiten`"
+                                    :title="`${user.label} bearbeiten`"
+                                    @click="openDialog(user, 'edit', $event)"
+                                >
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        aria-hidden="true"
+                                    >
+                                        <path d="M4 20h4L19 9l-4-4L4 16z" />
+                                        <path d="M13.5 6.5l4 4" />
+                                    </svg>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </TabsContent>
+        <TabsContent class="tab-panel" value="codes" :unmount-on-hide="false">
+            <InvitationCodesPanel :active="tab === 'codes'" />
+        </TabsContent>
+    </TabsRoot>
 
     <FormDialog
         v-model:open="dialogOpen"
@@ -562,6 +600,56 @@ onMounted(() => {
     margin: 0;
     color: var(--muted);
     font-size: var(--font-size-sm);
+}
+
+/* Reiter Konten und Einladungscodes (Reka UI Tabs: Pfeiltasten, aria-selected). */
+.tabs-root {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--touch-min);
+    margin-bottom: -1px;
+    padding: 0 16px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: none;
+    color: var(--text-secondary);
+    font: inherit;
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+}
+
+.tab:hover {
+    background: var(--nav-hover);
+    color: var(--text);
+}
+
+.tab[data-state='active'] {
+    border-bottom-color: var(--line);
+    color: var(--text);
+}
+
+.tab-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.tab-panel[hidden] {
+    display: none;
 }
 
 .retry {

@@ -27,6 +27,13 @@ import {
 } from '../api/deviceTypes';
 import { fetchInspectionOverview, type InspectionOverview } from '../api/inspections';
 import {
+    createInvitationCode as postInvitationCode,
+    revokeInvitationCode as postRevoke,
+    type CreatedInvitationCode,
+    type InvitationCode,
+    type NewInvitationCode,
+} from '../api/invitationCodes';
+import {
     createLocation,
     fetchAllLocations,
     renameLocation as postLocationName,
@@ -52,6 +59,7 @@ import { DeviceHistory } from './deviceHistory';
 import { DeviceStore } from './deviceStore';
 import { DeviceTypeStore } from './deviceTypeStore';
 import { INSPECTION_WINDOW_DAYS, SERVER_INSPECTION_LIMIT } from './inspections';
+import { InvitationCodeStore } from './invitationCodeStore';
 import { LocationStore } from './locationStore';
 import { UserStore } from './userStore';
 import { setBookingNotice } from './booking';
@@ -73,6 +81,8 @@ export const deviceTypeStore = new DeviceTypeStore();
 export const adminDeviceList = new AdminDeviceList();
 /** Benutzerverwaltung des Admins (Konten der Stadt ohne gelöschte). */
 export const userStore = new UserStore();
+/** Einladungscodes der Stadt (Benutzerverwaltung, Reiter „Einladungscodes“). */
+export const invitationCodeStore = new InvitationCodeStore();
 
 /**
  * Nach einer Änderung an Standorten oder Gerätetypen lädt die Verwaltung neu (abgewartet), andere
@@ -292,6 +302,29 @@ export async function deleteUser(id: number): Promise<ApiResult<AdminUser>> {
     return afterUserChange(await postDelete(id));
 }
 
+/**
+ * Neuer Einladungscode; danach lädt die Liste neu (abgewartet). Den Klartext liefert nur diese
+ * Antwort, die Seite zeigt ihn einmal.
+ */
+export async function createInvitationCode(
+    request: NewInvitationCode,
+): Promise<ApiResult<CreatedInvitationCode>> {
+    const result = await postInvitationCode(request);
+    if (result.ok) {
+        await invitationCodeStore.refresh('changed');
+    }
+    return result;
+}
+
+/** Code widerrufen (wiederholbar); danach, auch bei 404, lädt die Liste neu. */
+export async function revokeInvitationCode(id: number): Promise<ApiResult<InvitationCode>> {
+    const result = await postRevoke(id);
+    if (result.ok || result.error.code === 'not_found') {
+        await invitationCodeStore.refresh('changed');
+    }
+    return result;
+}
+
 /** Verlauf eines Geräts („Details und Verlauf“), je Ansicht neu. */
 export function deviceHistory(id: number): DeviceHistory {
     return new DeviceHistory(id);
@@ -352,6 +385,7 @@ export function installDataLayer(
         deviceTypeStore,
         adminDeviceList,
         userStore,
+        invitationCodeStore,
     ],
     storage = browserStorage(),
 ): () => void {

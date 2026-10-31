@@ -43,7 +43,7 @@ export function isId(value: unknown): value is number {
     return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }
 
-function isCount(value: unknown): value is number {
+export function isCount(value: unknown): value is number {
     return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
