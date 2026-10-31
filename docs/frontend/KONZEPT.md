@@ -58,6 +58,7 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 | `dashboard` | Stadt und `service` | Startseite der Admin-Konsole bzw. des Super-Admins |
 | `staedte` | nur `service` | Städte des Super-Admins (Entscheidung 42) |
 | `staedte/<id>` | nur `service` | Stadtdetail des Super-Admins (Entscheidung 44) |
+| `super-admins` | nur `service` | Super-Admins sperren und entsperren (Entscheidung 45) |
 | `einstellungen` | Stadt und `service` | Einstellungen des Admins bzw. des Super-Admins (Entscheidung 46) |
 
 `/` ist nur eine Weiche: ohne Sitzung zur Anmeldung, sonst zur Startseite der Rolle.
@@ -610,7 +611,8 @@ Stand (31.10.2026, Nacht): S1 umgesetzt und live geprüft (lesend): Menü, Dashb
 Einladungen mit „Erneut senden“, Städte), `staedte` mit Suche und Sortierung (am Handy Karten),
 Einstellungen. S2 umgesetzt und live geprüft (nur Prüfung beim Tippen, ohne Anlegen): „Neue Stadt“ auf
 Dashboard und Städte-Liste. S3 umgesetzt: Stadtdetail `staedte/<id>` (der Name in der Liste führt
-hin).
+hin). S4 umgesetzt: `super-admins`. S5: schreibende Prüfungen für Holger in
+`LIVETEST-SUPER-ADMIN.md`.
 
 ## User am Handy
 Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Live-Tests stehen in

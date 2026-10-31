@@ -88,6 +88,12 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
 - 31.10. S3 Stadtdetail: Commit „Super-Admin S3: Stadtdetail mit Umbenennen, Sperren und
   Einladungen“. Lokal: Lint, Typprüfung, 1108 Unit-Tests, `superAdmin.spec.ts` alle fünf Profile
   (120) grün.
+  CI 6:29 grün, Deploy ok, Build `d4a4bcdc0ca8`, Health ok. Live: ☑ Stadtdetail Test-Stadt (lesend),
+  ☑ Korrektur Updates: Tab mit der Vorversion → `registration-late` nach 4,2 s → neue Version ohne
+  „konnte nicht geladen werden“.
+- 31.10. S4 Super-Admins und Live-Test-Liste: Commit „Super-Admin S4: Super-Admins sperren und
+  entsperren; Live-Test-Liste“. Lokal: Lint, Typprüfung, 1109 Unit-Tests, `superAdmin.spec.ts` alle
+  fünf Profile (140) grün.
 
 # Zur Prüfung durch Holger
 

@@ -329,3 +329,35 @@ export function serviceServer(): ServiceServer {
     }
     return server;
 }
+
+/** Simulierter Server der Super-Admins: 7 = eigenes Konto (meBody), 1 geschützt, 8 aktiv, 9 gesperrt. */
+export function superAdminServer(): { handlers: Handlers; admins: Record<string, unknown>[] } {
+    const admins = [
+        superAdminJson(1, { label: 'Notfall-Konto', protected: true }),
+        superAdminJson(7, { label: 'Holger', email: 'anna@example.org' }),
+        superAdminJson(8, { label: 'Petra Vogel', email: 'petra@example.org' }),
+        superAdminJson(9, { label: 'Ralf Alt', email: 'ralf@example.org', locked: true }),
+    ];
+    const handlers: Handlers = {
+        'GET api/v1/superadmins': () => ({ status: 200, body: { super_admins: admins } }),
+    };
+    for (const admin of admins) {
+        const id = admin['id'] as number;
+        for (const action of ['lock', 'unlock'] as const) {
+            handlers[`POST api/v1/superadmins/${String(id)}/${action}`] = () => {
+                if (admin['protected'] === true || id === 7) {
+                    return {
+                        status: 409,
+                        body: {
+                            error: 'rule_violation',
+                            message: 'Dieses Konto lässt sich nicht sperren.',
+                        },
+                    };
+                }
+                admin['locked'] = action === 'lock';
+                return { status: 200, body: { super_admin: admin } };
+            };
+        }
+    }
+    return { handlers, admins };
+}

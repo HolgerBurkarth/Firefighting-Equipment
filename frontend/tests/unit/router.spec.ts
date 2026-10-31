@@ -152,6 +152,7 @@ describe('Wächter', () => {
     it.each([
         ['/staedte', 'tenants'],
         ['/staedte/7', 'tenant'],
+        ['/super-admins', 'super-admins'],
         ['/einstellungen', 'settings'],
     ] as const)('Seite %s nur für Super-Admins unter service', async (path, name) => {
         setSession(state('superadmin'));

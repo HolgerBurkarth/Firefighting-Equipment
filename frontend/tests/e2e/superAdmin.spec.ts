@@ -7,6 +7,7 @@ import {
     accountJson,
     SERVICE_OVERVIEW,
     serviceServer,
+    superAdminServer,
     TENANTS,
     tenantJson,
     type ServiceServer,
@@ -33,7 +34,12 @@ test.describe('Super-Admin', () => {
         const nav = menu(page);
         await expect(nav.getByTestId('menu-tenant')).toHaveText('Service');
         await expect(nav.getByText('Super-Admin', { exact: true })).toBeVisible();
-        await expect(nav.getByRole('link')).toHaveText(['Dashboard', 'Städte', 'Einstellungen']);
+        await expect(nav.getByRole('link')).toHaveText([
+            'Dashboard',
+            'Städte',
+            'Super-Admins',
+            'Einstellungen',
+        ]);
         await expect(nav.getByRole('link', { name: 'Dashboard' })).toHaveClass(/menu-link-active/);
         await expect(nav.getByTestId('account-name')).toHaveText('Holger');
         await expect(nav.getByRole('button', { name: 'Abmelden' })).toBeVisible();
@@ -185,7 +191,12 @@ test.describe('Super-Admin', () => {
 
         await page.getByRole('button', { name: 'Menü öffnen' }).click();
         const drawer = page.getByTestId('menu-drawer');
-        await expect(drawer.getByRole('link')).toHaveText(['Dashboard', 'Städte', 'Einstellungen']);
+        await expect(drawer.getByRole('link')).toHaveText([
+            'Dashboard',
+            'Städte',
+            'Super-Admins',
+            'Einstellungen',
+        ]);
         await drawer.getByRole('link', { name: 'Dashboard' }).click();
         await expect(page).toHaveURL(/\/firefighting\/service\/dashboard$/);
         await expect(drawer).toBeHidden();
@@ -559,6 +570,85 @@ test.describe('Stadtdetail', () => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto('/firefighting/service/staedte/2');
         await expect(page.getByTestId('account-21')).toBeVisible();
+        expect(await horizontalOverflow(page)).toBe(0);
+    });
+});
+
+test.describe('Super-Admins', () => {
+    let server = superAdminServer();
+    test.use({
+        api: { 'GET api/v1/auth/me': ME, ...delegate(() => server.handlers) },
+    });
+
+    test.beforeEach(() => {
+        server = superAdminServer();
+    });
+
+    test('Liste: eigenes und geschütztes Konto ohne Knopf', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await page.goto('/firefighting/service/super-admins');
+        await expect(page.getByRole('heading', { level: 1, name: 'Super-Admins' })).toBeVisible();
+        await expect(menu(page).getByRole('link', { name: 'Super-Admins' })).toHaveClass(
+            /menu-link-active/,
+        );
+        const own = page.getByTestId('super-admin-7');
+        await expect(own).toContainText('Sie');
+        await expect(own).toContainText('Ihr eigenes Konto');
+        await expect(own.getByRole('button')).toHaveCount(0);
+        const protectedAccount = page.getByTestId('super-admin-1');
+        await expect(protectedAccount).toContainText('geschützt');
+        await expect(protectedAccount.getByRole('button')).toHaveCount(0);
+        await expect(page.getByTestId('super-admin-9')).toContainText('gesperrt');
+        await expect(page.getByText('bin/user.php')).toBeVisible();
+    });
+
+    test('sperren und entsperren mit Rückfrage', async ({ page, apiRequests }) => {
+        await page.goto('/firefighting/service/super-admins');
+        await page.getByRole('button', { name: 'Petra Vogel sperren …' }).click();
+        const confirm = page.getByTestId('confirm-dialog');
+        await expect(confirm).toContainText('Petra Vogel sperren?');
+        await expect(confirm).toContainText('überall abgemeldet');
+        await confirm.getByRole('button', { name: 'Sperren' }).click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Petra Vogel ist gesperrt und überall abgemeldet.',
+        );
+        await expect(page.getByTestId('super-admin-8')).toContainText('gesperrt');
+
+        await page.getByRole('button', { name: 'Ralf Alt entsperren …' }).click();
+        await confirm.getByRole('button', { name: 'Entsperren' }).click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Ralf Alt ist wieder entsperrt.',
+        );
+        await expect(page.getByTestId('super-admin-9')).toContainText('aktiv');
+        expect(apiRequests.filter((r) => r.method === 'POST').map((r) => r.path)).toEqual([
+            'api/v1/superadmins/8/lock',
+            'api/v1/superadmins/9/unlock',
+        ]);
+    });
+
+    test.describe('Regelverstoß', () => {
+        test.use({ allowedConsoleError: HTTP_ERROR_CONSOLE });
+
+        test('409 des Servers erscheint auf der Seite', async ({ page }) => {
+            await page.goto('/firefighting/service/super-admins');
+            await expect(page.getByTestId('super-admin-8')).toBeVisible();
+            // Inzwischen geschützt (per Kommandozeile): der Server lehnt ab.
+            Object.assign(server.admins[2] ?? {}, { protected: true });
+            await page.getByRole('button', { name: 'Petra Vogel sperren …' }).click();
+            await page
+                .getByTestId('confirm-dialog')
+                .getByRole('button', { name: 'Sperren' })
+                .click();
+            await expect(page.getByRole('alert')).toContainText('lässt sich nicht sperren');
+            // Die Liste lädt neu und zeigt den Schutz.
+            await expect(page.getByTestId('super-admin-8')).toContainText('geschützt');
+        });
+    });
+
+    test('Handy: kein waagerechter Überstand', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto('/firefighting/service/super-admins');
+        await expect(page.getByTestId('super-admin-8')).toBeVisible();
         expect(await horizontalOverflow(page)).toBe(0);
     });
 });
