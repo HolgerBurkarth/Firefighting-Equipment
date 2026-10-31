@@ -1297,6 +1297,21 @@ Bestätigungslink der Mail auf `email-bestaetigen` (Bestätigung per Knopf, dort
 neue Admins legen auf `einladung-annehmen` Name und Passwort fest. Abläufe und
 Entscheidungen in `docs/frontend/KONZEPT.md`, "Anmeldung und Registrierung".
 
+Super-Admin unter `/firefighting/service/` (Menü wie die Admin-Konsole): `dashboard` (Kacheln,
+offene Admin-Einladungen mit „Erneut senden“, Städte), `staedte` mit „Neue Stadt“ (Kürzel aus dem
+Namen vorgeschlagen und beim Tippen geprüft), `staedte/<id>` (umbenennen, sperren/entsperren, Admin
+einladen, Konten nur ansehen), `super-admins` (sperren/entsperren; das eigene und geschützte Konten
+ohne Knopf) und `einstellungen`; Entscheidungen in KONZEPT.md, "Super-Admin – Entscheidungen",
+Live-Test in `docs/frontend/LIVETEST-SUPER-ADMIN.md`.
+
+Offline-Modus (unter Städten): Die App merkt sich die bestätigte Sitzung und eine Kopie der Geräte
+und Standorte (IndexedDB `ff-offline`) je Stadt und Konto. Ohne Verbindung öffnet sie die Seiten
+damit, zeigt oben einen grauen Streifen „Offline – angezeigt wird der Stand vom …“ und legt
+Umbuchungen in eine Warteschlange, die bei Verbindung von selbst rausgeht (Ergebnis je Buchung auf
+„Suchen“). Abmelden löscht Kopie und Warteschlange (mit Rückfrage, wenn noch etwas wartet).
+Entscheidungen in KONZEPT.md, "Offline-Modus – Entscheidungen", Live-Test in
+`docs/frontend/LIVETEST-OFFLINE.md`.
+
 Die Browser-Tests (Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build, den PHP
 ausliefert: Jeder Playwright-Worker startet eigene Server (`php -S localhost:<port>`, Ports ab 4173,
 je Worker zwei; unter Linux mit 4 PHP-Prozessen über `PHP_CLI_SERVER_WORKERS`). Die API wird

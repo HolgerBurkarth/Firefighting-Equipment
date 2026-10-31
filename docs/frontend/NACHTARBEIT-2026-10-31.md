@@ -120,6 +120,10 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
   Warteschlange; Live-Ergebnisse“. Neu: Browser-Test mit `context.setOffline` (alle fünf Profile und
   WSL grün), Unit-Test `installBookingQueue`. Lokal: 1129 Unit-Tests, `offline.spec.ts` alle fünf
   Profile (60) und WSL (60) grün.
+  CI 3:30 grün (nur betroffene Browser-Tests), Deploy ok, Build `5048ad40f686`, Health ok.
+  Teil B damit umgesetzt; echtes Offline offen für Holger (`LIVETEST-OFFLINE.md`).
+- 31.10. README: Abschnitte Super-Admin und Offline-Modus (Commit „README: Super-Admin und
+  Offline-Modus“, nur `.md`, keine CI).
 
 # Zur Prüfung durch Holger
 
