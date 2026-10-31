@@ -66,11 +66,15 @@ test.describe('Profil: Anzeigemodus', () => {
 
         await radio('Hell').check();
         await expect(html).toHaveAttribute('data-theme', 'light');
-        expect(await page.evaluate(() => window.localStorage.getItem('ff-theme'))).toBe('light');
+        await expect
+            .poll(() => page.evaluate(() => window.localStorage.getItem('ff-theme')))
+            .toBe('light');
 
         await radio('System').check();
         await expect(html).not.toHaveAttribute('data-theme');
-        expect(await page.evaluate(() => window.localStorage.getItem('ff-theme'))).toBeNull();
+        await expect
+            .poll(() => page.evaluate(() => window.localStorage.getItem('ff-theme')))
+            .toBeNull();
     });
 });
 

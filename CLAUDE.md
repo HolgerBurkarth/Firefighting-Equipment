@@ -1065,6 +1065,13 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   `build.json` beim Start), erst vorspulen, wenn die Antwort sichtbar verarbeitet ist (z. B.
   `update-loading` sichtbar); sonst läuft der Timer unter Last vor der Antwort ab. Nur gezielt
   in diesen Tests, nicht global.
+- Zustände, die die App asynchron setzt (CSS-Variablen wie `--accent`, localStorage,
+  sessionStorage, Eigenschaften ohne Locator), in Browser-Tests nie mit einmaligem `page.evaluate`
+  + `toBe` prüfen, sondern wartend: Locator-Assertions (`toHaveAttribute`, `toHaveCSS`, …) bzw.
+  `expect.poll(() => page.evaluate(…))`. Auch nicht nach einem scheinbar passenden Merkmal: Ein
+  Knopf, der beim Speichern „Wird gespeichert …“ heißt, ist unter seinem alten Namen schon vor der
+  Antwort verschwunden (sporadisch rote CI in `settings.spec.ts`, 31.10.2026). Ausnahmen nur für
+  Werte, die sich nicht mehr ändern (z. B. `document.baseURI`).
 - Formatierung: Prettier (4 Leerzeichen laut `.editorconfig`, JSON 2), ESLint mit typgeprüften
   strikten Regeln, `no-console`, nur `<script setup lang="ts">`, kein `v-html`.
 
