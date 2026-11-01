@@ -178,8 +178,8 @@ vollständig sind.
     frischt sie vom Server auf. Suchen, Gerät (Umbuchen-Ansicht), Prüffristen und Standortwahl
     funktionieren damit ohne Verbindung; „Details und Verlauf“ braucht den Server. Nur bis 2.000
     Geräte (Modus `local`); darüber keine Kopie und kein Offline-Modus.
-    Vorläufig: Die Standorte kommen in die Kopie, sobald die App sie ohnehin lädt (Umbuchen,
-    Standortwahl); vorher bleibt offline nur der aktuelle Standort des Geräts zur Auswahl.
+    Jede vollständige Synchronisierung (Laden der ganzen Geräteliste) lädt auch die Standorte in
+    die Kopie (Holger, 01.11.2026), offline sind also alle aktiven Standorte wählbar.
 50. **Sitzung offline:** Die letzte vom Server bestätigte Sitzung (Konto, Rolle, Stadt; nie das
     Cookie) steht in localStorage `ff-session:<kürzel>`, nur unter Städten. Antwortet `auth/me`
     wegen einer Störung nicht, öffnet die App die Seite mit dieser Sitzung und fragt im Hintergrund
@@ -203,8 +203,10 @@ vollständig sind.
 53. **Ergebnis:** je Buchung der Satz des Servers (`result.message`): übernommen (grün), überschrieben
     bzw. nur im Verlauf bzw. nicht übernommen (gelb, die Admins erhalten einen Hinweis), Fehler (rot)
     mit „Verwerfen“. Angekommene Buchungen bleiben sichtbar, bis man sie ausblendet.
-54. **Grenzen:** `client-config` wird bei jeder Synchronisierung gelesen und in der Kopie
-    gespeichert. Ist die letzte Synchronisierung älter als `max_age_days`, ist offline Buchen
+54. **Grenzen:** `client-config` wird bei jeder vollständigen Synchronisierung gelesen (Holger,
+    01.11.2026; zusätzlich vor dem ersten Senden eines Seitenaufrufs) und gespeichert. Vorläufig
+    (Agent, 01.11.): gespeichert je Stadt in localStorage (`ff-offline-limits:<kürzel>`, die Grenzen
+    gelten für die ganze Stadt), nicht in der Kopie des Kontos. Ist die letzte Synchronisierung älter als `max_age_days`, ist offline Buchen
     gesperrt („Daten zu alt, bitte mit dem Internet verbinden“). Liegt eine Buchung länger als
     `queue_max_age_days` in der Warteschlange (oder meldet der Server `stale_action`), geht sie nicht
     automatisch raus: „Trotzdem senden“ (`confirmed_stale`) oder „Verwerfen“. `clock_implausible`
@@ -217,9 +219,10 @@ vollständig sind.
 Stand (31.10.2026, Nacht): O1 umgesetzt und live (lokale Kopie, gespeicherte Sitzung, grauer
 Streifen, Lesemodul im Cache). O2 umgesetzt und live (online geprüft): Warteschlange, Ergebnis,
 Grenzen, Warnung beim Abmelden. O3: echtes Offline prüft Holger nach `LIVETEST-OFFLINE.md`.
-Vorläufig (Agent, Nacht 31.10.): `client-config` liest die App nur, wenn eine Buchung wartet (sonst
-gelten die zuletzt gelesenen bzw. 7 Tage); ohne gültige Kopie bleibt es nach einem
-Verbindungsfehler beim bisherigen Fehler mit „erneut senden“.
+Ohne gültige Kopie bleibt es nach einem Verbindungsfehler beim bisherigen Fehler mit „erneut
+senden“. Geändert nach Holgers Prüfung (01.11.2026): Warteschlange nach Verbindungsabbruch mit
+derselben `client_ref` und Aktionszeit (52), Standorte und `client-config` bei jeder vollständigen
+Synchronisierung (49, 54).
 
 ## Fehlerbehandlung
 - Fehler in Alltagssprache, gut sichtbar (z. B. farbiger Hinweis oben: „Keine Verbindung, wird

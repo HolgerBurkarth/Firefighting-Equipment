@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseAuthState } from '../../src/api/auth';
+import type { ApiResult } from '../../src/api/client';
 import type { DeviceListItem } from '../../src/api/devices';
+import type { Location } from '../../src/api/locations';
 import {
     configureStoredSession,
     ensureSession,
@@ -296,6 +298,50 @@ describe('lokale Kopie (Entscheidung 49)', () => {
         );
     });
 
+    it('lädt bei jeder vollständigen Synchronisierung auch die Standorte in die Kopie', async () => {
+        const db = new MemoryDb();
+        const deviceStore = stores([device(1)]).deviceStore;
+        let locationLoads = 0;
+        const locationStore = new LocationStore(() => {
+            locationLoads += 1;
+            return Promise.resolve({
+                ok: true,
+                status: 200,
+                data: [
+                    {
+                        id: 2,
+                        name: 'Lager',
+                        kind: 'room',
+                        kindLabel: 'Raum/Lager',
+                        level: 1,
+                        parentId: null,
+                        active: true,
+                        deviceCount: 1,
+                        deviceCountTotal: 1,
+                        children: [],
+                    },
+                ],
+            } as unknown as ApiResult<readonly Location[]>);
+        });
+        setSession(state());
+        stop = installOfflineCopy({
+            area: 'test',
+            devices: deviceStore,
+            locations: locationStore,
+            db,
+        });
+        await deviceStore.refresh('open');
+        await flush();
+        expect(locationLoads).toBe(1);
+        expect(
+            parseSnapshot(await db.get('snapshots', 'test:7'))?.locations?.map((l) => l.id),
+        ).toEqual([2]);
+        // Die nächste vollständige Synchronisierung lädt sie erneut.
+        await deviceStore.refresh('changed');
+        await flush();
+        expect(locationLoads).toBe(2);
+    });
+
     it('je Konto getrennt; Abmelden und ein anderes Konto löschen die Kopie, 401 nicht', async () => {
         const db = new MemoryDb();
         await db.put('snapshots', 'test:7', {
@@ -418,7 +464,8 @@ describe('Warteschlange an Konto und Geräte gebunden (Entscheidung 52)', () => 
         // Gewünschter Stand in der Liste, solange der Server das Gerät nicht geändert hat.
         expect(devices.find(1)?.status).toBe('maintenance');
         expect(posted).toHaveLength(1);
-        expect(limitReads).toBe(1);
+        // Vor dem ersten Senden und bei der vollständigen Synchronisierung.
+        expect(limitReads).toBe(2);
         expect(queue.currentLimits).toEqual({ maxAgeDays: 5, queueMaxAgeDays: 3 });
         expect(JSON.parse(storage.getItem('ff-offline-limits:test') ?? 'null')).toEqual({
             maxAgeDays: 5,
@@ -433,6 +480,57 @@ describe('Warteschlange an Konto und Geräte gebunden (Entscheidung 52)', () => 
         expect(await logout(respond(200, { logged_out: true }).fetch)).toBeNull();
         await flush();
         expect(await db.get('queue', 'test:7')).toBeNull();
+        stop();
+    });
+
+    it('liest client-config bei jeder vollständigen Synchronisierung, auch ohne Buchung', async () => {
+        const queue = new BookingQueue({
+            db: new MemoryDb(),
+            post: () => Promise.reject(new Error('nichts zu senden')),
+        });
+        const devices = new DeviceStore(() =>
+            Promise.resolve({
+                ok: true,
+                status: 200,
+                data: { devices: [device(1)], total: 1, limit: 200, offset: 0 },
+            }),
+        );
+        const storage = new MemoryStorage();
+        let limitReads = 0;
+        setSession(state());
+        const stop = installBookingQueue({
+            area: 'test',
+            queue,
+            devices,
+            storage,
+            doc: document,
+            fetchLimits: () => {
+                limitReads += 1;
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    data: {
+                        serverTime: '2026-10-31T12:00:00Z',
+                        maxAgeDays: 4,
+                        queueMaxAgeDays: 2,
+                        maxClockSkewSeconds: 300,
+                    },
+                });
+            },
+        });
+        await flush();
+        expect(limitReads).toBe(0);
+        await devices.refresh('open');
+        await flush();
+        expect(limitReads).toBe(1);
+        expect(queue.currentLimits).toEqual({ maxAgeDays: 4, queueMaxAgeDays: 2 });
+        expect(JSON.parse(storage.getItem('ff-offline-limits:test') ?? 'null')).toEqual({
+            maxAgeDays: 4,
+            queueMaxAgeDays: 2,
+        });
+        await devices.refresh('changed');
+        await flush();
+        expect(limitReads).toBe(2);
         stop();
     });
 });

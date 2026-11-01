@@ -64,9 +64,10 @@ export interface OfflineCopyOptions {
 /**
  * Hält die lokale Kopie aktuell (main.ts, nur unter Städten): Ist ein Konto bekannt, zeigen die
  * Stores zuerst die Kopie (solange vom Server noch nichts geladen ist); nach jedem vollständigen
- * Laden der Geräte bzw. Standorte wird sie neu gespeichert. Die Standorte lädt die App nicht
- * eigens, sie kommen mit, sobald Umbuchen oder Standortwahl sie geladen haben. Abmelden und ein anderes Konto löschen
- * die Kopie des bisherigen Kontos; eine abgelaufene Sitzung (401) nicht.
+ * Laden der Geräte bzw. Standorte wird sie neu gespeichert. Jedes vollständige Laden der Geräte
+ * (eine vollständige Synchronisierung) lädt auch die Standorte, damit offline alle aktiven Standorte
+ * wählbar sind. Abmelden und ein anderes Konto löschen die Kopie des bisherigen Kontos; eine
+ * abgelaufene Sitzung (401) nicht.
  */
 export function installOfflineCopy(options: OfflineCopyOptions): () => void {
     const db = options.db ?? browserLocalDb();
@@ -136,6 +137,7 @@ export function installOfflineCopy(options: OfflineCopyOptions): () => void {
     const stopDevices = options.devices.onLoaded(() => {
         loadedAt = now().toISOString();
         save();
+        void options.locations.refresh('changed');
     });
     const stopLocations = options.locations.onLoaded(save);
     const stopEnded = onSessionEnded((ended, reason) => {
@@ -180,8 +182,9 @@ export interface BookingQueueInstallOptions {
 /**
  * Warteschlange an das Konto binden und senden (KONZEPT.md, "Offline-Modus – Entscheidungen",
  * 52–55): beim Bekanntwerden des Kontos, nach jedem Laden der Geräte (der Server ist erreichbar),
- * wenn die Verbindung zurückkommt und beim Zurückkehren in die App. Vor dem Senden liest die App
- * die Grenzen (`client-config`, nur wenn etwas wartet). Wartende Buchungen zeigt die Liste mit dem
+ * wenn die Verbindung zurückkommt und beim Zurückkehren in die App. Die Grenzen (`client-config`)
+ * liest die App bei jeder vollständigen Synchronisierung (Laden der Geräte) und vor dem ersten Senden
+ * eines Seitenaufrufs; gemerkt je Stadt in localStorage. Wartende Buchungen zeigt die Liste mit dem
  * gewünschten Stand, solange der Server das Gerät nicht geändert hat. Abmelden und ein anderes
  * Konto löschen die Warteschlange des bisherigen Kontos, eine abgelaufene Sitzung nicht.
  */
@@ -191,6 +194,7 @@ export function installBookingQueue(options: BookingQueueInstallOptions): () => 
     const fetchLimits = options.fetchLimits ?? (() => fetchClientConfig());
     const doc = options.doc ?? document;
     let limitsRead = false;
+    let reading: Promise<boolean> | null = null;
 
     try {
         const stored = JSON.parse(storage?.getItem(limitsKey(options.area)) ?? 'null') as unknown;
@@ -213,6 +217,31 @@ export function installBookingQueue(options: BookingQueueInstallOptions): () => 
         }
     }
 
+    /** Grenzen vom Server lesen und merken; false = keine Verbindung (eine gleichzeitig). */
+    function readLimits(): Promise<boolean> {
+        reading ??= (async () => {
+            const result = await fetchLimits();
+            if (!result.ok) {
+                return result.error.status !== null;
+            }
+            limitsRead = true;
+            const limits = {
+                maxAgeDays: result.data.maxAgeDays,
+                queueMaxAgeDays: result.data.queueMaxAgeDays,
+            };
+            queue.setLimits(limits);
+            try {
+                storage?.setItem(limitsKey(options.area), JSON.stringify(limits));
+            } catch {
+                // Nur für diesen Seitenaufruf.
+            }
+            return true;
+        })().finally(() => {
+            reading = null;
+        });
+        return reading;
+    }
+
     async function sendIfUseful(): Promise<void> {
         // Nur, wenn der Browser offline meldet, gar nicht erst versuchen; nach einer gescheiterten
         // Anfrage lohnt ein neuer Versuch (er beendet den Streifen, sobald der Server antwortet).
@@ -222,23 +251,8 @@ export function installBookingQueue(options: BookingQueueInstallOptions): () => 
         ) {
             return;
         }
-        if (!limitsRead) {
-            const result = await fetchLimits();
-            if (result.ok) {
-                limitsRead = true;
-                const limits = {
-                    maxAgeDays: result.data.maxAgeDays,
-                    queueMaxAgeDays: result.data.queueMaxAgeDays,
-                };
-                queue.setLimits(limits);
-                try {
-                    storage?.setItem(limitsKey(options.area), JSON.stringify(limits));
-                } catch {
-                    // Nur für diesen Seitenaufruf.
-                }
-            } else if (result.error.status === null) {
-                return;
-            }
+        if (!limitsRead && !(await readLimits())) {
+            return;
         }
         const sentBefore = queue.state.bookings.filter((b) => b.state === 'done').length;
         await queue.send();
@@ -260,7 +274,7 @@ export function installBookingQueue(options: BookingQueueInstallOptions): () => 
     );
     const stopLoaded = devices.onLoaded(() => {
         applyPending();
-        void sendIfUseful();
+        void readLimits().then(sendIfUseful);
     });
     const stopOnline = onBackOnline(() => {
         void sendIfUseful();

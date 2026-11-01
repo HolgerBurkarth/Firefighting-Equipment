@@ -975,7 +975,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `MemoryDb`): Schlüssel `<kürzel>:<konto-id>`, `OfflineSnapshot` (Format 1, `syncedAt`, Geräte,
   `total`, Standorte); beim Bekanntwerden des Kontos `DeviceStore.restore`/`LocationStore.restore`
   (nur solange noch nichts geladen ist), gespeichert nach jedem vollständigen Laden der Geräte
-  (`onLoaded`, Modus `local`) bzw. der Standorte (nur nach Geräten vom Server); Abmelden und ein
+  (`onLoaded`, Modus `local`; jedes solche Laden lädt auch die Standorte, `refresh('changed')`) bzw.
+  der Standorte (nur nach Geräten vom Server); Abmelden und ein
   anderes Konto löschen die Kopie, eine abgelaufene Sitzung nicht. `AppNotices`: ohne gespeicherte
   Sitzung bei gestörter Prüfung wie bisher `connection-notice`, sonst offline bzw. mit gespeicherter
   Sitzung der graue Streifen `offline-notice` („Offline – angezeigt wird der Stand vom 31.10.,
@@ -990,9 +991,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   „Verwerfen“, `failed` mit „Verwerfen“). `send` der Reihe nach, älteste zuerst; ohne Verbindung,
   5xx und 401 wartet die Buchung weiter; `stale_action` → `stale`, andere 4xx (auch
   `clock_implausible`) → `failed`. Gesendet beim Bekanntwerden des Kontos, nach jedem Laden der
-  Geräte, bei `online` und `visibilitychange` (nicht, solange der Browser offline meldet); vorher
-  einmal je Seitenaufruf `GET client-config` (`src/api/clientConfig.ts`, nur wenn etwas wartet;
-  Grenzen in localStorage `ff-offline-limits:<kürzel>`, sonst 7/7 Tage). Wartende Buchungen zeigt die
+  Geräte, bei `online` und `visibilitychange` (nicht, solange der Browser offline meldet).
+  `GET client-config` (`src/api/clientConfig.ts`, `readLimits`, eine Abfrage gleichzeitig) nach
+  jedem vollständigen Laden der Geräte und vor dem ersten Senden eines Seitenaufrufs; Grenzen in
+  localStorage `ff-offline-limits:<kürzel>`, sonst 7/7 Tage. Wartende Buchungen zeigt die
   Liste mit dem gewünschten Stand (`pendingDevice`, nur solange die Version gleich ist). Umbuchen
   (`DevicePage`): offline (Streifen) und erlaubt (`offlineBookingProblem`: Kopie vorhanden und höchstens
   `maxAgeDays` alt) gleich in die Warteschlange (Hinweis „Gespeichert – wird gesendet, sobald eine
@@ -1216,7 +1218,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   PHP-Server des einzelnen Workers). Keine
   automatischen Wiederholungen (`retries: 0`), sie würden zeitweise Fehler verdecken. API und Manifest simuliert `page.route()`
   (`tests/e2e/fixtures.ts`) mit denselben Bereichen wie die Routen in PHP (unter `service` nur
-  `api/v1/app-icon/…`), eine Datenbank wird nicht gebraucht. Weitere Routen je Test über die
+  `api/v1/app-icon/…`), eine Datenbank wird nicht gebraucht. Ohne eigene Angabe antworten unter
+  Städten `GET api/v1/client-config` (`DEFAULT_CLIENT_CONFIG`, 7/7 Tage) und `GET api/v1/locations`
+  (keine Standorte), weil jede vollständige Synchronisierung beide liest; sie stehen nicht in
+  `apiRequests`. Weitere Routen je Test über die
   Option `api` (`"METHODE pfad"` → Antwort, Funktion je Anfrage oder `'abort'` für einen
   Netzwerkfehler; Antwort ohne JSON über `text` und `contentType`; gesendete Bodys in `apiRequests`); Hilfen `meBody(role)`, `NOT_AUTHENTICATED`,
   `DATABASE_UNAVAILABLE`, `HTTP_ERROR_CONSOLE` (Browsermeldung zu 4xx/5xx) und

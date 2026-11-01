@@ -138,6 +138,21 @@ test.describe('Offline-Modus: Grundlage', () => {
         await expect(page.getByTestId('offline-notice')).toBeVisible();
     });
 
+    test('ohne Verbindung sind alle aktiven Standorte wählbar (mit der Synchronisierung geladen)', async ({
+        page,
+    }) => {
+        // Online nur „Suchen“ geöffnet, nie Umbuchen oder die Standortwahl.
+        await goOfflineAndReload(page);
+        await page.getByRole('searchbox').fill('M2');
+        await page.getByTestId('device-card').click();
+        await page.getByRole('button', { name: 'Anderen Standort suchen …' }).click();
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'Standort wählen' }),
+        ).toBeVisible();
+        await expect(page.getByRole('button', { name: 'LF 10 2 Geräte' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Lager 5 Geräte' })).toBeVisible();
+    });
+
     test('Verbindung wieder da: Streifen weg, Daten frisch', async ({ page }) => {
         await goOfflineAndReload(page);
         await expect(page.getByTestId('offline-notice')).toBeVisible();

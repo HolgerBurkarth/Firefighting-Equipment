@@ -21,14 +21,20 @@ Ergebnisse bitte mit der Nummer eintragen (☑ bzw. ☒ mit Fund).
   Version 2 mit `queue` und `snapshots`, Kopie `test:4`; die Version 2 entstand durch die
   Selbstheilung nach meiner Diagnose, siehe Nachtarbeit-Datei.)
 
+- ☑ A3 Wiederholung nach Verbindungsabbruch (Server): M90 online gebucht mit `client_ref`, dieselbe
+  Buchung mit `occurred_at` (wie aus der Warteschlange) → 200 `replayed`, keine zweite Version;
+  anderer Kommentar → 409 `client_ref_conflict`; danach zurückgesetzt. (01.11.2026, Build
+  `f80fe02030cf`, per JavaScript im Browser.)
+
 ## B Offline am iPhone (Holger)
 - ☐ B1 Flugmodus an, App öffnen bzw. neu laden: grauer Streifen „Offline – angezeigt wird der Stand
   vom …“, keine Anmeldeseite; „Suchen“ findet Geräte, „Prüffristen“ zeigt die Listen.
 - ☐ B2 Offline M90 öffnen, Status „in Wartung“, Speichern: Hinweis „Gespeichert – wird gesendet,
   sobald eine Verbindung besteht: M90 → in Wartung“; auf „Suchen“ die Warteschlange mit Uhr; M90
   zeigt in der Suche „in Wartung“.
-- ☐ B3 Offline „Anderen Standort suchen …“: die Standorte erscheinen (aus der Kopie); Umbuchen auf
-  ein Fach, Speichern → zweite Buchung in der Warteschlange.
+- ☐ B3 Offline „Anderen Standort suchen …“: alle aktiven Standorte erscheinen (aus der Kopie, auch
+  wenn online nie Umbuchen geöffnet war); Umbuchen auf ein Fach, Speichern → zweite Buchung in der
+  Warteschlange.
 - ☐ B4 Offline „Code scannen“: Kamera und Lesemodul funktionieren ohne Netz (Modul im Cache).
 - ☐ B5 Flugmodus aus: Die Buchungen gehen von selbst raus (Haken, „Die Buchung wurde übernommen.“);
   am PC zeigt das Gerätedetail von M90 den neuen Stand, der Verlauf die Aktionszeit vom Handy und
