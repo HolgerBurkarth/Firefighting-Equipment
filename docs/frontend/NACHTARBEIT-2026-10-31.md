@@ -124,6 +124,12 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
   Teil B damit umgesetzt; echtes Offline offen für Holger (`LIVETEST-OFFLINE.md`).
 - 31.10. README: Abschnitte Super-Admin und Offline-Modus (Commit „README: Super-Admin und
   Offline-Modus“, nur `.md`, keine CI).
+- 31.10. 18:15 – Nächtlicher CI-Lauf: bisher keiner (der Zeitplan kam am 31.10. um 06:21 dazu, der
+  erste läuft am 01.11. um 02:17 UTC). Ein Hintergrund-Wächter wartet darauf (alle 10 Minuten).
+- 01.11. 03:32 – Nächtlicher CI-Lauf 41265079151 (Stand `7d7f5df26eeb`, 02:24–02:30 UTC, alle
+  14 Jobs, alle Browser-Tests in allen fünf Profilen): grün. Live weiterhin Build `5048ad40f686`,
+  Health ok. Teil A und B sind fertig; ich habe nichts aus `docs/TODO-SPAETER.md` vorgezogen und
+  keinen neuen Schritt mehr begonnen.
 
 # Zur Prüfung durch Holger
 
@@ -138,5 +144,31 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
   Standortwahl sie laden (kein eigenes Laden).
 - Offline O2: `client-config` nur, wenn eine Buchung wartet; „Speichern“ online ohne Verbindung →
   Warteschlange mit neuer `client_ref`; Abmelden mit Warnung schon in O2 (statt eigenem Schritt).
+- Offline, Randfall: Meldet der Server nach einem Offline-Start ein ANDERES Konto als das
+  gespeicherte (z. B. inzwischen in einem anderen Tab umgemeldet), gilt das wie ein Kontowechsel:
+  Kopie und Warteschlange des gespeicherten Kontos werden gelöscht, auch ungesendete Buchungen.
+  Ob hier stattdessen gewarnt werden soll, entscheidet Holger.
 - Offline 50: Die gespeicherte Sitzung (Konto mit E-Mail und Name, ohne Cookie) liegt im
   localStorage des Handys, bis Abmelden oder eine echte Ablehnung (401).
+
+# Abschluss (01.11. 03:35)
+
+| Schritt | Commit | CI | Build live | Live geprüft |
+|---|---|---|---|---|
+| S1 Menü, Dashboard, Städte, Einstellungen | `c99efc2` | 5:06 grün | `c99efc2b76c4` | ☑ lesend |
+| Korrektur Updates (späte Registrierung) + S2 Neue Stadt | `492c6b8`, `1e0bc9a` | 5:24 grün | `1e0bc9a58faa` | ☑ Prüfung beim Tippen, abgebrochen |
+| S3 Stadtdetail | `d4a4bcd` | 6:29 grün | `d4a4bcdc0ca8` | ☑ lesend, ☑ Korrektur Updates |
+| S4 Super-Admins, Live-Test-Liste | `27cae00` | 6:57 grün | `27cae0051e1a` | ☑ lesend |
+| O1 Kopie, gespeicherte Sitzung, Streifen | `15317cb` | 5:13 grün | `15317cb2ba4c` | ☑ online unverändert |
+| O2 Warteschlange, Warnung beim Abmelden | `487cdff` | 5:31 grün | `487cdffbb4bf` | ☑ M90 online, zurückgesetzt |
+| O3 Tests Browser offline, Live-Ergebnisse | `5048ad4` | 3:30 grün | `5048ad40f686` | ☑ |
+| README | `7d7f5df` | – (nur `.md`) | – | – |
+
+- Reparaturen, Reverts, Neustarts von CI-Läufen: keine.
+- Funde live, behoben: Start der App gab auf, wenn sich der Service Worker spät registrierte
+  (`492c6b8`); eine leere Datenbank `ff-offline` ohne Tabellen (durch meine Diagnose angelegt)
+  heilt die App jetzt selbst (O2).
+- Nächtliche CI: Lauf 41265079151 am 01.11. grün.
+- Offen für Holger: schreibende Prüfungen unter `/service/` (`LIVETEST-SUPER-ADMIN.md` B1–B8),
+  echtes Offline am iPhone (`LIVETEST-OFFLINE.md` B1–B10), Mails (Einladung, Hinweis „Log“),
+  schmale Breiten und iPhone allgemein, und die Punkte unter „Zur Prüfung durch Holger“.
