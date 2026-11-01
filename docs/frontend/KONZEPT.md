@@ -591,6 +591,9 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
     Scheitert das Speichern an einem Feld (z. B. Scan-Code schon vergeben), steht direkt unter den
     Knöpfen gut sichtbar „Nicht gespeichert: …“ mit „Zum Feld „Scan-Code““ (Holger, T10, umgesetzt
     01.11.2026), denn das Scrollen zum Feld allein ist nicht zuverlässig.
+    Nach „Speichern und nächstes“ steht die Seite wieder ganz oben (Bestätigung und Kennung im Bild),
+    die Kennung ist fokussiert; den Fokus setzt die App schon beim Antippen, weil das iPhone ihn nach
+    der Antwort des Servers nicht mehr annimmt (Holger, T11, umgesetzt 01.11.2026).
     Der Import ist in Schritt 7 umgesetzt als Seite `geraete/import` (Knopf „Import (CSV)“ in der
     Geräteliste): Vorlage und „Gültige Werte“ erzeugt der Server (Beispielzeilen mit Gerätetypen und
     Standorten der Stadt, damit sie gültig aussehen; „Gültige Werte“ nur aktive). Die Datei wird

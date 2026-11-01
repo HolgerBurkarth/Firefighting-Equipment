@@ -238,6 +238,11 @@ async function save(next: boolean): Promise<void> {
         return;
     }
     busy.value = true;
+    if (next) {
+        // Noch im Antippen fokussieren: Das iPhone fokussiert (und zeigt die Tastatur) nur dort,
+        // nach der Antwort des Servers nicht mehr (T11). Scheitert es, springt der Fokus zum Fehler.
+        identifierInput.value?.focus({ preventScroll: true });
+    }
     const result = await createDevice(newDeviceRequest(form.value));
     busy.value = false;
     saveFailed.value = !result.ok;
@@ -250,8 +255,10 @@ async function save(next: boolean): Promise<void> {
             touched.clear();
             submitted.value = false;
             await nextTick();
-            identifierInput.value?.focus();
+            identifierInput.value?.focus({ preventScroll: true });
             identifierInput.value?.select();
+            // Ganz nach oben: Bestätigung und Kennung im Bild (Fokus allein scrollt am iPhone nicht).
+            window.scrollTo(0, 0);
             return;
         }
         leaving = true;
