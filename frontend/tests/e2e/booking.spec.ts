@@ -147,9 +147,10 @@ test.describe('Umbuchen und Status', () => {
         page,
         apiRequests,
     }) => {
-        // 999 gibt es nicht (z. B. gesperrt), 20 = LF 10, 11 ist der aktuelle Standort.
+        // 999 gibt es nicht (z. B. gesperrt), 20 = LF 10, 11 ist der aktuelle Standort; HLF 20 / G2
+        // (12) wäre das zweite Ziel, angezeigt wird nur EINES (T2).
         await page.addInitScript((key) => {
-            window.localStorage.setItem(key, JSON.stringify([999, 20, 11]));
+            window.localStorage.setItem(key, JSON.stringify([999, 20, 12]));
         }, RECENT_LOCATIONS_KEY);
         await openFromSearch(page);
         const choices = page.getByTestId('location-choice');
@@ -167,7 +168,7 @@ test.describe('Umbuchen und Status', () => {
             .poll(() =>
                 page.evaluate((key) => window.localStorage.getItem(key), RECENT_LOCATIONS_KEY),
             )
-            .toBe('[20,999,11]');
+            .toBe('[20,999,12]');
     });
 
     test('nichts geändert: Hinweis, keine Anfrage', async ({ page, apiRequests }) => {
