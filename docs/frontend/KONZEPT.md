@@ -588,6 +588,9 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
     Scanner). Umgesetzt in Schritt 6 als eigene Seite `geraete/neu` (Knopf „Neues Gerät“ in der
     Geräteliste): „Speichern und nächstes“ ist der erste Knopf (auch Enter), „Speichern“ öffnet das
     neue Gerät; Enter im Feld Scan-Code speichert nicht (Handscanner), sondern führt weiter.
+    Scheitert das Speichern an einem Feld (z. B. Scan-Code schon vergeben), steht direkt unter den
+    Knöpfen gut sichtbar „Nicht gespeichert: …“ mit „Zum Feld „Scan-Code““ (Holger, T10, umgesetzt
+    01.11.2026), denn das Scrollen zum Feld allein ist nicht zuverlässig.
     Der Import ist in Schritt 7 umgesetzt als Seite `geraete/import` (Knopf „Import (CSV)“ in der
     Geräteliste): Vorlage und „Gültige Werte“ erzeugt der Server (Beispielzeilen mit Gerätetypen und
     Standorten der Stadt, damit sie gültig aussehen; „Gültige Werte“ nur aktive). Die Datei wird

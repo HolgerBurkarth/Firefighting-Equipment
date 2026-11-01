@@ -784,7 +784,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   speichert nie (Handscanner senden Enter), sondern führt zum nächsten Feld. 409 `identifier_taken`
   bzw. `scan_code_taken` am Feld, andere Fehler als `ErrorNotice` (bei `rule_violation` und
   `invalid_request` laden Typen und Standorte neu); nach einem Fehler Fokus auf das erste Feld mit
-  `aria-invalid`. Ungespeichert (`useUnsavedInput`) = Formular anders als nach dem Öffnen bzw. nach
+  `aria-invalid`, dazu direkt unter den Knöpfen „Nicht gespeichert: <Meldung des ersten Felds>“ mit
+  „Zum Feld „…““ (`saveProblem`, `goToField` über `data-field`, Namen `NEW_DEVICE_FIELD_LABELS`;
+  verschwindet, sobald alle Felder in Ordnung sind; T10). Ungespeichert (`useUnsavedInput`) = Formular anders als nach dem Öffnen bzw. nach
   „Speichern und nächstes“. „Zurück“ oben (`.detail-nav`/`.back-link` in `base.css`, auch im
   Gerätedetail) und „Abbrechen“ (`goBack`, sonst `geraete`). Unter 768 px eine Spalte, Knöpfe volle
   Breite. Browser-Tests `tests/e2e/deviceNew.spec.ts` (simulierter `POST devices` ab ID 100);
