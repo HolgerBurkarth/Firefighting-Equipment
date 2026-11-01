@@ -518,7 +518,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`locationPaths`). Status über drei Tasten (`aria-pressed`, Bezeichnungen `STATUS_LABELS` wie
   `DeviceStatus::label()`, per Test). Auswahl `null` = unverändert (folgt dem aktuellen Stand);
   gesendet werden nur geänderte Felder (`deviceStore.book` → `POST devices/{id}/state`, online nie
-  `occurred_at`), nichts geändert → Hinweis ohne Anfrage. `client_ref` (`ClientRefKeeper` in
+  `occurred_at`); „Speichern“ ist nur mit einer Änderung von Standort oder Status antippbar
+  (`hasChanges`, T4), ein Kommentar allein zeigt „Bitte wählen Sie einen anderen Standort oder
+  Status.“. `client_ref` (`ClientRefKeeper` in
   `src/data/booking.ts`, UUID v4): gleicher Inhalt (Gerät, Version, Felder) behält die Kennung
   (erneutes Senden nach einem Netzwerkfehler wirkt nicht doppelt), anderer Inhalt bekommt eine neue.
   Kommentar: Zeilenumbrüche und Steuerzeichen → Leerzeichen (`normalizeComment`, der Server nimmt
