@@ -169,6 +169,6 @@ Nach 03:20 Uhr: gh run list --workflow=ci.yml --event=schedule --limit=1. Rot: v
   (`492c6b8`); eine leere Datenbank `ff-offline` ohne Tabellen (durch meine Diagnose angelegt)
   heilt die App jetzt selbst (O2).
 - Nächtliche CI: Lauf 41265079151 am 01.11. grün.
-- Offen für Holger: schreibende Prüfungen unter `/service/` (`LIVETEST-SUPER-ADMIN.md` B1–B8),
+- Offen für Holger: schreibende Prüfungen unter `/service/` (`LIVETEST-SUPER-ADMIN.md` B1–B9),
   echtes Offline am iPhone (`LIVETEST-OFFLINE.md` B1–B10), Mails (Einladung, Hinweis „Log“),
   schmale Breiten und iPhone allgemein, und die Punkte unter „Zur Prüfung durch Holger“.
