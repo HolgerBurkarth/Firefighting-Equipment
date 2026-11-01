@@ -510,8 +510,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `NO_DEVICES` (`tests/e2e/support/devices.ts`; dort auch `deviceJson`, `devicesEndpoint`).
 - Umbuchen (`DevicePage`, `geraete/<id>`, KONZEPT.md Entscheidungen 13, 15, 18, 21, 22): Stand
   sofort aus `deviceStore.find`, dann `fetchCurrent`; ausgesondert → Hinweis ohne Formular, 404 →
-  „Dieses Gerät gibt es nicht (mehr).“. Standort: aktueller und die letzten 3 eigenen Ziele
-  (`recentLocationIds`/`rememberLocation` aus `src/data/index.ts`, `src/data/recentLocations.ts`,
+  „Dieses Gerät gibt es nicht (mehr).“. Standort: aktueller und das letzte eigene Ziel außer dem
+  aktuellen (`bookingLocationChoices`, `SHOWN_RECENT_LOCATIONS` = 1, T2; gespeichert werden die
+  letzten 3 als Reserve, `recentLocationIds`/`rememberLocation` aus `src/data/index.ts`, `src/data/recentLocations.ts`,
   localStorage `ff-recent-locations:<kürzel>:<konto-id>`; gemeinsame Klasse `RecentIds` in
   `src/data/recentIds.ts`, auch für „Zuletzt benutzt“), nur aktive aus `locationStore`
   (`locationPaths`). Status über drei Tasten (`aria-pressed`, Bezeichnungen `STATUS_LABELS` wie
@@ -603,8 +604,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   dann die Fächer; ohne Unterstandorte wählt Antippen. Mit Suchbegriff `searchLocations`: Wörter mit
   UND (Vergleichsform `searchKey`) im Namen der Ebene 1 bzw. im ganzen Pfad eines Unterstandorts
   („hlf g1“), flach, Fächer mit ihrem Fahrzeug darunter, „N Treffer“, sonst „Kein Standort passt zu
-  „…“.“. Markierung „aktuell“ und Häkchen „gewählt“. Ein gewählter Standort, der nicht unter den
-  zuletzt benutzten steht, erscheint beim Umbuchen nach dem aktuellen mit „gewählt“. Fokus: beim
+  „…“.“. Markierung „aktuell“ und Häkchen „gewählt“. Ein gewählter Standort, der nicht als zuletzt
+  benutzter angezeigt wird, erscheint beim Umbuchen nach dem aktuellen mit „gewählt“. Fokus: beim
   Öffnen die Überschrift, danach „Anderen Standort suchen …“. Tests in
   `tests/e2e/locationPicker.spec.ts` und `tests/unit/locationSearch.spec.ts`.
 - Admin-Konsole (KONZEPT.md "Admin-Konsole – Entscheidungen", 29–38; Seiten mit `layout: 'admin'`,

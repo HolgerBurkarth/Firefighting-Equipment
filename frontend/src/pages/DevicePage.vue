@@ -35,7 +35,11 @@ import {
 import { actionTime, offlineBookingProblem, pendingDevice, queuedText } from '../data/bookingQueue';
 import { offlineData } from '../data/offline';
 import { connectivity, isOffline } from '../runtime/connectivity';
-import { locationPaths, type LocationChoice } from '../data/recentLocations';
+import {
+    bookingLocationChoices,
+    locationPaths,
+    type BookingLocationChoice,
+} from '../data/recentLocations';
 import { closeQueryView, returnTo } from '../router/back';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 import { session } from '../auth/session';
@@ -126,27 +130,14 @@ useUnsavedInput(
 const paths = computed(() => locationPaths(locationStore.state.locations ?? []));
 
 /**
- * Aktueller Standort, ein in der Standortwahl gewählter und die letzten 3 eigenen Ziele
- * (Entscheidung 21), ohne gesperrte.
+ * Aktueller Standort, ein in der Standortwahl gewählter und das letzte eigene Ziel
+ * (Entscheidung 21, T2), ohne gesperrte.
  */
-const locationChoices = computed<(LocationChoice & { hint: string })[]>(() => {
+const locationChoices = computed<BookingLocationChoice[]>(() => {
     const current = device.value?.location;
-    if (current === undefined) {
-        return [];
-    }
-    const choices = [{ id: current.id, path: current.path, hint: 'aktuell' }];
-    const chosen =
-        chosenLocation.value === null ? undefined : paths.value.get(chosenLocation.value);
-    if (chosen !== undefined && chosen.id !== current.id && !recentIds.value.includes(chosen.id)) {
-        choices.push({ ...chosen, hint: 'gewählt' });
-    }
-    for (const id of recentIds.value) {
-        const known = paths.value.get(id);
-        if (known !== undefined && id !== current.id) {
-            choices.push({ ...known, hint: 'zuletzt' });
-        }
-    }
-    return choices;
+    return current === undefined
+        ? []
+        : bookingLocationChoices(current, chosenLocation.value, recentIds.value, paths.value);
 });
 
 const title = computed(() =>

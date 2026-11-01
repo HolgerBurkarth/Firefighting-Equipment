@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseAuthState, type AuthState } from '../../src/api/auth';
 import type { Location } from '../../src/api/locations';
 import {
+    bookingLocationChoices,
     locationPaths,
     MAX_RECENT_LOCATIONS,
     recentLocations,
@@ -66,6 +67,44 @@ describe('locationPaths', () => {
             { id: 10, path: 'HLF 20' },
             { id: 11, path: 'HLF 20 / G1' },
             { id: 20, path: 'Lager' },
+        ]);
+    });
+});
+
+describe('bookingLocationChoices', () => {
+    const paths = locationPaths([
+        location(10, 'HLF 20', [child(11, 'G1'), child(12, 'G2')]),
+        location(20, 'LF 10'),
+        location(30, 'Lager'),
+    ]);
+    const current = { id: 11, path: 'HLF 20 / G1' };
+
+    it('aktuell und genau EIN zuletzt benutztes Ziel (T2), ohne unbekannte', () => {
+        expect(bookingLocationChoices(current, null, [999, 12, 20, 30], paths)).toEqual([
+            { id: 11, path: 'HLF 20 / G1', hint: 'aktuell' },
+            { id: 12, path: 'HLF 20 / G2', hint: 'zuletzt' },
+        ]);
+    });
+
+    it('der aktuelle zählt nicht als zuletzt benutzt', () => {
+        expect(bookingLocationChoices(current, null, [11, 20], paths)).toEqual([
+            { id: 11, path: 'HLF 20 / G1', hint: 'aktuell' },
+            { id: 20, path: 'LF 10', hint: 'zuletzt' },
+        ]);
+    });
+
+    it('ein gewähltes, nicht angezeigtes Ziel erscheint mit „gewählt“', () => {
+        expect(bookingLocationChoices(current, 20, [12, 20], paths)).toEqual([
+            { id: 11, path: 'HLF 20 / G1', hint: 'aktuell' },
+            { id: 20, path: 'LF 10', hint: 'gewählt' },
+            { id: 12, path: 'HLF 20 / G2', hint: 'zuletzt' },
+        ]);
+        expect(bookingLocationChoices(current, 12, [12, 20], paths)).toEqual([
+            { id: 11, path: 'HLF 20 / G1', hint: 'aktuell' },
+            { id: 12, path: 'HLF 20 / G2', hint: 'zuletzt' },
+        ]);
+        expect(bookingLocationChoices(current, 11, [], paths)).toEqual([
+            { id: 11, path: 'HLF 20 / G1', hint: 'aktuell' },
         ]);
     });
 });

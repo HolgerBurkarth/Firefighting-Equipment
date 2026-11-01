@@ -793,9 +793,10 @@ Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Li
     „weiter eingrenzen“. Dafür liefert `GET devices` zusätzlich `serial_number`, `manufacturer`
     und `model`.
 21. **Zuletzt benutzte Standorte** (Umbuchen): die letzten 3 eigenen Ziele, lokal je Konto, beim
-    Abmelden gelöscht. Umgesetzt: zur Auswahl stehen der aktuelle Standort und diese Ziele, soweit
-    nicht gesperrt, dazu ein in der Standortwahl gewählter („gewählt“) und „Anderen Standort
-    suchen …“.
+    Abmelden gelöscht. Umgesetzt: zur Auswahl stehen der aktuelle Standort und das neueste dieser
+    Ziele außer dem aktuellen, soweit nicht gesperrt (Holger, T2, umgesetzt 01.11.2026: nur noch
+    EINES statt bis zu drei; die übrigen gespeicherten sind die Reserve), dazu ein in der
+    Standortwahl gewählter („gewählt“) und „Anderen Standort suchen …“.
 22. **Nach dem Speichern** geht es zurück dorthin, woher man kam („Suchen“ oder „Prüffristen“),
     mit grüner Bestätigung auf dieser Seite (z. B. „M1 → HLF 20 / G2 · einsatzbereit“); nach
     einem direkt geöffneten Link zu „Suchen“. Umgesetzt: Die Bestätigung bleibt auf „Suchen“ bis
