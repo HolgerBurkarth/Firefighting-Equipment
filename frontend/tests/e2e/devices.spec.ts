@@ -433,6 +433,29 @@ test.describe('Buchung aus der Liste', () => {
         },
     });
 
+    test('die ganze Zeile öffnet das Gerätedetail, das Kästchen nicht (T9)', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await open(page);
+        const row = page.getByTestId('device-row-1');
+        await expect(row).toHaveCSS('cursor', 'pointer');
+        // Das Kästchen wählt nur aus.
+        await row.getByRole('checkbox', { name: 'M1 auswählen' }).click();
+        await expect(page.getByTestId('selection-bar')).toContainText('1 Gerät ausgewählt');
+        await expect(page).toHaveURL(/\/geraete$/);
+        // Ein Klick irgendwo in der Zeile (hier: Standort) öffnet das Gerät.
+        await row.locator('.cell-location').click();
+        await expect(page).toHaveURL(/\/geraete\/1\/details$/);
+        await page.getByRole('button', { name: 'Zurück' }).click();
+        await expect(page).toHaveURL(/\/geraete$/);
+    });
+
+    test('Handy: die ganze Karte öffnet das Gerätedetail (T9)', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await open(page);
+        await page.getByTestId('device-row-1').locator('.cell-type').click();
+        await expect(page).toHaveURL(/\/geraete\/1\/details$/);
+    });
+
     test('Kennung öffnet das Gerätedetail; Zurück führt zur gefilterten Liste', async ({
         page,
     }) => {

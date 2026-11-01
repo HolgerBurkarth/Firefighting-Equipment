@@ -693,7 +693,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   bzw. `adminLocationStore`, gesperrte/deaktivierte markiert), Status als Knöpfe mit `aria-pressed`,
   „Ausgesonderte anzeigen“, „Filter zurücksetzen“, Anzahl („45 Geräte“, mit Filter „12 Geräte
   gefunden“). Suche nur in den Feldern von `q` (Gerätetyp und Standort wählt man über die
-  Auswahllisten; live geprüft 30.10.2026). Tabelle Kennung (öffnet das Gerätedetail), Gerätetyp,
+  Auswahllisten; live geprüft 30.10.2026). Tabelle (ein Klick irgendwo in der Zeile bzw. Karte öffnet das Gerätedetail,
+  außer in der Spalte des Kästchens, auf Links/Knöpfen und beim Markieren von Text, `openRow`, T9;
+  per Tastatur der Link der Kennung) Kennung, Gerätetyp,
   Standort, Status, Nächste
   Prüfung (überfällig rot, bis 30 Tage „bald fällig“ gelb, `dueState`; ausgesonderte nie), Spaltenköpfe
   mit `aria-sort`; unter 768 px Karten mit `AppSelect` „Sortieren nach“ und Knopf für die Richtung.
