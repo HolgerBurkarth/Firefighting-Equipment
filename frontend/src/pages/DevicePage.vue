@@ -29,7 +29,6 @@ import {
     commentLength,
     MAX_COMMENT_LENGTH,
     MIN_DEFECT_COMMENT_LENGTH,
-    newClientRef,
     normalizeComment,
     setBookingNotice,
 } from '../data/booking';
@@ -254,31 +253,39 @@ function pickStatus(value: BookableStatus): void {
 const offlineProblem = ref<string | null>(null);
 
 /**
- * Buchung in die Warteschlange (neue `client_ref`, Aktionszeit jetzt); die Liste zeigt sofort den
- * gewünschten Stand, danach zurück wie nach dem Speichern online (Entscheidungen 52 und 54).
+ * Buchung in die Warteschlange; die Liste zeigt sofort den gewünschten Stand, danach zurück wie nach
+ * dem Speichern online (Entscheidungen 52 und 54). `client_ref` und Aktionszeit sind die des ersten
+ * Versuchs mit diesem Inhalt (`refs`): Kam ein online gesendeter Versuch trotz Netzwerkfehler an,
+ * wiederholt der Server nur sein Ergebnis.
  */
 async function saveOffline(
     current: DeviceListItem,
-    content: { version: number; locationId?: number; status?: BookableStatus; comment?: string },
+    content: {
+        deviceId: number;
+        version: number;
+        locationId?: number;
+        status?: BookableStatus;
+        comment?: string;
+    },
 ): Promise<void> {
-    const now = new Date();
     offlineProblem.value = offlineBookingProblem(
         offlineData.syncedAt,
         bookingQueue.currentLimits,
-        now,
+        new Date(),
     );
     if (offlineProblem.value !== null) {
         return;
     }
+    const attempt = refs.attemptFor(content);
     const target =
         content.locationId === undefined ? undefined : paths.value.get(content.locationId);
     const booking = {
-        clientRef: newClientRef(),
+        clientRef: attempt.ref,
         deviceId,
         identifier: current.identifier,
         deviceTypeName: current.deviceType.name,
         version: content.version,
-        occurredAt: actionTime(now),
+        occurredAt: actionTime(attempt.at),
         ...(content.locationId !== undefined && {
             locationId: content.locationId,
             locationPath: target?.path ?? current.location.path,

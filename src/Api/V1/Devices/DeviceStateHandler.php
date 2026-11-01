@@ -60,14 +60,15 @@ final readonly class DeviceStateHandler implements RequestHandler
             $comment = DeviceFields::comment($context);
             [$clientRef, $occurredAt, $confirmedStale] = DeviceFields::bookingFields($context);
             $hash = BookingRequest::hash($deviceId, $version, $change, $comment, $occurredAt);
+            $onlineHash = BookingRequest::onlineHash($deviceId, $version, $change, $comment, $occurredAt);
 
-            $previous = $booker->previous($clientRef, $userId, $deviceId, $hash);
+            $previous = $booker->previous($clientRef, $userId, $deviceId, $hash, $onlineHash);
             if ($previous !== null) {
                 return self::response($previous);
             }
 
             $stale = $occurredAt !== null && $this->checkActionTime($occurredAt, $confirmedStale);
-            $result = $booker->book($userId, $deviceId, $version, $change, $comment, new BookingRequest($clientRef, $occurredAt, $stale, $hash));
+            $result = $booker->book($userId, $deviceId, $version, $change, $comment, new BookingRequest($clientRef, $occurredAt, $stale, $hash, $onlineHash));
             if ($result->replayed) {
                 // Dieselbe client_ref gleichzeitig verarbeitet: Die andere Anfrage hat gespeichert und benachrichtigt.
                 return self::response($result);

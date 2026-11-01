@@ -159,7 +159,8 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
   (z. B. „3 Buchungen wurden noch nicht gesendet und gehen beim Abmelden verloren“).
 
 ### Offline-Modus – Entscheidungen
-Geplant in der Nacht vom 31.10.2026 (Agent, ohne Rückfrage; „Vorläufig“ prüft Holger). API:
+Geplant in der Nacht vom 31.10.2026 (Agent, ohne Rückfrage), geprüft von Holger am 01.11.2026
+(was noch „Vorläufig“ heißt, prüft er noch). API:
 `CLAUDE.md`, "Offline-Buchungen (API)" und `GET client-config` (fertig und live). Jeder Schritt
 lässt die App online wie bisher; Offline-Buchen gibt es erst, wenn Warteschlange und Ergebnis
 vollständig sind.
@@ -175,8 +176,8 @@ vollständig sind.
     vollständigen Synchronisierung (Uhr des Handys) und den Grenzen aus `client-config`. Gespeichert
     nach jedem vollständigen Laden der Geräteliste; beim Start zeigt die App zuerst die Kopie, dann
     frischt sie vom Server auf. Suchen, Gerät (Umbuchen-Ansicht), Prüffristen und Standortwahl
-    funktionieren damit ohne Verbindung; „Details und Verlauf“ braucht den Server. Vorläufig (Agent,
-    Nacht 31.10.): nur bis 2.000 Geräte (Modus `local`); darüber keine Kopie und kein Offline-Modus.
+    funktionieren damit ohne Verbindung; „Details und Verlauf“ braucht den Server. Nur bis 2.000
+    Geräte (Modus `local`); darüber keine Kopie und kein Offline-Modus.
     Vorläufig: Die Standorte kommen in die Kopie, sobald die App sie ohnehin lädt (Umbuchen,
     Standortwahl); vorher bleibt offline nur der aktuelle Standort des Geräts zur Auswahl.
 50. **Sitzung offline:** Die letzte vom Server bestätigte Sitzung (Konto, Rolle, Stadt; nie das
@@ -188,8 +189,13 @@ vollständig sind.
     keine Verbindung bekam (bis zur nächsten Antwort des Servers): „Offline – angezeigt wird der
     Stand vom 31.10., 14:02.“ Er ersetzt dann die Meldung „Keine Verbindung zum Server …“.
 52. **Warteschlange:** Ist die App offline (Streifen) oder scheitert „Speichern“ an der
-    Verbindung, kommt die Buchung in die Warteschlange (IndexedDB, je Stadt und Konto) mit neuer
-    `client_ref`, Aktionszeit (`occurred_at`, Uhr des Handys), Version, Ziel und Kommentar; die
+    Verbindung, kommt die Buchung in die Warteschlange (IndexedDB, je Stadt und Konto) mit
+    `client_ref`, Aktionszeit (`occurred_at`, Uhr des Handys), Version, Ziel und Kommentar. Nach
+    einem Verbindungsfehler beim Speichern sind `client_ref` und Aktionszeit die des ersten
+    Versuchs (Holger, 01.11.2026; wie Entscheidung 22): Kam er doch an, wiederholt der Server nur
+    das gespeicherte Ergebnis. Vorläufig (Agent, 01.11.): Dafür wiederholt der Server bei einer
+    Buchung mit `occurred_at` auch eine gespeicherte Buchung ohne `occurred_at` mit derselben
+    `client_ref` und sonst gleichem Inhalt (Erweiterung der API, `BookingRequest::onlineHash`). Die
     lokale Liste zeigt sofort den gewünschten Stand. Gesendet wird automatisch, älteste zuerst, eine
     nach der anderen: beim Start, wenn die Verbindung zurückkommt, beim Zurückkehren in die App und
     nach jeder Buchung. „Suchen“ zeigt die Warteschlange: Uhr = wartet, Haken = beim Server
@@ -212,9 +218,8 @@ Stand (31.10.2026, Nacht): O1 umgesetzt und live (lokale Kopie, gespeicherte Sit
 Streifen, Lesemodul im Cache). O2 umgesetzt und live (online geprüft): Warteschlange, Ergebnis,
 Grenzen, Warnung beim Abmelden. O3: echtes Offline prüft Holger nach `LIVETEST-OFFLINE.md`.
 Vorläufig (Agent, Nacht 31.10.): `client-config` liest die App nur, wenn eine Buchung wartet (sonst
-gelten die zuletzt gelesenen bzw. 7 Tage); scheitert „Speichern“ online an der Verbindung, kommt die
-Buchung mit neuer `client_ref` in die Warteschlange (kam die erste doch an, ergibt die zweite
-„unverändert“); ohne gültige Kopie bleibt es beim bisherigen Fehler mit „erneut senden“.
+gelten die zuletzt gelesenen bzw. 7 Tage); ohne gültige Kopie bleibt es nach einem
+Verbindungsfehler beim bisherigen Fehler mit „erneut senden“.
 
 ## Fehlerbehandlung
 - Fehler in Alltagssprache, gut sichtbar (z. B. farbiger Hinweis oben: „Keine Verbindung, wird
@@ -618,8 +623,7 @@ als 2.000 Geräten.
 - **Super-Admins:** Liste mit Sperren und Entsperren; das geschützte Konto ohne Button.
 
 ### Super-Admin – Entscheidungen
-Geplant in der Nacht vom 31.10.2026 (Agent, ohne Rückfrage; alle mit „Vorläufig“ markierten Punkte
-prüft Holger). API: `CLAUDE.md`, "Städte verwalten und Admins einladen" (fertig und live).
+Geplant in der Nacht vom 31.10.2026 (Agent, ohne Rückfrage), bestätigt von Holger am 01.11.2026. API: `CLAUDE.md`, "Städte verwalten und Admins einladen" (fertig und live).
 
 39. **Schritte:** S1 Menü, Dashboard, Städte-Liste und Einstellungen; S2 „Neue Stadt“; S3
     Stadtdetail (umbenennen, sperren/entsperren, Admin einladen, Einladung erneut senden, Benutzer
@@ -628,12 +632,11 @@ prüft Holger). API: `CLAUDE.md`, "Städte verwalten und Admins einladen" (ferti
 40. **Gerüst:** dieselbe Darstellung wie die Admin-Konsole (Menü in drei Breiten, Entscheidung 34),
     Einträge Dashboard, Städte, Super-Admins; unten Einstellungen, der Name des Kontos und Abmelden.
     Oben „Service“ mit „Super-Admin“ und dem Standard-Symbol (unter `service` gibt es keine Stadt,
-    daher immer Feuerwehrrot). Vorläufig (Agent, Nacht 31.10.): keine Zähler im Menü.
+    daher immer Feuerwehrrot). Keine Zähler im Menü.
 41. **Dashboard** (Mockup „SuperAdmin“): Kacheln „Städte“ (N aktiv, M gesperrt; führt zu `staedte`),
     „Offene Admin-Einladungen“ (Summe der eingeladenen Admins aller Städte) und „Benutzer gesamt“
     (aktive, nicht gesperrte Konten aller Städte). Darunter die offenen Einladungen (Stadt, E-Mail,
-    eingeladen am) mit „Erneut senden“, dann die Städte wie in der Liste. Vorläufig (Agent, Nacht
-    31.10.): Die Ablaufzeit einer Einladung („läuft in 6 Std. ab“ im Mockup) zeigt die App nicht, die
+    eingeladen am) mit „Erneut senden“, dann die Städte wie in der Liste. Die Ablaufzeit einer Einladung („läuft in 6 Std. ab“ im Mockup) zeigt die App nicht, die
     API kennt sie nicht; stattdessen der Satz „Ein Einladungslink gilt 24 Stunden ab dem Senden.“
     Die eingeladenen Konten holt die App je Stadt mit Einladungen (`GET tenants/{id}/users?status=invited`).
 42. **Städte-Liste** (`staedte`): Spalten Name, Adresse (`/firefighting/<kürzel>/`), Status, Admins
@@ -643,7 +646,7 @@ prüft Holger). API: `CLAUDE.md`, "Städte verwalten und Admins einladen" (ferti
     Admins: aktive, dazu klein „N eingeladen“. Der Name führt zum Stadtdetail.
 43. **Neue Stadt** (Fenster `FormDialog`, Knopf „Neue Stadt“ auf Dashboard und Städte-Liste): Name,
     Kürzel und E-Mail des ersten Admins. Das Kürzel folgt dem Namen, bis es von Hand geändert wird.
-    Vorläufig (Agent, Nacht 31.10.): Vorschlag ohne „Freiwillige Feuerwehr“, „Feuerwehr“, „FF“,
+    Vorschlag ohne „Freiwillige Feuerwehr“, „Feuerwehr“, „FF“,
     „Stadt“, „Gemeinde“ am Anfang (wie im Mockup „Feuerwehr Bad Dürrheim“ → `bad-duerrheim`),
     ä/ö/ü/ß → ae/oe/ue/ss, andere Akzente ohne Zeichen, alles andere wird Bindestrich, höchstens 50
     Zeichen. Prüfung beim Tippen wie `TenantSlug` (Format, Länge, `service`), danach (300 ms) der

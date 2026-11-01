@@ -16,12 +16,15 @@ final readonly class BookingRequest
 {
     /**
      * @param string $requestHash SHA-256 (binär) über den Inhalt der Buchung, siehe hash()
+     * @param ?string $onlineHash bei einer Offline-Buchung derselbe Inhalt ohne Aktionszeit, siehe
+     *                            onlineHash()
      */
     public function __construct(
         public ?ClientRef $clientRef,
         public ?ActionTime $occurredAt,
         public bool $staleConfirmed,
         public string $requestHash,
+        public ?string $onlineHash = null,
     ) {
         if ($occurredAt !== null && $clientRef === null) {
             throw new \LogicException('Eine Offline-Buchung braucht eine client_ref.');
@@ -47,5 +50,17 @@ final readonly class BookingRequest
             [$deviceId, $version, $change->locationId, $change->status?->value, $comment, $occurredAt?->sql()],
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE,
         ), true);
+    }
+
+    /**
+     * Inhalt derselben Buchung ohne Aktionszeit (nur bei einer Offline-Buchung, sonst null): Eine
+     * Offline-Buchung wiederholt auch eine schon gespeicherte Online-Buchung mit derselben client_ref
+     * und sonst gleichem Inhalt. Die App legt eine online gesendete Buchung, deren Antwort wegen
+     * eines Verbindungsfehlers ausblieb, mit derselben client_ref und der Zeit des ersten Versuchs
+     * in die Warteschlange; kam der erste Versuch doch an, wirkt sie so nicht doppelt.
+     */
+    public static function onlineHash(int $deviceId, int $version, DeviceStateChange $change, ?string $comment, ?ActionTime $occurredAt): ?string
+    {
+        return $occurredAt === null ? null : self::hash($deviceId, $version, $change, $comment, null);
     }
 }

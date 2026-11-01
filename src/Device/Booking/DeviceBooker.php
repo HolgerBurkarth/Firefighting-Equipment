@@ -14,7 +14,8 @@ use FirefightingEquipment\Tenant\Tenant;
 /**
  * Buchung mit Wiederholung über die client_ref (POST devices/{id}/state und POST devices/bulk/state):
  * Ist die Buchung schon gespeichert, wird ihr Ergebnis wiederholt (replayed, nichts geschrieben);
- * dieselbe client_ref mit anderem Inhalt, Gerät oder Konto ist ein Fehler. Wird dieselbe client_ref
+ * dieselbe client_ref mit anderem Inhalt, Gerät oder Konto ist ein Fehler (eine Offline-Buchung
+ * wiederholt auch eine Online-Buchung mit sonst gleichem Inhalt, siehe BookingRequest::onlineHash). Wird dieselbe client_ref
  * gleichzeitig verarbeitet, gewinnt die andere Anfrage, und ihr Ergebnis wird wiederholt.
  */
 final readonly class DeviceBooker
@@ -30,14 +31,16 @@ final readonly class DeviceBooker
     /**
      * Gespeichertes Ergebnis derselben Buchung, ohne client_ref oder ohne Quittung null.
      *
+     * @param ?string $onlineHash siehe BookingRequest::onlineHash()
+     *
      * @throws ClientRefConflictException andere Buchung mit derselben client_ref
      * @throws DeviceNotFoundException
      */
-    public function previous(?ClientRef $clientRef, int $userId, int $deviceId, string $hash): ?BookingResult
+    public function previous(?ClientRef $clientRef, int $userId, int $deviceId, string $hash, ?string $onlineHash = null): ?BookingResult
     {
         $stored = $clientRef === null ? null : $this->bookings->find($this->tenant, $clientRef);
 
-        return $stored === null ? null : $this->replay($stored, $clientRef, $userId, $deviceId, $hash);
+        return $stored === null ? null : $this->replay($stored, $clientRef, $userId, $deviceId, $hash, $onlineHash);
     }
 
     /**
@@ -54,7 +57,7 @@ final readonly class DeviceBooker
             $clientRef = $booking->clientRef ?? throw new \LogicException('client_ref fehlt.');
             $stored = $this->bookings->find($this->tenant, $clientRef) ?? throw new \LogicException('Quittung fehlt.');
 
-            return $this->replay($stored, $clientRef, $userId, $deviceId, $booking->requestHash);
+            return $this->replay($stored, $clientRef, $userId, $deviceId, $booking->requestHash, $booking->onlineHash);
         }
     }
 
@@ -62,9 +65,9 @@ final readonly class DeviceBooker
      * @throws ClientRefConflictException
      * @throws DeviceNotFoundException
      */
-    private function replay(StoredBooking $stored, ClientRef $clientRef, int $userId, int $deviceId, string $hash): BookingResult
+    private function replay(StoredBooking $stored, ClientRef $clientRef, int $userId, int $deviceId, string $hash, ?string $onlineHash): BookingResult
     {
-        if (!$stored->matches($userId, $deviceId, $hash)) {
+        if (!$stored->matches($userId, $deviceId, $hash) && ($onlineHash === null || !$stored->matches($userId, $deviceId, $onlineHash))) {
             throw new ClientRefConflictException();
         }
         $device = $this->devices->find($this->tenant, $deviceId) ?? throw DeviceNotFoundException::forId($deviceId);

@@ -365,6 +365,7 @@ test.describe('Keine Verbindung beim Speichern', () => {
         // Offline-Modus (KONZEPT.md, "Offline-Modus – Entscheidungen", 52; offline.spec.ts).
         await openFromSearch(page);
         await statusButton(page, 'in Wartung').click();
+        const before = await page.evaluate(() => Date.now());
         await page.getByRole('button', { name: 'Speichern' }).click();
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
         await expect(page.getByTestId('booking-notice')).toContainText(
@@ -374,8 +375,14 @@ test.describe('Keine Verbindung beim Speichern', () => {
         await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
         await expect(page.getByTestId('queued-done')).toBeVisible();
         const [first, second] = stateRequests(apiRequests);
-        expect(second?.['occurred_at']).toMatch(/Z$/);
-        expect(second?.['client_ref']).not.toBe(first?.['client_ref']);
+        // Dieselbe Buchung wie der erste Versuch (kam er doch an, wiederholt der Server nur das
+        // Ergebnis), mit der Zeit des ersten Versuchs als Aktionszeit.
+        expect(first?.['occurred_at']).toBeUndefined();
+        expect(second?.['client_ref']).toBe(first?.['client_ref']);
+        const occurredAt = Date.parse(String(second?.['occurred_at']));
+        expect(occurredAt).toBeGreaterThanOrEqual(Math.floor(before / 1000) * 1000);
+        expect(occurredAt).toBeLessThanOrEqual(before + 5000);
+        expect({ ...second, occurred_at: undefined }).toEqual({ ...first, occurred_at: undefined });
     });
 });
 
