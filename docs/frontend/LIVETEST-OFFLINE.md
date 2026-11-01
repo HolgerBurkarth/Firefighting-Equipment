@@ -30,6 +30,10 @@ Ergebnisse bitte mit der Nummer eintragen (☑ bzw. ☒ mit Fund).
   Seit der Selbstheilung (Version 2) scheiterte jedes Öffnen der Datenbank mit fester Version 1
   (`VersionError`). Behoben mit „Offline: Warteschlange bleibt beim Kontowechsel; lokale Datenbank ohne feste Version öffnen“; Ergebnis nach
   dem Deploy siehe A5.
+- ☑ A5 Nach der Behebung (Build `c538ba392497`, 01.11.2026): Datenbank Version 2 öffnet, Kopie
+  frisch gespeichert (69 Geräte, 7 Standorte), Besitzer der Warteschlange gemerkt
+  (`ff-queue-owners:test`), kein Hinweis auf fremde Buchungen, keine Konsolenfehler. Der
+  Kontowechsel selbst (B8a) braucht An- und Abmelden und bleibt für Holger.
 
 ## B Offline am iPhone (Holger)
 - ☐ B1 Flugmodus an, App öffnen bzw. neu laden: grauer Streifen „Offline – angezeigt wird der Stand
