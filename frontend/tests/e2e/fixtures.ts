@@ -86,6 +86,13 @@ export const HTTP_ERROR_CONSOLE = /status of [45]\d\d|Failed to load resource/;
 export const NETWORK_ERROR_CONSOLE =
     /status of [45]\d\d|Failed to load resource|ERR_INTERNET_DISCONNECTED|NetworkError|network connection/i;
 
+/** Antwort von GET api/v1/client-config wie im Backend (ClientConfigHandler), Standardgrenzen. */
+export const DEFAULT_CLIENT_CONFIG = {
+    server_time: '2026-10-31T12:00:00Z',
+    offline: { max_age_days: 7, queue_max_age_days: 7 },
+    max_clock_skew_seconds: 300,
+};
+
 /** 1 × 1 px, transparent (für die Symbole aus api/v1/app-icon/…). */
 const PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
@@ -180,6 +187,13 @@ async function fulfillApi(
         await fulfillMock(route, typeof mock === 'function' ? mock(request) : mock);
     } else if (path === 'api/v1/tenant' && !isService) {
         await route.fulfill({ status: tenant.status, json: tenant.body });
+    } else if (method === 'GET' && path === 'api/v1/client-config' && !isService) {
+        // Jede vollständige Synchronisierung liest die Grenzen und die Standorte (KONZEPT.md,
+        // "Offline-Modus – Entscheidungen", 49 und 54); ohne eigene Angabe die Standardwerte bzw.
+        // keine Standorte. Tests, die sie prüfen, simulieren sie selbst (Option `api`).
+        await route.fulfill({ status: 200, json: DEFAULT_CLIENT_CONFIG });
+    } else if (method === 'GET' && path === 'api/v1/locations' && !isService) {
+        await route.fulfill({ status: 200, json: { locations: [] } });
     } else if (/^api\/v1\/app-icon\/(512|192|180)$/.test(path)) {
         await route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
     } else if (/^api\/v1\/tenant\/logo\/(512|192|180)$/.test(path) && !isService) {
