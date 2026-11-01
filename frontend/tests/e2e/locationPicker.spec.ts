@@ -8,7 +8,13 @@ import {
     type MockRequest,
     type MockResponse,
 } from './fixtures';
-import { deviceDetail, deviceJson, devicesEndpoint, LOCATIONS } from './support/devices';
+import {
+    deviceDetail,
+    deviceJson,
+    devicesEndpoint,
+    LOCATIONS,
+    locationJson,
+} from './support/devices';
 
 /** M1 an HLF 20 / G1 (11), einsatzbereit. */
 const M1 = deviceJson(1);
@@ -312,6 +318,94 @@ test.describe('Standortwahl', () => {
                 .map((element) => `${element.tagName}.${element.className}`);
         });
         expect(overflow).toEqual([]);
+    });
+});
+
+test.describe('Standortwahl: Aufklappen scrollt die Fächer ins Bild (T3)', () => {
+    const vehicles = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((letter, index) =>
+        locationJson(40 + index, `Wagen ${letter}`, [], 'vehicle', 1),
+    );
+    const compartments = [1, 2, 3, 4, 5, 6].map((n) => ({
+        id: 90 + n,
+        name: `Fach ${String(n)}`,
+        count: 1,
+    }));
+    test.use({
+        api: {
+            ...COMMON,
+            'GET api/v1/locations': {
+                status: 200,
+                body: {
+                    locations: [
+                        locationJson(10, 'HLF 20', [{ id: 11, name: 'G1', count: 6 }]),
+                        ...vehicles,
+                        locationJson(90, 'Zug-Wagen', compartments),
+                    ],
+                },
+            },
+        },
+    });
+
+    async function openAtBottom(page: Page, height: number): Promise<void> {
+        await page.setViewportSize({ width: 390, height });
+        await page.goto('/firefighting/test/geraete/1?standortwahl=1');
+        // Die Gruppe des aktuellen Standorts zuklappen, dann ganz nach unten.
+        await group(page, 'HLF 20').click();
+        await expect(page.getByTestId('picker-entry')).toHaveCount(0);
+        await page.evaluate(() => {
+            window.scrollTo(0, document.documentElement.scrollHeight);
+        });
+    }
+
+    /** Oberkante des Kopfs der Gruppe und Unterkante der Kopfzeile bzw. des letzten Fachs. */
+    async function positions(page: Page) {
+        return page.evaluate(() => {
+            const header = document.querySelector('.picker-header')?.getBoundingClientRect();
+            const head = [...document.querySelectorAll('[data-testid="picker-group"]')]
+                .find((element) => element.textContent.includes('Zug-Wagen'))
+                ?.getBoundingClientRect();
+            const last = [...document.querySelectorAll('[data-testid="picker-entry"]')]
+                .at(-1)
+                ?.getBoundingClientRect();
+            return {
+                headerBottom: Math.round(header?.bottom ?? 0),
+                headTop: Math.round(head?.top ?? 0),
+                lastBottom: Math.round(last?.bottom ?? 0),
+                viewport: window.innerHeight,
+            };
+        });
+    }
+
+    test('Fächer laufen unten aus dem Bild: danach alle sichtbar', async ({ page }) => {
+        await openAtBottom(page, 800);
+        const before = await positions(page);
+        await group(page, 'Zug-Wagen').click();
+        await expect(entry(page, 'Fach 6')).toBeVisible();
+        await expect
+            .poll(async () => {
+                const now = await positions(page);
+                return now.lastBottom <= now.viewport && now.headTop >= now.headerBottom - 1;
+            })
+            .toBe(true);
+        // Es wurde wirklich gescrollt (ohne Scrollen lägen die Fächer unter dem Rand).
+        expect((await positions(page)).headTop).toBeLessThan(before.headTop);
+    });
+
+    test('Gruppe höher als der Bildschirm: der Kopf bleibt oben sichtbar', async ({ page }) => {
+        await openAtBottom(page, 420);
+        await group(page, 'Zug-Wagen').click();
+        await expect(entry(page, 'Fach 1')).toBeVisible();
+        await expect
+            .poll(async () => {
+                const now = await positions(page);
+                // Direkt unter der Kopfzeile (Rahmen der Gruppe dazwischen), Fächer laufen weiter.
+                return (
+                    now.headTop >= now.headerBottom - 1 &&
+                    now.headTop <= now.headerBottom + 8 &&
+                    now.lastBottom > now.viewport
+                );
+            })
+            .toBe(true);
     });
 });
 

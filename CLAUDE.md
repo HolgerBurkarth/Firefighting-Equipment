@@ -401,7 +401,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Basispfad aus `document.baseURI`, `theme.ts` Anzeigemodus je Gerät, `accent.ts` Stadtfarbe,
   `appearance.ts` Manifest-Link und Erscheinungsbild der Stadt, `serviceWorker.ts` Registrierung,
   `appUpdate.ts` Updates, `updateTrace.ts` Zeitleiste der Updates, `unsavedInput.ts` ungespeicherte
-  Eingaben, `build.ts` Build-Kennung,
+  Eingaben, `reveal.ts` Scrollen beim Aufklappen, `build.ts` Build-Kennung,
   `now.ts` `useNow` für Zeitangaben: alle 30 s und bei `visibilitychange` neu, `countdown.ts`
   `useCountdown` Sperre nach 429 bis `Retry-After`, `download.ts` `saveDownload`, `share.ts`
   `shareLink`/`copyText`), `src/scanner/` (Kamera-Scanner:
@@ -603,7 +603,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `device_count_total`; mit Unterstandorten klappt die ganze Zeile auf (`aria-expanded`, zu Beginn
   die Gruppe des gewählten Standorts), erster Eintrag `WHOLE_LABELS` („Ganzes Fahrzeug, ohne Fach“,
   bei Räumen „Ganzer Raum, ohne Fach“, Extern „Ganzer Standort, ohne Fach“) = der Standort selbst,
-  dann die Fächer; ohne Unterstandorte wählt Antippen. Mit Suchbegriff `searchLocations`: Wörter mit
+  dann die Fächer; ohne Unterstandorte wählt Antippen. Laufen die Fächer beim Aufklappen unten aus
+  dem Bild, scrollt das Fenster (`revealOffset` in `src/runtime/reveal.ts`, T3) bis zu ihrem Ende,
+  höchstens bis der Kopf der Gruppe direkt unter `.picker-header` steht. Mit Suchbegriff `searchLocations`: Wörter mit
   UND (Vergleichsform `searchKey`) im Namen der Ebene 1 bzw. im ganzen Pfad eines Unterstandorts
   („hlf g1“), flach, Fächer mit ihrem Fahrzeug darunter, „N Treffer“, sonst „Kein Standort passt zu
   „…“.“. Markierung „aktuell“ und Häkchen „gewählt“. Ein gewählter Standort, der nicht als zuletzt
