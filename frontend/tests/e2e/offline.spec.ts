@@ -258,13 +258,30 @@ async function storedQueue(page: Page): Promise<Record<string, unknown>[] | null
 }
 
 test.describe('Offline-Modus: Buchungen in der Warteschlange', () => {
-    const state: { mode: 'online' | 'offline' | 'expired'; failBooking: boolean } = {
+    const state: {
+        mode: 'online' | 'offline' | 'expired';
+        failBooking: boolean;
+        otherAccount: boolean;
+    } = {
         mode: 'online',
         failBooking: false,
+        otherAccount: false,
     };
+    /** Ein anderes Konto (Bernd, Nr. 8) auf demselben Gerät. */
+    const bernd = meBody('user', 'Bernd');
+    bernd['user'] = {
+        ...(bernd['user'] as Record<string, unknown>),
+        id: 8,
+        email: 'bernd@example.org',
+    };
+    const online = switchable(state);
     test.use({
         api: {
-            ...switchable(state),
+            ...online,
+            'GET api/v1/auth/me': (request) =>
+                state.mode === 'online' && state.otherAccount
+                    ? { status: 200, body: bernd }
+                    : (online['GET api/v1/auth/me']?.(request) ?? 'abort'),
             'GET api/v1/client-config': () => (state.mode === 'offline' ? 'abort' : CLIENT_CONFIG),
             'POST api/v1/devices/1/state': (request) => {
                 if (state.mode === 'offline') {
@@ -279,6 +296,34 @@ test.describe('Offline-Modus: Buchungen in der Warteschlange', () => {
     test.beforeEach(() => {
         state.mode = 'online';
         state.failBooking = false;
+        state.otherAccount = false;
+    });
+
+    test('anderes Konto: Buchungen des bisherigen bleiben, Hinweis und Verwerfen nach Rückfrage', async ({
+        page,
+    }) => {
+        await bookOffline(page);
+        // Server gestört: Annas Buchung bleibt sicher in der Warteschlange.
+        state.mode = 'online';
+        state.failBooking = true;
+        state.otherAccount = true;
+        await page.reload();
+        await expect(page.getByText('Hallo Bernd')).toBeVisible();
+        const notice = page.getByTestId('other-queue');
+        await expect(notice).toHaveText(
+            /Auf diesem Gerät liegt 1 nicht gesendete Buchung von Anna\. Sie wird gesendet, sobald Anna sich wieder anmeldet\./,
+        );
+        await expect(page.getByTestId('booking-queue')).toHaveCount(0);
+        expect(await storedQueue(page)).toHaveLength(1);
+
+        await notice.getByRole('button', { name: 'Verwerfen …' }).click();
+        const confirm = page.getByTestId('confirm-dialog');
+        await expect(confirm).toContainText(
+            'Die nicht gesendete Buchung von Anna wird von diesem Gerät gelöscht und nie gesendet.',
+        );
+        await confirm.getByRole('button', { name: 'Verwerfen' }).click();
+        await expect(notice).toHaveCount(0);
+        await expect.poll(() => storedQueue(page)).toBeNull();
     });
 
     /** Online einmal laden (Kopie mit Standorten), dann ohne Verbindung M1 als defekt buchen. */
@@ -289,6 +334,8 @@ test.describe('Offline-Modus: Buchungen in der Warteschlange', () => {
         await expect(page.getByText('Jetzt: HLF 20 / G1 · einsatzbereit')).toBeVisible();
         await expect.poll(() => storedDeviceIds(page)).toEqual([1, 2, 3]);
         await page.getByRole('button', { name: 'Zurück' }).click();
+        // Erst nach dem Seitenwechsel neu laden (sonst lädt WebKit unter Last noch das Gerät).
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
         state.mode = 'offline';
         await page.reload();
         await expect(page.getByTestId('offline-notice')).toBeVisible();
@@ -467,6 +514,13 @@ test.describe('Offline-Modus: Buchungen in der Warteschlange', () => {
         );
         await page.goto('/firefighting/test/suchen');
         await expect.poll(() => storedDeviceIds(page)).toEqual([1, 2, 3]);
+        // Die Datenbank hat jetzt eine höhere Version; auch der nächste Seitenaufruf öffnet sie
+        // (live 01.11.2026: mit fester Version 1 scheiterte jedes Öffnen, die Kopie blieb alt).
+        state.mode = 'offline';
+        await page.reload();
+        await expect(page.getByTestId('offline-notice')).toBeVisible();
+        await page.getByRole('searchbox').fill('M1');
+        await expect(page.getByTestId('device-card')).toHaveCount(1);
     });
 });
 

@@ -25,6 +25,11 @@ Ergebnisse bitte mit der Nummer eintragen (☑ bzw. ☒ mit Fund).
   Buchung mit `occurred_at` (wie aus der Warteschlange) → 200 `replayed`, keine zweite Version;
   anderer Kommentar → 409 `client_ref_conflict`; danach zurückgesetzt. (01.11.2026, Build
   `f80fe02030cf`, per JavaScript im Browser.)
+- ☒→☑ A4 Synchronisierung (Build `71a179b53e9f`, 01.11.2026): „Suchen“ lädt Geräte, Standorte und
+  `client-config` (☑), Grenzen gespeichert (☑). ☒ Die Kopie blieb auf dem Stand von gestern 17:01:
+  Seit der Selbstheilung (Version 2) scheiterte jedes Öffnen der Datenbank mit fester Version 1
+  (`VersionError`). Behoben mit „Offline: Warteschlange bleibt beim Kontowechsel; lokale Datenbank ohne feste Version öffnen“; Ergebnis nach
+  dem Deploy siehe A5.
 
 ## B Offline am iPhone (Holger)
 - ☐ B1 Flugmodus an, App öffnen bzw. neu laden: grauer Streifen „Offline – angezeigt wird der Stand
@@ -48,6 +53,12 @@ Ergebnisse bitte mit der Nummer eintragen (☑ bzw. ☒ mit Fund).
   behält alles. (Abmelden selbst geht nur online.)
 - ☐ B8 Nach dem Abmelden und Anmelden mit einem anderen Konto: keine Geräte des alten Kontos
   sichtbar, bevor die Liste geladen ist; keine fremde Warteschlange.
+- ☐ B8a Kontowechsel OHNE Abmelden (Entscheidung 55): Konto A bucht offline (Flugmodus), dann (online,
+  Server gestört oder sofort danach) im selben Browser Konto B anmelden (z. B. Sitzung von A in einem
+  anderen Tab beendet): Auf „Suchen“ steht „Auf diesem Gerät liegt 1 nicht gesendete Buchung von A.
+  Sie wird gesendet, sobald A sich wieder anmeldet.“; die eigene Warteschlange von B ist leer. A
+  wieder anmelden → die Buchung geht raus. Zweiter Durchgang: als B „Verwerfen …“ → Rückfrage →
+  Hinweis weg, A hat danach keine Buchung mehr.
 - ☐ B9 Uhr des Handys 10 Minuten vorstellen, offline buchen, Flugmodus aus: Meldung „Die Uhr dieses
   Geräts geht vor …“ mit „Verwerfen“. Uhr zurückstellen.
 - ☐ B10 Grenzen: Mit `offline.queue_max_age_days` = 1 auf dem Server (nur, wenn Holger die

@@ -32,6 +32,7 @@ import {
     reportServerReached,
     resetConnectivity,
 } from '../../src/runtime/connectivity';
+import { OtherQueues, otherQueueText } from '../../src/data/otherQueues';
 import { MemoryDb } from '../../src/runtime/localDb';
 import { respond } from './support/fetch';
 import { meBody } from './support/me';
@@ -531,6 +532,85 @@ describe('Warteschlange an Konto und Geräte gebunden (Entscheidung 52)', () => 
         await devices.refresh('changed');
         await flush();
         expect(limitReads).toBe(2);
+        stop();
+    });
+});
+
+describe('Kontowechsel: Warteschlange des anderen Kontos bleibt (Entscheidung 55)', () => {
+    it('behält sie, zeigt sie dem neuen Konto und verwirft sie erst auf Wunsch', async () => {
+        const db = new MemoryDb();
+        const waiting = {
+            clientRef: '0b4d2a7c-1f3e-4c5a-9b8d-7e6f5a4b3c2d',
+            deviceId: 1,
+            identifier: 'M1',
+            deviceTypeName: 'Atemschutzmaske',
+            version: 1,
+            status: 'maintenance',
+            statusLabel: 'in Wartung',
+            occurredAt: '2026-10-31T11:00:00Z',
+            state: 'waiting',
+        };
+        await db.put('queue', 'test:7', [waiting, { ...waiting, clientRef: 'x', state: 'done' }]);
+        const queue = new BookingQueue({
+            db,
+            post: () =>
+                Promise.resolve({
+                    ok: false,
+                    error: {
+                        code: 'network',
+                        message: null,
+                        status: null,
+                        retryAfterSeconds: null,
+                        details: null,
+                    },
+                }),
+        });
+        const others = new OtherQueues({ area: 'test', db, storage });
+        const devices = new DeviceStore(() =>
+            Promise.resolve({
+                ok: true,
+                status: 200,
+                data: { devices: [], total: 0, limit: 200, offset: 0 },
+            }),
+        );
+        setSession(state());
+        const stop = installBookingQueue({
+            area: 'test',
+            queue,
+            devices,
+            others,
+            storage,
+            doc: document,
+            fetchLimits: () => new Promise(() => undefined),
+        });
+        await flush();
+        expect(others.list).toEqual([]);
+
+        // Ein anderes Konto meldet sich an: die Warteschlange von Anna bleibt gespeichert.
+        setSession(state('user', 8));
+        await flush();
+        expect(await db.get('queue', 'test:7')).toHaveLength(2);
+        expect(queue.state.key).toBe('test:8');
+        expect(others.list).toEqual([{ accountId: 7, name: 'Anna', count: 1 }]);
+        expect(otherQueueText({ accountId: 7, name: 'Anna', count: 1 })).toBe(
+            'Auf diesem Gerät liegt 1 nicht gesendete Buchung von Anna. Sie wird gesendet, sobald Anna sich wieder anmeldet.',
+        );
+        expect(otherQueueText({ accountId: 7, name: 'Anna', count: 3 })).toBe(
+            'Auf diesem Gerät liegen 3 nicht gesendete Buchungen von Anna. Sie werden gesendet, sobald Anna sich wieder anmeldet.',
+        );
+
+        // Anna meldet sich wieder an: ihre Buchungen sind wieder da, kein Hinweis.
+        setSession(state());
+        await flush();
+        expect(queue.state.bookings).toHaveLength(2);
+        expect(others.list).toEqual([]);
+
+        // Verwerfen löscht nur die Warteschlange des anderen Kontos.
+        setSession(state('user', 8));
+        await flush();
+        await others.discard(7);
+        expect(await db.get('queue', 'test:7')).toBeNull();
+        expect(others.list).toEqual([]);
         stop();
     });
 });

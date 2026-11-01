@@ -10,6 +10,7 @@ import { browserLocalDb, type LocalDb } from '../runtime/localDb';
 import { pendingDevice, type BookingQueue, type QueueLimits } from './bookingQueue';
 import type { DeviceStore } from './deviceStore';
 import type { LocationStore } from './locationStore';
+import type { OtherQueues } from './otherQueues';
 
 /** Format der lokalen Kopie; ein anderes wird ignoriert (und beim nächsten Laden ersetzt). */
 export const SNAPSHOT_FORMAT = 1;
@@ -174,6 +175,7 @@ export interface BookingQueueInstallOptions {
     readonly area: string;
     readonly queue: BookingQueue;
     readonly devices: DeviceStore;
+    readonly others?: OtherQueues;
     readonly fetchLimits?: () => Promise<ApiResult<ClientConfig>>;
     readonly storage?: Pick<Storage, 'getItem' | 'setItem'> | null;
     readonly doc?: Document;
@@ -185,11 +187,12 @@ export interface BookingQueueInstallOptions {
  * wenn die Verbindung zurückkommt und beim Zurückkehren in die App. Die Grenzen (`client-config`)
  * liest die App bei jeder vollständigen Synchronisierung (Laden der Geräte) und vor dem ersten Senden
  * eines Seitenaufrufs; gemerkt je Stadt in localStorage. Wartende Buchungen zeigt die Liste mit dem
- * gewünschten Stand, solange der Server das Gerät nicht geändert hat. Abmelden und ein anderes
- * Konto löschen die Warteschlange des bisherigen Kontos, eine abgelaufene Sitzung nicht.
+ * gewünschten Stand, solange der Server das Gerät nicht geändert hat. Abmelden löscht die
+ * Warteschlange des Kontos; ein anderes Konto und eine abgelaufene Sitzung nicht (`others` zeigt dem
+ * angemeldeten Konto die Warteschlangen der anderen, Entscheidung 55).
  */
 export function installBookingQueue(options: BookingQueueInstallOptions): () => void {
-    const { queue, devices } = options;
+    const { queue, devices, others } = options;
     const storage = options.storage === undefined ? safeLocalStorage() : options.storage;
     const fetchLimits = options.fetchLimits ?? (() => fetchClientConfig());
     const doc = options.doc ?? document;
@@ -265,8 +268,12 @@ export function installBookingQueue(options: BookingQueueInstallOptions): () => 
         session,
         (account) => {
             const key = account === null ? null : snapshotKey(options.area, account);
+            if (account !== null) {
+                others?.remember(account);
+            }
             void queue.use(key).then(() => {
                 applyPending();
+                void others?.refresh(account?.user.id ?? null);
                 void sendIfUseful();
             });
         },
@@ -286,7 +293,8 @@ export function installBookingQueue(options: BookingQueueInstallOptions): () => 
     };
     doc.addEventListener('visibilitychange', onVisibility);
     const stopEnded = onSessionEnded((ended, reason) => {
-        if (reason !== 'ended') {
+        if (reason === 'logout') {
+            others?.forget(ended.user.id);
             void queue.remove(snapshotKey(options.area, ended));
         }
     });
