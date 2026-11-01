@@ -73,10 +73,14 @@ async function onSaveAccent(): Promise<void> {
     savingAccent.value = true;
     accentError.value = null;
     success.value = null;
-    const result = await saveAccentColor(accentRequest(candidate.value ?? null));
+    const sent = candidate.value ?? null;
+    const result = await saveAccentColor(accentRequest(sent));
     savingAccent.value = false;
     if (result.ok) {
-        input.value = display(accentSelection(result.data.accentColor));
+        // Während des Speicherns anders gewählt: Die neue Wahl bleibt (T14), sonst die Antwort.
+        if (candidate.value === sent) {
+            input.value = display(accentSelection(result.data.accentColor));
+        }
         success.value = 'Akzentfarbe gespeichert. Sie gilt ab jetzt für alle Benutzer der Stadt.';
     } else {
         accentError.value = result.error;
