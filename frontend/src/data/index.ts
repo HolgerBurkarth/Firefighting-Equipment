@@ -69,6 +69,8 @@ import { LocationStore } from './locationStore';
 import { NoticeList } from './noticeList';
 import { UserStore } from './userStore';
 import { BookingQueue } from './bookingQueue';
+import { OtherQueues } from './otherQueues';
+import { currentAppBase } from '../runtime/appBase';
 import { browserLocalDb } from '../runtime/localDb';
 import { newClientRef, setBookingNotice } from './booking';
 import { runInBlocks, type BulkRun } from './deviceBulk';
@@ -104,6 +106,16 @@ export const bookingQueue = new BookingQueue({
     onSent: (response) => {
         deviceStore.upsert(response.device);
     },
+});
+
+/**
+ * Warteschlangen anderer Konten auf diesem Gerät (Entscheidung 55); Name des Besitzers je Stadt in
+ * localStorage.
+ */
+export const otherQueues = new OtherQueues({
+    area: () => currentAppBase().area,
+    db: browserLocalDb(),
+    storage: browserStorage(),
 });
 
 /**

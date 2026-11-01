@@ -14,6 +14,7 @@ import type { ApiError } from '../api/client';
 import type { DeviceListItem } from '../api/devices';
 import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
 import BookingQueuePanel from '../components/BookingQueuePanel.vue';
+import OtherQueuesNotice from '../components/OtherQueuesNotice.vue';
 import CodeScanner from '../components/CodeScanner.vue';
 import DeviceCard from '../components/DeviceCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
@@ -292,6 +293,7 @@ function retry(): void {
     <CodeScanner v-if="scannerOpen" @detected="onDetected" @close="closeScanner" />
 
     <BookingNoticeMessage v-if="bookingNotice !== null" :notice="bookingNotice" />
+    <OtherQueuesNotice />
     <BookingQueuePanel />
 
     <p v-if="notFound" class="notice notice-info" role="status" data-testid="search-not-found">

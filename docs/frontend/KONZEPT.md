@@ -214,6 +214,12 @@ vollständig sind.
 55. **Abmelden:** Liegen Buchungen in der Warteschlange, fragt die App vorher („3 Buchungen wurden
     noch nicht gesendet und gehen beim Abmelden verloren“). Abmelden löscht Kopie, Warteschlange und
     gespeicherte Sitzung des Kontos. Abmelden geht nur online (der Server beendet die Sitzung).
+    Kontowechsel ohne Abmelden (Holger, 01.11.2026): Die Warteschlange des bisherigen Kontos bleibt
+    (je Konto gespeichert) und geht raus, sobald es sich wieder anmeldet; seine Kopie darf gelöscht
+    werden. Das neue Konto sieht „Auf diesem Gerät liegen N nicht gesendete Buchungen von <Name>.
+    Sie werden gesendet, sobald <Name> sich wieder anmeldet.“ mit „Verwerfen …“ (Rückfrage, dann
+    gelöscht). Vorläufig (Agent, 01.11.): Der Hinweis steht auf „Suchen“ (wie die eigene
+    Warteschlange), nicht auf jeder Seite; den Namen merkt sich die App je Stadt in localStorage.
 56. **Scanner offline:** Das Lesemodul (WASM) kommt in den Cache des Service Workers.
 
 Stand (31.10.2026, Nacht): O1 umgesetzt und live (lokale Kopie, gespeicherte Sitzung, grauer

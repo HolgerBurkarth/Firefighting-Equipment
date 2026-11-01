@@ -982,7 +982,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Sitzung der graue Streifen `offline-notice` („Offline – angezeigt wird der Stand vom 31.10.,
   14:02.“, `syncedAtText`). Browser-Tests `tests/e2e/offline.spec.ts` (API per `abort`, die
   App-Seite liefert der Testserver; IndexedDB im Test direkt gelesen, ohne die Datenbank anzulegen:
-  `IndexedDbStore.openVersion` legt fehlende Tabellen sonst mit der nächsten Version an); Unit-Tests
+  `IndexedDbStore.openVersion` legt fehlende Tabellen sonst mit der nächsten Version an; die App
+  öffnet die Datenbank immer ohne feste Version, sonst scheiterte nach einer solchen Erhöhung jedes
+  Öffnen mit `VersionError`, live 01.11.2026); Unit-Tests
   `offline.spec.ts`. Warteschlange (Schritt O2; `src/data/bookingQueue.ts`, `BookingQueue` als
   `bookingQueue` in `src/data/index.ts`, `installBookingQueue` in `main.ts`): je Stadt und Konto
   (IndexedDB `queue`), Einträge `QueuedBooking` (`client_ref`, Gerät mit Version, Ziel mit Pfad bzw.
@@ -1006,8 +1008,15 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   wiederholt der Server nur sein Ergebnis (siehe "Offline-Buchungen (API)", Wiederholung). Dieselbe
   `client_ref` steht nur einmal in der Warteschlange. Anzeige `BookingQueuePanel` auf „Suchen“ (Uhr, Haken, Ergebnis,
   „Angekommene ausblenden“). Abmelden (`AccountPanel`, `AdminMenuNav`) mit ungesendeten Buchungen erst
-  nach `ConfirmDialog` (`unsentWarning`); Abmelden und ein anderes Konto löschen die Warteschlange,
-  eine abgelaufene Sitzung nicht. Tests `tests/e2e/offline.spec.ts` (auch `context.setOffline`:
+  nach `ConfirmDialog` (`unsentWarning`); Abmelden löscht die Warteschlange, ein anderes Konto und
+  eine abgelaufene Sitzung nicht (die Kopie löscht ein anderes Konto weiterhin). Warteschlangen
+  anderer Konten (`OtherQueues` in `src/data/otherQueues.ts`, `otherQueues` aus `src/data/index.ts`,
+  an `installBookingQueue` als `others`): Name des Besitzers je Stadt in localStorage
+  `ff-queue-owners:<kürzel>` (Konto-ID → Name, gemerkt bei jeder Sitzung, entfernt beim Abmelden);
+  auf „Suchen“ je anderem Konto mit nicht angekommenen Buchungen `OtherQueuesNotice` („Auf diesem
+  Gerät liegen N nicht gesendete Buchungen von <Name>. Sie werden gesendet, sobald <Name> sich wieder
+  anmeldet.“, `otherQueueText`) mit „Verwerfen …“ nach `ConfirmDialog` (löscht nur diese
+  Warteschlange); meldet sich das Konto wieder an, sendet die App sie. Tests `tests/e2e/offline.spec.ts` (auch `context.setOffline`:
   Streifen sofort, Buchung ohne Sendeversuch, bei `online` gesendet), `booking.spec.ts` („Keine
   Verbindung beim Speichern“), Unit-Tests `bookingQueue.spec.ts`, `offline.spec.ts`
   (`installBookingQueue`). Live-Test-Liste `docs/frontend/LIVETEST-OFFLINE.md` (echtes Offline nur

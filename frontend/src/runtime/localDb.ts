@@ -14,7 +14,6 @@ export interface LocalDb {
 export type LocalDbStore = 'snapshots' | 'queue';
 
 export const LOCAL_DB_NAME = 'ff-offline';
-const LOCAL_DB_VERSION = 1;
 const STORES: readonly LocalDbStore[] = ['snapshots', 'queue'];
 
 /** Speicher im Arbeitsspeicher (Tests; Browser ohne IndexedDB verlieren die Daten beim Neuladen). */
@@ -54,7 +53,7 @@ export class IndexedDbStore implements LocalDb {
     constructor(private readonly factory: IDBFactory) {}
 
     private open(): Promise<IDBDatabase> {
-        this.opened ??= this.openVersion(LOCAL_DB_VERSION).catch((error: unknown) => {
+        this.opened ??= this.openVersion(null).catch((error: unknown) => {
             // Beim nächsten Zugriff erneut versuchen.
             this.opened = null;
             throw error;
@@ -63,13 +62,18 @@ export class IndexedDbStore implements LocalDb {
     }
 
     /**
-     * Öffnet die Datenbank und legt fehlende Tabellen an. Fehlt eine Tabelle, obwohl die Version
-     * schon besteht (z. B. hat ein anderes Skript die Datenbank ohne Tabellen angelegt, live
-     * 31.10.2026), erneut mit der nächsten Version öffnen, damit sie angelegt wird.
+     * Öffnet die Datenbank (zuerst ohne Version: die vorhandene bzw. neu mit Version 1) und legt
+     * fehlende Tabellen an. Fehlt eine Tabelle, obwohl die Version schon besteht (z. B. hat ein
+     * anderes Skript die Datenbank ohne Tabellen angelegt, live 31.10.2026), erneut mit der nächsten
+     * Version öffnen, damit sie angelegt wird. Nie mit einer festen Version: Nach diesem Schritt ist
+     * die Version höher, ein Öffnen mit der alten scheiterte (VersionError, live 01.11.2026).
      */
-    private openVersion(version: number): Promise<IDBDatabase> {
+    private openVersion(version: number | null): Promise<IDBDatabase> {
         return new Promise<IDBDatabase>((resolve, reject) => {
-            const request = this.factory.open(LOCAL_DB_NAME, version);
+            const request =
+                version === null
+                    ? this.factory.open(LOCAL_DB_NAME)
+                    : this.factory.open(LOCAL_DB_NAME, version);
             request.onupgradeneeded = () => {
                 for (const store of STORES) {
                     if (!request.result.objectStoreNames.contains(store)) {
@@ -80,6 +84,11 @@ export class IndexedDbStore implements LocalDb {
             request.onsuccess = () => {
                 const db = request.result;
                 if (STORES.every((store) => db.objectStoreNames.contains(store))) {
+                    // Erhöht ein anderer Tab die Version, schließen und beim nächsten Zugriff neu öffnen.
+                    db.onversionchange = () => {
+                        db.close();
+                        this.opened = null;
+                    };
                     resolve(db);
                     return;
                 }

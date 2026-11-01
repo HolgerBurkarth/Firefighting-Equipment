@@ -7,7 +7,7 @@ import './styles/base.css';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { configureStoredSession } from './auth/session';
-import { bookingQueue, deviceStore, installDataLayer, locationStore } from './data';
+import { bookingQueue, deviceStore, installDataLayer, locationStore, otherQueues } from './data';
 import { installBookingQueue, installOfflineCopy } from './data/offline';
 import { installServiceDataLayer } from './data/service';
 import { createAppRouter } from './router';
@@ -40,7 +40,12 @@ if (base.isService) {
     // Sitzung und lokale Kopie der Daten je Stadt und Konto.
     configureStoredSession(`ff-session:${base.area}`, browserStorage());
     installOfflineCopy({ area: base.area, devices: deviceStore, locations: locationStore });
-    installBookingQueue({ area: base.area, queue: bookingQueue, devices: deviceStore });
+    installBookingQueue({
+        area: base.area,
+        queue: bookingQueue,
+        devices: deviceStore,
+        others: otherQueues,
+    });
 }
 installConnectivity();
 
