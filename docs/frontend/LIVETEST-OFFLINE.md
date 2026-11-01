@@ -30,37 +30,49 @@ Ergebnisse bitte mit der Nummer eintragen (☑ bzw. ☒ mit Fund).
   Seit der Selbstheilung (Version 2) scheiterte jedes Öffnen der Datenbank mit fester Version 1
   (`VersionError`). Behoben mit „Offline: Warteschlange bleibt beim Kontowechsel; lokale Datenbank ohne feste Version öffnen“; Ergebnis nach
   dem Deploy siehe A5.
+- ☑ A5 Nach der Behebung (Build `c538ba392497`, 01.11.2026): Datenbank Version 2 öffnet, Kopie
+  frisch gespeichert (69 Geräte, 7 Standorte), Besitzer der Warteschlange gemerkt
+  (`ff-queue-owners:test`), kein Hinweis auf fremde Buchungen, keine Konsolenfehler. Der
+  Kontowechsel selbst (B8a) braucht An- und Abmelden und bleibt für Holger.
 
 ## B Offline am iPhone (Holger)
-- ☐ B1 Flugmodus an, App öffnen bzw. neu laden: grauer Streifen „Offline – angezeigt wird der Stand
+Ergebnis (Holger, iPhone, 01.11.2026): ☑ B1–B9; B8a offen; B10 nicht live geprüft (durch
+automatische Tests abgedeckt).
+- ☑ B1 Flugmodus an, App öffnen bzw. neu laden: grauer Streifen „Offline – angezeigt wird der Stand
   vom …“, keine Anmeldeseite; „Suchen“ findet Geräte, „Prüffristen“ zeigt die Listen.
-- ☐ B2 Offline M90 öffnen, Status „in Wartung“, Speichern: Hinweis „Gespeichert – wird gesendet,
+- ☑ B2 Offline M90 öffnen, Status „in Wartung“, Speichern: Hinweis „Gespeichert – wird gesendet,
   sobald eine Verbindung besteht: M90 → in Wartung“; auf „Suchen“ die Warteschlange mit Uhr; M90
   zeigt in der Suche „in Wartung“.
-- ☐ B3 Offline „Anderen Standort suchen …“: alle aktiven Standorte erscheinen (aus der Kopie, auch
+- ☑ B3 Offline „Anderen Standort suchen …“: alle aktiven Standorte erscheinen (aus der Kopie, auch
   wenn online nie Umbuchen geöffnet war); Umbuchen auf ein Fach, Speichern → zweite Buchung in der
   Warteschlange.
-- ☐ B4 Offline „Code scannen“: Kamera und Lesemodul funktionieren ohne Netz (Modul im Cache).
-- ☐ B5 Flugmodus aus: Die Buchungen gehen von selbst raus (Haken, „Die Buchung wurde übernommen.“);
+- ☑ B4 Offline „Code scannen“: Kamera und Lesemodul funktionieren ohne Netz (Modul im Cache).
+- ☑ B5 Flugmodus aus: Die Buchungen gehen von selbst raus (Haken, „Die Buchung wurde übernommen.“);
   am PC zeigt das Gerätedetail von M90 den neuen Stand, der Verlauf die Aktionszeit vom Handy und
   „Eingang beim Server“. „Angekommene ausblenden“ entfernt sie.
-- ☐ B6 Konflikt: offline M90 auf „defekt“ (mit Kommentar) buchen, währenddessen am PC M90 auf
+- ☑ B6 Konflikt: offline M90 auf „defekt“ (mit Kommentar) buchen, währenddessen am PC M90 auf
   „einsatzbereit“ setzen; dann Flugmodus aus. Ergebnis in der App gelb (nur im Verlauf bzw.
   überschrieben, je nach Reihenfolge der Zeiten), im Protokoll der Admins ein Hinweis, Mail „Log“ an
   die Empfänger.
-- ☐ B7 Abmelden mit wartender Buchung (Flugmodus an, buchen, dann Flugmodus aus, aber bevor sie
+- ☑ B7 Abmelden mit wartender Buchung (Flugmodus an, buchen, dann Flugmodus aus, aber bevor sie
   rausgeht – oder Server-Störung): Rückfrage „1 Buchung wurde noch nicht gesendet …“; „Abbrechen“
   behält alles. (Abmelden selbst geht nur online.)
-- ☐ B8 Nach dem Abmelden und Anmelden mit einem anderen Konto: keine Geräte des alten Kontos
+- ☑ B8 Nach dem Abmelden und Anmelden mit einem anderen Konto: keine Geräte des alten Kontos
   sichtbar, bevor die Liste geladen ist; keine fremde Warteschlange.
-- ☐ B8a Kontowechsel OHNE Abmelden (Entscheidung 55): Konto A bucht offline (Flugmodus), dann (online,
+- ☐ B8a (offen für Holger) Kontowechsel OHNE Abmelden (Entscheidung 55): Konto A bucht offline (Flugmodus), dann (online,
   Server gestört oder sofort danach) im selben Browser Konto B anmelden (z. B. Sitzung von A in einem
   anderen Tab beendet): Auf „Suchen“ steht „Auf diesem Gerät liegt 1 nicht gesendete Buchung von A.
   Sie wird gesendet, sobald A sich wieder anmeldet.“; die eigene Warteschlange von B ist leer. A
   wieder anmelden → die Buchung geht raus. Zweiter Durchgang: als B „Verwerfen …“ → Rückfrage →
   Hinweis weg, A hat danach keine Buchung mehr.
-- ☐ B9 Uhr des Handys 10 Minuten vorstellen, offline buchen, Flugmodus aus: Meldung „Die Uhr dieses
+- ☑ B9 Uhr des Handys 10 Minuten vorstellen, offline buchen, Flugmodus aus: Meldung „Die Uhr dieses
   Geräts geht vor …“ mit „Verwerfen“. Uhr zurückstellen.
 - ☐ B10 Grenzen: Mit `offline.queue_max_age_days` = 1 auf dem Server (nur, wenn Holger die
   Konfiguration dafür ändern möchte) eine Buchung über einen Tag offline liegen lassen → „Trotzdem
   senden“ bzw. „Verwerfen“. Sonst als offen markieren.
+  Nicht live geprüft (bräuchte eine Änderung der Server-Konfiguration; 01.11.2026), durch
+  automatische Tests abgedeckt: `offline.spec.ts` „alte Buchung: erst „Trotzdem senden“, dann mit
+  confirmed_stale“ (Browser), `bookingQueue.spec.ts` „alte Buchung: erst Rückfrage, dann mit
+  confirmed_stale“ und „stale_action des Servers ebenso; clock_implausible ist ein Fehler zum
+  Verwerfen“ (Vitest), `DeviceOfflineBookingTest::testStaleLimitAndConfirmation` (PHPUnit, Grenze
+  `queue_max_age_days` und `confirmed_stale`).

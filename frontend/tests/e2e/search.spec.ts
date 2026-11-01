@@ -209,7 +209,8 @@ test.describe('„Zuletzt benutzt“: Zeitpunkt der letzten Änderung', () => {
         m1 = deviceJson(1, { identifier: 'M1', state_changed_at: '2026-10-29T13:25:00Z' });
         await page.clock.setFixedTime(NOW);
         await page.addInitScript((key) => {
-            window.localStorage.setItem(key, JSON.stringify([1, 4, 2, 3]));
+            // Eigene Nutzung in anderer Reihenfolge: angezeigt nach der letzten Änderung (T1).
+            window.localStorage.setItem(key, JSON.stringify([3, 2, 4, 1]));
         }, RECENT_KEY);
     });
 

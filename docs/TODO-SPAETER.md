@@ -5,7 +5,7 @@ Wünsche aus Live-Tests. Nicht vorziehen; erst nach Abschluss der Hauptabschnitt
 
 | Nr. | Seite | Wunsch | Aufgenommen |
 |---|---|---|---|
-| T1 | Suchen | „Zuletzt benutzt“ nach dem Zeitpunkt der letzten Änderung des Geräts sortieren (neueste Änderung oben) statt nach der eigenen Nutzung. | 29.10.2026 |
+| T1 | Suchen | ~~„Zuletzt benutzt“ nach dem Zeitpunkt der letzten Änderung des Geräts sortieren (neueste Änderung oben) statt nach der eigenen Nutzung.~~ Erledigt am 01.11.2026 („Suchen: „Zuletzt benutzt“ nach der letzten Änderung sortieren (T1)“; KONZEPT.md Entscheidung 16). | 29.10.2026 |
 | T2 | Umbuchen | Unter „zuletzt“ nur noch EINEN zuletzt benutzten Standort anzeigen (zusätzlich zum aktuellen), statt bisher zwei. | 29.10.2026 |
 | T3 | Standort wählen | Beim Aufklappen einer Gruppe (z. B. HLF 20) so scrollen, dass die aufgeklappten Fächer sichtbar werden, wenn sie unten aus dem Bild laufen; der Kopf der Gruppe bleibt dabei oben sichtbar. | 29.10.2026 |
 | T4 | Umbuchen | „Speichern“ nur antippbar, wenn sich gegenüber dem jetzigen Stand etwas geändert hat (Standort, Status oder Kommentar). | 29.10.2026 |

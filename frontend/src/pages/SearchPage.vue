@@ -21,6 +21,7 @@ import ErrorNotice from '../components/ErrorNotice.vue';
 import { deviceStore, recentDeviceIds } from '../data';
 import { takeBookingNotice } from '../data/booking';
 import { changeTimeText } from '../data/changeTime';
+import { orderByLastChange } from '../data/recentDevices';
 import { isOffline } from '../runtime/connectivity';
 import { useNow } from '../runtime/now';
 import { closeQueryView } from '../router/back';
@@ -101,16 +102,19 @@ const result = computed<SearchResult | null>(() => {
     return list.value.mode === 'server' ? serverResult.value : null;
 });
 
-// „Zuletzt benutzt“: gespeicherte IDs, Angaben immer aus der aktuellen Geräteliste.
+// „Zuletzt benutzt“: gespeicherte IDs, Angaben immer aus der aktuellen Geräteliste, sortiert nach
+// der letzten Änderung des Geräts.
 const recentIds = ref<number[]>([]);
 const serverRecent = shallowRef<readonly DeviceListItem[]>([]);
 const recent = computed<readonly DeviceListItem[]>(() => {
     if (list.value.mode === 'server') {
-        return serverRecent.value;
+        return orderByLastChange(serverRecent.value);
     }
-    return recentIds.value
-        .map((id) => list.value.devices.find((device) => device.id === id))
-        .filter((device): device is DeviceListItem => device !== undefined);
+    return orderByLastChange(
+        recentIds.value
+            .map((id) => list.value.devices.find((device) => device.id === id))
+            .filter((device): device is DeviceListItem => device !== undefined),
+    );
 });
 async function loadServerRecent(): Promise<void> {
     serverRecent.value = await deviceStore.findMany(recentIds.value);
