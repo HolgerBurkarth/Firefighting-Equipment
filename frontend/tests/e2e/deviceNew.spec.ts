@@ -410,6 +410,40 @@ test.describe('Neues Gerät: Ablehnungen des Servers', () => {
 test.describe('Neues Gerät am Handy', () => {
     useServer();
 
+    test('Speichern und nächstes: sofort Fokus auf der Kennung, danach ganz oben (T11)', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 390, height: 700 });
+        await open(page);
+        await page.getByLabel('Kennung').fill('M24');
+        await choose(page, 'Gerätetyp', 'Atemschutzmaske');
+        await choose(page, 'Standort', 'HLF 20 / G1');
+        // Die Anfrage hängt, bis der Test sie freigibt.
+        let release = (): void => undefined;
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        await page.route('**/api/v1/devices', async (route) => {
+            if (route.request().method() === 'POST') {
+                await gate;
+            }
+            await route.fallback();
+        });
+        const save = page.getByRole('button', { name: 'Speichern und nächstes' });
+        await save.scrollIntoViewIfNeeded();
+        await save.click();
+        // Noch im Antippen (iPhone fokussiert nur dort und öffnet nur dann die Tastatur).
+        await expect(page.getByLabel('Kennung')).toBeFocused();
+        release();
+        await expect(page.getByTestId('created')).toContainText('M24 angelegt.');
+        await expect(page.getByLabel('Kennung')).toHaveValue('M25');
+        await expect(page.getByLabel('Kennung')).toBeFocused();
+        // Ganz oben: Bestätigung und Kennung im Bild.
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+        await expect(page.getByTestId('created')).toBeInViewport();
+        await expect(page.getByLabel('Kennung')).toBeInViewport();
+    });
+
     test('eine Spalte, kein waagerechter Überstand', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await open(page);

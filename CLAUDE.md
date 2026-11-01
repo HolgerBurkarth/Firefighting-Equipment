@@ -779,7 +779,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   „Speichern und nächstes“ (erster Knopf, auch Enter in einem Feld): grüne Meldung „M24 angelegt.“ mit
   Link „Gerät öffnen“, dann `nextNewDeviceForm`: Gerätetyp, Standort und nächste Prüfung bleiben, die
   Kennung zählt weiter (`nextIdentifier`: Zahl am Ende + 1, führende Nullen bleiben, M99 → M100;
-  ohne Zahl am Ende leer), alles andere leer, Fokus und Auswahl auf der Kennung. „Speichern“:
+  ohne Zahl am Ende leer), alles andere leer, Fokus und Auswahl auf der Kennung (fokussiert schon beim
+  Antippen vor der Anfrage, sonst fokussiert das iPhone nicht; nach Erfolg `window.scrollTo(0, 0)`,
+  T11). „Speichern“:
   Bestätigung per `setBookingNotice`, `router.replace` auf das Gerätedetail. Enter im Scan-Code
   speichert nie (Handscanner senden Enter), sondern führt zum nächsten Feld. 409 `identifier_taken`
   bzw. `scan_code_taken` am Feld, andere Fehler als `ErrorNotice` (bei `rule_violation` und
