@@ -156,14 +156,21 @@ test.describe('Neues Gerät', () => {
     }) => {
         await open(page);
         await page.getByRole('button', { name: 'Speichern', exact: true }).click();
-        await expect(page.getByText('Bitte eine Kennung eingeben.')).toBeVisible();
+        await expect(page.locator('[data-field="identifier"] .field-error')).toHaveText(
+            'Bitte eine Kennung eingeben.',
+        );
+        await expect(page.getByTestId('save-problem')).toContainText(
+            'Nicht gespeichert: Bitte eine Kennung eingeben.',
+        );
         await expect(page.getByTestId('type-problem')).toHaveText('Bitte einen Gerätetyp wählen.');
         await expect(page.getByTestId('location-problem')).toHaveText(
             'Bitte einen Standort wählen.',
         );
         await expect(page.getByLabel('Kennung')).toBeFocused();
         await page.getByLabel('Kennung').fill('M 24!');
-        await expect(page.getByText('Nur Buchstaben, Ziffern')).toBeVisible();
+        await expect(page.locator('[data-field="identifier"] .field-error')).toContainText(
+            'Nur Buchstaben, Ziffern',
+        );
         expect(posts(apiRequests)).toEqual([]);
     });
 
@@ -324,7 +331,9 @@ test.describe('Neues Gerät: Ablehnungen des Servers', () => {
         await open(page);
         await fill(page, 'M1', 'HLF 20 / G1');
         await page.getByRole('button', { name: 'Speichern und nächstes' }).click();
-        await expect(page.getByText('Die Kennung „M1“ ist schon vergeben.')).toBeVisible();
+        await expect(page.locator('.field-error')).toHaveText(
+            'Die Kennung „M1“ ist schon vergeben.',
+        );
         await expect(page.getByLabel('Kennung')).toHaveAttribute('aria-invalid', 'true');
         await expect(page.getByLabel('Kennung')).toBeFocused();
         await page.getByLabel('Kennung').fill('M2');
@@ -338,13 +347,55 @@ test.describe('Neues Gerät: Ablehnungen des Servers', () => {
         await fill(page, 'M5', 'HLF 20 / G1');
         await page.getByLabel('Scan-Code (optional)').fill('ABC');
         await page.getByRole('button', { name: 'Speichern und nächstes' }).click();
-        await expect(
-            page.getByText('Der Scan-Code ist schon einem anderen Gerät zugeordnet.'),
-        ).toBeVisible();
+        await expect(page.locator('.field-error')).toHaveText(
+            'Der Scan-Code ist schon einem anderen Gerät zugeordnet.',
+        );
         await expect(page.getByLabel('Scan-Code (optional)')).toHaveAttribute(
             'aria-invalid',
             'true',
         );
+    });
+
+    test('Hinweis direkt unter den Knöpfen mit Sprung zum Feld (T10)', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 700 });
+        await open(page);
+        await fill(page, 'M5', 'HLF 20 / G1');
+        await page.getByLabel('Scan-Code (optional)').fill('ABC');
+        await page.getByRole('button', { name: 'Speichern und nächstes' }).click();
+        const problem = page.getByTestId('save-problem');
+        await expect(problem).toContainText(
+            'Nicht gespeichert: Der Scan-Code ist schon einem anderen Gerät zugeordnet.',
+        );
+        // Direkt unter den Knöpfen.
+        const buttons = await page.locator('.actions').boundingBox();
+        const notice = await problem.boundingBox();
+        expect(notice?.y ?? 0).toBeGreaterThanOrEqual(
+            (buttons?.y ?? 0) + (buttons?.height ?? 0) - 1,
+        );
+        // Woanders weitergetippt, dann zurück zum Knopf: der Sprung führt zum Feld.
+        await page.getByLabel('Kommentar für den Verlauf (optional)').focus();
+        await problem.scrollIntoViewIfNeeded();
+        await problem.getByRole('button', { name: 'Zum Feld „Scan-Code“' }).click();
+        await expect(page.getByLabel('Scan-Code (optional)')).toBeFocused();
+        await expect(page.getByLabel('Scan-Code (optional)')).toBeInViewport();
+        // Behoben: der Hinweis verschwindet.
+        await page.getByLabel('Scan-Code (optional)').fill('XYZ');
+        await expect(problem).toBeHidden();
+    });
+
+    test('Hinweis auch bei Fehlern der Eingabe; Auswahlfeld per Sprung (T10)', async ({ page }) => {
+        await open(page);
+        await page.getByLabel('Kennung').fill('M5');
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+        const problem = page.getByTestId('save-problem');
+        await expect(problem).toContainText('Nicht gespeichert: Bitte einen Gerätetyp wählen.');
+        await page.getByLabel('Kennung').focus();
+        await problem.getByRole('button', { name: 'Zum Feld „Gerätetyp“' }).click();
+        await expect(page.getByRole('combobox', { name: 'Gerätetyp' })).toBeFocused();
+        await choose(page, 'Gerätetyp', 'Atemschutzmaske');
+        await expect(problem).toContainText('Nicht gespeichert: Bitte einen Standort wählen.');
+        await choose(page, 'Standort', 'HLF 20 / G1');
+        await expect(problem).toBeHidden();
     });
 
     test('Regelverstoß: Meldung unter dem Formular', async ({ page }) => {

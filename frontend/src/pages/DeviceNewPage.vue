@@ -26,6 +26,7 @@ import {
     newDeviceRequest,
     nextNewDeviceForm,
     sameNewDeviceForm,
+    NEW_DEVICE_FIELD_LABELS,
     type NewDeviceField,
     type NewDeviceForm,
 } from '../data/deviceForm';
@@ -193,6 +194,33 @@ async function closeScanner(): Promise<void> {
     scanCodeInput.value?.focus();
 }
 
+/**
+ * Nach einem gescheiterten Speichern: das erste Feld mit Problem (Reihenfolge der Seite) für den
+ * Hinweis direkt unter den Knöpfen (T10); verschwindet, sobald alle Felder in Ordnung sind.
+ */
+const saveFailed = ref(false);
+const saveProblem = computed((): { field: NewDeviceField; message: string } | null => {
+    if (!saveFailed.value) {
+        return null;
+    }
+    for (const field of Object.keys(NEW_DEVICE_FIELD_LABELS) as NewDeviceField[]) {
+        const message = shownProblem(field);
+        if (message !== null) {
+            return { field, message };
+        }
+    }
+    return null;
+});
+
+/** Sprung zum Feld: sichtbar machen und fokussieren (Auswahllisten über ihren Knopf). */
+function goToField(field: NewDeviceField): void {
+    const control = formElement.value?.querySelector<HTMLElement>(
+        `[data-field="${field}"] :is(input, textarea, button)`,
+    );
+    control?.scrollIntoView({ block: 'center' });
+    control?.focus({ preventScroll: true });
+}
+
 async function focusFirstProblem(): Promise<void> {
     await nextTick();
     formElement.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
@@ -205,12 +233,14 @@ async function save(next: boolean): Promise<void> {
         return;
     }
     if (Object.keys(problems.value).length > 0 || serverProblems.size > 0) {
+        saveFailed.value = true;
         await focusFirstProblem();
         return;
     }
     busy.value = true;
     const result = await createDevice(newDeviceRequest(form.value));
     busy.value = false;
+    saveFailed.value = !result.ok;
     if (result.ok) {
         const message = `${result.data.identifier} angelegt.`;
         if (next) {
@@ -294,7 +324,7 @@ onMounted(() => {
 
     <form ref="form" class="card new-device" novalidate @submit.prevent="save(true)">
         <div class="grid">
-            <label class="field">
+            <label class="field" data-field="identifier">
                 <span class="field-label">Kennung</span>
                 <input
                     ref="identifier-input"
@@ -314,7 +344,7 @@ onMounted(() => {
                     {{ shownProblem('identifier') }}
                 </p>
             </label>
-            <div class="field">
+            <div class="field" data-field="deviceTypeId">
                 <AppSelect
                     v-model="typeValue"
                     label="Gerätetyp"
@@ -329,7 +359,7 @@ onMounted(() => {
                     {{ shownProblem('deviceTypeId') }}
                 </p>
             </div>
-            <div class="field">
+            <div class="field" data-field="locationId">
                 <AppSelect
                     v-model="locationValue"
                     label="Standort"
@@ -344,7 +374,7 @@ onMounted(() => {
                     {{ shownProblem('locationId') }}
                 </p>
             </div>
-            <fieldset class="statuses">
+            <fieldset class="statuses" data-field="status">
                 <legend class="field-label">Status</legend>
                 <label v-for="status in BOOKABLE_STATUSES" :key="status" class="check">
                     <input
@@ -357,7 +387,7 @@ onMounted(() => {
                 </label>
             </fieldset>
             <div class="field">
-                <label class="field">
+                <label class="field" data-field="scanCode">
                     <span class="field-label">Scan-Code (optional)</span>
                     <input
                         ref="scan-code-input"
@@ -404,7 +434,7 @@ onMounted(() => {
                     Mit der Kamera scannen
                 </button>
             </div>
-            <label class="field">
+            <label class="field" data-field="nextInspectionDue">
                 <span class="field-label">Nächste Prüfung (optional)</span>
                 <input
                     v-model="form.nextInspectionDue"
@@ -424,7 +454,12 @@ onMounted(() => {
                     {{ shownProblem('nextInspectionDue') }}
                 </p>
             </label>
-            <label v-for="field in TEXT_FIELDS" :key="field.key" class="field">
+            <label
+                v-for="field in TEXT_FIELDS"
+                :key="field.key"
+                class="field"
+                :data-field="field.key"
+            >
                 <span class="field-label">{{ field.label }} (optional)</span>
                 <input
                     v-model="form[field.key]"
@@ -443,7 +478,7 @@ onMounted(() => {
                     {{ shownProblem(field.key) }}
                 </p>
             </label>
-            <label class="field">
+            <label class="field" data-field="procuredOn">
                 <span class="field-label">Beschaffungsdatum (optional)</span>
                 <input
                     v-model="form.procuredOn"
@@ -463,7 +498,7 @@ onMounted(() => {
                     {{ shownProblem('procuredOn') }}
                 </p>
             </label>
-            <label class="field wide">
+            <label class="field wide" data-field="note">
                 <span class="field-label">Notiz (optional)</span>
                 <textarea
                     v-model="form.note"
@@ -477,7 +512,7 @@ onMounted(() => {
                     {{ shownProblem('note') }}
                 </p>
             </label>
-            <label class="field wide">
+            <label class="field wide" data-field="comment">
                 <span class="field-label">Kommentar für den Verlauf (optional)</span>
                 <input
                     v-model="form.comment"
@@ -506,6 +541,17 @@ onMounted(() => {
             </button>
             <button class="btn" type="button" :disabled="busy" @click="back">Abbrechen</button>
         </div>
+        <!-- Gut sichtbar direkt unter den Knöpfen, falls das Feld außer Sicht ist (T10). -->
+        <p
+            v-if="saveProblem !== null"
+            class="notice notice-error save-problem"
+            data-testid="save-problem"
+        >
+            <span>Nicht gespeichert: {{ saveProblem.message }}</span>
+            <button class="link-button" type="button" @click="goToField(saveProblem.field)">
+                Zum Feld „{{ NEW_DEVICE_FIELD_LABELS[saveProblem.field] }}“
+            </button>
+        </p>
     </form>
 
     <CodeScanner
@@ -572,6 +618,14 @@ onMounted(() => {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+}
+
+.save-problem {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    margin-top: 12px;
 }
 
 @media (max-width: 767.98px) {

@@ -313,6 +313,25 @@ export interface NewDeviceForm {
 
 export type NewDeviceField = keyof NewDeviceForm;
 
+/**
+ * Felder des Formulars „Neues Gerät“ in der Reihenfolge der Seite, mit Namen für den Hinweis unter
+ * den Knöpfen („Zum Feld „Scan-Code““, T10).
+ */
+export const NEW_DEVICE_FIELD_LABELS: Readonly<Record<NewDeviceField, string>> = {
+    identifier: 'Kennung',
+    deviceTypeId: 'Gerätetyp',
+    locationId: 'Standort',
+    status: 'Status',
+    scanCode: 'Scan-Code',
+    nextInspectionDue: 'Nächste Prüfung',
+    serialNumber: 'Seriennummer',
+    manufacturer: 'Hersteller',
+    model: 'Modell',
+    procuredOn: 'Beschaffungsdatum',
+    note: 'Notiz',
+    comment: 'Kommentar für den Verlauf',
+};
+
 export function emptyNewDeviceForm(): NewDeviceForm {
     return {
         identifier: '',
