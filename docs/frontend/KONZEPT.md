@@ -160,7 +160,7 @@ verwalten und Admins einladen"; Frontend: `CLAUDE.md`, "Frontend").
 
 ### Offline-Modus – Entscheidungen
 Geplant in der Nacht vom 31.10.2026 (Agent, ohne Rückfrage), geprüft von Holger am 01.11.2026
-(was noch „Vorläufig“ heißt, prüft er noch). API:
+(die zuerst vorläufigen Punkte in 52, 54 und 55 bestätigt am 01.11.2026). API:
 `CLAUDE.md`, "Offline-Buchungen (API)" und `GET client-config` (fertig und live). Jeder Schritt
 lässt die App online wie bisher; Offline-Buchen gibt es erst, wenn Warteschlange und Ergebnis
 vollständig sind.
@@ -193,7 +193,7 @@ vollständig sind.
     `client_ref`, Aktionszeit (`occurred_at`, Uhr des Handys), Version, Ziel und Kommentar. Nach
     einem Verbindungsfehler beim Speichern sind `client_ref` und Aktionszeit die des ersten
     Versuchs (Holger, 01.11.2026; wie Entscheidung 22): Kam er doch an, wiederholt der Server nur
-    das gespeicherte Ergebnis. Vorläufig (Agent, 01.11.): Dafür wiederholt der Server bei einer
+    das gespeicherte Ergebnis. Bestätigt (Holger, 01.11.2026): Dafür wiederholt der Server bei einer
     Buchung mit `occurred_at` auch eine gespeicherte Buchung ohne `occurred_at` mit derselben
     `client_ref` und sonst gleichem Inhalt (Erweiterung der API, `BookingRequest::onlineHash`). Die
     lokale Liste zeigt sofort den gewünschten Stand. Gesendet wird automatisch, älteste zuerst, eine
@@ -204,8 +204,8 @@ vollständig sind.
     bzw. nur im Verlauf bzw. nicht übernommen (gelb, die Admins erhalten einen Hinweis), Fehler (rot)
     mit „Verwerfen“. Angekommene Buchungen bleiben sichtbar, bis man sie ausblendet.
 54. **Grenzen:** `client-config` wird bei jeder vollständigen Synchronisierung gelesen (Holger,
-    01.11.2026; zusätzlich vor dem ersten Senden eines Seitenaufrufs) und gespeichert. Vorläufig
-    (Agent, 01.11.): gespeichert je Stadt in localStorage (`ff-offline-limits:<kürzel>`, die Grenzen
+    01.11.2026; zusätzlich vor dem ersten Senden eines Seitenaufrufs) und gespeichert. Bestätigt
+    (Holger, 01.11.2026): gespeichert je Stadt in localStorage (`ff-offline-limits:<kürzel>`, die Grenzen
     gelten für die ganze Stadt), nicht in der Kopie des Kontos. Ist die letzte Synchronisierung älter als `max_age_days`, ist offline Buchen
     gesperrt („Daten zu alt, bitte mit dem Internet verbinden“). Liegt eine Buchung länger als
     `queue_max_age_days` in der Warteschlange (oder meldet der Server `stale_action`), geht sie nicht
@@ -218,7 +218,7 @@ vollständig sind.
     (je Konto gespeichert) und geht raus, sobald es sich wieder anmeldet; seine Kopie darf gelöscht
     werden. Das neue Konto sieht „Auf diesem Gerät liegen N nicht gesendete Buchungen von <Name>.
     Sie werden gesendet, sobald <Name> sich wieder anmeldet.“ mit „Verwerfen …“ (Rückfrage, dann
-    gelöscht). Vorläufig (Agent, 01.11.): Der Hinweis steht auf „Suchen“ (wie die eigene
+    gelöscht). Bestätigt (Holger, 01.11.2026): Der Hinweis steht auf „Suchen“ (wie die eigene
     Warteschlange), nicht auf jeder Seite; den Namen merkt sich die App je Stadt in localStorage.
 56. **Scanner offline:** Das Lesemodul (WASM) kommt in den Cache des Service Workers.
 
@@ -229,6 +229,8 @@ Ohne gültige Kopie bleibt es nach einem Verbindungsfehler beim bisherigen Fehle
 senden“. Geändert nach Holgers Prüfung (01.11.2026): Warteschlange nach Verbindungsabbruch mit
 derselben `client_ref` und Aktionszeit (52), Standorte und `client-config` bei jeder vollständigen
 Synchronisierung (49, 54).
+Live-Test am iPhone (Holger, 01.11.2026, `LIVETEST-OFFLINE.md`): B1–B9 ☑; B10 (alte Buchungen)
+nicht live, durch automatische Tests abgedeckt; offen B8a (Kontowechsel ohne Abmelden).
 
 ## Fehlerbehandlung
 - Fehler in Alltagssprache, gut sichtbar (z. B. farbiger Hinweis oben: „Keine Verbindung, wird
