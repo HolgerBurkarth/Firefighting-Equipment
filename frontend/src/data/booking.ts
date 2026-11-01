@@ -44,19 +44,29 @@ export function newClientRef(
  * Netzwerkfehler, bei dem offen ist, ob der Server gespeichert hat), bleibt die Kennung gleich und
  * der Server wiederholt nur das Ergebnis. Anderer Inhalt (andere Auswahl, neue Version nach einem
  * Konflikt) ist eine neue Buchung mit neuer Kennung; sonst antwortete der Server mit
- * `client_ref_conflict`.
+ * `client_ref_conflict`. Zu jeder Kennung bleibt die Zeit des ersten Versuchs: Kommt die Buchung nach
+ * einem Netzwerkfehler in die Warteschlange, ist sie ihre Aktionszeit (KONZEPT.md, "Offline-Modus –
+ * Entscheidungen", 52).
  */
 export class ClientRefKeeper {
-    private last: { readonly key: string; readonly ref: string } | null = null;
+    private last: { readonly key: string; readonly ref: string; readonly at: Date } | null = null;
 
-    constructor(private readonly create: () => string = () => newClientRef()) {}
+    constructor(
+        private readonly create: () => string = () => newClientRef(),
+        private readonly now: () => Date = () => new Date(),
+    ) {}
 
     refFor(content: unknown): string {
+        return this.attemptFor(content).ref;
+    }
+
+    /** Kennung und Zeit des ersten Versuchs mit diesem Inhalt. */
+    attemptFor(content: unknown): { readonly ref: string; readonly at: Date } {
         const key = JSON.stringify(content);
         if (this.last?.key !== key) {
-            this.last = { key, ref: this.create() };
+            this.last = { key, ref: this.create(), at: this.now() };
         }
-        return this.last.ref;
+        return { ref: this.last.ref, at: this.last.at };
     }
 }
 

@@ -8,6 +8,25 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-01 – „Offline: Warteschlange nach Verbindungsabbruch mit derselben client_ref und Aktionszeit“
+
+Erweiterung der Wiederholung bei `POST api/v1/devices/{id}/state` (sonst unverändert): Eine Buchung
+MIT `occurred_at` wiederholt jetzt auch eine schon gespeicherte Buchung OHNE `occurred_at`, wenn
+`client_ref`, Konto, Gerät, Version, Standort, Status und Kommentar gleich sind (bisher 409
+`client_ref_conflict`, weil die Aktionszeit in `request_hash` steckt). Antwort wie jede Wiederholung
+(`replayed: true`, gespeichertes Ergebnis, aktueller Gerätestand, nichts geschrieben, keine Mail,
+auch nach den Zeitgrenzen). Umgekehrt (gespeichert mit Aktionszeit, gesendet ohne oder mit anderer)
+bleibt es ein Konflikt. Code: `BookingRequest::onlineHash` (Hash derselben Buchung ohne
+Aktionszeit, nur bei Offline-Buchungen), `BookingRequest::$onlineHash` (optional),
+`DeviceBooker::previous(…, $onlineHash)` und die Wiederholung bei gleichzeitiger Buchung.
+
+- Warum: Scheitert „Speichern“ online an der Verbindung, legt die App die Buchung mit derselben
+  `client_ref` und der Zeit des ersten Versuchs in die Warteschlange (Entscheidung Holger,
+  01.11.2026; KONZEPT.md Entscheidung 52). Kam der erste Versuch doch an, wirkt die Buchung so nicht
+  doppelt; kam er nicht an, gilt die Aktionszeit des ersten Versuchs.
+- Tests: `DeviceOfflineBookingTest::testQueuedRetryOfOnlineBookingIsReplayed` (vorher rot).
+- Dokumentiert in `CLAUDE.md`, "Offline-Buchungen (API)", Wiederholung.
+
 ## 2026-10-31 – „Admin-Konsole: Protokoll mit Hinweisen und Export des Verlaufs (Schritt 11)“
 
 Ein neues Feld, sonst unverändert: Jeder Hinweis (`GET notices`, `GET notices/{id}`, Antworten von

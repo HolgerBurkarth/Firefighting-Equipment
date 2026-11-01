@@ -231,12 +231,19 @@ export class BookingQueue {
         );
     }
 
-    /** Neue Buchung anhängen (gespeichert, bevor die Seite weitergeht). */
+    /**
+     * Neue Buchung anhängen (gespeichert, bevor die Seite weitergeht). Dieselbe `client_ref` steht
+     * nur einmal in der Liste (erneutes Speichern derselben Buchung).
+     */
     async add(booking: Omit<QueuedBooking, 'state'>): Promise<boolean> {
         if (this.current.value.key === null) {
             return false;
         }
-        this.update((bookings) => [...bookings, { ...booking, state: 'waiting' }]);
+        this.update((bookings) =>
+            bookings.some((queued) => queued.clientRef === booking.clientRef)
+                ? [...bookings]
+                : [...bookings, { ...booking, state: 'waiting' }],
+        );
         await this.writes;
         return true;
     }

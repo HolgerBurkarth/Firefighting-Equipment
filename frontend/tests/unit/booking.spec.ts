@@ -64,6 +64,31 @@ describe('client_ref', () => {
         // Zurück zu einem früheren Inhalt: nicht die alte Kennung (der Server kennt sie vielleicht).
         expect(keeper.refFor({ deviceId: 5, version: 1, status: 'defective' })).toBe('ref-4');
     });
+
+    it('merkt sich die Zeit des ersten Versuchs je Kennung', () => {
+        let now = Date.parse('2026-11-01T10:00:00Z');
+        let count = 0;
+        const keeper = new ClientRefKeeper(
+            () => `ref-${String(++count)}`,
+            () => new Date(now),
+        );
+        const content = { deviceId: 5, version: 1, status: 'defective' };
+        expect(keeper.attemptFor(content)).toEqual({
+            ref: 'ref-1',
+            at: new Date('2026-11-01T10:00:00Z'),
+        });
+        now += 60_000;
+        // Erneuter Versuch (z. B. nach einem Netzwerkfehler): dieselbe Kennung, dieselbe Zeit.
+        expect(keeper.attemptFor(content)).toEqual({
+            ref: 'ref-1',
+            at: new Date('2026-11-01T10:00:00Z'),
+        });
+        expect(keeper.refFor(content)).toBe('ref-1');
+        expect(keeper.attemptFor({ ...content, status: 'ready' })).toEqual({
+            ref: 'ref-2',
+            at: new Date('2026-11-01T10:01:00Z'),
+        });
+    });
 });
 
 describe('Bestätigung nach dem Speichern', () => {

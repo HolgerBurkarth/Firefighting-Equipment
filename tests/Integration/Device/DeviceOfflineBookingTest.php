@@ -232,6 +232,28 @@ final class DeviceOfflineBookingTest extends DeviceApiTestCase
         self::assertCount(2, $this->events($id));
     }
 
+    public function testQueuedRetryOfOnlineBookingIsReplayed(): void
+    {
+        // Die App sendet online ohne Aktionszeit; bleibt die Antwort aus, legt sie dieselbe Buchung
+        // mit derselben client_ref und der Zeit des ersten Versuchs in die Warteschlange.
+        $id = $this->createViaApi('MA-01')['id'];
+        $online = ['version' => 1, 'status' => 'defective', 'comment' => 'Riss', 'client_ref' => $this->ref()];
+        $this->book($id, $online, $this->user);
+        $events = $this->events($id);
+
+        $queued = $this->offline($id, [...$online, 'occurred_at' => $this->at('-3 days')]);
+        self::assertSame(['applied', true, 2], [$queued['result']['outcome'], $queued['result']['replayed'], $queued['device']['version']]);
+        self::assertSame($events, $this->events($id));
+
+        // Anderer Inhalt bleibt ein Konflikt, ebenso eine andere Aktionszeit einer Offline-Buchung.
+        self::assertError(409, 'client_ref_conflict', $this->offlineResponse($id, [...$online, 'comment' => 'anders', 'occurred_at' => $this->at('-3 days')]));
+        $ref = $this->ref();
+        $offline = ['version' => 2, 'status' => 'ready', 'occurred_at' => $this->at('-1 minute'), 'client_ref' => $ref];
+        $this->offline($id, $offline);
+        self::assertError(409, 'client_ref_conflict', $this->offlineResponse($id, [...$offline, 'occurred_at' => $this->at('-2 minutes')]));
+        self::assertError(409, 'client_ref_conflict', $this->api('POST', "devices/{$id}/state", ['version' => 2, 'status' => 'ready', 'client_ref' => $ref], $this->user));
+    }
+
     public function testTwoPhonesLastActionWins(): void
     {
         // Beide Handys kennen Version 1; das ältere kommt zuerst an, dann das jüngere.

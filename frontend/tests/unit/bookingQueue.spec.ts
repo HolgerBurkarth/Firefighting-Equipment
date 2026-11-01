@@ -120,6 +120,15 @@ describe('BookingQueue', () => {
         expect(q.state.bookings).toEqual([]);
     });
 
+    it('dieselbe client_ref kommt nur einmal in die Warteschlange', async () => {
+        const { q, db } = queue([]);
+        await q.use('test:7');
+        expect(await q.add(booking())).toBe(true);
+        expect(await q.add(booking())).toBe(true);
+        expect(q.state.bookings).toHaveLength(1);
+        expect((await db.get('queue', 'test:7')) as unknown[]).toHaveLength(1);
+    });
+
     it('ohne Verbindung, bei 5xx und 401 wartet die Buchung weiter', async () => {
         for (const failure of [
             error('network', null),

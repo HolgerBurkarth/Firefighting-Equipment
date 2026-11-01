@@ -995,11 +995,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Grenzen in localStorage `ff-offline-limits:<kürzel>`, sonst 7/7 Tage). Wartende Buchungen zeigt die
   Liste mit dem gewünschten Stand (`pendingDevice`, nur solange die Version gleich ist). Umbuchen
   (`DevicePage`): offline (Streifen) und erlaubt (`offlineBookingProblem`: Kopie vorhanden und höchstens
-  `maxAgeDays` alt) gleich in die Warteschlange (neue `client_ref`, Hinweis „Gespeichert – wird
-  gesendet, sobald eine Verbindung besteht: …“, zurück wie online); meldet der Browser offline und ist
-  es nicht erlaubt, der Grund (`offline-problem`); sonst online, und scheitert das an der Verbindung,
-  bei erlaubtem Offline-Buchen ebenfalls in die Warteschlange, sonst wie bisher der Fehler (Eingaben
-  bleiben, gleiche `client_ref`). Anzeige `BookingQueuePanel` auf „Suchen“ (Uhr, Haken, Ergebnis,
+  `maxAgeDays` alt) gleich in die Warteschlange (Hinweis „Gespeichert – wird gesendet, sobald eine
+  Verbindung besteht: …“, zurück wie online); meldet der Browser offline und ist es nicht erlaubt, der
+  Grund (`offline-problem`); sonst online, und scheitert das an der Verbindung, bei erlaubtem
+  Offline-Buchen ebenfalls in die Warteschlange, sonst wie bisher der Fehler (Eingaben bleiben, gleiche
+  `client_ref`). `client_ref` und Aktionszeit der Warteschlange sind die des ersten Versuchs mit
+  demselben Inhalt (`ClientRefKeeper.attemptFor`); kam ein online gesendeter Versuch doch an,
+  wiederholt der Server nur sein Ergebnis (siehe "Offline-Buchungen (API)", Wiederholung). Dieselbe
+  `client_ref` steht nur einmal in der Warteschlange. Anzeige `BookingQueuePanel` auf „Suchen“ (Uhr, Haken, Ergebnis,
   „Angekommene ausblenden“). Abmelden (`AccountPanel`, `AdminMenuNav`) mit ungesendeten Buchungen erst
   nach `ConfirmDialog` (`unsentWarning`); Abmelden und ein anderes Konto löschen die Warteschlange,
   eine abgelaufene Sitzung nicht. Tests `tests/e2e/offline.spec.ts` (auch `context.setOffline`:
@@ -2167,7 +2170,12 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     und passen Konto, Gerät und `request_hash` (SHA-256 über Gerät, Version, Standort, Status,
     Kommentar, Aktionszeit; `confirmed_stale` zählt nicht), wird das gespeicherte Ergebnis mit
     `replayed: true` und dem aktuellen Gerätestand wiederholt (nichts geschrieben, keine Mail, auch
-    nach den Zeitgrenzen); sonst 409 `client_ref_conflict`. Die Quittung entsteht in derselben
+    nach den Zeitgrenzen); sonst 409 `client_ref_conflict`. Eine Buchung mit `occurred_at` wiederholt
+    auch eine gespeicherte Buchung OHNE Aktionszeit mit sonst gleichem Inhalt
+    (`BookingRequest::onlineHash`, an `DeviceBooker::previous` und `BookingRequest`): Die App legt eine
+    online gesendete Buchung, deren Antwort ausblieb, mit derselben `client_ref` und der Zeit des
+    ersten Versuchs in die Warteschlange. Umgekehrt (gespeichert mit, gesendet ohne bzw. mit anderer
+    Aktionszeit) bleibt es ein Konflikt. Die Quittung entsteht in derselben
     Transaktion wie die Buchung; gleichzeitig dieselbe `client_ref` → Fehler 1062 auf
     `uq_fe_device_bookings_tenant_ref` → Rollback (`DuplicateClientRefException`) → Wiederholung.
     Abgelehnte Buchungen (Fehler) speichern keine Quittung.
