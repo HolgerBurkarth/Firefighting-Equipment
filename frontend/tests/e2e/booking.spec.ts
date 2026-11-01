@@ -171,20 +171,36 @@ test.describe('Umbuchen und Status', () => {
             .toBe('[20,999,12]');
     });
 
-    test('nichts geändert: Hinweis, keine Anfrage', async ({ page, apiRequests }) => {
+    test('nichts geändert: „Speichern“ gesperrt, Hinweis beim Kommentar, keine Anfrage', async ({
+        page,
+        apiRequests,
+    }) => {
+        await page.addInitScript((key) => {
+            window.localStorage.setItem(key, JSON.stringify([20]));
+        }, RECENT_LOCATIONS_KEY);
         await openFromSearch(page);
+        const save = page.getByRole('button', { name: 'Speichern' });
+        const hint = page.getByText('Bitte wählen Sie einen anderen Standort oder Status.');
+        // T4: nur antippbar, wenn sich gegenüber dem jetzigen Stand etwas ändert.
+        await expect(save).toBeDisabled();
+        await expect(hint).toBeHidden();
+        // Ein Kommentar allein ändert nichts (der Server bucht nur Standort oder Status).
         await page.getByLabel('Kommentar (optional)').fill('nur ein Kommentar');
-        await page.getByRole('button', { name: 'Speichern' }).click();
-        await expect(
-            page.getByText('Bitte wählen Sie einen anderen Standort oder Status.'),
-        ).toBeVisible();
-        // Erneutes Antippen des jetzigen Status ist keine Änderung.
+        await expect(save).toBeDisabled();
+        await expect(hint).toBeVisible();
+        await page.getByLabel('Kommentar (optional)').press('Enter');
+        // Ein anderer Status gibt „Speichern“ frei; erneutes Antippen des jetzigen sperrt wieder.
         await statusButton(page, 'in Wartung').click();
+        await expect(save).toBeEnabled();
+        await expect(hint).toBeHidden();
         await statusButton(page, 'einsatzbereit').click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
-        await expect(
-            page.getByText('Bitte wählen Sie einen anderen Standort oder Status.'),
-        ).toBeVisible();
+        await expect(save).toBeDisabled();
+        await expect(hint).toBeVisible();
+        // Ebenso der Standort.
+        await page.getByTestId('location-choice').filter({ hasText: 'LF 10' }).click();
+        await expect(save).toBeEnabled();
+        await page.getByTestId('location-choice').filter({ hasText: 'HLF 20 / G1' }).click();
+        await expect(save).toBeDisabled();
         expect(stateRequests(apiRequests)).toHaveLength(0);
         await expect(page).toHaveURL(/\/geraete\/1$/);
     });

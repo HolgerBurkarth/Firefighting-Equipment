@@ -85,7 +85,6 @@ const saved = ref(false);
 const saveError = shallowRef<ApiError | null>(null);
 /** Nach 409 version_conflict: Der Kopf zeigt den neuen Stand, die Auswahl bleibt. */
 const conflict = ref(false);
-const nothingChanged = ref(false);
 const submitted = ref(false);
 
 const refs = new ClientRefKeeper();
@@ -105,6 +104,10 @@ const changesLocation = computed(
 const changesStatus = computed(
     () => device.value !== null && status.value !== null && status.value !== device.value.status,
 );
+/** „Speichern“ nur mit einer Änderung von Standort oder Status (T4). */
+const hasChanges = computed(() => changesLocation.value || changesStatus.value);
+/** Kommentar ohne Änderung: Hinweis, denn ein Kommentar allein wird nicht gebucht. */
+const nothingChanged = computed(() => !hasChanges.value && comment.value.trim() !== '');
 /** Neuer Defekt: Kommentar Pflicht (Entscheidung 18); ein schon defektes Gerät umbuchen nicht. */
 const reportsDefect = computed(() => changesStatus.value && status.value === 'defective');
 const commentTooShort = computed(
@@ -227,7 +230,6 @@ onMounted(() => {
 
 // Neue Eingabe: alte Meldungen zum Speichern gelten nicht mehr.
 watch([chosenLocation, chosenStatus], () => {
-    nothingChanged.value = false;
     saveError.value = null;
     offlineProblem.value = null;
 });
@@ -315,8 +317,7 @@ async function save(): Promise<void> {
     submitted.value = true;
     conflict.value = false;
     saveError.value = null;
-    if (!changesLocation.value && !changesStatus.value) {
-        nothingChanged.value = true;
+    if (!hasChanges.value) {
         return;
     }
     if (commentTooShort.value) {
@@ -594,7 +595,7 @@ async function save(): Promise<void> {
                 >
                     {{ offlineProblem }}
                 </p>
-                <button class="btn btn-primary" type="submit" :disabled="saving">
+                <button class="btn btn-primary" type="submit" :disabled="saving || !hasChanges">
                     {{ saving ? 'Wird gespeichert …' : 'Speichern' }}
                 </button>
             </div>

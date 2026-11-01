@@ -744,6 +744,9 @@ Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Li
     löschen die Liste.
 15. **Gerät antippen** öffnet direkt die Umbuchen-Ansicht (Mockup „UserUmbuchen“), unten ein Link
     „Details und Verlauf“ (Stammdaten, Historie). Admins nutzen dieselbe Umbuchen-Ansicht.
+    „Speichern“ ist nur antippbar, wenn sich Standort oder Status gegenüber dem jetzigen Stand
+    ändern (Holger, T4, umgesetzt 01.11.2026); ein Kommentar allein bucht nichts, dann steht
+    darunter „Bitte wählen Sie einen anderen Standort oder Status.“.
     Umgesetzt: „Details und Verlauf“ ist wie die Standortwahl eine Ansicht der Umbuchen-Seite
     (`?details=1`); angefangene Eingaben bleiben, der Zurück-Knopf führt zum Umbuchen. Oben der
     aktuelle Standort, Status und die nächste Prüfung (überfällig rot), darunter alle Stammdaten
