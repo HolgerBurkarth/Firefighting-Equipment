@@ -600,7 +600,9 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
 33. **Adressen:** Die Detailseite eines Geräts für Admins ist `geraete/<id>/details`;
     `geraete/<id>` bleibt das Umbuchen (Entscheidung 15). Die Geräteliste der Konsole (`geraete`) hat
     den Filter „Ausgesonderte anzeigen“; von dort öffnet der Admin die Details und nimmt das Gerät
-    wieder auf.
+    wieder auf. In der Liste öffnet ein Klick auf die ganze Zeile bzw. Karte das Gerätedetail (nicht
+    nur die Kennung), die ganze Zeile ist beim Überfahren hinterlegt (Holger, T9, umgesetzt
+    01.11.2026); das Kästchen zum Auswählen öffnet nichts.
 34. **Menü:** am PC links mit Text, am Tablet eingeklappt auf Symbole, am Handy über ☰ ausklappbar;
     Einträge Dashboard, Suchen, Geräte, Standorte, Gerätetypen, Benutzer, Protokoll; unten
     „Einstellungen“ und „Abmelden“, der Name des Kontos nur als Text (kein eigenes Profil in der
