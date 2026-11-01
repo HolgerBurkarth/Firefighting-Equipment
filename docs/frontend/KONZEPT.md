@@ -699,7 +699,9 @@ Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Li
   Status über drei große Tasten, vorausgewählt ist der jetzige Zustand. Kommentar freiwillig; bei
   „defekt“ rot hervorgehoben mit Bitte um Beschreibung. Unten groß „Speichern“.
 - **Standortauswahl:** bildschirmfüllend, Suchfeld oben. Ohne Eingabe alle Standorte als Karten;
-  ein Fahrzeug klappt mit Antippen der ganzen Zeile auf. Eine aufgeklappte Gruppe hebt sich ab
+  ein Fahrzeug klappt mit Antippen der ganzen Zeile auf; laufen die Fächer dabei unten aus dem
+  Bild, scrollt die Liste so weit, dass sie sichtbar werden, der Kopf der Gruppe bleibt aber unter
+  der Kopfzeile sichtbar (Holger, T3, umgesetzt 01.11.2026). Eine aufgeklappte Gruppe hebt sich ab
   (Abstand, Rahmen in der Stadtfarbe, Schatten, getönte Kopfzeile); Fächer darunter eingerückt,
   als erster Eintrag **„Ganzes Fahrzeug, ohne Fach“** (entschieden: ein Gerät darf auf ein ganzes
   Fahrzeug gebucht werden, auch wenn es Fächer hat; das Backend erlaubt das bereits). Mit

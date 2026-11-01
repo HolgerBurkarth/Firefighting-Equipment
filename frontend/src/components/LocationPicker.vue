@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue';
 import type { ApiError } from '../api/client';
 import type { Location } from '../api/locations';
 import {
@@ -10,6 +10,7 @@ import {
     type PickerEntry,
 } from '../data/locationSearch';
 import { searchTokens } from '../data/deviceSearch';
+import { revealOffset } from '../runtime/reveal';
 import ErrorNotice from './ErrorNotice.vue';
 import { KIND_ICONS, SUB_ICON } from './locationIcons';
 
@@ -29,6 +30,7 @@ const props = defineProps<{
 const emit = defineEmits<{ pick: [id: number]; close: []; retry: [] }>();
 
 const heading = useTemplateRef<HTMLHeadingElement>('heading');
+const header = useTemplateRef<HTMLElement>('header');
 const query = ref('');
 const searching = computed(() => searchTokens(query.value).length > 0);
 const groups = computed(() => locationGroups(props.locations ?? []));
@@ -50,12 +52,27 @@ onMounted(() => {
     heading.value?.focus();
 });
 
-function toggle(id: number): void {
+async function toggle(id: number, event: MouseEvent): Promise<void> {
     const next = new Set(expanded.value);
-    if (!next.delete(id)) {
+    const opening = !next.delete(id);
+    if (opening) {
         next.add(id);
     }
     expanded.value = next;
+    const group = (event.currentTarget as HTMLElement | null)?.parentElement;
+    if (!opening || group == null) {
+        return;
+    }
+    // Laufen die Fächer unten aus dem Bild, so weit scrollen, dass sie sichtbar werden; der Kopf
+    // der Gruppe bleibt dabei unter der festen Kopfzeile (T3).
+    await nextTick();
+    const offset = revealOffset(group.getBoundingClientRect(), {
+        top: header.value?.getBoundingClientRect().bottom ?? 0,
+        bottom: window.innerHeight,
+    });
+    if (offset > 0) {
+        window.scrollBy(0, offset);
+    }
 }
 
 // Standorte kommen erst nach dem Öffnen: dann die Gruppe des gewählten aufklappen.
@@ -86,7 +103,7 @@ const listHint = computed(() => {
 
 <!-- Standortwahl beim Umbuchen (Mockup UserStandortwahl), bildschirmfüllend. -->
 <template>
-    <header class="picker-header">
+    <header ref="header" class="picker-header">
         <button
             class="picker-close"
             type="button"
@@ -230,7 +247,7 @@ const listHint = computed(() => {
                     @click="
                         group.children.length === 0
                             ? emit('pick', group.entry.id)
-                            : toggle(group.entry.id)
+                            : toggle(group.entry.id, $event)
                     "
                 >
                     <svg
