@@ -297,6 +297,40 @@ test.describe('Einstellungen', () => {
         ]);
     });
 
+    test('Akzentfarbe: eine neue Wahl während des Speicherns bleibt erhalten (T14)', async ({
+        page,
+        apiRequests,
+    }) => {
+        await page.goto(SETTINGS);
+        // Die Antwort hängt, bis der Test sie freigibt.
+        let release = (): void => undefined;
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        await page.route('**/api/v1/tenant/appearance', async (route) => {
+            await gate;
+            await route.fallback();
+        });
+        const field = page.getByLabel(/Farbe als Hex-Wert/);
+        await pickSwatch(page, 'Dunkelblau');
+        await page.getByRole('button', { name: 'Farbe speichern' }).click();
+        await expect(page.getByRole('button', { name: 'Wird gespeichert …' })).toBeVisible();
+        await pickSwatch(page, 'Grün');
+        await expect(field).toHaveValue('#2E5E3E');
+        release();
+        // Gespeichert ist Dunkelblau, die neue Wahl Grün bleibt und lässt sich speichern.
+        await expect.poll(() => accentProperty(page)).toBe('#1d3557');
+        await expect(field).toHaveValue('#2E5E3E');
+        await expect(swatch(page, 'Grün')).toBeChecked();
+        await page.getByRole('button', { name: 'Farbe speichern' }).click();
+        await expect.poll(() => accentProperty(page)).toBe('#2e5e3e');
+        await expect(page.getByRole('button', { name: 'Farbe speichern' })).toHaveCount(0);
+        expect(bodies(apiRequests, 'POST api/v1/tenant/appearance')).toEqual([
+            { accent_color: '#1d3557' },
+            { accent_color: '#2e5e3e' },
+        ]);
+    });
+
     test('Akzentfarbe: Verwerfen stellt den gespeicherten Stand her', async ({ page }) => {
         await page.goto(SETTINGS);
         await pickSwatch(page, 'Grün');

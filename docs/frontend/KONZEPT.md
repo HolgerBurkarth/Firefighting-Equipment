@@ -537,7 +537,8 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
   sie verkleinert in einen weißen Kreis. Deckende `maskable`-Symbole sind T13 in
   `docs/TODO-SPAETER.md`. Außerdem (eigene Beobachtung beim Umsetzen): Wählt man während des
   Speicherns der Akzentfarbe eine andere Farbe, setzt die App das Feld nach der Antwort auf die
-  gespeicherte zurück (T14, Randfall).
+  gespeicherte zurück (T14, Randfall; behoben am 01.11.2026: die neue Wahl bleibt erhalten und
+  lässt sich danach speichern).
 
 ### Admin-Konsole – Entscheidungen
 29. **Reihenfolge:** Die Admin-Konsole kommt vor dem Offline-Modus, damit Immendingen starten kann.

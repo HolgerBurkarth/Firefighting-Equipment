@@ -917,7 +917,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Standardfarbe gilt als „Standard“ und wird als `null` gesendet, `accentSelection`/`accentRequest`).
   Vorschau (`appearance-preview`: Kopfleiste mit Logo und Name, Gerät mit Status, Knopf) über
   `--preview-accent`, die App erst nach „Farbe speichern“ (`saveAccentColor` → `POST
-  tenant/appearance`); „Verwerfen“ stellt den gespeicherten Stand her. Logo: verstecktes `<input
+  tenant/appearance`; wurde während des Speicherns anders gewählt, bleibt die neue Wahl, T14);
+  „Verwerfen“ stellt den gespeicherten Stand her. Logo: verstecktes `<input
   type="file">` (`LOGO_ACCEPT`, danach geleert), vorher `logoSourceProblem` (leer, über 10 MB), dann
   `renderLogo` (`src/runtime/logoImage.ts`: `blob:` in ein `<img>`, `decode()`, Canvas `LOGO_EDGE`
   512 mit `placeLogo`: Rand `LOGO_MARGIN` 16 px, Seitenverhältnis bleibt, ohne Maße quadratisch;
