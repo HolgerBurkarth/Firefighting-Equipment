@@ -5,6 +5,7 @@ import {
     clearRecent,
     loadRecent,
     MAX_RECENT_DEVICES,
+    orderByLastChange,
     recentKey,
 } from '../../src/data/recentDevices';
 import { meBody } from './support/me';
@@ -94,5 +95,27 @@ describe('Zuletzt benutzt', () => {
         expect(() => {
             clearRecent(blocked, account(7));
         }).not.toThrow();
+    });
+});
+
+describe('orderByLastChange', () => {
+    const device = (id: number, stateChangedAt: string | null) => ({ id, stateChangedAt });
+
+    it('neueste Änderung oben, ohne Zeitpunkt unten, Gleichstand in der Reihenfolge der Nutzung', () => {
+        const ordered = orderByLastChange([
+            device(1, '2026-10-12T08:00:00Z'),
+            device(2, null),
+            device(3, '2026-10-29T13:25:00Z'),
+            device(4, '2026-10-28T17:30:00Z'),
+            device(5, '2026-10-28T17:30:00Z'),
+            device(6, null),
+        ]);
+        expect(ordered.map((d) => d.id)).toEqual([3, 4, 5, 1, 2, 6]);
+    });
+
+    it('ändert die übergebene Liste nicht', () => {
+        const list = [device(1, '2026-10-12T08:00:00Z'), device(2, '2026-10-29T08:00:00Z')];
+        orderByLastChange(list);
+        expect(list.map((d) => d.id)).toEqual([1, 2]);
     });
 });

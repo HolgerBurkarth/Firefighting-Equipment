@@ -753,8 +753,9 @@ Umgesetzt und abgeschlossen am 30.10.2026 (Schritte 1–10). Wünsche aus den Li
     Kommentar. Nicht übernommene Offline-Buchungen sind gestrichelt abgesetzt und zeigen das
     Gewünschte, den Grund und, wenn sie später ankamen, den Eingang beim Server. Auch ausgesonderte
     Geräte haben den Link.
-16. **„Zuletzt benutzt“:** geöffnete oder umgebuchte Geräte, nur auf diesem Handy, höchstens 8,
-    neueste oben; die Angaben kommen immer aus der aktuellen Geräteliste. Abmelden löscht die Liste
+16. **„Zuletzt benutzt“:** geöffnete oder umgebuchte Geräte, nur auf diesem Handy, höchstens 8
+    (die zuletzt benutzten); angezeigt nach der letzten Umbuchung/Statusänderung des Geräts, neueste
+    oben (Holger, T1, umgesetzt 01.11.2026; ohne Zeitpunkt unten); die Angaben kommen immer aus der aktuellen Geräteliste. Abmelden löscht die Liste
     (eine abgelaufene Sitzung nicht: Nach der erneuten Anmeldung ist sie wieder da). Gespeichert wird
     je Stadt und Konto, ein anderes Konto auf demselben Handy sieht sie nicht. Je Gerät steht klein
     unter dem Standort, wann es zuletzt umgebucht oder sein Status geändert wurde (egal von wem;

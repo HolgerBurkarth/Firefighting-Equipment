@@ -499,8 +499,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   auch `scan_code`.
   „Zuletzt benutzt“ (`src/data/recentDevices.ts`, `recentDeviceIds`/`rememberDevice` aus
   `src/data/index.ts`): localStorage `ff-recent-devices:<kürzel>:<konto-id>`, nur IDs, höchstens 8,
-  neueste zuerst; `DevicePage` merkt sich das Gerät beim Öffnen; angezeigt nur Geräte der aktuellen
-  Liste (im Modus `server` per `findMany`, auch bei jeder Rückkehr auf „Suchen“). Je Gerät klein
+  zuletzt benutzte zuerst; `DevicePage` merkt sich das Gerät beim Öffnen; angezeigt nur Geräte der
+  aktuellen Liste, sortiert nach `stateChangedAt` (neueste Änderung oben, ohne unten, Gleichstand
+  in der Reihenfolge der Nutzung; `orderByLastChange`, T1) (im Modus `server` per `findMany`, auch bei jeder Rückkehr auf „Suchen“). Je Gerät klein
   unter dem Standort die letzte Umbuchung/Statusänderung (`stateChangedAt` aus `state_changed_at`,
   `changeTimeText` in `src/data/changeTime.ts`, Ortszeit: „gerade eben“, „vor 5 Min.“ unter 1 h,
   „heute 14:02“, „gestern 18:30“, sonst „12.10.2026“; `SearchPage` frischt die Uhr alle 30 s und
