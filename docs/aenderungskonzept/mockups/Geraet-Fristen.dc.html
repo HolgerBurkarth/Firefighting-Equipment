@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Ausrüstung mit Wartungen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav.active{background:#F8E6E6;color:#1B2430;font-weight:600;box-shadow:inset 4px 0 0 #B71C1C}
+.card{background:#FFFFFF;border:1px solid #E1E5EA;border-radius:12px;box-sizing:border-box;padding:20px 24px}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.chip{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.inp{font:inherit;font-size:16px;padding:10px 12px;border-radius:8px;border:2px solid #C9D1DA;min-height:44px;box-sizing:border-box;background:#fff;color:#1B2430;width:100%}
+.lbl{display:block;font-weight:600;font-size:15px;margin-bottom:6px}
+.kv{display:grid;grid-template-columns:200px 1fr;gap:10px 16px;font-size:16px;align-items:baseline}
+.kv dt{color:#5B6675}
+.kv dd{margin:0}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 2px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #B71C1C; color: #fff; font-weight: 700; font-size: 18px">FF</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">FF Immendingen</span>
+        <span style="font-size: 14px; color: #5B6675">Geräteverwaltung</span>
+      </div>
+    </div>
+    <a class="nav" href="#">Dashboard</a>
+    <a class="nav" href="#">Suchen</a>
+    <a class="nav active" href="#" aria-current="page">{{tMenu}}</a>
+    <a class="nav" href="#">{{tTypes}}</a>
+    <a class="nav" href="#">Termine</a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <nav aria-label="Pfad" style="font-size: 15px; color: #5B6675; display: flex; gap: 8px"><a href="#">{{tMenu}}</a><span aria-hidden="true">›</span><span>PA 7</span></nav>
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+      <h1 style="margin: 0; font-size: 30px; font-weight: 700">PA 7</h1>
+      <span style="font-size: 17px; color: #3A4655">Atemschutzgerät · Lager Gerätehaus</span>
+      <span class="chip" style="background: #E3F2E7; color: #1B6330">einsatzbereit</span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <section class="card" aria-labelledby="h-fristen" style="flex: 3 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <h2 id="h-fristen" style="margin: 0; font-size: 19px">Wartungen</h2>
+        <div style="font-size: 16px"><span style="color: #5B6675">In Betrieb seit</span> 01.04.2021</div>
+        <div style="overflow-x: auto; border: 1px solid #E1E5EA; border-radius: 10px">
+          <table style="width: 100%; border-collapse: collapse; min-width: 560px">
+            <thead><tr style="background: #F7F8FA"><th style="padding: 10px 14px; font-size: 14px; color: #3A4655; text-align: left">Wartung</th><th style="padding: 10px 14px; font-size: 14px; color: #3A4655; text-align: left">zuletzt gemacht</th><th style="padding: 10px 14px; font-size: 14px; color: #3A4655; text-align: left">nächste</th><th style="padding: 10px 14px"><span style="position: absolute; left: -9999px">Aktion</span></th></tr></thead>
+            <tbody>
+              <sc-for list="{{rows}}" as="r" hint-placeholder-count="2">
+                <tr>
+                  <td style="padding: 12px 14px; border-top: 1px solid #EEF0F3; font-size: 15px"><div style="font-weight: 700">{{r.name}}</div><div style="font-size: 13px; color: #5B6675">{{r.rule}}</div></td>
+                  <td style="padding: 12px 14px; border-top: 1px solid #EEF0F3; font-size: 15px">{{r.last}}</td>
+                  <td style="padding: 12px 14px; border-top: 1px solid #EEF0F3; font-size: 15px"><strong>{{r.next}}</strong><div style="margin-top: 4px"><span class="chip" style="{{r.chipStyle}}">{{r.chip}}</span></div></td>
+                  <td style="padding: 12px 14px; border-top: 1px solid #EEF0F3; text-align: right"><button class="btn" type="button" onClick="{{r.toggle}}" style="font-size: 14px; min-height: 40px">{{r.btn}}</button></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <sc-if value="{{editing}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 2px solid #E1E5EA; border-radius: 10px">
+            <div style="font-weight: 700">Anderes Datum für „{{editName}}“ bei {{tThisDat}}</div>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap">
+              <div style="flex: 1 1 200px"><label class="lbl" for="od">nächste am</label><input id="od" class="inp" type="date" value="2027-01-31"></div>
+              <div style="flex: 2 1 260px"><label class="lbl" for="og">Grund (für den Verlauf)</label><input id="og" class="inp" type="text" value="Sonderprüfung nach Herstellerrückruf"></div>
+            </div>
+            <div style="font-size: 14px; color: #5B6675">Die App rechnet diese Wartung dann nicht mehr selbst, bis das Datum wieder auf „berechnet“ steht.</div>
+          </div>
+        </sc-if>
+        <div style="font-size: 14px; color: #5B6675">Bei der Rückkehr aus der Werkstatt kreuzt der Gerätewart an, welche Wartung gemacht wurde. Nur diese bekommt ein neues Datum.</div>
+        <div style="display: flex; gap: 10px"><button class="btn btn-primary" type="button">Speichern</button><button class="btn" type="button">Abbrechen</button></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-neu" style="flex: 2 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+        <h2 id="h-neu" style="margin: 0; font-size: 19px">„{{tNew}}“ – geänderte Felder</h2>
+        <div><label class="lbl" for="n1">In Betrieb seit</label><input id="n1" class="inp" type="date" value="2026-11-02"></div>
+        <div><label class="lbl" for="n2">Letzte kleine Wartung (optional)</label><input id="n2" class="inp" type="date"></div>
+        <div style="font-size: 15px; background: #F7F8FA; border: 1px solid #E1E5EA; border-radius: 10px; padding: 12px 14px">Kleine Wartung: <strong>02.05.2027</strong><br>Große Wartung: <strong>02.11.2032</strong><br><span style="font-size: 14px; color: #5B6675">berechnet aus {{tTypeDat}} „Atemschutzgerät“</span></div>
+        <p style="margin: 0; font-size: 14px; color: #5B6675">Das heutige Eingabefeld „Nächste Prüfung“ entfällt, die App rechnet jede Wartung selbst. Bei Typen ohne Wartung bleibt es wie heute.</p>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1070}}'>
+var ROWS = [
+  { key: 'k', name: 'Kleine Wartung', rule: 'alle 6 Monate, ab letzter Wartung', last: '02.11.2026', next: '02.05.2027', chip: 'berechnet', od: '31.01.2027' },
+  { key: 'g', name: 'Große Wartung', rule: 'alle 6 Jahre, fest ab „in Betrieb seit“', last: '15.03.2021 (vor Inbetriebnahme)', next: '01.04.2027', chip: 'in 5 Monaten', od: '31.01.2027' }
+];
+var TERMS = {
+  bisher: { label: 'bisher: „Gerät“', menu: 'Geräte', one: 'Gerät', many: 'Geräte', type: 'Gerätetyp', types: 'Gerätetypen', newOne: 'Neues Gerät', newType: 'Neuer Gerätetyp', thisDat: 'diesem Gerät', typeDat: 'dem Gerätetyp', theNom: 'das Gerät', ofThisType: 'dieses Typs' },
+  aus: { label: '„Ausrüstung“ allein', menu: 'Ausrüstung', one: 'Ausrüstung', many: 'Ausrüstungen', type: 'Ausrüstungstyp', types: 'Ausrüstungstypen', newOne: 'Neue Ausrüstung', newType: 'Neuer Ausrüstungstyp', thisDat: 'dieser Ausrüstung', typeDat: 'dem Ausrüstungstyp', theNom: 'die Ausrüstung', ofThisType: 'dieses Typs' },
+  teil: { label: '„Ausrüstung“ + „Teil“', menu: 'Ausrüstung', one: 'Teil', many: 'Teile', type: 'Art', types: 'Arten', newOne: 'Neues Teil', newType: 'Neue Art', thisDat: 'diesem Teil', typeDat: 'der Art', theNom: 'das Teil', ofThisType: 'dieser Art' }
+};
+function termOf(c) { return TERMS.aus; }
+function termBar(c) {
+  var cur = c.state.term || 'aus';
+  return ['bisher', 'aus', 'teil'].map(function (k) {
+    var on = cur === k;
+    return { label: TERMS[k].label, pressed: on ? 'true' : 'false',
+      style: 'min-height: 36px; padding: 0 12px; border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid ' + (on ? '#1B2430; background: #1B2430; color: #FFFFFF' : '#C9D1DA; background: #FFFFFF; color: #3A4655'),
+      pick: function () { c.setState({ term: k }); } };
+  });
+}
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { edit: null }; }
+  renderVals() {
+    var TT = termOf(this);
+    var s = this.state, self = this;
+    var cur = ROWS.filter(function (r) { return r.key === s.edit; })[0];
+    return {
+      termBar: termBar(this), tMenu: TT.menu, tOne: TT.one, tMany: TT.many, tType: TT.type, tTypes: TT.types, tNew: TT.newOne, tNewType: TT.newType, tThisDat: TT.thisDat, tTypeDat: TT.typeDat, tTheNom: TT.theNom, tOfThisType: TT.ofThisType,
+      
+      rows: ROWS.map(function (r) {
+        var on = s.edit === r.key;
+        var soon = r.chip.indexOf('Monaten') > 0;
+        return { name: r.name, rule: r.rule, last: r.last,
+          next: on ? r.od : r.next,
+          chip: on ? 'anders festgelegt' : r.chip,
+          chipStyle: on ? 'background: #FFF1DB; color: #7A4A00' : (soon ? 'background: #FFF1DB; color: #7A4A00' : 'background: #EEF0F3; color: #3A4655'),
+          btn: on ? 'wieder berechnen' : 'anderes Datum …',
+          toggle: function () { self.setState({ edit: on ? null : r.key }); } };
+      }),
+      editing: !!cur,
+      editName: cur ? cur.name : ''
+    };
+  }
+}
+</script>
+</body>
+</html>

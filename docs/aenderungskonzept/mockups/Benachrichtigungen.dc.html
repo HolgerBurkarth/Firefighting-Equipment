@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Mail-Benachrichtigungen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav.active{background:#F8E6E6;color:#1B2430;font-weight:600;box-shadow:inset 4px 0 0 #B71C1C}
+.card{background:#FFFFFF;border:1px solid #E1E5EA;border-radius:12px;box-sizing:border-box;padding:20px 24px}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;box-sizing:border-box;white-space:nowrap}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.chk{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:8px 0;font-size:16px;cursor:pointer;border-top:1px solid #EEF0F3}
+.chk input{width:20px;height:20px;margin:2px 0 0 0;accent-color:#B71C1C;flex-shrink:0}
+.filter{min-height:40px;padding:0 14px;border-radius:999px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #C9D1DA}
+.chip{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 2px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #B71C1C; color: #fff; font-weight: 700; font-size: 18px">FF</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">FF Immendingen</span>
+        <span style="font-size: 14px; color: #5B6675">Jonas Weber · Gerätewart</span>
+      </div>
+    </div>
+    <a class="nav" href="#">Dashboard</a>
+    <a class="nav" href="#">Ausrüstung</a>
+    <a class="nav" href="#">Wartung</a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+    <a class="nav active" href="#" aria-current="page">Jonas Weber</a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; max-width: 1100px">
+    <h1 style="margin: 0; font-size: 30px; font-weight: 700">Profil</h1>
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <section class="card" aria-labelledby="h-mail" style="flex: 3 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+        <h2 id="h-mail" style="margin: 0; font-size: 19px">Mail-Benachrichtigungen</h2>
+        <p style="margin: 4px 0 10px 0; font-size: 15px; color: #5B6675">Eine Mail an jonas.weber@example.de, sobald einer dieser Vorgänge passiert. Eigene Buchungen lösen keine Mail aus.</p>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap">
+          <button class="btn" type="button" onClick="{{all}}">Alle</button>
+          <button class="btn" type="button" onClick="{{important}}">Nur Wichtiges</button>
+          <button class="btn" type="button" onClick="{{noneAll}}">Keine</button>
+        </div>
+        <sc-for list="{{events}}" as="e" hint-placeholder-count="7">
+          <label class="chk"><input type="checkbox" checked="{{e.checked}}" onChange="{{e.toggle}}"><span style="display: flex; flex-direction: column"><span>{{e.label}}</span><span style="font-size: 14px; color: #5B6675">{{e.hint}}</span></span></label>
+        </sc-for>
+        <div style="border-top: 1px solid #EEF0F3; padding-top: 14px; margin-top: 6px; display: flex; flex-direction: column; gap: 10px">
+          <div style="font-weight: 700; font-size: 16px">Nur für diese Ausrüstungstypen</div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <sc-for list="{{types}}" as="t" hint-placeholder-count="4">
+              <button class="filter" type="button" aria-pressed="{{t.pressed}}" onClick="{{t.toggle}}" style="{{t.style}}">{{t.label}}</button>
+            </sc-for>
+          </div>
+          <div style="font-size: 14px; color: #5B6675">Nichts gewählt heißt: alle Ausrüstungstypen.</div>
+        </div>
+        <div style="border-top: 1px solid #EEF0F3; padding-top: 14px; margin-top: 10px; display: flex; flex-direction: column; gap: 4px">
+          <h3 style="margin: 0; font-size: 17px">Erinnerungen an Termine</h3>
+          <p style="margin: 2px 0 6px 0; font-size: 15px; color: #5B6675">Die App schaut jeden Morgen um 6 Uhr nach, was fällig ist, und schickt dann die Erinnerung.</p>
+          <label class="chk"><input type="checkbox" checked="{{remSoon}}" onChange="{{toggleSoon}}"><span style="display: flex; flex-direction: column; gap: 6px"><span>Wartung bald fällig</span><span style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 14px; color: #5B6675">vorher erinnern: <sc-for list="{{leads}}" as="l" hint-placeholder-count="3"><button class="filter" type="button" aria-pressed="{{l.pressed}}" onClick="{{l.pick}}" style="{{l.style}}">{{l.label}}</button></sc-for></span></span></label>
+          <label class="chk"><input type="checkbox" checked="{{remOver}}" onChange="{{toggleOver}}"><span style="display: flex; flex-direction: column"><span>Wartung überfällig</span><span style="font-size: 14px; color: #5B6675">einmal pro Woche, bis die Wartung eingetragen ist</span></span></label>
+          <label class="chk"><input type="checkbox" checked="{{remRet}}" onChange="{{toggleRet}}"><span style="display: flex; flex-direction: column"><span>Ausgeliehen und nicht zurück</span><span style="font-size: 14px; color: #5B6675">nur wenn beim Ausleihen „Rückgabe bis“ eingetragen wurde</span></span></label>
+          <label class="chk"><input type="checkbox" checked="{{digest}}" onChange="{{toggleDigest}}"><span style="display: flex; flex-direction: column"><span>Alles in einer Mail am Morgen</span><span style="font-size: 14px; color: #5B6675">statt einzelner Mails: eine Zusammenfassung pro Tag, nur wenn es etwas gibt</span></span></label>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 14px"><button class="btn btn-primary" type="button">Speichern</button></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-prev" style="flex: 2 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <h2 id="h-prev" style="margin: 0; font-size: 19px">So sieht es aus</h2>
+        <div style="font-size: 15px; color: #3A4655">{{summary}}</div>
+        <div style="border: 1px solid #E1E5EA; border-radius: 10px; padding: 12px 14px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; background: #F7F8FA">
+          <div><span style="color: #5B6675">Betreff:</span> <strong>Log Feuerwehr Immendingen: M 17 defekt gemeldet</strong></div>
+          <div>Wer: Sven Hofmann · heute 08:30</div>
+          <div>Kommentar: „Sichtscheibe gerissen“</div>
+          <div><a href="#">Ausrüstung öffnen</a></div>
+        </div>
+        <div style="font-size: 15px; color: #3A4655">{{remSummary}}</div>
+        <div style="border: 1px solid #E1E5EA; border-radius: 10px; padding: 12px 14px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; background: #F7F8FA">
+          <div><span style="color: #5B6675">Betreff:</span> <strong>{{remSubject}}</strong></div>
+          <div>PA 07 · Kleine Wartung · fällig am 10.12.2026</div>
+          <div>PA 12 · Große Wartung · fällig am 18.12.2026</div>
+          <div>M 30 · ausgeliehen an Ippingen · Rückgabe war bis 01.11.2026</div>
+          <div><a href="#">Termine öffnen</a></div>
+        </div>
+        <p style="margin: 0; font-size: 14px; color: #5B6675">Sammelaktionen und CSV-Import bleiben je eine Sammelmail. Den Zeitgeber richtet der Super-Admin einmal pro Server ein.</p>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+var EVENTS = [
+  { key: 'defect', label: 'Defekt gemeldet', hint: 'jemand meldet eine Ausrüstung als defekt', imp: true },
+  { key: 'used', label: 'Benutzt gemeldet', hint: 'Ausrüstung, die nach jedem Einsatz zur Wartung muss', imp: false },
+  { key: 'return', label: 'Zurückgegeben', hint: 'auch ohne Anmeldung über den Aushang', imp: true },
+  { key: 'lend', label: 'Ausgeliehen', hint: 'Ausrüstung an Hattingen, Ippingen … gegeben', imp: false },
+  { key: 'below', label: 'Fach außer Betrieb oder neuer Hinweis', hint: 'es fehlt etwas, oder beim Buchen ohne Netz gab es einen Konflikt', imp: true },
+  { key: 'move', label: 'Umgebucht oder Status geändert', hint: 'kann viele Mails ergeben', imp: false },
+  { key: 'master', label: 'Ausrüstungsdaten, Wartungsdatum, Liste eingelesen', hint: 'Änderungen durch Admin oder Gerätewart', imp: false }
+];
+var TYPES = ['Atemschutzgerät', 'Atemschutzmaske', 'Lungenautomat', 'Funkgerät'];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { on: { defect: true, return: true, below: true }, types: {}, rem: { soon: true, over: true, ret: true, digest: true }, lead: 14 }; }
+  renderVals() {
+    var s = this.state, self = this;
+    var set = function (pred) { var x = {}; EVENTS.forEach(function (e) { if (pred(e)) x[e.key] = true; }); self.setState({ on: x }); };
+    var n = EVENTS.filter(function (e) { return s.on[e.key]; }).length;
+    var tsel = TYPES.filter(function (t) { return s.types[t]; });
+    return {
+      events: EVENTS.map(function (e) { return { label: e.label, hint: e.hint, checked: !!s.on[e.key], toggle: function () { var x = Object.assign({}, s.on); x[e.key] = !x[e.key]; self.setState({ on: x }); } }; }),
+      all: function () { set(function () { return true; }); },
+      important: function () { set(function (e) { return e.imp; }); },
+      noneAll: function () { set(function () { return false; }); },
+      types: TYPES.map(function (t) { var on = !!s.types[t]; return { label: t, pressed: on ? 'true' : 'false', style: on ? 'background: #1B2430; color: #FFFFFF; border-color: #1B2430' : 'background: #FFFFFF; color: #3A4655', toggle: function () { var x = Object.assign({}, s.types); x[t] = !x[t]; self.setState({ types: x }); } }; }),
+      remSoon: !!s.rem.soon, remOver: !!s.rem.over, remRet: !!s.rem.ret, digest: !!s.rem.digest,
+      toggleSoon: function () { self.setState({ rem: Object.assign({}, s.rem, { soon: !s.rem.soon }) }); },
+      toggleOver: function () { self.setState({ rem: Object.assign({}, s.rem, { over: !s.rem.over }) }); },
+      toggleRet: function () { self.setState({ rem: Object.assign({}, s.rem, { ret: !s.rem.ret }) }); },
+      toggleDigest: function () { self.setState({ rem: Object.assign({}, s.rem, { digest: !s.rem.digest }) }); },
+      leads: [7, 14, 30].map(function (d) { var on = s.lead === d; return { label: d + ' Tage', pressed: on ? 'true' : 'false', style: on ? 'background: #1B2430; color: #FFFFFF; border-color: #1B2430' : 'background: #FFFFFF; color: #3A4655', pick: function (ev) { ev.preventDefault(); self.setState({ lead: d }); } }; }),
+      remSummary: (function () { var r = []; if (s.rem.soon) r.push('Wartung ' + s.lead + ' Tage vorher'); if (s.rem.over) r.push('überfällige Wartung'); if (s.rem.ret) r.push('nicht zurückgegebene Ausrüstung'); return r.length ? 'Erinnerungen: ' + r.join(', ') + (s.rem.digest ? ', gesammelt in einer Mail am Morgen.' : ', je eine Mail.') : 'Keine Erinnerungen an Termine.'; })(),
+      remSubject: s.rem.digest ? 'FF Immendingen: 3 Termine stehen an' : 'FF Immendingen: PA 07 Kleine Wartung fällig am 10.12.2026',
+      summary: n === 0 ? 'Sie bekommen keine Mails.' : 'Sie bekommen Mails zu ' + n + ' von ' + EVENTS.length + ' Vorgängen, ' + (tsel.length ? 'nur für ' + tsel.join(', ') : 'für alle Ausrüstungstypen') + '.'
+    };
+  }
+}
+</script>
+</body>
+</html>

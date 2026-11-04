@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Ausrüstungstyp mit Wartungen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav:hover{background:#F3E3E3;color:#1B2430}
+.nav.active{background:#F8E6E6;color:#1B2430;font-weight:600;box-shadow:inset 4px 0 0 #B71C1C}
+.card{background:#FFFFFF;border:1px solid #E1E5EA;border-radius:12px;box-sizing:border-box}
+.th{padding:10px 14px;font-size:14px;color:#3A4655;text-align:left;font-weight:600;white-space:nowrap}
+.td{padding:12px 14px;border-top:1px solid #EEF0F3;font-size:15px;text-align:left;vertical-align:middle}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+.btn:hover{background:#F3F4F6;color:#1B2430}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.btn-primary:hover{background:#8E1515;color:#fff}
+.btn-quiet{border-color:transparent;background:transparent}
+.inp{font:inherit;font-size:16px;padding:10px 12px;border-radius:8px;border:2px solid #C9D1DA;min-height:44px;box-sizing:border-box;background:#fff;color:#1B2430}
+.lbl{display:block;font-weight:600;font-size:15px;margin-bottom:6px}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;cursor:pointer;box-sizing:border-box}
+.opt input{width:20px;height:20px;margin:1px 0 0 0;accent-color:#B71C1C;flex-shrink:0}
+.seg{min-height:40px;padding:0 12px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;border:0;border-left:1px solid #C9D1DA}
+.seg:first-child{border-left:0}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 2px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #B71C1C; color: #fff; font-weight: 700; font-size: 18px">FF</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">FF Immendingen</span>
+        <span style="font-size: 14px; color: #5B6675">Geräteverwaltung</span>
+      </div>
+    </div>
+    <a class="nav" href="#">Dashboard</a>
+    <a class="nav" href="#">Suchen</a>
+    <a class="nav" href="#">{{tMenu}}</a>
+    <a class="nav" href="#">Standorte</a>
+    <a class="nav active" href="#" aria-current="page">{{tTypes}}</a>
+    <a class="nav" href="#">Termine</a>
+    <a class="nav" href="#">Wartung</a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+      <h1 style="margin: 0; font-size: 30px; font-weight: 700; flex-grow: 1">{{tTypes}}</h1>
+      <button class="btn btn-primary" type="button">{{tNewType}}</button>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <div style="flex: 2 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+          <div style="position: relative; flex: 1 1 240px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B6675" stroke-width="2" aria-hidden="true" style="position: absolute; left: 12px; top: 12px"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+            <label for="q" style="position: absolute; left: -9999px">{{tType}} suchen</label>
+            <input id="q" class="inp" type="search" placeholder="{{tType}} suchen" style="padding-left: 40px; width: 100%">
+          </div>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 15px; min-height: 44px"><input type="checkbox" style="width: 20px; height: 20px; accent-color: #B71C1C; margin: 0">Ohne Wartung</label>
+        </div>
+        <section class="card" aria-label="{{tTypes}}" style="overflow-x: auto">
+          <table style="width: 100%; border-collapse: collapse; min-width: 460px">
+            <thead><tr style="background: #F7F8FA"><th class="th">Name</th><th class="th">Wartungen</th><th class="th" style="text-align: right">{{tMany}}</th></tr></thead>
+            <tbody>
+              <tr style="background: #FDF5F5"><td class="td" style="font-weight: 700">Atemschutzgerät</td><td class="td">{{summary}}</td><td class="td" style="text-align: right">33</td></tr>
+              <tr><td class="td" style="font-weight: 700">Atemschutzmaske</td><td class="td">nach jedem Einsatz · alle 2 Jahre</td><td class="td" style="text-align: right">25</td></tr>
+              <tr><td class="td" style="font-weight: 700">Lungenautomat</td><td class="td">alle 12 Monate</td><td class="td" style="text-align: right">12</td></tr>
+              <tr><td class="td" style="font-weight: 700">Funkgerät</td><td class="td" style="color: #5B6675">keine</td><td class="td" style="text-align: right">3</td></tr>
+            </tbody>
+          </table>
+        </section>
+        <p style="margin: 0; font-size: 14px; color: #5B6675">Die Fristen hier sind Beispielwerte. Maßgeblich sind Hersteller und Prüfordnung.</p>
+      </div>
+
+      <section class="card" aria-labelledby="edit-title" style="flex: 3 1 560px; min-width: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+        <h2 id="edit-title" style="margin: 0; font-size: 19px">„Atemschutzgerät“ bearbeiten</h2>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end">
+          <div style="flex: 1 1 220px"><label class="lbl" for="f-name">Name</label><input id="f-name" class="inp" type="text" value="Atemschutzgerät" style="width: 100%"></div>
+          <label class="opt" style="border: 2px solid #E1E5EA; flex: 1 1 260px"><input type="checkbox"><span style="display: flex; flex-direction: column"><span style="font-weight: 700">Nach jedem Einsatz zur Wartung</span><span style="font-size: 14px; color: #5B6675">Träger können dann nur „benutzt“ melden.</span></span></label>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px">
+          <h3 style="margin: 0; font-size: 17px; flex-grow: 1">Wartungen</h3>
+          <button class="btn" type="button" onClick="{{add}}">+ Wartung hinzufügen</button>
+        </div>
+        <sc-for list="{{rows}}" as="w" hint-placeholder-count="2">
+          <div style="border: 2px solid #E1E5EA; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap">
+              <div style="flex: 1 1 180px"><label class="lbl">Name der Wartung</label><input class="inp" type="text" value="{{w.name}}" style="width: 100%"></div>
+              <div>
+                <span class="lbl">alle</span>
+                <div style="display: flex; gap: 8px; align-items: center">
+                  <input class="inp" type="number" min="1" value="{{w.n}}" onChange="{{w.setN}}" style="width: 80px" aria-label="Anzahl">
+                  <div role="group" aria-label="Einheit" style="display: inline-flex; border: 1px solid #C9D1DA; border-radius: 8px; overflow: hidden; background: #fff">
+                    <sc-for list="{{w.units}}" as="u" hint-placeholder-count="3">
+                      <button class="seg" type="button" aria-pressed="{{u.pressed}}" onClick="{{u.pick}}" style="{{u.style}}">{{u.label}}</button>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-quiet" type="button" onClick="{{w.remove}}" style="color: #9B1C1C">Entfernen</button>
+            </div>
+            <div>
+              <span class="lbl">gerechnet</span>
+              <div role="group" aria-label="Berechnung" style="display: inline-flex; border: 1px solid #C9D1DA; border-radius: 8px; overflow: hidden; background: #fff; flex-wrap: wrap">
+                <sc-for list="{{w.methods}}" as="m" hint-placeholder-count="3">
+                  <button class="seg" type="button" aria-pressed="{{m.pressed}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button>
+                </sc-for>
+              </div>
+            </div>
+            <sc-if value="{{w.hasOthers}}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap">
+                <span class="lbl" style="margin: 0">enthält auch</span>
+                <sc-for list="{{w.others}}" as="o" hint-placeholder-count="1">
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 15px; min-height: 40px; cursor: pointer"><input type="checkbox" checked="{{o.checked}}" onChange="{{o.toggle}}" style="width: 20px; height: 20px; accent-color: #B71C1C; margin: 0">{{o.label}}</label>
+                </sc-for>
+                <span style="font-size: 14px; color: #5B6675">{{w.incHint}}</span>
+              </div>
+            </sc-if>
+            <div style="font-size: 15px; background: #F7F8FA; border-radius: 8px; padding: 10px 12px">Beispiel: in Betrieb seit 15.03.2024, zuletzt gemacht 10.06.2026 → nächste: <strong>{{w.example}}</strong></div>
+          </div>
+        </sc-for>
+        <sc-if value="{{none}}" hint-placeholder-val="{{ false }}">
+          <div style="font-size: 15px; color: #5B6675">Keine Wartung festgelegt – {{tTheNom}} erscheint nicht unter „Termine“.</div>
+        </sc-if>
+        <div style="display: flex; gap: 10px"><button class="btn btn-primary" type="button">Speichern</button><button class="btn" type="button">Abbrechen</button></div>
+        <p style="margin: 0; font-size: 14px; color: #5B6675">Beim Speichern fragt die App nach, wenn sich für {{tMany}} {{tOfThisType}} Termine ändern. Erinnerungs-Mails nennen die Wartung beim Namen.</p>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1320}}'>
+var UNITS = [{ key: 'd', label: 'Tage' }, { key: 'm', label: 'Monate' }, { key: 'y', label: 'Jahre' }];
+var METHODS = [
+  { key: 'rolling', label: 'ab letzter Wartung' },
+  { key: 'grid', label: 'fest ab „in Betrieb seit“' },
+  { key: 'monthEnd', label: 'bis Monatsende' }
+];
+function add(d, n, unit) {
+  var r = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  if (unit === 'd') r.setUTCDate(r.getUTCDate() + n);
+  if (unit === 'm') r.setUTCMonth(r.getUTCMonth() + n);
+  if (unit === 'y') r.setUTCFullYear(r.getUTCFullYear() + n);
+  return r;
+}
+function fmt(d) { var p = function (x) { return (x < 10 ? '0' : '') + x; }; return p(d.getUTCDate()) + '.' + p(d.getUTCMonth() + 1) + '.' + d.getUTCFullYear(); }
+var NEU = new Date(Date.UTC(2024, 2, 15));
+var LAST = new Date(Date.UTC(2026, 5, 10));
+var UL = { d: 'Tage', m: 'Monate', y: 'Jahre' };
+var nextId = 3;
+var TERMS = {
+  bisher: { label: 'bisher: „Gerät“', menu: 'Geräte', one: 'Gerät', many: 'Geräte', type: 'Gerätetyp', types: 'Gerätetypen', newOne: 'Neues Gerät', newType: 'Neuer Gerätetyp', thisDat: 'diesem Gerät', typeDat: 'dem Gerätetyp', theNom: 'das Gerät', ofThisType: 'dieses Typs' },
+  aus: { label: '„Ausrüstung“ allein', menu: 'Ausrüstung', one: 'Ausrüstung', many: 'Ausrüstungen', type: 'Ausrüstungstyp', types: 'Ausrüstungstypen', newOne: 'Neue Ausrüstung', newType: 'Neuer Ausrüstungstyp', thisDat: 'dieser Ausrüstung', typeDat: 'dem Ausrüstungstyp', theNom: 'die Ausrüstung', ofThisType: 'dieses Typs' },
+  teil: { label: '„Ausrüstung“ + „Teil“', menu: 'Ausrüstung', one: 'Teil', many: 'Teile', type: 'Art', types: 'Arten', newOne: 'Neues Teil', newType: 'Neue Art', thisDat: 'diesem Teil', typeDat: 'der Art', theNom: 'das Teil', ofThisType: 'dieser Art' }
+};
+function termOf(c) { return TERMS.aus; }
+function termBar(c) {
+  var cur = c.state.term || 'aus';
+  return ['bisher', 'aus', 'teil'].map(function (k) {
+    var on = cur === k;
+    return { label: TERMS[k].label, pressed: on ? 'true' : 'false',
+      style: 'min-height: 36px; padding: 0 12px; border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid ' + (on ? '#1B2430; background: #1B2430; color: #FFFFFF' : '#C9D1DA; background: #FFFFFF; color: #3A4655'),
+      pick: function () { c.setState({ term: k }); } };
+  });
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { rows: [
+      { id: 1, name: 'Kleine Wartung', n: 6, unit: 'm', method: 'rolling' },
+      { id: 2, name: 'Große Wartung', n: 6, unit: 'y', method: 'grid', inc: [1] }
+    ] };
+  }
+  renderVals() {
+    var TT = termOf(this);
+    var s = this.state, self = this;
+    var upd = function (id, patch) { self.setState({ rows: s.rows.map(function (r) { return r.id === id ? Object.assign({}, r, patch) : r; }) }); };
+    return {
+      termBar: termBar(this), tMenu: TT.menu, tOne: TT.one, tMany: TT.many, tType: TT.type, tTypes: TT.types, tNew: TT.newOne, tNewType: TT.newType, tThisDat: TT.thisDat, tTypeDat: TT.typeDat, tTheNom: TT.theNom, tOfThisType: TT.ofThisType,
+      
+      rows: s.rows.map(function (r) {
+        var n = Math.max(1, parseInt(r.n, 10) || 1);
+        var due;
+        if (r.method === 'grid') { due = NEU; var k = 1; while (due <= LAST) { due = add(NEU, n * k, r.unit); k++; } }
+        else { due = add(LAST, n, r.unit); }
+        if (r.method === 'monthEnd') due = new Date(Date.UTC(due.getUTCFullYear(), due.getUTCMonth() + 1, 0));
+        return {
+          name: r.name, n: n, example: fmt(due),
+          setN: function (e) { upd(r.id, { n: e.target.value }); },
+          units: UNITS.map(function (u) { var on = r.unit === u.key; return { label: u.label, pressed: on ? 'true' : 'false', style: on ? 'background: #1B2430; color: #FFFFFF' : 'background: #FFFFFF; color: #3A4655', pick: function () { upd(r.id, { unit: u.key }); } }; }),
+          methods: METHODS.map(function (m) { var on = r.method === m.key; return { label: m.label, pressed: on ? 'true' : 'false', style: on ? 'background: #1B2430; color: #FFFFFF' : 'background: #FFFFFF; color: #3A4655', pick: function () { upd(r.id, { method: m.key }); } }; }),
+          remove: function () { self.setState({ rows: s.rows.filter(function (x) { return x.id !== r.id; }) }); },
+          hasOthers: s.rows.length > 1,
+          others: s.rows.filter(function (o) { return o.id !== r.id; }).map(function (o) { var inc = r.inc || []; var on = inc.indexOf(o.id) >= 0; return { label: o.name, checked: on, toggle: function () { upd(r.id, { inc: on ? inc.filter(function (x) { return x !== o.id; }) : inc.concat([o.id]) }); } }; }),
+          incHint: (r.inc || []).length ? 'Wird sie eingetragen, bekommen diese Wartungen dasselbe Datum.' : ''
+        };
+      }),
+      none: s.rows.length === 0,
+      add: function () { self.setState({ rows: s.rows.concat([{ id: nextId++, name: 'Neue Wartung', n: 12, unit: 'm', method: 'rolling' }]) }); },
+      summary: s.rows.length ? s.rows.map(function (r) { return r.name + ' alle ' + r.n + ' ' + UL[r.unit]; }).join(' · ') : 'keine'
+    };
+  }
+}
+</script>
+</body>
+</html>
