@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Wege der Ausrüstung</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav:hover{background:#F3E3E3;color:#1B2430}
+.nav.active{background:#F8E6E6;color:#1B2430;font-weight:600;box-shadow:inset 4px 0 0 #B71C1C}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+.btn:hover{background:#F3F4F6;color:#1B2430}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.btn-quiet{border-color:transparent;background:transparent}
+.filter{min-height:40px;padding:0 14px;border-radius:999px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #C9D1DA;background:#fff;color:#3A4655}
+.filter.on{background:#1B2430;color:#fff;border-color:#1B2430}
+.chk{display:flex;align-items:center;gap:10px;min-height:40px;font-size:15px;cursor:pointer}
+.chk input{width:20px;height:20px;accent-color:#B71C1C;margin:0}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 2px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #B71C1C; color: #fff; font-weight: 700; font-size: 18px">FF</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">FF Immendingen</span>
+        <span style="font-size: 14px; color: #5B6675">Geräteverwaltung</span>
+      </div>
+    </div>
+    <a class="nav" href="#">Dashboard</a>
+    <a class="nav" href="#">Suchen</a>
+    <a class="nav" href="#">Ausrüstung</a>
+    <a class="nav active" href="Standorte-Aufgaben.dc.html" aria-current="page">Standorte</a>
+    <a class="nav" href="#">Ausrüstungstypen</a>
+    <a class="nav" href="#">Termine</a>
+    <a class="nav" href="Wartung.dc.html">Wartung</a>
+    <a class="nav" href="#">Verleih</a>
+    <a class="nav" href="#">Protokoll</a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px">
+    <nav aria-label="Pfad" style="font-size: 15px; color: #5B6675; display: flex; gap: 8px"><a href="Standorte-Aufgaben.dc.html">Standorte</a><span aria-hidden="true">›</span><span>Wege als Grafik</span></nav>
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+      <h1 style="margin: 0; font-size: 30px; font-weight: 700; flex-grow: 1">Wege der Ausrüstung</h1>
+      <div role="group" aria-label="Modus" style="display: inline-flex; border: 1px solid #C9D1DA; border-radius: 8px; overflow: hidden">
+        <button type="button" aria-pressed="false" style="min-height: 44px; padding: 0 16px; border: 0; background: #fff; color: #3A4655; font: inherit; font-weight: 600; cursor: pointer">Ansehen</button>
+        <button type="button" aria-pressed="true" style="min-height: 44px; padding: 0 16px; border: 0; background: #1B2430; color: #fff; font: inherit; font-weight: 600; cursor: pointer">Bearbeiten</button>
+      </div>
+    </div>
+    <p style="margin: 0; font-size: 16px; color: #3A4655">Jeder Pfeil ist eine erlaubte Buchung; ein Weg, der fehlt, ist gesperrt. Ohne eingerichtete Wege ist alles frei wie bisher. Bearbeiten geht nur am PC: einen Pfeil anklicken, mit „+ Weg“ von Kasten zu Kasten ziehen oder mit „+ Standort“ einen neuen Kasten setzen.</p>
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+      <span style="font-size: 15px; color: #5B6675">Zeigen für:</span>
+      <button class="filter on" type="button" aria-pressed="true">Alle Rollen</button>
+      <button class="filter" type="button" aria-pressed="false">Gerätewart</button>
+      <button class="filter" type="button" aria-pressed="false">Geräteträger</button>
+      <button class="filter" type="button" aria-pressed="false">Extern</button>
+      <span style="font-size: 15px; color: #5B6675; margin-left: 12px">Ausrüstung:</span>
+      <button class="filter on" type="button" aria-pressed="true">Alle</button>
+      <button class="filter" type="button" aria-pressed="false">Mehrweggeräte</button>
+      <button class="filter" type="button" aria-pressed="false">Einmalgeräte</button>
+    </div>
+
+    <section aria-label="Grafik der Wege" style="background: #FFFFFF; border: 1px solid #E1E5EA; border-radius: 12px; padding: 8px; overflow-x: auto">
+      <div role="toolbar" aria-label="Grafik bearbeiten" style="display: flex; gap: 8px; padding: 8px 8px 0 8px; flex-wrap: wrap">
+        <button class="btn" type="button">+ Standort</button>
+        <button class="btn" type="button">+ Weg</button>
+        <button class="btn btn-quiet" type="button">Anordnung automatisch</button>
+      </div>
+      <div style="position: relative; width: 1080px; height: 560px">
+        <svg width="159" height="8" viewBox="0 0 159 8" preserveAspectRatio="none" style="position: absolute; left: 260px; top: 145px; width: 159px; height: 8px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-1" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#5B6675" stroke="none" style="stroke: none; fill: #5B6675; fill: context-stroke"/></marker></defs><path d="M 0 4 L 155 4" marker-end="url(#dc-arrow-head-filled-1)"></path></svg>
+        <svg width="159" height="8" viewBox="0 0 159 8" preserveAspectRatio="none" style="position: absolute; left: 261px; top: 175px; width: 159px; height: 8px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-2" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#5B6675" stroke="none" style="stroke: none; fill: #5B6675; fill: context-stroke"/></marker></defs><path d="M 159 4 L 4 4" marker-end="url(#dc-arrow-head-filled-2)"></path></svg>
+        <svg width="159" height="8" viewBox="0 0 159 8" preserveAspectRatio="none" style="position: absolute; left: 620px; top: 160px; width: 159px; height: 8px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-3" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#5B6675" stroke="none" style="stroke: none; fill: #5B6675; fill: context-stroke"/></marker></defs><path d="M 0 4 L 155 4" marker-end="url(#dc-arrow-head-filled-3)"></path></svg>
+        <svg width="8" height="191" viewBox="0 0 8 191" preserveAspectRatio="none" style="position: absolute; left: 876px; top: 208px; width: 8px; height: 191px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-4" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#5B6675" stroke="none" style="stroke: none; fill: #5B6675; fill: context-stroke"/></marker></defs><path d="M 4 0 L 4 187" marker-end="url(#dc-arrow-head-filled-4)"></path></svg>
+        <svg width="8" height="32" viewBox="0 0 8 32" preserveAspectRatio="none" style="position: absolute; left: 876px; top: 488px; width: 8px; height: 32px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M 4 0 L 4 32"></path></svg>
+        <svg width="850" height="8" viewBox="0 0 850 8" preserveAspectRatio="none" style="position: absolute; left: 30px; top: 516px; width: 850px; height: 8px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M 0 4 L 850 4"></path></svg>
+        <svg width="8" height="356" viewBox="0 0 8 356" preserveAspectRatio="none" style="position: absolute; left: 26px; top: 164px; width: 8px; height: 356px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M 4 0 L 4 356"></path></svg>
+        <svg width="29" height="8" viewBox="0 0 29 8" preserveAspectRatio="none" style="position: absolute; left: 30px; top: 160px; width: 29px; height: 8px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-5" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#5B6675" stroke="none" style="stroke: none; fill: #5B6675; fill: context-stroke"/></marker></defs><path d="M 0 4 L 25 4" marker-end="url(#dc-arrow-head-filled-5)"></path></svg>
+        <svg width="8" height="60" viewBox="0 0 8 60" preserveAspectRatio="none" style="position: absolute; left: 156px; top: 60px; width: 8px; height: 60px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M 4 60 L 4 0"></path></svg>
+        <svg width="720" height="8" viewBox="0 0 720 8" preserveAspectRatio="none" style="position: absolute; left: 160px; top: 56px; width: 720px; height: 8px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M 0 4 L 720 4"></path></svg>
+        <svg width="8" height="59" viewBox="0 0 8 59" preserveAspectRatio="none" style="position: absolute; left: 876px; top: 60px; width: 8px; height: 59px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-6" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#5B6675" stroke="none" style="stroke: none; fill: #5B6675; fill: context-stroke"/></marker></defs><path d="M 4 0 L 4 55" marker-end="url(#dc-arrow-head-filled-6)"></path></svg>
+        <svg width="8" height="191" viewBox="0 0 8 191" preserveAspectRatio="none" style="position: absolute; left: 89px; top: 208px; width: 8px; height: 191px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-7" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#5B6675" stroke="none" style="stroke: none; fill: #5B6675; fill: context-stroke"/></marker></defs><path d="M 4 0 L 4 187" marker-end="url(#dc-arrow-head-filled-7)"></path></svg>
+        <svg width="159" height="8" viewBox="0 0 159 8" preserveAspectRatio="none" style="position: absolute; left: 260px; top: 440px; width: 159px; height: 8px; overflow: visible; fill: none; stroke: #B71C1C; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-8" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#B71C1C" stroke="none" style="stroke: none; fill: #B71C1C; fill: context-stroke"/></marker></defs><path d="M 0 4 L 153 4" marker-end="url(#dc-arrow-head-filled-8)"></path></svg>
+        <svg width="8" height="110" viewBox="0 0 8 110" preserveAspectRatio="none" style="position: absolute; left: 483px; top: 290px; width: 8px; height: 110px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M 4 110 L 4 0"></path></svg>
+        <svg width="260" height="8" viewBox="0 0 260 8" preserveAspectRatio="none" style="position: absolute; left: 227px; top: 286px; width: 260px; height: 8px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M 0 4 L 260 4"></path></svg>
+        <svg width="8" height="81" viewBox="0 0 8 81" preserveAspectRatio="none" style="position: absolute; left: 223px; top: 209px; width: 8px; height: 81px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-9" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#5B6675" stroke="none" style="stroke: none; fill: #5B6675; fill: context-stroke"/></marker></defs><path d="M 4 81 L 4 4" marker-end="url(#dc-arrow-head-filled-9)"></path></svg>
+        <svg width="8" height="140" viewBox="0 0 8 140" preserveAspectRatio="none" style="position: absolute; left: 549px; top: 260px; width: 8px; height: 140px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M 4 140 L 4 0"></path></svg>
+        <svg width="260" height="8" viewBox="0 0 260 8" preserveAspectRatio="none" style="position: absolute; left: 553px; top: 256px; width: 260px; height: 8px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M 0 4 L 260 4"></path></svg>
+        <svg width="8" height="51" viewBox="0 0 8 51" preserveAspectRatio="none" style="position: absolute; left: 809px; top: 209px; width: 8px; height: 51px; overflow: visible; fill: none; stroke: #5B6675; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-10" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#5B6675" stroke="none" style="stroke: none; fill: #5B6675; fill: context-stroke"/></marker></defs><path d="M 4 51 L 4 4" marker-end="url(#dc-arrow-head-filled-10)"></path></svg>
+
+        <div style="position: absolute; left: 60px; top: 120px; width: 200px; height: 88px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #F2FAF4; border: 2px solid #1B6330; border-radius: 10px; font-size: 15px; line-height: 20px"><span><b>Lager Gerätehaus</b><br>Lager · 41 Ausrüstungen</span></div>
+        <div style="position: absolute; left: 420px; top: 120px; width: 200px; height: 88px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #FFFFFF; border: 2px solid #8796A8; border-radius: 10px; font-size: 15px; line-height: 20px"><span><b>Fahrzeuge</b><br>HLF 20, LF 10, MTW · 24<br><span style="font-size: 13px; color: #5B6675">untereinander umbuchbar</span></span></div>
+        <div style="position: absolute; left: 780px; top: 120px; width: 200px; height: 88px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #FFF8EC; border: 2px solid #B86E00; border-radius: 10px; font-size: 15px; line-height: 20px"><span><b>Kisten „Benutzt“, „Defekt“</b><br>Sammelstelle · 5</span></div>
+        <div style="position: absolute; left: 60px; top: 400px; width: 200px; height: 88px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #FFFFFF; border: 2px solid #8796A8; border-radius: 10px; font-size: 15px; line-height: 20px"><span><b>Hattingen, Ippingen</b><br>Ausgeliehen an · 3</span></div>
+        <div style="position: absolute; left: 420px; top: 400px; width: 200px; height: 88px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #F8F2FB; border: 2px solid #5B2A7A; border-radius: 10px; font-size: 15px; line-height: 20px"><span><b>Rückgabe Gerätehaus</b><br>Rückgabe · 3</span></div>
+        <div style="position: absolute; left: 780px; top: 400px; width: 200px; height: 88px; box-sizing: border-box; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; background: #F2F6FB; border: 2px solid #1D3557; border-radius: 10px; font-size: 15px; line-height: 20px"><span><b>Werkstatt Tuttlingen</b><br>Werkstatt · 4</span></div>
+
+        <div style="position: absolute; left: 280px; top: 121px; width: 120px; text-align: center; font-size: 13px; line-height: 16px; color: #3A4655">ausgeben, Tausch</div>
+        <div style="position: absolute; left: 290px; top: 191px; width: 100px; text-align: center; font-size: 13px; line-height: 16px; color: #3A4655">zurück ins Lager</div>
+        <div style="position: absolute; left: 625px; top: 116px; width: 150px; text-align: center; font-size: 13px; line-height: 16px; color: #3A4655">Einmal benutzt,<br>defekt, Wartung fällig</div>
+        <div style="position: absolute; left: 754px; top: 296px; width: 110px; text-align: center; font-size: 13px; line-height: 16px; color: #3A4655">Sammeltransport</div>
+        <div style="position: absolute; left: 430px; top: 32px; width: 200px; text-align: center; font-size: 13px; line-height: 16px; color: #3A4655">Wartung fällig (Ersatz im Lager)</div>
+        <div style="position: absolute; left: 375px; top: 532px; width: 170px; text-align: center; font-size: 13px; line-height: 16px; color: #3A4655">zurück, gewartet</div>
+        <div style="position: absolute; left: 105px; top: 296px; width: 70px; text-align: center; font-size: 13px; line-height: 16px; color: #3A4655">ausleihen</div>
+        <div style="position: absolute; left: 300px; top: 262px; width: 80px; text-align: center; font-size: 13px; line-height: 16px; color: #3A4655">in Ordnung</div>
+        <div style="position: absolute; left: 620px; top: 232px; width: 120px; text-align: center; font-size: 13px; line-height: 16px; color: #9B1C1C; font-weight: 600">defekt, benutzt</div>
+        <div style="position: absolute; left: 285px; top: 456px; width: 110px; text-align: center; font-size: 13px; line-height: 16px; color: #B71C1C; font-weight: 600">Rückgabe ohne<br>Anmeldung</div>
+      </div>
+      <p style="margin: 0; padding: 4px 12px 12px 12px; font-size: 14px; color: #5B6675">Mehrweggeräte bleiben nach dem Einsatz am Fahrzeug. In die Sammelstelle kommen sie nur bei Defekt oder fälliger Wartung. Einmalgeräte gehen nach jeder Benutzung dorthin.</p>
+    </section>
+
+    <section aria-labelledby="weg-titel" style="background: #FFFFFF; border: 2px solid #B71C1C; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; max-width: 760px">
+      <h2 id="weg-titel" style="margin: 0; font-size: 19px">Weg: Ausgeliehen an → Rückgabe Gerätehaus</h2>
+      <fieldset style="border: 0; margin: 0; padding: 0">
+        <legend style="font-weight: 600; font-size: 15px; padding: 0 0 4px 0">Wer darf so buchen</legend>
+        <div style="display: flex; gap: 24px; flex-wrap: wrap">
+          <label class="chk"><input type="checkbox" checked>Extern (ohne Anmeldung)</label>
+          <label class="chk"><input type="checkbox" checked>Gerätewart</label>
+          <label class="chk"><input type="checkbox">Geräteträger</label>
+        </div>
+      </fieldset>
+      <fieldset style="border: 0; margin: 0; padding: 0">
+        <legend style="font-weight: 600; font-size: 15px; padding: 0 0 4px 0">Gilt für</legend>
+        <div style="display: flex; gap: 24px; flex-wrap: wrap">
+          <label class="chk"><input type="checkbox" checked>Mehrweggeräte</label>
+          <label class="chk"><input type="checkbox" checked>Einmalgeräte</label>
+        </div>
+      </fieldset>
+      <fieldset style="border: 0; margin: 0; padding: 0">
+        <legend style="font-weight: 600; font-size: 15px; padding: 0 0 4px 0">Status beim Ankommen</legend>
+        <div style="display: flex; gap: 24px; flex-wrap: wrap">
+          <label class="chk"><input type="radio" name="st">bleibt</label>
+          <label class="chk"><input type="radio" name="st" checked>wählt, wer bucht (in Ordnung, benutzt, defekt)</label>
+        </div>
+      </fieldset>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap">
+        <button class="btn btn-primary" type="button">Speichern</button>
+        <button class="btn" type="button">Abbrechen</button>
+        <div style="flex-grow: 1"></div>
+        <button class="btn btn-quiet" type="button" style="color: #9B1C1C">Weg entfernen …</button>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

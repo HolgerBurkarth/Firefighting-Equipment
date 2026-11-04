@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Rolle bearbeiten</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav:hover{background:#E3E9F2;color:#1B2430}
+.nav.active{background:#E3E9F2;color:#1B2430;font-weight:600}
+.card{background:#FFFFFF;border:1px solid #E1E5EA;border-radius:12px;padding:20px 24px;box-sizing:border-box}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+.btn:hover{background:#EEF2F7;color:#1B2430}
+.btn-primary{background:#2B3440;border-color:#2B3440;color:#fff}
+.btn-primary:hover{background:#1B2430;color:#fff}
+.btn[disabled]{color:#5B6675;background:#F3F4F6;cursor:not-allowed}
+.seg{min-height:40px;padding:0 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;border:0;border-left:1px solid #C9D1DA}
+.seg:first-child{border-left:0}
+.chk{display:flex;align-items:flex-start;gap:10px;min-height:40px;padding:8px 0;font-size:15px;cursor:pointer}
+.chk input{width:20px;height:20px;margin:1px 0 0 0;accent-color:#2B3440;flex-shrink:0}
+.field label{display:block;font-weight:600;font-size:15px;margin-bottom:6px}
+.field input,.field textarea{font:inherit;font-size:16px;padding:10px 12px;border-radius:8px;border:2px solid #C9D1DA;min-height:44px;box-sizing:border-box;width:100%;color:#1B2430;background:#fff}
+.chip{display:inline-flex;align-items:center;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;background:#EEF0F3;color:#3A4655;white-space:nowrap}
+h2{margin:0;font-size:19px}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 4px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #2B3440">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"></path></svg>
+      </div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">Service</span>
+        <span style="font-size: 14px; color: #5B6675">Super-Admin</span>
+      </div>
+    </div>
+    <a class="nav" href="#">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+      Dashboard
+    </a>
+    <a class="nav active" href="Main.dc.html" aria-current="page">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 21h18"></path><path d="M5 21V8l7-4 7 4v13"></path><path d="M10 21v-5h4v5"></path></svg>
+      Städte
+    </a>
+    <a class="nav" href="#">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"></path></svg>
+      Super-Admins
+    </a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+    <div style="border-top: 1px solid #E1E5EA; padding-top: 8px; display: flex; flex-direction: column; gap: 4px">
+      <a class="nav" href="#">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3"></path><path d="M12 19v3"></path><path d="M2 12h3"></path><path d="M19 12h3"></path></svg>
+        Einstellungen
+      </a>
+      <a class="nav" href="#">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>
+        Holger Burkarth
+      </a>
+      <a class="nav" href="#">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 4h4v16h-4"></path><path d="M10 8l-4 4 4 4"></path><path d="M6 12h10"></path></svg>
+        Abmelden
+      </a>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <nav aria-label="Pfad" style="font-size: 15px; color: #5B6675; display: flex; gap: 8px; flex-wrap: wrap">
+      <a href="#">Städte</a><span aria-hidden="true">›</span><a href="#">Feuerwehr Immendingen</a><span aria-hidden="true">›</span><a href="Main.dc.html">Rollen</a><span aria-hidden="true">›</span><span>Gerätewart</span>
+    </nav>
+    <h1 style="margin: 0; font-size: 30px; font-weight: 700">Rolle bearbeiten</h1>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <div style="flex: 3 1 620px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+        <section class="card" aria-labelledby="h-name" style="display: flex; flex-direction: column; gap: 16px">
+          <h2 id="h-name">Name</h2>
+          <div style="display: flex; gap: 16px; flex-wrap: wrap">
+            <div class="field" style="flex: 1 1 220px">
+              <label for="f-name">Name der Rolle</label>
+              <input id="f-name" type="text" value="Gerätewart">
+            </div>
+            <div class="field" style="flex: 2 1 320px">
+              <label for="f-desc">Kurzbeschreibung (für den Admin der Stadt)</label>
+              <input id="f-desc" type="text" value="Wie Admin, ohne Benutzer und Einstellungen">
+            </div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="h-areas" style="display: flex; flex-direction: column; gap: 4px">
+          <h2 id="h-areas">1 · Ansichten und Bereiche</h2>
+          <p style="margin: 4px 0 12px 0; font-size: 15px; color: #5B6675">Ohne Zugriff fehlt die Seite im Menü, und der Server lehnt jeden Aufruf ab. „Ändern“ schließt „Ansehen“ ein.</p>
+          <sc-for list="{{areas}}" as="row" hint-placeholder-count="11">
+            <div style="display: flex; align-items: center; gap: 16px; padding: 10px 0; border-top: 1px solid #EEF0F3; flex-wrap: wrap">
+              <div style="flex: 1 1 240px; min-width: 0">
+                <div style="font-weight: 600; font-size: 16px">{{row.label}}</div>
+                <div style="font-size: 14px; color: #5B6675">{{row.hint}}</div>
+              </div>
+              <div role="group" aria-label="{{row.label}}" style="display: inline-flex; border: 1px solid #C9D1DA; border-radius: 8px; overflow: hidden; background: #fff">
+                <sc-for list="{{row.options}}" as="opt" hint-placeholder-count="3">
+                  <button class="seg" type="button" aria-pressed="{{opt.pressed}}" onClick="{{opt.pick}}" style="{{opt.style}}">{{opt.label}}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </section>
+
+        <section class="card" aria-labelledby="h-actions" style="display: flex; flex-direction: column; gap: 8px">
+          <h2 id="h-actions">2 · Aktionen</h2>
+          <p style="margin: 4px 0 4px 0; font-size: 15px; color: #5B6675">Grau heißt: Der Bereich darüber reicht nicht. Die Aktion bleibt angehakt und wirkt, sobald der Bereich freigegeben ist.</p>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 32px">
+            <sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+              <fieldset style="border: 0; border-top: 1px solid #EEF0F3; margin: 0; padding: 12px 0 4px 0; min-width: 0">
+                <legend style="font-weight: 700; font-size: 15px; padding: 0 0 2px 0">{{g.title}}</legend>
+                <sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+                  <label class="chk" style="{{it.style}}">
+                    <input type="checkbox" checked="{{it.checked}}" disabled="{{it.disabled}}" onChange="{{it.toggle}}">
+                    <span style="display: flex; flex-direction: column">
+                      <span>{{it.label}}</span>
+                      <sc-if value="{{it.disabled}}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size: 13px; color: #7A4A00">{{it.note}}</span>
+                      </sc-if>
+                    </span>
+                  </label>
+                </sc-for>
+              </fieldset>
+            </sc-for>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="h-limits" style="display: flex; flex-direction: column; gap: 4px">
+          <h2 id="h-limits">3 · Einschränkungen</h2>
+          <label class="chk">
+            <input type="checkbox" checked="{{restrictSingleUse}}" onChange="{{toggleRestrict}}">
+            <span style="display: flex; flex-direction: column">
+              <span>Bei Einmalgeräten nur „Benutzt melden“</span>
+              <span style="font-size: 14px; color: #5B6675">Für Ausrüstungstypen mit „nach jeder Benutzung warten“: kein Umbuchen und kein Status außer „benutzt“.</span>
+            </span>
+          </label>
+        </section>
+
+        <section class="card" aria-labelledby="h-filter" style="display: flex; flex-direction: column; gap: 16px">
+          <div>
+            <h2 id="h-filter">4 · Sieht nur …</h2>
+            <p style="margin: 4px 0 0 0; font-size: 15px; color: #5B6675">Die Rolle sieht nur Ausrüstung, deren Typ und Standort hier erlaubt sind – überall: Listen, Suche, Zähler, Termine, CSV, Mails und Offline-Kopie.</p>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px">
+            <fieldset style="border: 0; margin: 0; padding: 0; min-width: 0">
+              <legend style="font-weight: 700; font-size: 16px; padding: 0 0 6px 0">Standorte</legend>
+              <label class="chk"><input type="radio" name="loc" checked="{{locAll}}" onChange="{{setLocAll}}"><span>Alle Standorte</span></label>
+              <label class="chk"><input type="radio" name="loc" checked="{{locSome}}" onChange="{{setLocSome}}"><span>Nur ausgewählte</span></label>
+              <sc-if value="{{locSome}}" hint-placeholder-val="{{ false }}">
+                <div style="border: 1px solid #E1E5EA; border-radius: 8px; padding: 4px 12px; margin-top: 4px">
+                  <sc-for list="{{locs}}" as="l" hint-placeholder-count="9">
+                    <label class="chk" style="{{l.style}}">
+                      <input type="checkbox" checked="{{l.checked}}" onChange="{{l.toggle}}">
+                      <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span>{{l.label}}</span><sc-if value="{{l.tag}}" hint-placeholder-val="{{ false }}"><span class="chip">{{l.tag}}</span></sc-if></span>
+                    </label>
+                  </sc-for>
+                </div>
+                <p style="margin: 8px 0 0 0; font-size: 14px; color: #5B6675">Ein Fahrzeug schließt seine Fächer ein. Sammelstelle, Werkstatt und Rückgabe bleiben als Ziel immer wählbar, weil der Ablauf sie vorgibt.</p>
+              </sc-if>
+            </fieldset>
+            <fieldset style="border: 0; margin: 0; padding: 0; min-width: 0">
+              <legend style="font-weight: 700; font-size: 16px; padding: 0 0 6px 0">Ausrüstungstypen</legend>
+              <label class="chk"><input type="radio" name="typ" checked="{{typeAll}}" onChange="{{setTypeAll}}"><span>Alle Ausrüstungstypen</span></label>
+              <label class="chk"><input type="radio" name="typ" checked="{{typeSome}}" onChange="{{setTypeSome}}"><span>Nur ausgewählte</span></label>
+              <sc-if value="{{typeSome}}" hint-placeholder-val="{{ false }}">
+                <div style="border: 1px solid #E1E5EA; border-radius: 8px; padding: 4px 12px; margin-top: 4px">
+                  <sc-for list="{{types}}" as="t" hint-placeholder-count="5">
+                    <label class="chk">
+                      <input type="checkbox" checked="{{t.checked}}" onChange="{{t.toggle}}">
+                      <span>{{t.label}}</span>
+                    </label>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </fieldset>
+          </div>
+        </section>
+
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+          <button class="btn btn-primary" type="button">Speichern</button>
+          <a class="btn" href="Main.dc.html">Abbrechen</a>
+          <div style="flex-grow: 1"></div>
+          <button class="btn" type="button" disabled>Rolle löschen …</button>
+          <span style="font-size: 14px; color: #5B6675">Löschen geht erst, wenn niemand die Rolle hat (3 Personen).</span>
+        </div>
+      </div>
+
+      <aside aria-labelledby="h-preview" style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <section class="card" style="display: flex; flex-direction: column; gap: 14px">
+          <h2 id="h-preview">So sieht es die Rolle</h2>
+          <div>
+            <div style="font-size: 14px; font-weight: 600; color: #5B6675; margin-bottom: 6px">Menü am PC</div>
+            <sc-if value="{{hasConsole}}" hint-placeholder-val="{{ true }}">
+              <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px">
+                <sc-for list="{{menu}}" as="m" hint-placeholder-count="8">
+                  <li style="padding: 6px 10px; border-radius: 6px; background: #F3F4F6; font-size: 15px">{{m.label}}</li>
+                </sc-for>
+              </ul>
+            </sc-if>
+            <sc-if value="{{noConsole}}" hint-placeholder-val="{{ false }}">
+              <div style="font-size: 15px; color: #3A4655">Keine Konsole – nur die Handy-Seiten.</div>
+            </sc-if>
+          </div>
+          <div>
+            <div style="font-size: 14px; font-weight: 600; color: #5B6675; margin-bottom: 6px">Leiste am Handy</div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap">
+              <sc-for list="{{bar}}" as="b" hint-placeholder-count="3">
+                <span class="chip" style="font-size: 14px; padding: 4px 10px">{{b.label}}</span>
+              </sc-for>
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 14px; font-weight: 600; color: #5B6675; margin-bottom: 6px">Darf</div>
+            <div style="font-size: 15px; line-height: 1.5">{{actionSummary}}</div>
+          </div>
+          <div>
+            <div style="font-size: 14px; font-weight: 600; color: #5B6675; margin-bottom: 6px">Sieht Ausrüstung</div>
+            <div style="font-size: 15px; line-height: 1.5">{{filterSummary}}</div>
+          </div>
+        </section>
+        <section class="card" style="display: flex; gap: 12px; align-items: flex-start; background: #FFF8EC; border-color: #F1D9AE">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7A4A00" stroke-width="2" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><path d="M12 3l9 16H3z"></path><path d="M12 10v4"></path><path d="M12 17v.5"></path></svg>
+          <div style="font-size: 15px; line-height: 1.5; color: #4A3200">Die Änderung gilt sofort für <strong>3 Personen</strong>. Offene Sitzungen bekommen die neuen Rechte beim nächsten Aufruf; Handys laden dabei ihre Offline-Kopie neu.</div>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2000}}'>
+var RANK = { none: 0, read: 1, write: 2 };
+var LEVEL_LABEL = { none: 'Kein Zugriff', read: 'Ansehen', write: 'Ändern' };
+var AREAS = [
+  { key: 'dashboard', label: 'Dashboard', hint: 'Kacheln und letzte Aktivitäten', levels: ['none', 'read'], menu: 'Dashboard' },
+  { key: 'search', label: 'Suchen und Ausrüstung ansehen', hint: 'Handy-Seiten, Scan, Umbuchen-Ansicht', levels: ['none', 'read'], menu: 'Suchen' },
+  { key: 'devices', label: 'Ausrüstungsliste', hint: 'Konsole: Liste, Detailseite, Verlauf', levels: ['none', 'read', 'write'], menu: 'Ausrüstung' },
+  { key: 'locations', label: 'Standorte', hint: 'Fahrzeuge, Fächer, Räume, Aufgaben, Mindestbestand', levels: ['none', 'read', 'write'], menu: 'Standorte' },
+  { key: 'types', label: 'Ausrüstungstypen', hint: 'Typen, Wartungen, Einmalgeräte', levels: ['none', 'read', 'write'], menu: 'Ausrüstungstypen' },
+  { key: 'due', label: 'Termine', hint: 'Fällige und überfällige Ausrüstung', levels: ['none', 'read', 'write'], menu: 'Termine' },
+  { key: 'maintenance', label: 'Wartung', hint: 'Sammelstelle, Werkstatt, Rückkehr', levels: ['none', 'read', 'write'], menu: 'Wartung' },
+  { key: 'lending', label: 'Verleih und Rückgabe', hint: 'Verliehene Ausrüstung, Rückgaben', levels: ['none', 'read', 'write'], menu: 'Verleih' },
+  { key: 'log', label: 'Protokoll und Hinweise', hint: 'Hinweise erledigen, Verlauf exportieren', levels: ['none', 'read', 'write'], menu: 'Protokoll' },
+  { key: 'users', label: 'Benutzer', hint: 'Konten, Rollen zuweisen, Einladungscodes, Aushang', levels: ['none', 'read', 'write'], menu: 'Benutzer' },
+  { key: 'settings', label: 'Einstellungen der Stadt', hint: 'Farbe und Logo', levels: ['none', 'read', 'write'], menu: 'Einstellungen' }
+];
+var GROUPS = [
+  { title: 'Buchen', items: [
+    { key: 'move', label: 'Umbuchen', needs: ['search', 'read'] },
+    { key: 'status', label: 'Status setzen', needs: ['search', 'read'] },
+    { key: 'used', label: 'Benutzt melden', needs: ['search', 'read'] },
+    { key: 'swap', label: 'Tauschen', needs: ['search', 'read'] },
+    { key: 'belowMin', label: 'Mindestbestand ohne Ersatz unterschreiten', needs: ['search', 'read'] }
+  ] },
+  { title: 'Ausrüstung verwalten', items: [
+    { key: 'create', label: 'Ausrüstung anlegen', needs: ['devices', 'write'] },
+    { key: 'edit', label: 'Stammdaten bearbeiten', needs: ['devices', 'write'] },
+    { key: 'retire', label: 'Aussondern und wieder aufnehmen', needs: ['devices', 'write'] },
+    { key: 'code', label: 'Code zuordnen', needs: ['devices', 'write'] }
+  ] },
+  { title: 'Mehrere Ausrüstungen', items: [
+    { key: 'bulk', label: 'Sammelaktionen', needs: ['devices', 'write'] },
+    { key: 'import', label: 'CSV-Import', needs: ['devices', 'write'] },
+    { key: 'export', label: 'CSV-Export', needs: ['devices', 'read'] }
+  ] },
+  { title: 'Verleih', items: [
+    { key: 'lend', label: 'Verleihen', needs: ['lending', 'write'] },
+    { key: 'intake', label: 'Rückgaben bearbeiten', needs: ['lending', 'write'] }
+  ] },
+  { title: 'Benachrichtigungen', items: [
+    { key: 'mail', label: 'Log-Mails empfangen', needs: null }
+  ] }
+];
+var LOCS = [
+  { key: 'lager', label: 'Lager Gerätehaus', tag: 'Lager', depth: 0 },
+  { key: 'hlf', label: 'HLF 20', tag: 'Fahrzeug', depth: 0 },
+  { key: 'hlf-fh', label: 'Fahrerhaus', tag: '', depth: 1 },
+  { key: 'hlf-g1', label: 'Fach G1', tag: 'nie leer', depth: 1 },
+  { key: 'hlf-g2', label: 'Fach G2', tag: 'nie leer', depth: 1 },
+  { key: 'lf', label: 'LF 10', tag: 'Fahrzeug', depth: 0 },
+  { key: 'lf-g1', label: 'Fach G1', tag: '', depth: 1 },
+  { key: 'sammel', label: 'Kiste „Benutzt“', tag: 'Sammelstelle', depth: 0 },
+  { key: 'werkstatt', label: 'Atemschutzwerkstatt Tuttlingen', tag: 'Werkstatt', depth: 0 },
+  { key: 'annahme', label: 'Rückgabe Gerätehaus', tag: 'Rückgabe', depth: 0 }
+];
+var TYPES = ['Atemschutzgerät', 'Atemschutzmaske', 'Lungenautomat', 'Funkgerät', 'Wärmebildkamera'];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      levels: { dashboard: 'read', search: 'read', devices: 'write', locations: 'write', types: 'write', due: 'write', maintenance: 'write', lending: 'write', log: 'write', users: 'none', settings: 'none' },
+      actions: { move: true, status: true, used: true, swap: true, belowMin: true, create: true, edit: true, retire: true, code: true, bulk: true, import: true, export: true, lend: true, intake: true, mail: true },
+      restrict: false,
+      locMode: 'all',
+      locSel: { lager: true, hlf: true, 'hlf-fh': true, 'hlf-g1': true, 'hlf-g2': true },
+      typeMode: 'all',
+      typeSel: { 'Atemschutzgerät': true, 'Atemschutzmaske': true, 'Lungenautomat': true }
+    };
+  }
+  renderVals() {
+    var s = this.state;
+    var self = this;
+    var ok = function (needs) { return !needs || RANK[s.levels[needs[0]]] >= RANK[needs[1]]; };
+    var areaLabel = function (k) { for (var i = 0; i < AREAS.length; i++) { if (AREAS[i].key === k) return AREAS[i].label; } return k; };
+    var areas = AREAS.map(function (a) {
+      return {
+        label: a.label,
+        hint: a.hint,
+        options: a.levels.map(function (lv) {
+          var on = s.levels[a.key] === lv;
+          return {
+            label: LEVEL_LABEL[lv],
+            pressed: on ? 'true' : 'false',
+            style: on ? 'background: #2B3440; color: #FFFFFF' : 'background: #FFFFFF; color: #3A4655',
+            pick: function () { var l = Object.assign({}, s.levels); l[a.key] = lv; self.setState({ levels: l }); }
+          };
+        })
+      };
+    });
+    var granted = [];
+    var groups = GROUPS.map(function (g) {
+      return {
+        title: g.title,
+        items: g.items.map(function (it) {
+          var enabled = ok(it.needs);
+          var checked = !!s.actions[it.key];
+          if (enabled && checked) granted.push(it.label);
+          return {
+            label: it.label,
+            checked: checked,
+            disabled: !enabled,
+            note: it.needs ? 'braucht „' + areaLabel(it.needs[0]) + ': ' + LEVEL_LABEL[it.needs[1]] + '“' : '',
+            style: enabled ? '' : 'color: #5B6675',
+            toggle: function () { var a = Object.assign({}, s.actions); a[it.key] = !a[it.key]; self.setState({ actions: a }); }
+          };
+        })
+      };
+    });
+    var menu = AREAS.filter(function (a) { return a.key !== 'search' && s.levels[a.key] !== 'none'; }).map(function (a) { return { label: a.menu }; });
+    var bar = [];
+    if (s.levels.search !== 'none') bar.push({ label: 'Suchen' });
+    if (s.levels.due !== 'none') bar.push({ label: 'Termine' });
+    if (menu.length) bar.push({ label: 'Dashboard' });
+    bar.push({ label: 'Profil' });
+    var locs = LOCS.map(function (l) {
+      return {
+        label: l.label,
+        tag: l.tag,
+        checked: !!s.locSel[l.key],
+        style: l.depth ? 'padding-left: 28px' : '',
+        toggle: function () { var x = Object.assign({}, s.locSel); x[l.key] = !x[l.key]; self.setState({ locSel: x }); }
+      };
+    });
+    var types = TYPES.map(function (t) {
+      return {
+        label: t,
+        checked: !!s.typeSel[t],
+        toggle: function () { var x = Object.assign({}, s.typeSel); x[t] = !x[t]; self.setState({ typeSel: x }); }
+      };
+    });
+    var nLoc = LOCS.filter(function (l) { return s.locSel[l.key]; }).length;
+    var nType = TYPES.filter(function (t) { return s.typeSel[t]; }).length;
+    var filterSummary = (s.locMode === 'all' ? 'alle Standorte' : nLoc + ' von ' + LOCS.length + ' Standorten') + ', ' + (s.typeMode === 'all' ? 'alle Ausrüstungstypen' : nType + ' von ' + TYPES.length + ' Ausrüstungstypen');
+    var actionSummary = granted.length ? granted.join(', ') : 'nichts ändern, nur ansehen';
+    if (s.restrict) actionSummary += '; bei Einmalgeräten nur „Benutzt melden“';
+    return {
+      areas: areas,
+      groups: groups,
+      restrictSingleUse: s.restrict,
+      toggleRestrict: function () { self.setState({ restrict: !s.restrict }); },
+      locAll: s.locMode === 'all',
+      locSome: s.locMode === 'some',
+      setLocAll: function () { self.setState({ locMode: 'all' }); },
+      setLocSome: function () { self.setState({ locMode: 'some' }); },
+      typeAll: s.typeMode === 'all',
+      typeSome: s.typeMode === 'some',
+      setTypeAll: function () { self.setState({ typeMode: 'all' }); },
+      setTypeSome: function () { self.setState({ typeMode: 'some' }); },
+      locs: locs,
+      types: types,
+      menu: menu,
+      hasConsole: menu.length > 0,
+      noConsole: menu.length === 0,
+      bar: bar,
+      actionSummary: actionSummary,
+      filterSummary: filterSummary
+    };
+  }
+}
+</script>
+</body>
+</html>

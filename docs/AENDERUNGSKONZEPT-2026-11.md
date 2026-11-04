@@ -2,7 +2,7 @@
 
 Stand: 04.11.2026 · Holger Burkarth
 
-> Abzug des Claude-Dokuments „Änderungskonzept: Rollen, Abläufe und Bestände“ (dort wird weiter gearbeitet; diese Datei wird bei Änderungen neu abgelegt). Die UI-Mockups dazu liegen im Claude-Projekt (Design „Mockups Änderungskonzept“). **Für alles, was Nutzer sehen, gelten die Begriffe der Tabelle in Abschnitt 9**, nicht die Arbeitsbegriffe im übrigen Text.
+> Abzug des Claude-Dokuments „Änderungskonzept: Rollen, Abläufe und Bestände“ (dort wird weiter gearbeitet; diese Datei wird bei Änderungen neu abgelegt). Die UI-Mockups dazu liegen als Referenz in [`aenderungskonzept/mockups/`](aenderungskonzept/mockups/LIESMICH.md) (Abzug des Designs „Mockups Änderungskonzept“ aus dem Claude-Projekt). **Für alles, was Nutzer sehen, gelten die Begriffe der Tabelle in Abschnitt 9**, nicht die Arbeitsbegriffe im übrigen Text.
 
 ## Kurzfassung
 

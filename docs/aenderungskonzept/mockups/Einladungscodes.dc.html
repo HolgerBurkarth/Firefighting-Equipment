@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Einladungscodes mit Rolle</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav:hover{background:#F3E3E3;color:#1B2430}
+.nav.active{background:#F8E6E6;color:#1B2430;font-weight:600;box-shadow:inset 4px 0 0 #B71C1C}
+.th{padding:12px 14px;font-size:14px;color:#3A4655;text-align:left;font-weight:600;white-space:nowrap}
+.td{padding:12px 14px;border-top:1px solid #EEF0F3;font-size:15px;text-align:left;vertical-align:middle}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+.btn:hover{background:#F3F4F6;color:#1B2430}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.btn-primary:hover{background:#8E1515;color:#fff}
+.btn-quiet{border-color:transparent;background:transparent}
+.chip{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.tab{display:inline-flex;align-items:center;min-height:44px;font-size:16px;color:#5B6675;text-decoration:none;border-bottom:3px solid transparent;box-sizing:border-box}
+.tab.active{color:#1B2430;font-weight:700;border-bottom-color:#B71C1C}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;cursor:pointer;box-sizing:border-box}
+.opt input{width:20px;height:20px;margin:1px 0 0 0;accent-color:#B71C1C;flex-shrink:0}
+.field label{display:block;font-weight:600;font-size:15px;margin-bottom:6px}
+.field input{font:inherit;font-size:16px;padding:10px 12px;border-radius:8px;border:2px solid #C9D1DA;min-height:44px;box-sizing:border-box;width:100%;color:#1B2430;background:#fff}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 2px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #B71C1C; color: #fff; font-weight: 700; font-size: 18px">FF</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">FF Immendingen</span>
+        <span style="font-size: 14px; color: #5B6675">Geräteverwaltung</span>
+      </div>
+    </div>
+    <a class="nav" href="#">Dashboard</a>
+    <a class="nav" href="#">Suchen</a>
+    <a class="nav" href="#">Ausrüstung</a>
+    <a class="nav" href="#">Standorte</a>
+    <a class="nav" href="#">Ausrüstungstypen</a>
+    <a class="nav" href="#">Termine</a>
+    <a class="nav" href="#">Wartung</a>
+    <a class="nav" href="#">Verleih</a>
+    <a class="nav" href="#">Protokoll</a>
+    <a class="nav active" href="Benutzer.dc.html" aria-current="page">Benutzer</a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+    <div style="border-top: 1px solid #E1E5EA; padding-top: 8px; display: flex; flex-direction: column; gap: 2px">
+      <a class="nav" href="#">Einstellungen</a>
+      <a class="nav" href="#">Holger Burkarth</a>
+      <a class="nav" href="#">Abmelden</a>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <h1 style="margin: 0; font-size: 30px; font-weight: 700">Benutzer</h1>
+    <div role="tablist" aria-label="Benutzer" style="display: flex; gap: 24px; border-bottom: 1px solid #E1E5EA">
+      <a class="tab" href="Benutzer.dc.html" role="tab" aria-selected="false">Konten</a>
+      <a class="tab active" href="#" role="tab" aria-selected="true">Einladungscodes</a>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <section aria-label="Einladungscodes" style="flex: 3 1 560px; min-width: 0; background: #FFFFFF; border: 1px solid #E1E5EA; border-radius: 12px; overflow-x: auto">
+        <table style="width: 100%; border-collapse: collapse; min-width: 640px">
+          <thead>
+            <tr style="background: #F7F8FA">
+              <th class="th" scope="col">Code</th>
+              <th class="th" scope="col">Rolle nach Freischaltung</th>
+              <th class="th" scope="col">Gültig bis</th>
+              <th class="th" scope="col" style="text-align: right">Registriert</th>
+              <th class="th" scope="col"><span style="position: absolute; left: -9999px">Aktionen</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="td" style="font-family: ui-monospace, monospace; letter-spacing: 1px">7KQ4-…-M2PX</td>
+              <td class="td"><span class="chip" style="background: #EEF0F3; color: #3A4655">Geräteträger</span></td>
+              <td class="td">31.12.2026</td>
+              <td class="td" style="text-align: right">18</td>
+              <td class="td" style="text-align: right; white-space: nowrap"><button class="btn btn-quiet" type="button">Aushang drucken</button> <button class="btn btn-quiet" type="button">Widerrufen …</button></td>
+            </tr>
+            <tr>
+              <td class="td" style="font-family: ui-monospace, monospace; letter-spacing: 1px">R9TB-…-4WZE</td>
+              <td class="td"><span class="chip" style="background: #E3ECF8; color: #1D3557">Gerätewart</span></td>
+              <td class="td">16.11.2026</td>
+              <td class="td" style="text-align: right">1</td>
+              <td class="td" style="text-align: right; white-space: nowrap"><button class="btn btn-quiet" type="button">Code kopieren</button> <button class="btn btn-quiet" type="button">Widerrufen …</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section aria-labelledby="neu-titel" style="flex: 2 1 340px; min-width: 0; background: #FFFFFF; border: 1px solid #E1E5EA; border-radius: 12px; padding: 20px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px">
+        <h2 id="neu-titel" style="margin: 0; font-size: 19px">Neuer Einladungscode</h2>
+        <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px">
+          <legend style="font-weight: 600; font-size: 15px; padding: 0 0 6px 0">Rolle nach der Freischaltung</legend>
+          <sc-for list="{{roles}}" as="r" hint-placeholder-count="3">
+            <label class="opt" style="{{r.style}}">
+              <input type="radio" name="code-role" checked="{{r.checked}}" onChange="{{r.pick}}">
+              <span style="display: flex; flex-direction: column"><span style="font-weight: 700">{{r.name}}</span><span style="font-size: 14px; color: #5B6675">{{r.desc}}</span></span>
+            </label>
+          </sc-for>
+        </fieldset>
+        <div class="field">
+          <label for="f-until">Gültig bis</label>
+          <input id="f-until" type="date" value="2026-12-31">
+        </div>
+        <p style="margin: 0; font-size: 14px; color: #5B6675">Die Rolle „Admin“ gibt es für Codes nicht: Wer einen Aushang fotografiert, soll nie Admin werden können. Admins ernennen Sie unter „Konten“.</p>
+        <button class="btn btn-primary" type="button" style="align-self: flex-start">Code erstellen</button>
+      </section>
+    </div>
+
+    <section aria-labelledby="ablauf-titel" style="background: #FFFFFF; border: 1px solid #E1E5EA; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px">
+      <h2 id="ablauf-titel" style="margin: 0; font-size: 19px">So läuft es ab</h2>
+      <ol style="margin: 0; padding-left: 22px; font-size: 15px; line-height: 1.6; color: #3A4655">
+        <li>Die Person registriert sich mit dem Aushang „Geräteträger“ und bestätigt ihre E-Mail.</li>
+        <li>Unter „Konten“ erscheint sie als wartend, mit der Rolle aus dem Code vorausgewählt.</li>
+        <li>Der Admin prüft den Namen, ändert bei Bedarf die Rolle und schaltet frei.</li>
+      </ol>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var ROLES = [
+  { name: 'Geräteträger', desc: 'Handy: suchen, buchen, benutzt melden, tauschen' },
+  { name: 'Gerätewart', desc: 'Wie Admin, ohne Benutzer und Einstellungen' },
+  { name: 'Benutzer', desc: 'Wie bisher: suchen, umbuchen, Termine' }
+];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { role: 'Geräteträger' }; }
+  renderVals() {
+    var s = this.state, self = this;
+    return {
+      roles: ROLES.map(function (r) {
+        var on = s.role === r.name;
+        return {
+          name: r.name, desc: r.desc, checked: on,
+          style: on ? 'border: 2px solid #B71C1C; background: #FDF5F5' : 'border: 2px solid #E1E5EA; background: #FFFFFF',
+          pick: function () { self.setState({ role: r.name }); }
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

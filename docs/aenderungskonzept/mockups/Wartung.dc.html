@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Wartung</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav:hover{background:#F3E3E3;color:#1B2430}
+.nav.active{background:#F8E6E6;color:#1B2430;font-weight:600;box-shadow:inset 4px 0 0 #B71C1C}
+.card{background:#FFFFFF;border:1px solid #E1E5EA;border-radius:12px;box-sizing:border-box}
+.th{padding:10px 14px;font-size:14px;color:#3A4655;text-align:left;font-weight:600;white-space:nowrap}
+.td{padding:10px 14px;border-top:1px solid #EEF0F3;font-size:15px;text-align:left;vertical-align:middle}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+.btn:hover{background:#F3F4F6;color:#1B2430}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.btn-primary:hover{background:#8E1515;color:#fff}
+.btn[disabled]{color:#5B6675;background:#F3F4F6;border-color:#E1E5EA;cursor:not-allowed}
+.chip{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.filter{min-height:40px;padding:0 14px;border-radius:999px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #C9D1DA}
+.cb{width:20px;height:20px;accent-color:#B71C1C;margin:0}
+.step{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;background:#1B2430;color:#fff;font-weight:700;font-size:15px;flex-shrink:0}
+.inp{font:inherit;font-size:16px;padding:10px 12px;border-radius:8px;border:2px solid #C9D1DA;min-height:44px;box-sizing:border-box;width:100%;background:#fff}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 2px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #B71C1C; color: #fff; font-weight: 700; font-size: 18px">FF</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">FF Immendingen</span>
+        <span style="font-size: 14px; color: #5B6675">Jonas Weber · Gerätewart</span>
+      </div>
+    </div>
+    <a class="nav" href="#">Dashboard</a>
+    <a class="nav" href="#">Suchen</a>
+    <a class="nav" href="#">Ausrüstung</a>
+    <a class="nav" href="Standorte-Aufgaben.dc.html">Standorte</a>
+    <a class="nav" href="#">Ausrüstungstypen</a>
+    <a class="nav" href="#">Termine</a>
+    <a class="nav active" href="#" aria-current="page">Wartung <span class="chip" style="margin-left: auto; background: #FFF1DB; color: #7A4A00">7</span></a>
+    <a class="nav" href="#">Verleih</a>
+    <a class="nav" href="#">Protokoll</a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+    <div style="border-top: 1px solid #E1E5EA; padding-top: 8px; display: flex; flex-direction: column; gap: 2px">
+      <a class="nav" href="#">Jonas Weber</a>
+      <a class="nav" href="#">Abmelden</a>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <div>
+      <h1 style="margin: 0; font-size: 30px; font-weight: 700">Wartung</h1>
+      <p style="margin: 6px 0 0 0; font-size: 16px; color: #3A4655">Benutzte und defekte Ausrüstung sammeln, zur Werkstatt bringen und nach der Rückkehr gesammelt einbuchen.</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+      <div class="card" style="padding: 16px 20px; border-top: 6px solid #B86E00">
+        <div style="font-size: 15px; color: #5B6675; font-weight: 600">In der Sammelstelle</div>
+        <div style="font-size: 34px; font-weight: 700">{{nSammel}}</div>
+        <div style="font-size: 14px; color: #3A4655">ältestes seit 6 Tagen</div>
+      </div>
+      <div class="card" style="padding: 16px 20px; border-top: 6px solid #1D3557">
+        <div style="font-size: 15px; color: #5B6675; font-weight: 600">In der Werkstatt</div>
+        <div style="font-size: 34px; font-weight: 700">{{nWerkstatt}}</div>
+        <div style="font-size: 14px; color: #3A4655">seit 24.10.2026 unterwegs</div>
+      </div>
+      <div class="card" style="padding: 16px 20px; border-top: 6px solid #1B6330">
+        <div style="font-size: 15px; color: #5B6675; font-weight: 600">Heute zurück</div>
+        <div style="font-size: 34px; font-weight: 700">{{nBack}}</div>
+        <div style="font-size: 14px; color: #3A4655">ins Lager Gerätehaus gebucht</div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+      <div style="position: relative; flex: 0 1 300px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B6675" stroke-width="2" aria-hidden="true" style="position: absolute; left: 12px; top: 12px"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+        <label for="q" style="position: absolute; left: -9999px">Ausrüstung suchen</label>
+        <input id="q" class="inp" type="search" placeholder="Nummer, z. B. PA 3" value="{{q}}" onChange="{{onSearch}}" style="padding-left: 40px">
+      </div>
+      <span style="font-size: 15px; color: #5B6675">Typ:</span>
+      <sc-for list="{{typeFilters}}" as="f" hint-placeholder-count="4">
+        <button class="filter" type="button" aria-pressed="{{f.pressed}}" onClick="{{f.pick}}" style="{{f.style}}">{{f.label}}</button>
+      </sc-for>
+    </div>
+
+    <section class="card" aria-labelledby="s1" style="overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 16px 20px; flex-wrap: wrap">
+        <span class="step" aria-hidden="true">1</span>
+        <h2 id="s1" style="margin: 0; font-size: 19px; flex-grow: 1">Sammelstelle „Kiste Benutzt“</h2>
+        <button class="btn" type="button" onClick="{{selectAllSammel}}">Alle auswählen</button>
+        <button class="btn btn-primary" type="button" disabled="{{noneSammel}}" onClick="{{toWorkshop}}">{{toWorkshopLabel}}</button>
+      </div>
+      <div style="overflow-x: auto">
+        <table style="width: 100%; border-collapse: collapse; min-width: 640px">
+          <thead><tr style="background: #F7F8FA"><th class="th" style="width: 44px"><span style="position: absolute; left: -9999px">Auswahl</span></th><th class="th">Ausrüstung</th><th class="th">Typ</th><th class="th">Status</th><th class="th">Gemeldet</th><th class="th">Kommentar</th></tr></thead>
+          <tbody>
+            <sc-for list="{{sammel}}" as="d" hint-placeholder-count="5">
+              <tr>
+                <td class="td"><input class="cb" type="checkbox" aria-label="{{d.id}} auswählen" checked="{{d.checked}}" onChange="{{d.toggle}}"></td>
+                <td class="td" style="font-weight: 700">{{d.id}}</td>
+                <td class="td">{{d.type}}</td>
+                <td class="td"><span class="chip" style="{{d.statusStyle}}">{{d.status}}</span></td>
+                <td class="td">{{d.when}}</td>
+                <td class="td" style="color: #3A4655">{{d.comment}}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <sc-if value="{{sammelEmpty}}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 16px 20px; color: #5B6675; border-top: 1px solid #EEF0F3">Keine Ausrüstung (Filter beachten).</div>
+      </sc-if>
+      <div style="padding: 12px 20px; border-top: 1px solid #EEF0F3; font-size: 14px; color: #5B6675">„Zur Werkstatt bringen“ bucht die Auswahl in die Werkstatt (Status „in Wartung“) und bietet eine Liste für den Transport zum Drucken an.</div>
+    </section>
+
+    <section class="card" aria-labelledby="s2" style="overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 16px 20px; flex-wrap: wrap">
+        <span class="step" aria-hidden="true">2</span>
+        <h2 id="s2" style="margin: 0; font-size: 19px; flex-grow: 1">In der Werkstatt „Atemschutzwerkstatt Tuttlingen“</h2>
+        <button class="btn" type="button">Transportliste drucken</button>
+      </div>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; padding: 0 20px 16px 20px">
+        <div style="flex: 2 1 260px">
+          <label for="scan" style="display: block; font-weight: 600; font-size: 15px; margin-bottom: 6px">Zurückgekommene Ausrüstung scannen – sie wird angehakt</label>
+          <input id="scan" class="inp" type="text" placeholder="Nummer scannen oder eingeben">
+        </div>
+        <button class="btn" type="button" onClick="{{scanNext}}">Mit der Kamera scannen</button>
+        <button class="btn" type="button" onClick="{{selectAllWerk}}">Alle auswählen</button>
+      </div>
+      <div style="overflow-x: auto">
+        <table style="width: 100%; border-collapse: collapse; min-width: 560px">
+          <thead><tr style="background: #F7F8FA"><th class="th" style="width: 44px"><span style="position: absolute; left: -9999px">Auswahl</span></th><th class="th">Ausrüstung</th><th class="th">Typ</th><th class="th">Status</th><th class="th">In der Werkstatt seit</th></tr></thead>
+          <tbody>
+            <sc-for list="{{werkstatt}}" as="d" hint-placeholder-count="4">
+              <tr style="{{d.rowStyle}}">
+                <td class="td"><input class="cb" type="checkbox" aria-label="{{d.id}} auswählen" checked="{{d.checked}}" onChange="{{d.toggle}}"></td>
+                <td class="td" style="font-weight: 700">{{d.id}}</td>
+                <td class="td">{{d.type}}</td>
+                <td class="td"><span class="chip" style="{{d.statusStyle}}">{{d.status}}</span></td>
+                <td class="td">{{d.since}}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; padding: 16px 20px; border-top: 1px solid #EEF0F3; background: #F7F8FA">
+        <div style="flex: 1 1 240px">
+          <label for="ziel" style="display: block; font-weight: 600; font-size: 15px; margin-bottom: 6px">Ziel</label>
+          <select id="ziel" class="inp"><option>Lager Gerätehaus (Standard)</option></select>
+        </div>
+        <div style="flex: 1 1 200px">
+          <label for="datum" style="display: block; font-weight: 600; font-size: 15px; margin-bottom: 6px">Gewartet am</label>
+          <input id="datum" class="inp" type="date" value="2026-11-02">
+        </div>
+        <button class="btn btn-primary" type="button" disabled="{{noneWerk}}" onClick="{{bookBack}}">{{bookBackLabel}}</button>
+      </div>
+      <sc-if value="{{hasBack}}" hint-placeholder-val="{{ false }}">
+        <div style="margin: 0 20px 16px 20px; display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 8px; background: #E3F2E7; color: #1B6330; font-size: 15px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><path d="M5 12l5 5 9-10"></path></svg>
+          <span>{{backText}}</span>
+        </div>
+      </sc-if>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+var ST = {
+  'benutzt': 'background: #FFF1DB; color: #7A4A00',
+  'defekt': 'background: #FCE4E2; color: #9B1C1C',
+  'in Wartung': 'background: #E3ECF8; color: #1D3557'
+};
+var SAMMEL = [
+  { id: 'PA 3', type: 'Atemschutzgerät', status: 'benutzt', when: 'heute 08:12 · Markus Vogt', comment: 'Einsatz Brand Hauptstraße' },
+  { id: 'PA 5', type: 'Atemschutzgerät', status: 'benutzt', when: 'heute 08:14 · Julia Graf', comment: '' },
+  { id: 'M 12', type: 'Atemschutzmaske', status: 'benutzt', when: 'heute 08:15 · Julia Graf', comment: '' },
+  { id: 'M 17', type: 'Atemschutzmaske', status: 'defekt', when: 'vor 6 Tagen · Sven Hofmann', comment: 'Sichtscheibe gerissen' },
+  { id: 'LA 4', type: 'Lungenautomat', status: 'benutzt', when: 'gestern · Jonas Weber', comment: 'Übung' }
+];
+var WERK = [
+  { id: 'PA 7', type: 'Atemschutzgerät', status: 'in Wartung', since: '24.10.2026' },
+  { id: 'PA 9', type: 'Atemschutzgerät', status: 'in Wartung', since: '24.10.2026' },
+  { id: 'M 4', type: 'Atemschutzmaske', status: 'in Wartung', since: '24.10.2026' },
+  { id: 'M 8', type: 'Atemschutzmaske', status: 'defekt', since: '24.10.2026' }
+];
+var TYPES = ['Alle', 'Atemschutzgerät', 'Atemschutzmaske', 'Lungenautomat'];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sammel: SAMMEL, werkstatt: WERK, selS: {}, selW: {}, back: [], type: 'Alle', q: '' }; }
+  renderVals() {
+    var s = this.state, self = this;
+    var q = s.q.trim().toLowerCase();
+    var match = function (d) { return (s.type === 'Alle' || d.type === s.type) && (!q || d.id.toLowerCase().indexOf(q) >= 0); };
+    var sammel = s.sammel.filter(match);
+    var werk = s.werkstatt.filter(match);
+    var nS = sammel.filter(function (d) { return s.selS[d.id]; }).length;
+    var nW = werk.filter(function (d) { return s.selW[d.id]; }).length;
+    return {
+      q: s.q,
+      onSearch: function (e) { self.setState({ q: e.target.value }); },
+      typeFilters: TYPES.map(function (t) {
+        var on = s.type === t;
+        return { label: t, pressed: on ? 'true' : 'false', style: on ? 'background: #1B2430; color: #FFFFFF; border-color: #1B2430' : 'background: #FFFFFF; color: #3A4655', pick: function () { self.setState({ type: t }); } };
+      }),
+      nSammel: s.sammel.length,
+      nWerkstatt: s.werkstatt.length,
+      nBack: s.back.length,
+      sammel: sammel.map(function (d) {
+        return Object.assign({}, d, { statusStyle: ST[d.status], checked: !!s.selS[d.id], toggle: function () { var x = Object.assign({}, s.selS); x[d.id] = !x[d.id]; self.setState({ selS: x }); } });
+      }),
+      sammelEmpty: sammel.length === 0,
+      noneSammel: nS === 0,
+      toWorkshopLabel: nS ? nS + ' zur Werkstatt bringen' : 'Zur Werkstatt bringen',
+      selectAllSammel: function () { var x = {}; sammel.forEach(function (d) { x[d.id] = true; }); self.setState({ selS: x }); },
+      toWorkshop: function () {
+        var moved = s.sammel.filter(function (d) { return s.selS[d.id]; }).map(function (d) { return { id: d.id, type: d.type, status: d.status === 'defekt' ? 'defekt' : 'in Wartung', since: 'heute' }; });
+        self.setState({ sammel: s.sammel.filter(function (d) { return !s.selS[d.id]; }), werkstatt: s.werkstatt.concat(moved), selS: {} });
+      },
+      werkstatt: werk.map(function (d) {
+        var on = !!s.selW[d.id];
+        return Object.assign({}, d, { statusStyle: ST[d.status], checked: on, rowStyle: on ? 'background: #F2FAF4' : '', toggle: function () { var x = Object.assign({}, s.selW); x[d.id] = !x[d.id]; self.setState({ selW: x }); } });
+      }),
+      selectAllWerk: function () { var x = {}; werk.forEach(function (d) { x[d.id] = true; }); self.setState({ selW: x }); },
+      scanNext: function () {
+        var next = s.werkstatt.filter(function (d) { return !s.selW[d.id]; })[0];
+        if (!next) return;
+        var x = Object.assign({}, s.selW); x[next.id] = true; self.setState({ selW: x });
+      },
+      noneWerk: nW === 0,
+      bookBackLabel: nW ? nW + (nW === 1 ? ' Ausrüstung' : ' Ausrüstungen') + ' einbuchen' : 'Einbuchen',
+      bookBack: function () {
+        var ids = s.werkstatt.filter(function (d) { return s.selW[d.id]; }).map(function (d) { return d.id; });
+        self.setState({ werkstatt: s.werkstatt.filter(function (d) { return !s.selW[d.id]; }), back: s.back.concat(ids), selW: {} });
+      },
+      hasBack: s.back.length > 0,
+      backText: s.back.join(', ') + ' → Lager Gerätehaus · einsatzbereit · letzte Wartung 02.11.2026 · nächste Wartung nach dem Intervall des Ausrüstungstyps.'
+    };
+  }
+}
+</script>
+</body>
+</html>
