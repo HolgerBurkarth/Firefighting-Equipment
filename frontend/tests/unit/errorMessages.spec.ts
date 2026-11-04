@@ -20,6 +20,7 @@ describe('errorMessage', () => {
         ['tenant_not_found', 'gibt es unter dieser Adresse nicht'],
         ['not_authenticated', 'Sitzung ist abgelaufen'],
         ['database_unavailable', 'nicht erreichbar'],
+        ['client_outdated', 'Diese Version ist veraltet – bitte aktualisieren.'],
     ])('%s', (code, text) => {
         expect(errorMessage(error(code))).toContain(text);
     });

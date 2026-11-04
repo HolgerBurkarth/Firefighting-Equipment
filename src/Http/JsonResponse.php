@@ -11,11 +11,12 @@ final readonly class JsonResponse implements Response
 {
     public const string CONTENT_TYPE = 'application/json; charset=utf-8';
 
-    /** Header, die jede Antwort der API trägt. */
+    /** Header, die jede Antwort der API trägt (auch Fehler); X-Api-Version siehe ClientApi. */
     public const array DEFAULT_HEADERS = [
         'Content-Type' => self::CONTENT_TYPE,
         'Cache-Control' => 'no-store',
         'X-Content-Type-Options' => 'nosniff',
+        ClientApi::RESPONSE_HEADER => (string) ClientApi::CURRENT,
     ];
 
     /**

@@ -3,7 +3,9 @@ import {
     apiDownload,
     apiRequest,
     downloadFileName,
+    parseApiVersion,
     parseRetryAfter,
+    setOutdatedHandler,
     setUnauthorizedHandler,
 } from '../../src/api/client';
 import { respond } from './support/fetch';
@@ -13,6 +15,7 @@ const parseOk = (json: unknown): { ok: true } | null =>
 
 afterEach(() => {
     setUnauthorizedHandler(null);
+    setOutdatedHandler(null);
 });
 
 describe('apiRequest', () => {
@@ -158,5 +161,69 @@ describe('apiDownload', () => {
         expect(downloadFileName('attachment; filename="a-1.csv"', 'x.csv')).toBe('a-1.csv');
         expect(downloadFileName('attachment; filename="../böse.csv"', 'x.csv')).toBe('x.csv');
         expect(downloadFileName(null, 'x.csv')).toBe('x.csv');
+    });
+});
+
+describe('Vertragsnummer des Servers (X-Api-Version) und client_outdated', () => {
+    it('meldet client_outdated sofort, auch bei Downloads', async () => {
+        const outdated = vi.fn();
+        setOutdatedHandler(outdated);
+        const body = {
+            error: 'client_outdated',
+            message: 'Diese Version der App ist veraltet – bitte aktualisieren.',
+            details: { min_client_api: 2 },
+        };
+        const result = await apiRequest('auth/me', parseOk, {
+            fetchFn: respond(409, body, { 'X-Api-Version': '2' }).fetch,
+        });
+        expect(!result.ok && result.error.code).toBe('client_outdated');
+        expect(!result.ok && result.error.details).toEqual({ min_client_api: 2 });
+        const download = await apiDownload(
+            'devices/export',
+            'geraete.csv',
+            respond(409, body).fetch,
+        );
+        expect(!download.ok && download.error.code).toBe('client_outdated');
+        expect(outdated.mock.calls).toEqual([['client_outdated'], ['client_outdated']]);
+    });
+
+    it('meldet eine neuere Nummer des Servers, auch bei Erfolg und anderen Fehlern', async () => {
+        const outdated = vi.fn();
+        setOutdatedHandler(outdated);
+        await apiRequest('x', parseOk, {
+            fetchFn: respond(200, { ok: true }, { 'X-Api-Version': '2' }).fetch,
+        });
+        await apiRequest('x', parseOk, {
+            fetchFn: respond(404, { error: 'not_found', message: 'x' }, { 'X-Api-Version': '2' })
+                .fetch,
+        });
+        await apiDownload(
+            'devices/export',
+            'g.csv',
+            respond(200, 'a;b', { 'X-Api-Version': '2' }).fetch,
+        );
+        expect(outdated.mock.calls).toEqual([['newer_api'], ['newer_api'], ['newer_api']]);
+    });
+
+    it('meldet nichts bei gleicher, kleinerer oder fehlender Nummer', async () => {
+        const outdated = vi.fn();
+        setOutdatedHandler(outdated);
+        for (const headers of [{ 'X-Api-Version': '1' }, { 'X-Api-Version': '0' }, {}]) {
+            await apiRequest('x', parseOk, { fetchFn: respond(200, { ok: true }, headers).fetch });
+        }
+        expect(outdated).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['1', 1],
+        [' 12 ', 12],
+        ['0', null],
+        ['01', null],
+        ['1.0', null],
+        ['zwei', null],
+        ['', null],
+        [null, null],
+    ])('X-Api-Version %j → %j', (value, expected) => {
+        expect(parseApiVersion(value)).toBe(expected);
     });
 });

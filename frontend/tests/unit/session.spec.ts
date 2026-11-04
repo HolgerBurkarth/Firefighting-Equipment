@@ -133,7 +133,10 @@ describe('isTransientError', () => {
         ['invalid_response', 404, true],
         ['database_unavailable', 503, true],
         ['internal_error', 500, true],
+        // Veraltete Version: Das Update folgt, die Sitzung bleibt.
+        ['client_outdated', 409, true],
         ['not_authenticated', 401, false],
+        ['rule_violation', 409, false],
         ['tenant_inactive', 403, false],
         ['tenant_not_found', 404, false],
     ])('%s (%j) → %j', (code, status, expected) => {

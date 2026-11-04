@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { CLIENT_API_HEADER, CLIENT_API_VERSION } from '../../src/api/client';
+import { API_VERSION_HEADER, CLIENT_API_HEADER, CLIENT_API_VERSION } from '../../src/api/client';
 
 const ROOT = new URL('../../../', import.meta.url);
 
@@ -21,5 +21,8 @@ describe('Vertragsnummer der API (X-Client-Api)', () => {
     it('gleich mit ClientApi im Backend', () => {
         expect(clientApiPhp).toContain(`public const int CURRENT = ${String(CLIENT_API_VERSION)};`);
         expect(clientApiPhp).toContain(`public const string HEADER = '${CLIENT_API_HEADER}';`);
+        expect(clientApiPhp).toContain(
+            `public const string RESPONSE_HEADER = '${API_VERSION_HEADER}';`,
+        );
     });
 });

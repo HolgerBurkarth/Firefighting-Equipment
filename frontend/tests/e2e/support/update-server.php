@@ -40,7 +40,7 @@ if (preg_match('#^/firefighting/[a-z0-9-]+/(api/.*|manifest\.webmanifest)$#', $p
     /*
      * Seiten hinter der Anmeldung (z. B. ein Gerätedetail in einem zweiten Tab): Der Test legt je
      * Bereich eine Tabelle test-builds/state/<bereich>.api.json an, "METHODE pfad" (Pfad ohne Bereich
-     * und Query) → {status, body}. Sie gilt vor den festen Antworten unten.
+     * und Query) → {status, body, headers?}. Sie gilt vor den festen Antworten unten.
      */
     $apiFile = $frontend . '/test-builds/state/' . $area . '.api.json';
     $table = $area !== '' && is_file($apiFile)
@@ -50,6 +50,9 @@ if (preg_match('#^/firefighting/[a-z0-9-]+/(api/.*|manifest\.webmanifest)$#', $p
     if (is_array($entry) && is_int($entry['status'] ?? null)) {
         http_response_code($entry['status']);
         header('Content-Type: application/json; charset=utf-8');
+        foreach (is_array($entry['headers'] ?? null) ? $entry['headers'] : [] as $name => $value) {
+            header($name . ': ' . $value);
+        }
         echo json_encode($entry['body'] ?? new stdClass(), JSON_UNESCAPED_UNICODE);
         return;
     }

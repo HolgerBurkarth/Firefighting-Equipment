@@ -24,7 +24,8 @@ use FirefightingEquipment\User\Password\PasswordHasher;
  * Frontend.
  *
  * Reihenfolge: Adresse zerlegen, Route suchen (keine Route, GET und nicht unter api/: Frontend, ohne
- * Datenbank und Sitzung), ändernde Anfragen prüfen (CSRF, JSON-Body; ohne Datenbank), erst dann
+ * Datenbank und Sitzung), ändernde Anfragen prüfen (CSRF, JSON-Body; ohne Datenbank), Version der
+ * App prüfen (X-Client-Api unter ClientApi::MIN: 409 client_outdated; ohne Datenbank), erst dann
  * die Stadt laden (Datenbank), Sitzung und Zugriffsstufe prüfen (nur bei Routen, die nicht
  * öffentlich sind), zum Schluss den Handler aufrufen. Unbekannte Adressen verbinden sich so nie
  * mit der Datenbank.
@@ -43,6 +44,8 @@ final readonly class Application
         private AppUrls $urls = new AppUrls(),
         /** null = kein Frontend (Tests mit eigenen Routern): unbekannte Pfade bleiben 404. */
         private ?FrontendHandler $frontend = null,
+        /** Kleinste angenommene Nummer der App (X-Client-Api); andere als ClientApi::MIN nur in Tests. */
+        private int $minClientApi = ClientApi::MIN,
     ) {
     }
 
@@ -74,6 +77,9 @@ final readonly class Application
                 return $this->frontend?->respond($request, $path) ?? throw HttpException::notFound();
             }
             $body = $this->guard->check($request, $route->maxBodyBytes);
+            if (ClientApi::isOutdated($request->header(ClientApi::HEADER), $this->minClientApi)) {
+                throw HttpException::clientOutdated($this->minClientApi);
+            }
             $tenant = $path->isService() ? null : $this->tenants->resolve($path->scope, $this->db);
 
             $auth = null;

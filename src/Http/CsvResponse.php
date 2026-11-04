@@ -8,8 +8,8 @@ use FirefightingEquipment\Csv\CsvFormat;
 
 /**
  * CSV-Download (Format siehe CsvFormat), Zeile für Zeile geschrieben, ohne die Datei im Speicher
- * aufzubauen. Header wie bei JSON: Cache-Control no-store und X-Content-Type-Options nosniff, dazu
- * Content-Disposition attachment mit dem Dateinamen.
+ * aufzubauen. Header wie bei JSON: Cache-Control no-store, X-Content-Type-Options nosniff und
+ * X-Api-Version, dazu Content-Disposition attachment mit dem Dateinamen.
  *
  * Die Zeilen kommen in der Regel aus einem Generator mit einer ungepufferten Abfrage. Der
  * Konstruktor startet ihn bis zur ersten Zeile, damit Fehler der Abfrage noch im Handler auftreten
@@ -73,6 +73,7 @@ final readonly class CsvResponse implements Response
             'Content-Disposition' => sprintf('attachment; filename="%s"', $this->filename),
             'Cache-Control' => JsonResponse::DEFAULT_HEADERS['Cache-Control'],
             'X-Content-Type-Options' => JsonResponse::DEFAULT_HEADERS['X-Content-Type-Options'],
+            ClientApi::RESPONSE_HEADER => JsonResponse::DEFAULT_HEADERS[ClientApi::RESPONSE_HEADER],
         ];
     }
 

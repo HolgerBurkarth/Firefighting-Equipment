@@ -1,5 +1,6 @@
 import { shallowRef, type InjectionKey } from 'vue';
 import { START_LOCATION, type Router } from 'vue-router';
+import type { OutdatedReason } from '../api/client';
 import { hasUnsavedInput } from './unsavedInput';
 import { UpdateTrace } from './updateTrace';
 
@@ -60,6 +61,12 @@ export const START_LOAD_TIMEOUT_MS = START_RETRY_DELAYS_MS.reduce((sum, ms) => s
  * checks“).
  */
 export const REQUEST_SETTLE_TIMEOUT_MS = 1000;
+/**
+ * Mindestabstand der Prüfungen, die Antworten der API auslösen (`X-Api-Version` größer als die
+ * eigene Nummer steht in JEDER Antwort, solange die neue Version nicht geladen ist). Das erste
+ * `client_outdated` prüft immer sofort.
+ */
+export const OUTDATED_CHECK_INTERVAL_MS = 30_000;
 /** Nachricht an den wartenden Service Worker (Workbox generateSW ohne skipWaiting). */
 export const SKIP_WAITING_MESSAGE = { type: 'SKIP_WAITING' } as const;
 export const RELOAD_STORAGE_KEY = 'ff-update-reloaded-at';
@@ -114,6 +121,14 @@ export class AppUpdater {
     readonly loadingPage = shallowRef(false);
     /** Die neue Version ließ sich beim Start nicht laden: Hinweis mit Knopf „Neu laden“. */
     readonly reloadNeeded = shallowRef(false);
+    /**
+     * Der Server lehnt diese Version ab (409 `client_outdated`): Hinweis „Diese Version ist veraltet
+     * – bitte aktualisieren“, bis die App neu lädt.
+     */
+    readonly outdated = shallowRef(false);
+    /** Laufende Prüfung nach einer Antwort der API (reportOutdated). */
+    private outdatedCheck: Promise<void> | null = null;
+    private lastOutdatedCheck = Number.NEGATIVE_INFINITY;
     private registration: UpdateRegistration | null = null;
     /** Warten auf attach (siehe registrationAttached). */
     private readonly attachWaiters = new Set<() => void>();
@@ -270,6 +285,48 @@ export class AppUpdater {
             !this.hasNewWorker(registration)
         ) {
             void this.findNewWorker(registration, UPDATE_RETRY_DELAYS_MS);
+        }
+    }
+
+    /**
+     * Eine Antwort der API verlangt ein Update (src/api/client.ts): `client_outdated` (der Server
+     * lehnt diese Version ab) oder eine neuere Vertragsnummer in `X-Api-Version`. Sofort prüfen
+     * (höchstens alle OUTDATED_CHECK_INTERVAL_MS, das erste `client_outdated` immer); dann gelten
+     * die Regeln der Updates (beim nächsten Seitenwechsel). Bei `client_outdated` und neuer Version
+     * sofort aktualisieren wie bei einem Seitenwechsel, außer mitten in einer Eingabe: Dann bleibt
+     * der Hinweis, die Eingabe bleibt erhalten. `currentUrl` liefert die Adresse zum Neuladen.
+     */
+    async reportOutdated(reason: OutdatedReason, currentUrl: () => string): Promise<void> {
+        const becameOutdated = reason === 'client_outdated' && !this.outdated.value;
+        if (becameOutdated) {
+            this.outdated.value = true;
+            this.trace.record('client-outdated');
+        }
+        if (this.outdatedCheck !== null) {
+            if (!becameOutdated) {
+                return this.outdatedCheck;
+            }
+            await this.outdatedCheck;
+        }
+        if (this.reloading || this.applying || this.outdatedCheck !== null) {
+            return;
+        }
+        const now = this.env.now();
+        if (!becameOutdated && now - this.lastOutdatedCheck < OUTDATED_CHECK_INTERVAL_MS) {
+            return;
+        }
+        this.lastOutdatedCheck = now;
+        this.trace.record('outdated-check', reason);
+        this.outdatedCheck = this.checkOutdated(currentUrl).finally(() => {
+            this.outdatedCheck = null;
+        });
+        return this.outdatedCheck;
+    }
+
+    private async checkOutdated(currentUrl: () => string): Promise<void> {
+        await this.check();
+        if (this.outdated.value && this.ready.value && !hasUnsavedInput.value) {
+            await this.applyNow(currentUrl());
         }
     }
 
@@ -706,8 +763,14 @@ export class AppUpdater {
 /** Für Seiten, die selbst prüfen (z. B. „Seite nicht gefunden“); in main.ts bereitgestellt. */
 export const UPDATER_KEY: InjectionKey<AppUpdater> = Symbol('AppUpdater');
 
-/** Hinweis oben: neue Version da, aber gerade nicht automatisch (Eingabe oder Schleifensperre). */
-export function updateNotice(updater: AppUpdater): 'unsaved' | 'blocked' | null {
+/**
+ * Hinweis oben: Version vom Server abgelehnt (`outdated`, immer) bzw. neue Version da, aber gerade
+ * nicht automatisch (Eingabe oder Schleifensperre).
+ */
+export function updateNotice(updater: AppUpdater): 'outdated' | 'unsaved' | 'blocked' | null {
+    if (updater.outdated.value) {
+        return 'outdated';
+    }
     if (!updater.ready.value) {
         return null;
     }

@@ -83,6 +83,8 @@ export function errorMessage(error: ApiError, options: ErrorOptions = {}): strin
             return 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.';
         case 'forbidden':
             return 'Dafür fehlen Ihnen die Rechte.';
+        case 'client_outdated':
+            return 'Diese Version ist veraltet – bitte aktualisieren.';
         case 'weak_password':
             return error.message ?? 'Dieses Passwort ist zu unsicher.';
         default:

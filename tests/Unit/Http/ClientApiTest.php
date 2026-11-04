@@ -8,6 +8,7 @@ use FirefightingEquipment\Http\ClientApi;
 use FirefightingEquipment\Http\Request;
 use FirefightingEquipment\Http\RequestGuard;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /** Gemeinsame Vertragsnummer mit dem Frontend (resources/client-api.json). */
@@ -25,6 +26,52 @@ final class ClientApiTest extends TestCase
         self::assertIsArray($shared);
         self::assertSame(ClientApi::CURRENT, $shared['client_api']);
         self::assertSame(ClientApi::HEADER, $shared['header']);
+    }
+
+    public function testMinimumIsAtMostCurrent(): void
+    {
+        self::assertGreaterThanOrEqual(1, ClientApi::MIN);
+        self::assertLessThanOrEqual(ClientApi::CURRENT, ClientApi::MIN);
+    }
+
+    /**
+     * @return iterable<string, array{string|null, int|null}>
+     */
+    public static function headerValues(): iterable
+    {
+        yield 'ohne Header' => [null, null];
+        yield 'leer' => ['', null];
+        yield 'null' => ['0', 0];
+        yield 'eins' => ['1', 1];
+        yield 'zweistellig' => ['12', 12];
+        yield 'neun Stellen' => ['999999999', 999_999_999];
+        yield 'zehn Stellen' => ['1000000000', null];
+        yield 'führende Null' => ['01', null];
+        yield 'Vorzeichen' => ['-1', null];
+        yield 'Plus' => ['+1', null];
+        yield 'Leerzeichen' => [' 1', null];
+        yield 'Dezimalzahl' => ['1.0', null];
+        yield 'Text' => ['alt', null];
+        yield 'Zeilenumbruch am Ende' => ["1\n", null];
+    }
+
+    #[DataProvider('headerValues')]
+    public function testFromHeaderAcceptsOnlyPlainNumbers(?string $value, ?int $expected): void
+    {
+        self::assertSame($expected, ClientApi::fromHeader($value));
+    }
+
+    public function testOutdatedOnlyBelowMinimum(): void
+    {
+        self::assertTrue(ClientApi::isOutdated('0'));
+        self::assertFalse(ClientApi::isOutdated((string) ClientApi::MIN));
+        self::assertFalse(ClientApi::isOutdated((string) (ClientApi::CURRENT + 1)));
+        // Ohne Header oder ohne Nummer gilt die Anfrage als aktuell.
+        self::assertFalse(ClientApi::isOutdated(null));
+        self::assertFalse(ClientApi::isOutdated('alt'));
+
+        self::assertTrue(ClientApi::isOutdated('2', 3));
+        self::assertFalse(ClientApi::isOutdated('3', 3));
     }
 
     public function testHeaderDoesNotDisturbTheRequestGuard(): void

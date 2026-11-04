@@ -55,6 +55,49 @@ export interface QueueLimits {
 
 export const DEFAULT_QUEUE_LIMITS: QueueLimits = { maxAgeDays: 7, queueMaxAgeDays: 7 };
 
+/**
+ * Formatversion der gespeicherten Warteschlange (`{format, bookings}` in IndexedDB). Steigt, wenn
+ * sich die Einträge ändern, z. B. weil mit einer neuen Vertragsnummer der API (X-Client-Api)
+ * Buchungen anders gesendet werden: Die neue Version wandelt ältere Formate beim Lesen um
+ * (`readStoredQueue`), sodass Buchungen eines Updates nicht verloren gehen. Format 1 = Einträge wie
+ * `QueuedBooking`; davor lag die Liste ohne Hülle (gilt als Format 1).
+ */
+export const QUEUE_FORMAT = 1;
+
+export interface StoredQueue {
+    readonly format: number;
+    readonly bookings: readonly QueuedBooking[];
+}
+
+/**
+ * Gespeicherte Warteschlange lesen. `writable` false: Format einer neueren Version (z. B. ein Tab
+ * mit der alten App, ein anderer schon aktualisiert); dann nichts anzeigen und nichts schreiben,
+ * die neue Version sendet sie.
+ */
+export function readStoredQueue(stored: unknown): {
+    readonly bookings: QueuedBooking[];
+    readonly writable: boolean;
+} {
+    if (Array.isArray(stored)) {
+        return { bookings: stored as QueuedBooking[], writable: true };
+    }
+    if (typeof stored === 'object' && stored !== null && 'format' in stored) {
+        const { format } = stored;
+        if (typeof format === 'number' && format > QUEUE_FORMAT) {
+            return { bookings: [], writable: false };
+        }
+        const bookings = 'bookings' in stored ? stored.bookings : null;
+        if (format === QUEUE_FORMAT && Array.isArray(bookings)) {
+            return { bookings: bookings as QueuedBooking[], writable: true };
+        }
+    }
+    return { bookings: [], writable: true };
+}
+
+export function storedQueue(bookings: readonly QueuedBooking[]): StoredQueue {
+    return { format: QUEUE_FORMAT, bookings };
+}
+
 const DAY_MS = 86_400_000;
 
 /** Aktionszeit wie der Server sie annimmt: UTC, auf Sekunden gekürzt. */
@@ -146,6 +189,8 @@ export class BookingQueue {
     private readonly current = shallowRef<QueueState>({ key: null, bookings: [], sending: false });
     private limits: QueueLimits = DEFAULT_QUEUE_LIMITS;
     private running: Promise<void> | null = null;
+    /** false: gespeichert im Format einer neueren Version (readStoredQueue), nie überschreiben. */
+    private writable = true;
     private generation = 0;
     private writes = Promise.resolve();
 
@@ -180,6 +225,7 @@ export class BookingQueue {
         this.generation += 1;
         const generation = this.generation;
         this.current.value = { key, bookings: [], sending: false };
+        this.writable = true;
         if (key === null) {
             return;
         }
@@ -187,7 +233,8 @@ export class BookingQueue {
         if (generation !== this.generation) {
             return;
         }
-        const bookings = Array.isArray(stored) ? (stored as QueuedBooking[]) : [];
+        const { bookings, writable } = readStoredQueue(stored);
+        this.writable = writable;
         // Eine beim Schließen unterbrochene Sendung gilt wieder als wartend (client_ref schützt).
         this.current.value = {
             key,
@@ -212,14 +259,14 @@ export class BookingQueue {
 
     private update(change: (bookings: readonly QueuedBooking[]) => QueuedBooking[]): void {
         const state = this.current.value;
-        if (state.key === null) {
+        if (state.key === null || !this.writable) {
             return;
         }
         const bookings = change(state.bookings);
         this.current.value = { ...state, bookings };
         const key = state.key;
         this.writes = this.writes.then(async () => {
-            await this.options.db.put('queue', key, bookings);
+            await this.options.db.put('queue', key, storedQueue(bookings));
         });
     }
 
@@ -236,7 +283,7 @@ export class BookingQueue {
      * nur einmal in der Liste (erneutes Speichern derselben Buchung).
      */
     async add(booking: Omit<QueuedBooking, 'state'>): Promise<boolean> {
-        if (this.current.value.key === null) {
+        if (this.current.value.key === null || !this.writable) {
             return false;
         }
         this.update((bookings) =>
@@ -264,8 +311,9 @@ export class BookingQueue {
     }
 
     /**
-     * Wartende Buchungen senden, älteste zuerst, eine nach der anderen. Ohne Verbindung, bei 401 und
-     * Serverfehlern (5xx) endet der Lauf, die Buchung wartet weiter. Läuft schon einer, gilt er.
+     * Wartende Buchungen senden, älteste zuerst, eine nach der anderen. Ohne Verbindung, bei 401,
+     * Serverfehlern (5xx) und `client_outdated` (diese Version ist veraltet; nach dem Update sendet
+     * die neue) endet der Lauf, die Buchung wartet weiter. Läuft schon einer, gilt er.
      */
     send(): Promise<void> {
         this.running ??= this.run().finally(() => {
@@ -333,9 +381,11 @@ export class BookingQueue {
                     status === null ||
                     status >= 500 ||
                     code === 'invalid_response' ||
+                    code === 'client_outdated' ||
                     status === 401
                 ) {
-                    // Keine Verbindung, Server gestört oder abgemeldet: später erneut.
+                    // Keine Verbindung, Server gestört, abgemeldet oder Version veraltet: später
+                    // erneut (nach dem Update sendet die neue Version).
                     this.set(next.clientRef, { state: 'waiting' });
                     return;
                 }

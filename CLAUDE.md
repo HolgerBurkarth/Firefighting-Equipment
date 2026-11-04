@@ -167,7 +167,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `[a-z0-9-]+` → 404. Der Pfad wird nicht URL-dekodiert.
 - Reihenfolge in `Application::handle` (nicht ändern): Adresse zerlegen → Route suchen
   (404/405; keine Route, Methode `GET` und Pfad nicht `api` bzw. `api/…` → Frontend, ohne Datenbank
-  und Sitzung, siehe "Frontend ausliefern") → ändernde Anfrage prüfen (`RequestGuard`, ohne Datenbank; 415/403/400) → erst dann
+  und Sitzung, siehe "Frontend ausliefern") → ändernde Anfrage prüfen (`RequestGuard`, ohne Datenbank; 415/403/400) → Version
+  der App prüfen (`X-Client-Api` unter `ClientApi::MIN` → 409 `client_outdated`, ohne Datenbank) → erst dann
   die Stadt laden → Sitzung und Zugriffsstufe prüfen (nur bei nicht öffentlichen Routen; 401/403)
   → Handler. Unbekannte Adressen und abgelehnte ändernde Anfragen verbinden sich so nie mit der
   Datenbank.
@@ -236,7 +237,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (Gerät inzwischen geändert, aktueller Stand in `details`), `import_outdated` 409 (CSV-Import: seit
   der Vorschau geändert, Vorschau neu erstellen), `client_ref_conflict` 409 (Buchung: `client_ref`
   schon für eine andere Buchung verwendet), `stale_action` 409 (Offline-Buchung zu alt, ohne
-  `confirmed_stale`), `unsupported_media_type` 415, `weak_password` 422, `clock_implausible` 422
+  `confirmed_stale`), `client_outdated` 409 (App-Version unter `ClientApi::MIN`, `details
+  {min_client_api}`), `unsupported_media_type` 415, `weak_password` 422, `clock_implausible` 422
   (Aktionszeit einer Offline-Buchung zu weit in der Zukunft), `too_many_attempts` 429 (mit
   `Retry-After`), `database_unavailable` 503, `frontend_unavailable` 503 (Build des Frontends fehlt, siehe
   "Frontend ausliefern"), `internal_error` 500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
@@ -255,10 +257,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `ErrorReporter` ins `error_log`: maskiert (`DatabaseError`), ohne Stack-Trace (enthält
   Argumente wie Zugangsdaten). Nie Details oder Zugangsdaten in die Antwort.
 - Jede API-Antwort trägt `Content-Type: application/json; charset=utf-8`,
-  `Cache-Control: no-store` und `X-Content-Type-Options: nosniff` (`JsonResponse::DEFAULT_HEADERS`,
-  nicht überschreibbar). Ausnahmen: CSV-Downloads (`CsvResponse`, siehe "CSV-Export (API)")
-  mit `text/csv; charset=utf-8` und `Content-Disposition: attachment`, ebenfalls `no-store` und
-  `nosniff`; ihre Fehler kommen weiterhin als JSON. Und zwischenspeicherbare öffentliche Dateien
+  `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` und `X-Api-Version: <ClientApi::CURRENT>`
+  (`JsonResponse::DEFAULT_HEADERS`, nicht überschreibbar, auch Fehler und `health`). Ausnahmen:
+  CSV-Downloads (`CsvResponse`, siehe "CSV-Export (API)") mit `text/csv; charset=utf-8` und
+  `Content-Disposition: attachment`, ebenfalls `no-store`, `nosniff` und `X-Api-Version`; ihre
+  Fehler kommen weiterhin als JSON. Und zwischenspeicherbare öffentliche Dateien
   (`CacheableResponse`, siehe "Erscheinungsbild (API)" und "Frontend ausliefern").
 - Ausnahmen von `Cache-Control: no-store` (eng begrenzt): NUR `CacheableResponse`, NUR für die drei
   öffentlichen Routen `GET api/v1/tenant/logo/{size}`, `GET api/v1/app-icon/{size}` (auch unter
@@ -280,25 +283,42 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   nie ohne `Vary`), siehe "Frontend ausliefern". Fehler dieser Routen bleiben JSON mit
   `no-store`. Keine weiteren Ausnahmen ohne Rückfrage; neue nur über
   `CacheableResponse`/`CachePolicy` und hier dokumentiert.
-- Versionierung der API für das Frontend (beschlossener Plan, gilt für alle Arbeiten an API und
-  Frontend): Die App sendet bei JEDEM API-Aufruf `X-Client-Api: <n>` (umgesetzt: `apiRequest` in
-  `frontend/src/api/client.ts`, `ClientApi::HEADER`/`CURRENT` in `src/Http/ClientApi.php`; die Zahl
-  steht in `resources/client-api.json`, abgeglichen von `ClientApiTest` und `clientApi.spec.ts`;
-  derzeit 1). Ein gewöhnlicher Header einer Anfrage an dieselbe Adresse: kein CORS-Preflight,
-  `RequestGuard` prüft nur `Content-Type`, `Origin` und Body (per Test). Das Backend wertet ihn
-  NOCH NICHT aus. Geplant, jeweils erst nach Rückfrage umzusetzen:
+- Versionierung der API für das Frontend (umgesetzt 04.11.2026, Phase 0 des Änderungskonzepts; gilt
+  für alle Arbeiten an API und Frontend): Die App sendet bei JEDEM API-Aufruf `X-Client-Api: <n>`
+  (`apiRequest`/`apiDownload` in `frontend/src/api/client.ts`, `ClientApi::HEADER`/`CURRENT` in
+  `src/Http/ClientApi.php`; die Zahl steht in `resources/client-api.json`, abgeglichen von
+  `ClientApiTest` und `clientApi.spec.ts`; derzeit 1). Ein gewöhnlicher Header einer Anfrage an
+  dieselbe Adresse: kein CORS-Preflight, `RequestGuard` prüft nur `Content-Type`, `Origin` und Body
+  (per Test).
   - Grundregel: Die API nur erweitern (neue Felder optional, alte noch mindestens einen Deploy
     lang behalten). `n` steigt nur bei einer inkompatiblen Änderung, dann in Datei, `ClientApi` und
-    Frontend gemeinsam.
-  - Backend: `MIN_CLIENT_API`; liegt `X-Client-Api` darunter, antwortet `Application` vor dem
-    Handler mit 409 `client_outdated` (neuer Fehlercode, `details {min_client_api}`). Ohne Header
-    (curl, ältere Apps) gilt die Anfrage als aktuell, bis das ausdrücklich geändert wird.
-  - Jede Antwort trägt `X-Api-Version: <m>`; kennt die App eine kleinere Zahl, prüft sie sofort auf
-    ein Update.
-  - Frontend bei `client_outdated`: sofort auf eine neue Version prüfen und nach den Regeln der
-    Updates aktualisieren (angefangene Eingaben bleiben, Hinweis „Diese Version ist veraltet –
-    bitte aktualisieren“). Offline-Buchungen bleiben in der Warteschlange und gehen nach dem Update
-    raus; die Warteschlange bekommt dafür eine eigene Formatversion.
+    Frontend gemeinsam. `ClientApi::MIN` (MIN_CLIENT_API, derzeit 1, höchstens `CURRENT`, per Test)
+    erst nach Rückfrage anheben.
+  - Backend: Ist `X-Client-Api` eine Nummer (`ClientApi::fromHeader`: nur Ziffern ohne führende
+    Null, höchstens 9 Stellen) unter `ClientApi::MIN`, antwortet `Application` nach `RequestGuard`
+    und vor der Stadt mit 409 `client_outdated` (`HttpException::clientOutdated`, `details
+    {min_client_api}`; ohne Datenbank, Sitzung und Handler). Ohne Header (curl, Deploy-Skript,
+    ältere Apps) oder ohne gültige Nummer gilt die Anfrage als aktuell, bis das ausdrücklich
+    geändert wird. Tests: `ClientApiTest`, `ApplicationTest` (Unit).
+  - Jede JSON- und CSV-Antwort trägt `X-Api-Version: <ClientApi::CURRENT>`
+    (`ClientApi::RESPONSE_HEADER`), Dateien des Frontends und `CacheableResponse` nicht (per Test).
+  - Frontend: `apiRequest`/`apiDownload` melden `client_outdated` bzw. eine größere
+    `X-Api-Version` (`parseApiVersion`) über `setOutdatedHandler` an
+    `AppUpdater.reportOutdated` (`main.ts`): sofort prüfen (`check`; höchstens alle
+    `OUTDATED_CHECK_INTERVAL_MS` = 30 s, das erste `client_outdated` immer), dann nach den Regeln der
+    Updates. Bei `client_outdated` zusätzlich `outdated` (Hinweis „Diese Version ist veraltet –
+    bitte aktualisieren.“ in `AppNotices` mit „Jetzt aktualisieren“, bei Eingaben nach Rückfrage;
+    lässt sich die neue Version nicht aktivieren, wie „Neu laden“ vom Server) und, wenn eine neue
+    Version da ist und nichts ungespeichert, sofort aktualisieren wie beim Seitenwechsel.
+    `client_outdated` gilt bei `auth/me` als Störung (`isTransientError`: nie abmelden), der
+    Verbindungshinweis und der graue Streifen entfallen dabei. Eine Buchung der Warteschlange mit
+    `client_outdated` bleibt `waiting` (der Lauf endet), nach dem Update sendet sie die neue
+    Version. Gespeichert wird die Warteschlange mit Formatversion (`QUEUE_FORMAT` = 1,
+    `{format, bookings}`, `readStoredQueue`: Liste ohne Hülle = Format 1; ein neueres Format zeigt
+    und überschreibt eine alte App nie). Steigt `n` mit anderen Einträgen, steigt `QUEUE_FORMAT`,
+    und `readStoredQueue` wandelt ältere Formate um. Tests: `client.spec.ts`, `appUpdate.spec.ts`
+    (Unit und Browser, Mail-Link mit `client_outdated` bzw. `X-Api-Version: 2`),
+    `bookingQueue.spec.ts`, `session.spec.ts`.
 - Antworten implementieren `Http\Response` (`statusCode()`, `headers()`, `send()`): `JsonResponse`
   (Regelfall), `CsvResponse` oder `CacheableResponse`. `Application` erzeugt nur JSON vorab
   (Kodierfehler → 500); ein CSV-Download wird erst beim Senden geschrieben.
@@ -1003,8 +1023,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (IndexedDB `queue`), Einträge `QueuedBooking` (`client_ref`, Gerät mit Version, Ziel mit Pfad bzw.
   Status, Kommentar, `occurredAt` = `actionTime` in UTC-Sekunden; Zustände `waiting`, `sending`,
   `done` mit Ergebnis des Servers, `stale` mit „Trotzdem senden“ (`confirmed_stale`) bzw.
-  „Verwerfen“, `failed` mit „Verwerfen“). `send` der Reihe nach, älteste zuerst; ohne Verbindung,
-  5xx und 401 wartet die Buchung weiter; `stale_action` → `stale`, andere 4xx (auch
+  „Verwerfen“, `failed` mit „Verwerfen“; gespeichert mit Formatversion, siehe "Versionierung der
+  API für das Frontend"). `send` der Reihe nach, älteste zuerst; ohne Verbindung,
+  5xx, 401 und `client_outdated` wartet die Buchung weiter; `stale_action` → `stale`, andere 4xx (auch
   `clock_implausible`) → `failed`. Gesendet beim Bekanntwerden des Kontos, nach jedem Laden der
   Geräte, bei `online` und `visibilitychange` (nicht, solange der Browser offline meldet).
   `GET client-config` (`src/api/clientConfig.ts`, `readLimits`, eine Abfrage gleichzeitig) nach
@@ -1266,7 +1287,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   selbst, weil WebKit Anfragen einer vom Service Worker kontrollierten Seite nicht an `page.route()`
   gibt; für Seiten hinter der Anmeldung in weiteren Tabs zusätzlich eine Tabelle je Bereich
   `test-builds/state/<bereich>.api.json` (`writeApiTable`, `"METHODE pfad"` ohne Query → `{status,
-  body}`, z. B. `adminDeviceApi`: Gerätedetail und Geräteliste als Admin). Bereiche je Test über `randomUUID` (Prozess-IDs werden unter Windows wiederverwendet).
+  body, headers?}`, z. B. `adminDeviceApi`: Gerätedetail und Geräteliste als Admin). Bereiche je Test über `randomUUID` (Prozess-IDs werden unter Windows wiederverwendet).
   Abgedeckte Fälle: ohne/mit Eingabe, Rückfrage, erster Besuch mit Deploy vor der
   Installation (Registrierung per Init-Skript zurückgehalten), Seite per Strg+F5 geladen und vom
   neuen Service Worker übernommen (nur Chromium: `Page.reload` mit `ignoreCache` über CDP), zwei Tabs

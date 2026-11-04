@@ -6,6 +6,7 @@ import './styles/base.css';
 
 import { createApp } from 'vue';
 import App from './App.vue';
+import { setOutdatedHandler } from './api/client';
 import { configureStoredSession } from './auth/session';
 import { bookingQueue, deviceStore, installDataLayer, locationStore, otherQueues } from './data';
 import { installBookingQueue, installOfflineCopy } from './data/offline';
@@ -56,6 +57,11 @@ document.documentElement.dataset['build'] = BUILD_ID;
 const startUrl = window.location.href;
 const updater = new AppUpdater(browserUpdateEnvironment(BUILD_ID));
 const router = createAppRouter(base);
+// Antworten der API, die ein Update verlangen (409 client_outdated, neuere X-Api-Version): sofort
+// prüfen (CLAUDE.md, "Versionierung der API für das Frontend").
+setOutdatedHandler((reason) => {
+    void updater.reportOutdated(reason, () => window.location.href);
+});
 
 // Service Worker vor der ersten Seite registrieren: Der Start prüft, ob die Seite aus seinem Cache
 // veraltet ist, und lädt dann sofort die neue Version (KONZEPT.md, "Updates der App").

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Tests\Unit\Http;
 
 use FirefightingEquipment\Csv\CsvFormat;
+use FirefightingEquipment\Http\ClientApi;
 use FirefightingEquipment\Http\CsvResponse;
 use FirefightingEquipment\Http\ErrorReporter;
 use FirefightingEquipment\Http\JsonResponse;
@@ -30,8 +31,10 @@ final class CsvResponseTest extends TestCase
             'Content-Disposition' => 'attachment; filename="geraete-immendingen-2026-06-15.csv"',
             'Cache-Control' => 'no-store',
             'X-Content-Type-Options' => 'nosniff',
+            'X-Api-Version' => '1',
         ], $response->headers());
         self::assertSame(JsonResponse::DEFAULT_HEADERS['Cache-Control'], $response->headers()['Cache-Control']);
+        self::assertSame((string) ClientApi::CURRENT, $response->headers()[ClientApi::RESPONSE_HEADER]);
     }
 
     public function testBomOnceThenHeaderAndRows(): void

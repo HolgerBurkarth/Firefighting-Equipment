@@ -110,6 +110,8 @@ final class FrontendDeliveryTest extends TestCase
         self::assertSame('same-origin', $headers['Referrer-Policy']);
         self::assertSame('DENY', $headers['X-Frame-Options']);
         self::assertArrayNotHasKey('Set-Cookie', $headers);
+        // Nur Antworten der API tragen die Vertragsnummer, Dateien des Frontends nicht.
+        self::assertArrayNotHasKey('X-Api-Version', $headers);
         self::assertSame(0, $this->connectAttempts);
         self::assertSame([], $this->log);
     }
@@ -158,6 +160,7 @@ final class FrontendDeliveryTest extends TestCase
         self::assertSame($cacheControl, $headers['Cache-Control']);
         self::assertSame('nosniff', $headers['X-Content-Type-Options']);
         self::assertArrayNotHasKey('Content-Security-Policy', $headers);
+        self::assertArrayNotHasKey('X-Api-Version', $headers);
         $relative = (string) preg_replace('#^/firefighting/[a-z0-9-]+/#', '', $uri);
         self::assertSame(file_get_contents(self::DIST . '/' . $relative), $response->body());
         self::assertSame(0, $this->connectAttempts);

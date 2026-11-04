@@ -44,6 +44,17 @@ final class HttpExceptionTest extends TestCase
         );
     }
 
+    public function testClientOutdatedNamesTheMinimum(): void
+    {
+        $response = HttpException::clientOutdated(2)->toResponse();
+
+        self::assertSame(409, $response->statusCode());
+        self::assertSame(
+            '{"error":"client_outdated","message":"Diese Version der App ist veraltet – bitte aktualisieren.","details":{"min_client_api":2}}',
+            $response->body(),
+        );
+    }
+
     public function testNameTakenIsConflict(): void
     {
         $response = HttpException::nameTaken('Es gibt bereits einen Gerätetyp „Funkgerät“.')->toResponse();
