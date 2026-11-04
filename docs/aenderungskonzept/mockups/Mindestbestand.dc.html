@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Sollbestand eines Standorts</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav.active{background:#F8E6E6;color:#1B2430;font-weight:600;box-shadow:inset 4px 0 0 #B71C1C}
+.card{background:#FFFFFF;border:1px solid #E1E5EA;border-radius:12px;box-sizing:border-box}
+.row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid #EEF0F3;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.btn-quiet{border-color:transparent;background:transparent}
+.chip{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.inp{font:inherit;font-size:16px;padding:10px 12px;border-radius:8px;border:2px solid #C9D1DA;min-height:44px;box-sizing:border-box;background:#fff;color:#1B2430}
+.th{padding:10px 10px;font-size:14px;color:#3A4655;text-align:left;font-weight:600;white-space:nowrap}
+.td{padding:10px 10px;border-top:1px solid #EEF0F3;font-size:15px;text-align:left;vertical-align:middle}
+.step{width:40px;height:40px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;font:inherit;font-size:20px;font-weight:700;cursor:pointer}
+.mini{min-height:36px;padding:0 10px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 2px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #B71C1C; color: #fff; font-weight: 700; font-size: 18px">FF</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">FF Immendingen</span>
+        <span style="font-size: 14px; color: #5B6675">Geräteverwaltung</span>
+      </div>
+    </div>
+    <a class="nav" href="#">Dashboard</a>
+    <a class="nav" href="#">Suchen</a>
+    <a class="nav" href="#">Ausrüstung</a>
+    <a class="nav active" href="#" aria-current="page">Standorte</a>
+    <a class="nav" href="#">Ausrüstungstypen</a>
+    <a class="nav" href="#">Wartung</a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <h1 style="margin: 0; font-size: 30px; font-weight: 700">Standorte</h1>
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <section class="card" aria-label="Standorte" style="flex: 2 1 420px; min-width: 0; overflow: hidden">
+        <div class="row" style="border-top: 0; background: #F7F8FA; font-size: 14px; font-weight: 600; color: #3A4655"><span style="flex: 1 1 160px">Name</span><span style="flex: 0 0 190px">Bestand</span></div>
+        <div class="row" style="{{hlfStyle}}">
+          <span style="flex: 1 1 160px; display: flex; flex-direction: column"><span style="font-weight: 700">HLF 20</span><span style="font-size: 13px; color: #5B6675">Fahrzeug</span></span>
+          <span style="flex: 0 0 190px"><span class="chip" style="{{hlfChipStyle}}">{{hlfChip}}</span></span>
+        </div>
+        <div class="row" style="padding-left: 40px; background: #FDF5F5">
+          <span style="flex: 1 1 160px; display: flex; flex-direction: column"><span style="font-weight: 600">Fach G1</span><span style="font-size: 13px; color: #5B6675">Fach in HLF 20</span></span>
+          <span style="flex: 0 0 190px"><span class="chip" style="{{g1Style}}">{{g1Text}}</span></span>
+        </div>
+        <div class="row" style="padding-left: 40px">
+          <span style="flex: 1 1 160px; display: flex; flex-direction: column"><span style="font-weight: 600">Fach G2</span><span style="font-size: 13px; color: #5B6675">Fach in HLF 20</span></span>
+          <span style="flex: 0 0 190px"><span class="chip" style="background: #E3F2E7; color: #1B6330">vollständig</span></span>
+        </div>
+        <div class="row" style="padding-left: 40px">
+          <span style="flex: 1 1 160px; display: flex; flex-direction: column"><span style="font-weight: 600">Fahrerhaus</span><span style="font-size: 13px; color: #5B6675">Fach in HLF 20</span></span>
+          <span style="flex: 0 0 190px; color: #5B6675; font-size: 14px">ohne Sollbestand</span>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="mb" style="flex: 3 1 560px; min-width: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px">
+        <h2 id="mb" style="margin: 0; font-size: 19px">„Fach G1“ – Sollbestand</h2>
+        <p style="margin: 0; font-size: 15px; color: #3A4655">Ein Fach kann verschiedene Ausrüstungstypen aufnehmen, jeden mit eigener Anzahl. Gleichwertige Typen fasst eine Zeile mit „oder“ zusammen.</p>
+        <div style="overflow-x: auto">
+          <table style="width: 100%; border-collapse: collapse; min-width: 520px">
+            <thead><tr><th class="th">Ausrüstungstyp</th><th class="th">Soll</th><th class="th">jetzt</th><th class="th"><span style="position: absolute; left: -9999px">Ausprobieren</span></th></tr></thead>
+            <tbody>
+              <sc-for list="{{lines}}" as="l" hint-placeholder-count="3">
+                <tr>
+                  <td class="td"><div style="font-weight: 600">{{l.types}}</div><sc-if value="{{l.equiv}}" hint-placeholder-val="{{ false }}"><div style="font-size: 13px; color: #5B6675">gleichwertig, zählen zusammen</div></sc-if></td>
+                  <td class="td"><div style="display: flex; align-items: center; gap: 8px"><button class="step" type="button" aria-label="weniger" onClick="{{l.minus}}">−</button><span style="min-width: 24px; text-align: center; font-size: 18px; font-weight: 700">{{l.soll}}</span><button class="step" type="button" aria-label="mehr" onClick="{{l.plus}}">+</button></div></td>
+                  <td class="td"><span class="chip" style="{{l.style}}">{{l.have}}</span></td>
+                  <td class="td" style="white-space: nowrap"><button class="mini" type="button" onClick="{{l.out}}">−1 heraus</button> <button class="mini" type="button" onClick="{{l.in}}">+1 hinein</button></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap">
+          <button class="btn" type="button">+ Ausrüstungstyp</button>
+          <button class="btn" type="button">+ gleichwertigen Typ zu einer Zeile</button>
+        </div>
+        <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 15px; cursor: pointer">
+          <input type="checkbox" checked style="width: 20px; height: 20px; accent-color: #B71C1C; margin: 2px 0 0 0">
+          <span style="display: flex; flex-direction: column"><span style="font-weight: 700">Nur diese Ausrüstungstypen dürfen hinein</span><span style="font-size: 14px; color: #5B6675">Andere Typen lehnt die App beim Buchen ab.</span></span>
+        </label>
+        <div style="font-size: 14px; color: #5B6675; background: #F7F8FA; border-radius: 8px; padding: 10px 12px">Weniger als Soll: das Fach ist <strong>außer Betrieb</strong>. Mehr als Soll: nur ein Hinweis „zu viel“, keine Sperre. Beim Tausch muss der Ersatz zur selben Zeile passen.</div>
+        <div style="display: flex; gap: 10px"><button class="btn btn-primary" type="button">Speichern</button><button class="btn" type="button">Abbrechen</button></div>
+      </section>
+    </div>
+
+    <section aria-labelledby="dlg" style="max-width: 640px; background: #FFFFFF; border: 2px solid #B86E00; border-radius: 14px; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px">
+      <h2 id="dlg" style="margin: 0; font-size: 19px">Rückfrage für Admin und Gerätewart: „PA 3 ohne Ersatz herausnehmen?“</h2>
+      <p style="margin: 0; font-size: 15px; color: #3A4655">Fach G1 hat danach 1 von 2 Atemschutzgeräten und gilt als <strong>außer Betrieb</strong>, bis wieder eines eingebucht ist. Es entsteht ein Hinweis im Protokoll.</p>
+      <div><label for="gr" style="display: block; font-weight: 600; font-size: 15px; margin-bottom: 6px">Grund (Pflicht)</label><input id="gr" class="inp" type="text" value="Kein Ersatz im Lager, PA 3 muss zur Prüfung" style="width: 100%"></div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap"><button class="btn btn-primary" type="button">Trotzdem herausnehmen</button><button class="btn" type="button">Doch tauschen</button></div>
+      <p style="margin: 0; font-size: 14px; color: #5B6675">Geräteträger sehen diese Möglichkeit nicht; sie können nur tauschen.</p>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1150}}'>
+var LINES = [
+  { key: 'pa', types: 'Atemschutzgerät', equiv: false, soll: 2, have: 2 },
+  { key: 'ma', types: 'Atemschutzmaske', equiv: false, soll: 2, have: 2 },
+  { key: 'fu', types: 'Handfunkgerät oder Funkmeldeempfänger', equiv: true, soll: 1, have: 1 }
+];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { lines: LINES }; }
+  renderVals() {
+    var s = this.state, self = this;
+    var upd = function (key, patch) { self.setState({ lines: s.lines.map(function (l) { return l.key === key ? Object.assign({}, l, patch(l)) : l; }) }); };
+    var below = s.lines.filter(function (l) { return l.have < l.soll; });
+    var above = s.lines.filter(function (l) { return l.have > l.soll; });
+    var down = below.length > 0;
+    return {
+      lines: s.lines.map(function (l) {
+        var st = l.have < l.soll ? 'background: #FCE4E2; color: #9B1C1C' : (l.have > l.soll ? 'background: #FFF1DB; color: #7A4A00' : 'background: #E3F2E7; color: #1B6330');
+        return {
+          types: l.types, equiv: l.equiv, soll: l.soll,
+          have: l.have + ' von ' + l.soll + (l.have > l.soll ? ' · zu viel' : ''),
+          style: st,
+          minus: function () { upd(l.key, function (x) { return { soll: Math.max(0, x.soll - 1) }; }); },
+          plus: function () { upd(l.key, function (x) { return { soll: x.soll + 1 }; }); },
+          out: function () { upd(l.key, function (x) { return { have: Math.max(0, x.have - 1) }; }); },
+          in: function () { upd(l.key, function (x) { return { have: x.have + 1 }; }); }
+        };
+      }),
+      hlfStyle: down ? 'background: #FEF6F5' : '',
+      hlfChip: down ? '1 Fach außer Betrieb' : 'vollständig',
+      hlfChipStyle: down ? 'background: #FCE4E2; color: #9B1C1C' : 'background: #E3F2E7; color: #1B6330',
+      g1Text: down ? 'außer Betrieb · ' + below.map(function (l) { return l.types.split(' ')[0]; }).join(', ') + ' fehlt' : (above.length ? 'vollständig · zu viel' : 'vollständig'),
+      g1Style: down ? 'background: #FCE4E2; color: #9B1C1C' : (above.length ? 'background: #FFF1DB; color: #7A4A00' : 'background: #E3F2E7; color: #1B6330')
+    };
+  }
+}
+</script>
+</body>
+</html>

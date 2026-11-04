@@ -5,6 +5,7 @@ import { sessionCheckError, usingStoredSession } from '../auth/session';
 import { offlineData, syncedAtText } from '../data/offline';
 import { isOffline } from '../runtime/connectivity';
 import { updateNotice, type AppUpdater } from '../runtime/appUpdate';
+import { hasUnsavedInput } from '../runtime/unsavedInput';
 import { tenantState } from '../runtime/tenantState';
 import ConfirmDialog from './ConfirmDialog.vue';
 
@@ -21,7 +22,8 @@ const notice = computed(() => updateNotice(props.updater));
  * gespeicherten Sitzung, solange der Server nicht antwortet; mit dem Stand der lokalen Kopie.
  */
 const offlineText = computed(() => {
-    if (!isOffline.value && !usingStoredSession.value) {
+    // Lehnt der Server diese Version ab, ist er erreichbar (Hinweis zum Update statt „offline“).
+    if (!isOffline.value && (!usingStoredSession.value || props.updater.outdated.value)) {
         return null;
     }
     const head = isOffline.value ? 'Offline' : 'Keine Verbindung zum Server';
@@ -34,15 +36,26 @@ const confirmOpen = ref(false);
 
 /** Mit ungespeicherten Eingaben erst nachfragen (sie gingen beim Neuladen verloren). */
 function updateNow(): void {
-    if (notice.value === 'unsaved') {
+    if (hasUnsavedInput.value) {
         confirmOpen.value = true;
         return;
     }
-    applyUpdate();
+    void applyUpdate();
 }
 
-function applyUpdate(): void {
-    void props.updater.apply(window.location.href);
+function confirmUpdate(): void {
+    void applyUpdate();
+}
+
+/**
+ * Aktualisieren; lehnt der Server diese Version ab und lässt sich die neue nicht aktivieren, wie
+ * „Neu laden“ vom Server (sonst bliebe die App ohne Ausweg bei der abgelehnten Version).
+ */
+async function applyUpdate(): Promise<void> {
+    const url = window.location.href;
+    if (!(await props.updater.apply(url)) && props.updater.outdated.value) {
+        await props.updater.reloadFromServer(url);
+    }
 }
 
 /** Neue Version ließ sich beim Start nicht laden: vom Server neu laden, samt #token bzw. #code. */
@@ -90,7 +103,11 @@ onBeforeUnmount(() => {
         offline (bzw. mit gespeicherter Sitzung) der graue Streifen mit dem Stand der Daten.
     -->
     <p
-        v-if="sessionCheckError !== null && !usingStoredSession"
+        v-if="
+            sessionCheckError !== null &&
+            sessionCheckError.code !== 'client_outdated' &&
+            !usingStoredSession
+        "
         class="app-error app-offline"
         role="status"
         data-testid="connection-notice"
@@ -131,7 +148,10 @@ onBeforeUnmount(() => {
         Neue Version wird geladen …
     </p>
 
-    <!-- Neue Version, aber gerade nicht automatisch: Formular angefangen oder kurz zuvor neu geladen. -->
+    <!--
+        Version vom Server abgelehnt (client_outdated) oder neue Version, aber gerade nicht
+        automatisch: Formular angefangen oder kurz zuvor neu geladen.
+    -->
     <div
         v-else-if="notice !== null"
         ref="passthrough"
@@ -142,9 +162,11 @@ onBeforeUnmount(() => {
     >
         <span>
             {{
-                notice === 'unsaved'
-                    ? 'Neue Version verfügbar – nach dem Speichern wird aktualisiert.'
-                    : 'Neue Version verfügbar.'
+                notice === 'outdated'
+                    ? 'Diese Version ist veraltet – bitte aktualisieren.'
+                    : notice === 'unsaved'
+                      ? 'Neue Version verfügbar – nach dem Speichern wird aktualisiert.'
+                      : 'Neue Version verfügbar.'
             }}
         </span>
         <button class="btn app-update-button" type="button" @click="updateNow">
@@ -156,7 +178,7 @@ onBeforeUnmount(() => {
         title="Jetzt aktualisieren?"
         description="Ihre Eingaben auf dieser Seite gehen verloren. Trotzdem aktualisieren?"
         confirm-label="Aktualisieren"
-        @confirm="applyUpdate"
+        @confirm="confirmUpdate"
     />
 </template>
 

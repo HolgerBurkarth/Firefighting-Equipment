@@ -4,7 +4,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 import { START_LOAD_TIMEOUT_MS } from '../../src/runtime/appUpdate';
-import { expect, meBody, test as base, type ApiMocks, type MockResponse } from './fixtures';
+import {
+    expect,
+    HTTP_ERROR_CONSOLE,
+    meBody,
+    test as base,
+    type ApiMocks,
+    type MockResponse,
+} from './fixtures';
 import { NEXT_BUILD_ID } from './globalSetup';
 import { ADMIN_OVERVIEW } from './support/admin';
 import { isAbortedFontDownload } from './support/consoleErrors';
@@ -646,5 +653,112 @@ test.describe('Updates der App: Zurück-Knopf', () => {
         await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
         await expect(page).toHaveURL(`/firefighting/${area}/anmelden`);
         await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+    });
+});
+
+test.describe('Updates der App: Antworten der API verlangen ein Update', () => {
+    /** Wie ClientApi::RESPONSE_HEADER im Backend; die laufende App kennt die Nummer 1. */
+    const NEWER_API = { 'X-Api-Version': '2' };
+
+    /**
+     * Mail-Link in einem zweiten Tab (wie aus einem Mailprogramm) mit der alten Version; danach
+     * Deploy, ohne dass die App es bemerkt. Antworten der API für diesen Tab aus der Tabelle des
+     * Update-Testservers (alle Browser, auch WebKit unter dem Service Worker).
+     */
+    async function openMailLinkThenDeploy(
+        page: Page,
+        area: string,
+        verify: MockResponse,
+    ): Promise<Page> {
+        await openOldVersion(page, area);
+        const mail = await page.context().newPage();
+        await mail.goto(`/firefighting/${area}/email-bestaetigen#token=${MAIL_TOKEN}`);
+        await expect(mail.getByRole('heading', { level: 1 })).toHaveText(
+            'E-Mail-Adresse bestätigen',
+        );
+        await expect(mail.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+        deploy(area);
+        writeApiTable(area, { 'POST api/v1/auth/email/verify': verify });
+        return mail;
+    }
+
+    test('client_outdated mit offenem Link: Hinweis, Link bleibt, Aktualisieren nach Rückfrage', async ({
+        page,
+        browserName,
+        baseURL,
+    }, testInfo) => {
+        const area = newArea(testInfo.project.name);
+        const mail = await openMailLinkThenDeploy(page, area, {
+            status: 409,
+            body: {
+                error: 'client_outdated',
+                message: 'Diese Version der App ist veraltet – bitte aktualisieren.',
+                details: { min_client_api: 2 },
+            },
+        });
+        const problems = collectProblems(mail, browserName, baseURL ?? '');
+        await mail.evaluate(() => {
+            (window as unknown as { ffMarker: boolean }).ffMarker = true;
+        });
+
+        const confirm = mail.getByRole('button', { name: 'E-Mail-Adresse bestätigen' });
+        await confirm.click();
+        // Der noch nicht eingelöste Link zählt als Eingabe: kein Neuladen, sondern der Hinweis.
+        const notice = mail.getByTestId('update-notice');
+        await expect(notice).toContainText('Diese Version ist veraltet – bitte aktualisieren.');
+        await expect(mail.getByRole('alert')).toContainText(
+            'Diese Version ist veraltet – bitte aktualisieren.',
+        );
+        await expect(confirm).toBeVisible();
+        await expect(mail.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+        expect(
+            await mail.evaluate(() => (window as unknown as { ffMarker?: boolean }).ffMarker),
+        ).toBe(true);
+
+        await notice.getByRole('button', { name: 'Jetzt aktualisieren' }).click();
+        const dialog = mail.getByRole('alertdialog', { name: 'Jetzt aktualisieren?' });
+        await dialog.getByRole('button', { name: 'Aktualisieren' }).click();
+        await expect(mail.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(mail).toHaveURL(`/firefighting/${area}/email-bestaetigen`);
+        await expect(mail.getByTestId('update-notice')).toBeHidden();
+        // Erwartet nur die Meldung des Browsers zur Antwort 409.
+        expect(problems.filter((problem) => !HTTP_ERROR_CONSOLE.test(problem))).toEqual([]);
+        await mail.close();
+    });
+
+    test('neuere X-Api-Version: sofort geprüft, beim nächsten Seitenwechsel die neue Version', async ({
+        page,
+        browserName,
+        baseURL,
+    }, testInfo) => {
+        const area = newArea(testInfo.project.name);
+        const mail = await openMailLinkThenDeploy(page, area, {
+            status: 200,
+            body: { message: 'Ihre E-Mail-Adresse ist bestätigt.' },
+            headers: NEWER_API,
+        });
+        const problems = collectProblems(mail, browserName, baseURL ?? '');
+
+        await mail.getByRole('button', { name: 'E-Mail-Adresse bestätigen' }).click();
+        await expect(mail.getByTestId('email-verified')).toHaveText(
+            'Ihre E-Mail-Adresse ist bestätigt.',
+        );
+        // Ohne Eingabe kein Hinweis; die App prüft sofort, die neue Version wartet installiert.
+        await expect
+            .poll(() =>
+                mail.evaluate(async () => {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    return registration?.waiting?.state ?? null;
+                }),
+            )
+            .toBe('installed');
+        await expect(mail.getByTestId('update-notice')).toBeHidden();
+        await expect(mail.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+
+        await mail.getByRole('link', { name: 'Zur Anmeldung' }).first().click();
+        await expect(mail.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(mail).toHaveURL(`/firefighting/${area}/anmelden`);
+        expect(problems).toEqual([]);
+        await mail.close();
     });
 });

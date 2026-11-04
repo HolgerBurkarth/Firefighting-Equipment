@@ -174,11 +174,17 @@ export function resetSession(): void {
 
 /**
  * Störung statt Antwort: keine Verbindung, unerwartete Antwort oder Serverfehler (5xx). Dann ist
- * offen, ob eine Sitzung besteht. Nur eine echte Antwort mit 4xx (401, oder 403/404 für eine
- * gesperrte bzw. unbekannte Stadt) ist endgültig.
+ * offen, ob eine Sitzung besteht. Ebenso `client_outdated` (diese Version ist veraltet, das Update
+ * folgt; nie abmelden). Nur eine echte Antwort mit 4xx (401, oder 403/404 für eine gesperrte bzw.
+ * unbekannte Stadt) ist endgültig.
  */
 export function isTransientError(error: ApiError): boolean {
-    return error.status === null || error.status >= 500 || error.code === 'invalid_response';
+    return (
+        error.status === null ||
+        error.status >= 500 ||
+        error.code === 'invalid_response' ||
+        error.code === 'client_outdated'
+    );
 }
 
 /** Wartet `ms` oder bis der Browser wieder online ist. */

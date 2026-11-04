@@ -8,6 +8,14 @@ import { reportServerReached } from '../runtime/connectivity';
  */
 export const CLIENT_API_HEADER = 'X-Client-Api';
 export const CLIENT_API_VERSION = 1;
+/** Vertragsnummer des Servers in jeder JSON- und CSV-Antwort (ClientApi::RESPONSE_HEADER). */
+export const API_VERSION_HEADER = 'X-Api-Version';
+
+/**
+ * Anlass, sofort auf ein Update zu prüfen: Der Server lehnt diese Version ab (409
+ * `client_outdated`) bzw. kennt eine neuere Vertragsnummer (`X-Api-Version` größer).
+ */
+export type OutdatedReason = 'client_outdated' | 'newer_api';
 
 /** Fehler einer API-Anfrage; `code` ist der Code der API oder "network" bzw. "invalid_response". */
 export interface ApiError {
@@ -46,6 +54,30 @@ let unauthorizedHandler: (() => void) | null = null;
 /** Wird bei 401 einer nicht öffentlichen Anfrage aufgerufen (der Router meldet dann ab). */
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
     unauthorizedHandler = handler;
+}
+
+let outdatedHandler: ((reason: OutdatedReason) => void) | null = null;
+
+/** Wird aufgerufen, wenn eine Antwort ein Update verlangt (main.ts: AppUpdater.reportOutdated). */
+export function setOutdatedHandler(handler: ((reason: OutdatedReason) => void) | null): void {
+    outdatedHandler = handler;
+}
+
+/** Vertragsnummer aus `X-Api-Version` (nur Ziffern ohne führende Null); sonst null. */
+export function parseApiVersion(value: string | null): number | null {
+    return value !== null && /^[1-9]\d{0,8}$/.test(value.trim()) ? Number(value.trim()) : null;
+}
+
+/** Meldet `client_outdated` bzw. eine neuere Vertragsnummer des Servers an den AppUpdater. */
+function noticeVersion(response: Response, error: ApiError | null): void {
+    if (error?.code === 'client_outdated') {
+        outdatedHandler?.('client_outdated');
+        return;
+    }
+    const server = parseApiVersion(response.headers.get(API_VERSION_HEADER));
+    if (server !== null && server > CLIENT_API_VERSION) {
+        outdatedHandler?.('newer_api');
+    }
 }
 
 function apiError(
@@ -119,11 +151,14 @@ export async function apiRequest<T>(
     }
 
     if (!response.ok) {
+        const error = errorFromResponse(response, json);
+        noticeVersion(response, error);
         if (response.status === 401 && options.public !== true) {
             unauthorizedHandler?.();
         }
-        return { ok: false, error: errorFromResponse(response, json) };
+        return { ok: false, error };
     }
+    noticeVersion(response, null);
     const data = json === undefined ? null : parse(json);
     return data === null
         ? { ok: false, error: apiError('invalid_response', response.status) }
@@ -174,11 +209,14 @@ export async function apiDownload(
         } catch {
             json = undefined;
         }
+        const error = errorFromResponse(response, json);
+        noticeVersion(response, error);
         if (response.status === 401) {
             unauthorizedHandler?.();
         }
-        return { ok: false, error: errorFromResponse(response, json) };
+        return { ok: false, error };
     }
+    noticeVersion(response, null);
     try {
         const blob = await response.blob();
         const fileName = downloadFileName(

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Rolle einer Person ändern</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+.btn:hover{background:#F3F4F6;color:#1B2430}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.btn-primary:hover{background:#8E1515;color:#fff}
+.btn-quiet{border-color:transparent;background:transparent}
+.field label{display:block;font-weight:600;font-size:15px;margin-bottom:6px}
+.field input{font:inherit;font-size:16px;padding:10px 12px;border-radius:8px;border:2px solid #C9D1DA;min-height:44px;box-sizing:border-box;width:100%;color:#1B2430;background:#fff}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:10px;cursor:pointer;box-sizing:border-box}
+.opt input{width:20px;height:20px;margin:2px 0 0 0;accent-color:#B71C1C;flex-shrink:0}
+</style>
+</helmet>
+<div style="position: relative; min-height: 100vh">
+  <div aria-hidden="true" style="display: flex; min-height: 100vh">
+    <div style="flex: 0 0 240px; background: #FFFFFF; border-right: 1px solid #E1E5EA"></div>
+    <div style="flex: 1 1 auto; padding: 28px 32px; display: flex; flex-direction: column; gap: 16px">
+      <div style="font-size: 30px; font-weight: 700">Benutzer</div>
+      <div style="height: 44px; border-bottom: 1px solid #E1E5EA"></div>
+      <div style="height: 420px; background: #FFFFFF; border: 1px solid #E1E5EA; border-radius: 12px"></div>
+    </div>
+  </div>
+  <div style="position: absolute; inset: 0; background: rgba(27, 36, 48, 0.45); display: flex; justify-content: center; align-items: flex-start; padding: 64px 16px; box-sizing: border-box">
+    <section role="dialog" aria-modal="true" aria-labelledby="dlg-title" style="width: 100%; max-width: 620px; background: #FFFFFF; border-radius: 14px; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+      <div>
+        <h2 id="dlg-title" style="margin: 0; font-size: 22px">Jonas Weber bearbeiten</h2>
+        <div style="font-size: 15px; color: #5B6675; margin-top: 4px">jonas.weber@example.de · aktiv</div>
+      </div>
+      <div class="field">
+        <label for="f-name">Anzeigename</label>
+        <input id="f-name" type="text" value="Jonas Weber">
+      </div>
+      <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend style="font-weight: 600; font-size: 15px; padding: 0 0 8px 0">Rolle</legend>
+        <sc-for list="{{roles}}" as="r" hint-placeholder-count="4">
+          <label class="opt" style="{{r.style}}">
+            <input type="radio" name="role" checked="{{r.checked}}" onChange="{{r.pick}}">
+            <span style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-weight: 700; font-size: 16px">{{r.name}}</span>
+              <span style="font-size: 14px; color: #3A4655">{{r.desc}}</span>
+              <span style="font-size: 14px; color: #5B6675">Sieht: {{r.sees}}</span>
+            </span>
+          </label>
+        </sc-for>
+      </fieldset>
+      <sc-if value="{{isAdmin}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; gap: 10px; align-items: flex-start; background: #FFF8EC; border: 1px solid #F1D9AE; border-radius: 10px; padding: 12px 14px; font-size: 15px; color: #4A3200">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7A4A00" stroke-width="2" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><path d="M12 3l9 16H3z"></path><path d="M12 10v4"></path><path d="M12 17v.5"></path></svg>
+          <span>Admins haben alle Rechte, auch Benutzer und Einstellungen. Jonas Weber kann dann selbst Rollen zuweisen.</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{changed}}" hint-placeholder-val="{{ false }}">
+        <div style="font-size: 14px; color: #5B6675">Die neue Rolle gilt beim nächsten Aufruf der App; das Handy lädt dabei seine Offline-Kopie neu.</div>
+      </sc-if>
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-top: 1px solid #EEF0F3; padding-top: 16px">
+        <button class="btn btn-quiet" type="button">Sperren …</button>
+        <button class="btn btn-quiet" type="button" style="color: #9B1C1C">Löschen …</button>
+        <div style="flex-grow: 1"></div>
+        <a class="btn" href="Benutzer.dc.html">Abbrechen</a>
+        <a class="btn btn-primary" href="Benutzer.dc.html">Speichern</a>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var ROLES = [
+  { name: 'Admin', desc: 'Alle Rechte.', sees: 'alles' },
+  { name: 'Gerätewart', desc: 'Wie Admin, ohne Benutzer und Einstellungen.', sees: 'Dashboard, Ausrüstung, Standorte, Ausrüstungstypen, Termine, Wartung, Verleih, Protokoll' },
+  { name: 'Geräteträger', desc: 'Handy: suchen, buchen, benutzt melden, tauschen.', sees: 'Suchen, Profil' },
+  { name: 'Benutzer', desc: 'Wie bisher: suchen, umbuchen, Termine.', sees: 'Suchen, Termine, Profil' }
+];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { role: 'Gerätewart' }; }
+  renderVals() {
+    var s = this.state, self = this;
+    return {
+      roles: ROLES.map(function (r) {
+        var on = s.role === r.name;
+        return {
+          name: r.name, desc: r.desc, sees: r.sees, checked: on,
+          style: on ? 'border: 2px solid #B71C1C; background: #FDF5F5' : 'border: 2px solid #E1E5EA; background: #FFFFFF',
+          pick: function () { self.setState({ role: r.name }); }
+        };
+      }),
+      isAdmin: s.role === 'Admin',
+      changed: s.role !== 'Gerätewart'
+    };
+  }
+}
+</script>
+</body>
+</html>

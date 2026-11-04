@@ -250,7 +250,9 @@ async function storedQueue(page: Page): Promise<Record<string, unknown>[] | null
                     const get = db.transaction('queue').objectStore('queue').get('test:7');
                     get.onsuccess = () => {
                         db.close();
-                        resolve((get.result as Record<string, unknown>[] | undefined) ?? null);
+                        const stored = get.result as
+                            { bookings: Record<string, unknown>[] } | undefined;
+                        resolve(stored?.bookings ?? null);
                     };
                 };
             }),
@@ -458,9 +460,9 @@ test.describe('Offline-Modus: Buchungen in der Warteschlange', () => {
                             .objectStore('queue');
                         const get = store.get('test:7');
                         get.onsuccess = () => {
-                            const queue = get.result as Record<string, unknown>[];
+                            const queue = get.result as { bookings: Record<string, unknown>[] };
                             const old = new Date(Date.now() - 8 * 86_400_000);
-                            for (const entry of queue) {
+                            for (const entry of queue.bookings) {
                                 entry['occurredAt'] = `${old.toISOString().slice(0, 19)}Z`;
                             }
                             store.put(queue, 'test:7').onsuccess = () => {

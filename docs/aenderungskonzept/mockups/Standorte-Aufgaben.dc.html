@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Standorte mit Aufgabe</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}a:hover{color:#0F1F33}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box}
+.nav:hover{background:#F3E3E3;color:#1B2430}
+.nav.active{background:#F8E6E6;color:#1B2430;font-weight:600;box-shadow:inset 4px 0 0 #B71C1C}
+.card{background:#FFFFFF;border:1px solid #E1E5EA;border-radius:12px;box-sizing:border-box}
+.row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid #EEF0F3;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+.btn:hover{background:#F3F4F6;color:#1B2430}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.btn-primary:hover{background:#8E1515;color:#fff}
+.btn-quiet{border-color:transparent;background:transparent}
+.chip{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.filter{min-height:40px;padding:0 14px;border-radius:999px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #C9D1DA}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;cursor:pointer;box-sizing:border-box}
+.opt input{width:20px;height:20px;margin:1px 0 0 0;accent-color:#B71C1C;flex-shrink:0}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh; align-items: stretch">
+  <nav aria-label="Hauptmenü" style="flex: 1 1 240px; max-width: 100%; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 2px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #B71C1C; color: #fff; font-weight: 700; font-size: 18px">FF</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">FF Immendingen</span>
+        <span style="font-size: 14px; color: #5B6675">Geräteverwaltung</span>
+      </div>
+    </div>
+    <a class="nav" href="#">Dashboard</a>
+    <a class="nav" href="#">Suchen</a>
+    <a class="nav" href="#">Ausrüstung</a>
+    <a class="nav active" href="#" aria-current="page">Standorte</a>
+    <a class="nav" href="#">Ausrüstungstypen</a>
+    <a class="nav" href="#">Termine</a>
+    <a class="nav" href="Wartung.dc.html">Wartung</a>
+    <a class="nav" href="#">Verleih</a>
+    <a class="nav" href="#">Protokoll</a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+      <h1 style="margin: 0; font-size: 30px; font-weight: 700; flex-grow: 1">Standorte</h1>
+      <a class="btn" href="Wege.dc.html">Wege als Grafik</a>
+      <button class="btn btn-primary" type="button">Neuer Standort</button>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <div style="flex: 3 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+          <div style="position: relative; flex: 1 1 260px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5B6675" stroke-width="2" aria-hidden="true" style="position: absolute; left: 12px; top: 12px"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+            <label for="q" style="position: absolute; left: -9999px">Standort suchen</label>
+            <input id="q" type="search" placeholder="Name, z. B. hlf g1" value="{{q}}" onChange="{{onSearch}}" style="font: inherit; font-size: 16px; padding: 10px 12px 10px 40px; border-radius: 8px; border: 2px solid #C9D1DA; min-height: 44px; box-sizing: border-box; width: 100%; background: #fff">
+          </div>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 15px; min-height: 44px; cursor: pointer"><input type="checkbox" style="width: 20px; height: 20px; accent-color: #B71C1C; margin: 0">Gesperrte anzeigen (2)</label>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+          <span style="font-size: 15px; color: #5B6675; margin-right: 4px">Aufgabe:</span>
+          <sc-for list="{{filters}}" as="f" hint-placeholder-count="7">
+            <button class="filter" type="button" aria-pressed="{{f.pressed}}" onClick="{{f.pick}}" style="{{f.style}}">{{f.label}}</button>
+          </sc-for>
+        </div>
+        <section class="card" aria-label="Standorte" style="overflow: hidden">
+          <div class="row" style="border-top: 0; background: #F7F8FA; font-size: 14px; font-weight: 600; color: #3A4655"><span style="flex: 1 1 200px">Name</span><span style="flex: 0 0 150px">Aufgabe</span><span style="flex: 0 0 80px; text-align: right">Ausrüstung</span><span style="flex: 0 0 110px"></span></div>
+          <sc-for list="{{locs}}" as="l" hint-placeholder-count="9">
+            <div class="row" style="{{l.rowStyle}}">
+              <span style="flex: 1 1 200px; display: flex; flex-direction: column; min-width: 0">
+                <span style="{{l.nameStyle}}">{{l.name}}</span>
+                <span style="font-size: 13px; color: #5B6675">{{l.kind}}</span>
+              </span>
+              <span style="flex: 0 0 150px"><sc-if value="{{l.task}}" hint-placeholder-val="{{ false }}"><span class="chip" style="{{l.taskStyle}}">{{l.task}}</span></sc-if></span>
+              <span style="flex: 0 0 80px; text-align: right; font-variant-numeric: tabular-nums">{{l.count}}</span>
+              <span style="flex: 0 0 110px; text-align: right"><button class="btn btn-quiet" type="button" onClick="{{l.edit}}">Bearbeiten</button></span>
+            </div>
+          </sc-for>
+          <sc-if value="{{empty}}" hint-placeholder-val="{{ false }}">
+            <div class="row" style="color: #5B6675">Kein Standort passt zum Filter.</div>
+          </sc-if>
+        </section>
+      </div>
+
+      <section class="card" aria-labelledby="edit-title" style="flex: 2 1 360px; min-width: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px">
+        <h2 id="edit-title" style="margin: 0; font-size: 19px">„{{current.name}}“ bearbeiten</h2>
+        <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px">
+          <legend style="font-weight: 600; font-size: 15px; padding: 0 0 6px 0">Aufgabe</legend>
+          <sc-for list="{{tasks}}" as="t" hint-placeholder-count="6">
+            <label class="opt" style="{{t.style}}">
+              <input type="radio" name="task" checked="{{t.checked}}" onChange="{{t.pick}}">
+              <span style="display: flex; flex-direction: column"><span style="font-weight: 700">{{t.name}}</span><span style="font-size: 14px; color: #5B6675">{{t.desc}}</span></span>
+            </label>
+          </sc-for>
+        </fieldset>
+        <sc-if value="{{isLager}}" hint-placeholder-val="{{ false }}">
+          <label class="opt" style="border: 2px solid #E1E5EA">
+            <input type="checkbox" checked="{{isDefault}}" onChange="{{toggleDefault}}">
+            <span style="display: flex; flex-direction: column"><span style="font-weight: 700">Standard-Lager</span><span style="font-size: 14px; color: #5B6675">Ziel nach der Werkstatt und nach Rückgaben. Es gibt genau eines.</span></span>
+          </label>
+        </sc-if>
+        <sc-if value="{{isSammel}}" hint-placeholder-val="{{ false }}">
+          <fieldset style="border: 2px solid #E1E5EA; border-radius: 10px; margin: 0; padding: 8px 12px 10px 12px">
+            <legend style="font-weight: 600; font-size: 15px; padding: 0 4px">Nimmt an</legend>
+            <label class="opt" style="padding: 6px 0"><input type="checkbox" checked="{{acceptsUsed}}" onChange="{{toggleUsed}}"><span>benutzte Ausrüstung</span></label>
+            <label class="opt" style="padding: 6px 0"><input type="checkbox" checked="{{acceptsDefective}}" onChange="{{toggleDefective}}"><span>defekte Ausrüstung</span></label>
+            <div style="font-size: 14px; color: #5B6675">Für getrennte Sammelstellen eine zweite anlegen und je einen Haken setzen.</div>
+          </fieldset>
+        </sc-if>
+        <p style="margin: 0; font-size: 14px; color: #5B6675">Die Aufgabe ändert nur, wo der Standort in Abläufen auftaucht. Der Name bleibt frei, die Ausrüstung bleibt, wo sie ist.</p>
+        <div style="display: flex; gap: 10px">
+          <button class="btn btn-primary" type="button">Speichern</button>
+          <button class="btn" type="button">Abbrechen</button>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+var TASKS = [
+  { key: '', name: 'Ohne Aufgabe', desc: 'Normaler Standort, z. B. Fahrzeug, Fach, Kleiderkammer' },
+  { key: 'Lager', name: 'Lager', desc: 'Hier liegt einsatzbereite Ersatz-Ausrüstung' },
+  { key: 'Sammelstelle', name: 'Sammelstelle', desc: 'Benutzte oder defekte Ausrüstung wartet auf den Transport' },
+  { key: 'Werkstatt', name: 'Werkstatt', desc: 'Ausrüstung in Prüfung oder Reparatur' },
+  { key: 'Rückgabe', name: 'Rückgabe', desc: 'Rückgaben verliehener Ausrüstung ohne Anmeldung' },
+  { key: 'Ausgeliehen an', name: 'Ausgeliehen an', desc: 'Externe Orte, an die verliehen wird' }
+];
+var TASK_STYLE = {
+  'Lager': 'background: #E3F2E7; color: #1B6330',
+  'Sammelstelle': 'background: #FFF1DB; color: #7A4A00',
+  'Werkstatt': 'background: #E3ECF8; color: #1D3557',
+  'Rückgabe': 'background: #F1E6F8; color: #5B2A7A',
+  'Ausgeliehen an': 'background: #EEF0F3; color: #3A4655'
+};
+var LOCS0 = [
+  { id: 1, name: 'Lager Gerätehaus', kind: 'Raum/Lager', task: 'Lager', isDefault: true, count: 41, depth: 0 },
+  { id: 2, name: 'HLF 20', kind: 'Fahrzeug', task: '', count: 12, depth: 0 },
+  { id: 3, name: 'Fach G1', kind: 'Fach in HLF 20', task: '', count: 4, depth: 1 },
+  { id: 4, name: 'LF 10', kind: 'Fahrzeug', task: '', count: 8, depth: 0 },
+  { id: 5, name: 'Kiste „Benutzt“', kind: 'Raum/Lager', task: 'Sammelstelle', count: 5, depth: 0, acceptsUsed: true, acceptsDefective: true },
+  { id: 6, name: 'Atemschutzwerkstatt Tuttlingen', kind: 'Extern', task: 'Werkstatt', count: 2, depth: 0 },
+  { id: 7, name: 'Rückgabe Gerätehaus', kind: 'Raum/Lager', task: 'Rückgabe', count: 0, depth: 0 },
+  { id: 8, name: 'Hattingen', kind: 'Extern', task: 'Ausgeliehen an', count: 3, depth: 0 },
+  { id: 9, name: 'Ippingen', kind: 'Extern', task: 'Ausgeliehen an', count: 0, depth: 0 }
+];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { locs: LOCS0, editId: 5, filter: 'Alle', q: '' }; }
+  renderVals() {
+    var s = this.state, self = this;
+    var cur = s.locs.filter(function (l) { return l.id === s.editId; })[0];
+    var update = function (patch) {
+      self.setState({ locs: s.locs.map(function (l) { return l.id === cur.id ? Object.assign({}, l, patch) : l; }) });
+    };
+    var q = s.q.trim().toLowerCase();
+    var shown = s.locs.filter(function (l) {
+      var okTask = s.filter === 'Alle' || (s.filter === 'Ohne Aufgabe' ? !l.task : l.task === s.filter);
+      var okQ = !q || (l.name + ' ' + l.kind).toLowerCase().indexOf(q) >= 0;
+      return okTask && okQ;
+    });
+    var filters = ['Alle', 'Ohne Aufgabe', 'Lager', 'Sammelstelle', 'Werkstatt', 'Rückgabe', 'Ausgeliehen an'].map(function (f) {
+      var on = s.filter === f;
+      return {
+        label: f,
+        pressed: on ? 'true' : 'false',
+        style: on ? 'background: #1B2430; color: #FFFFFF; border-color: #1B2430' : 'background: #FFFFFF; color: #3A4655',
+        pick: function () { self.setState({ filter: f }); }
+      };
+    });
+    return {
+      q: s.q,
+      onSearch: function (e) { self.setState({ q: e.target.value }); },
+      filters: filters,
+      empty: shown.length === 0,
+      locs: shown.map(function (l) {
+        return {
+          name: l.name + (l.isDefault ? ' (Standard)' : ''),
+          kind: l.kind,
+          task: l.task,
+          taskStyle: TASK_STYLE[l.task] || '',
+          count: l.count,
+          rowStyle: (l.depth ? 'padding-left: 40px;' : '') + (l.id === s.editId ? ' background: #FDF5F5;' : ''),
+          nameStyle: l.depth ? 'font-weight: 600' : 'font-weight: 700',
+          edit: function () { self.setState({ editId: l.id }); }
+        };
+      }),
+      current: { name: cur.name },
+      tasks: TASKS.map(function (t) {
+        var on = cur.task === t.key;
+        return {
+          name: t.name, desc: t.desc, checked: on,
+          style: on ? 'border: 2px solid #B71C1C; background: #FDF5F5' : 'border: 2px solid #E1E5EA; background: #FFFFFF',
+          pick: function () { update({ task: t.key, acceptsUsed: t.key === 'Sammelstelle' ? true : cur.acceptsUsed, acceptsDefective: t.key === 'Sammelstelle' ? true : cur.acceptsDefective }); }
+        };
+      }),
+      isLager: cur.task === 'Lager',
+      isDefault: !!cur.isDefault,
+      toggleDefault: function () { update({ isDefault: !cur.isDefault }); },
+      isSammel: cur.task === 'Sammelstelle',
+      acceptsUsed: !!cur.acceptsUsed,
+      acceptsDefective: !!cur.acceptsDefective,
+      toggleUsed: function () { update({ acceptsUsed: !cur.acceptsUsed }); },
+      toggleDefective: function () { update({ acceptsDefective: !cur.acceptsDefective }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

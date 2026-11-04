@@ -7,9 +7,12 @@ import {
     isStale,
     offlineBookingProblem,
     pendingDevice,
+    QUEUE_FORMAT,
     queuedText,
+    readStoredQueue,
     unsentWarning,
     type QueuedBooking,
+    type StoredQueue,
 } from '../../src/data/bookingQueue';
 import { MemoryDb } from '../../src/runtime/localDb';
 
@@ -94,7 +97,7 @@ describe('BookingQueue', () => {
         const { q, requests, sent, db } = queue([{ ok: true, status: 200, data: response() }]);
         await q.use('test:7');
         expect(await q.add(booking())).toBe(true);
-        expect((await db.get('queue', 'test:7')) as unknown[]).toHaveLength(1);
+        expect(((await db.get('queue', 'test:7')) as StoredQueue).bookings).toHaveLength(1);
         expect(q.unsent).toHaveLength(1);
         await q.send();
         expect(requests).toEqual([
@@ -114,8 +117,9 @@ describe('BookingQueue', () => {
         expect(q.state.bookings[0]?.result?.message).toBe('Die Buchung wurde übernommen.');
         expect(sent).toHaveLength(1);
         expect(q.unsent).toHaveLength(0);
-        const stored = (await db.get('queue', 'test:7')) as QueuedBooking[];
-        expect(stored[0]?.state).toBe('done');
+        const stored = (await db.get('queue', 'test:7')) as StoredQueue;
+        expect(stored.format).toBe(QUEUE_FORMAT);
+        expect(stored.bookings[0]?.state).toBe('done');
         q.dismissDone();
         expect(q.state.bookings).toEqual([]);
     });
@@ -126,14 +130,19 @@ describe('BookingQueue', () => {
         expect(await q.add(booking())).toBe(true);
         expect(await q.add(booking())).toBe(true);
         expect(q.state.bookings).toHaveLength(1);
-        expect((await db.get('queue', 'test:7')) as unknown[]).toHaveLength(1);
+        expect(((await db.get('queue', 'test:7')) as StoredQueue).bookings).toHaveLength(1);
     });
 
-    it('ohne Verbindung, bei 5xx und 401 wartet die Buchung weiter', async () => {
+    it('ohne Verbindung, bei 5xx, 401 und client_outdated wartet die Buchung weiter', async () => {
         for (const failure of [
             error('network', null),
             error('database_unavailable', 503),
             error('not_authenticated', 401),
+            error(
+                'client_outdated',
+                409,
+                'Diese Version der App ist veraltet – bitte aktualisieren.',
+            ),
         ]) {
             const { q, requests } = queue([{ ok: false, error: failure }]);
             await q.use('test:7');
@@ -177,9 +186,56 @@ describe('BookingQueue', () => {
         expect(clock.q.state.bookings).toEqual([]);
     });
 
+    it('nach client_outdated sendet die neue Version dieselbe Buchung', async () => {
+        const db = new MemoryDb();
+        const old = queue([{ ok: false, error: error('client_outdated', 409) }], db);
+        await old.q.use('test:7');
+        await old.q.add(booking());
+        await old.q.send();
+        expect(old.q.state.bookings[0]?.state).toBe('waiting');
+
+        // Nach dem Update: neue App, dieselbe Datenbank.
+        const fresh = queue([{ ok: true, status: 200, data: response() }], db);
+        await fresh.q.use('test:7');
+        await fresh.q.send();
+        expect(fresh.requests[0]?.request.clientRef).toBe('0b4d2a7c-1f3e-4c5a-9b8d-7e6f5a4b3c2d');
+        expect(fresh.q.state.bookings[0]?.state).toBe('done');
+    });
+
+    it('liest die Liste ohne Formatversion (vor dem Format) und speichert dann mit Format', async () => {
+        const db = new MemoryDb();
+        await db.put('queue', 'test:7', [{ ...booking(), state: 'waiting' }]);
+        const { q } = queue([{ ok: true, status: 200, data: response() }], db);
+        await q.use('test:7');
+        expect(q.state.bookings).toHaveLength(1);
+        await q.send();
+        expect(await db.get('queue', 'test:7')).toEqual({
+            format: QUEUE_FORMAT,
+            bookings: [expect.objectContaining({ state: 'done' })],
+        });
+    });
+
+    it('Format einer neueren Version: nichts anzeigen, nichts senden, nichts überschreiben', async () => {
+        const db = new MemoryDb();
+        const newer = { format: QUEUE_FORMAT + 1, bookings: [{ ...booking(), state: 'waiting' }] };
+        await db.put('queue', 'test:7', newer);
+        const { q, requests } = queue([{ ok: true, status: 200, data: response() }], db);
+        await q.use('test:7');
+        expect(q.state.bookings).toEqual([]);
+        expect(
+            await q.add(booking({ clientRef: 'b'.repeat(8) + '-1111-4111-8111-111111111111' })),
+        ).toBe(false);
+        await q.send();
+        expect(requests).toEqual([]);
+        expect(await db.get('queue', 'test:7')).toEqual(newer);
+    });
+
     it('je Konto getrennt; eine unterbrochene Sendung wartet wieder; Löschen beim Abmelden', async () => {
         const db = new MemoryDb();
-        await db.put('queue', 'test:7', [{ ...booking(), state: 'sending' }]);
+        await db.put('queue', 'test:7', {
+            format: QUEUE_FORMAT,
+            bookings: [{ ...booking(), state: 'sending' }],
+        });
         const { q } = queue([], db);
         await q.use('test:8');
         expect(q.state.bookings).toEqual([]);
@@ -245,5 +301,20 @@ describe('Regeln', () => {
         expect(unsentWarning(3)).toBe(
             '3 Buchungen wurden noch nicht gesendet und gehen beim Abmelden verloren.',
         );
+    });
+});
+
+describe('readStoredQueue', () => {
+    const entry = { ...booking(), state: 'waiting' } as QueuedBooking;
+
+    it.each([
+        ['Liste ohne Format', [entry], [entry], true],
+        ['aktuelles Format', { format: QUEUE_FORMAT, bookings: [entry] }, [entry], true],
+        ['neueres Format', { format: QUEUE_FORMAT + 1, bookings: [entry] }, [], false],
+        ['unbekannte Form', { format: 'x' }, [], true],
+        ['aktuelles Format ohne Liste', { format: QUEUE_FORMAT }, [], true],
+        ['nichts gespeichert', null, [], true],
+    ])('%s', (_name, stored, bookings, writable) => {
+        expect(readStoredQueue(stored)).toEqual({ bookings, writable });
     });
 });

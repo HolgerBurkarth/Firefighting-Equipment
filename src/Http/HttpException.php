@@ -224,6 +224,20 @@ final class HttpException extends \RuntimeException
     }
 
     /**
+     * Die App ist älter als ClientApi::MIN (Header X-Client-Api); nichts ausgeführt. Die App prüft
+     * daraufhin auf ein Update.
+     */
+    public static function clientOutdated(int $minClientApi): self
+    {
+        return new self(
+            'client_outdated',
+            'Diese Version der App ist veraltet – bitte aktualisieren.',
+            409,
+            details: ['min_client_api' => $minClientApi],
+        );
+    }
+
+    /**
      * Das Kürzel einer neuen Stadt ist bereits vergeben (nur Super-Admin).
      *
      * @param string $message Meldung mit dem Kürzel

@@ -8,6 +8,34 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-04 – „Sperre für veraltete App-Versionen: client_outdated und X-Api-Version (Phase 0)“
+
+Umsetzung des beschlossenen Plans „Versionierung der API für das Frontend“ (Änderungskonzept
+2026-11, Abschnitt 9 „Alte App-Versionen“, Phase 0); bestehende Routen und Felder unverändert:
+
+- `ClientApi::MIN` (= MIN_CLIENT_API, Start 1, also vorerst ohne Wirkung) und
+  `ClientApi::isOutdated`/`fromHeader`: Ist `X-Client-Api` eine Nummer (nur Ziffern ohne führende
+  Null, höchstens 9 Stellen) kleiner als `MIN`, antwortet `Application` mit 409 `client_outdated`
+  (`HttpException::clientOutdated`, `details {min_client_api}`, Meldung „Diese Version der App ist
+  veraltet – bitte aktualisieren.“). Geprüft nach `RequestGuard` und VOR dem Laden der Stadt, also
+  ohne Datenbank, ohne Sitzung, ohne Handler. Unbekannte Adressen (404), falsche Methode (405) und
+  abgelehnte ändernde Anfragen (415/403/400) bleiben wie bisher. Ohne Header oder mit einem Wert, der
+  keine Nummer ist, gilt die Anfrage als aktuell (curl, Deploy-Skript, ältere Apps).
+  `Application` nimmt optional `minClientApi` (nur für Tests).
+- Neuer Header `X-Api-Version: <ClientApi::CURRENT>` (derzeit 1) an JEDER JSON-Antwort
+  (`JsonResponse::DEFAULT_HEADERS`, auch Fehler und `health`) und jedem CSV-Download
+  (`CsvResponse`). Nicht an `CacheableResponse` (Logo, Symbol, Manifest, Dateien des Frontends).
+- Warum: Rechte und neue Status (Phase 1 ff.) ändern die Bedeutung der API; ein Handy mit alter App
+  darf dann nicht falsch buchen. Die App prüft bei `client_outdated` bzw. größerer `X-Api-Version`
+  sofort auf ein Update; Buchungen der Warteschlange mit `client_outdated` warten und gehen nach dem
+  Update raus.
+- Tests: `ClientApiTest` (Nummern, Grenze), `ApplicationTest` (409 ohne Datenbank und Handler,
+  aktuelle/fehlende/ungültige Nummer, eigene Grenze, 404/405/415 unverändert, `X-Api-Version` an
+  allen Antworten), `HttpExceptionTest`, `JsonResponseTest`, `CsvResponseTest`, `DeviceExportTest`,
+  `FrontendDeliveryTest` (Dateien des Frontends ohne `X-Api-Version`).
+- Dokumentiert in `CLAUDE.md`, "HTTP und REST-API" (Reihenfolge, Fehlercodes, Header,
+  Versionierung).
+
 ## 2026-11-01 – „Offline: Warteschlange nach Verbindungsabbruch mit derselben client_ref und Aktionszeit“
 
 Erweiterung der Wiederholung bei `POST api/v1/devices/{id}/state` (sonst unverändert): Eine Buchung

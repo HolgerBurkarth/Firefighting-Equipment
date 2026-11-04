@@ -7,6 +7,7 @@ import {
     fetchServedBuildId,
     installUpdateGuard,
     isChunkLoadError,
+    OUTDATED_CHECK_INTERVAL_MS,
     RELOAD_COOLDOWN_MS,
     RELOAD_STORAGE_KEY,
     REQUEST_SETTLE_TIMEOUT_MS,
@@ -1337,5 +1338,85 @@ describe('fetchServedBuildId', () => {
         ['keine Verbindung', new TypeError('offline')],
     ])('%s → null', async (_, response) => {
         expect(await fetchServedBuildId(fetchReturning(response).fn)).toBeNull();
+    });
+});
+
+describe('AppUpdater: Antworten der API verlangen ein Update', () => {
+    const url = (): string => 'https://x/firefighting/test/suchen';
+
+    it('client_outdated: sofort prüfen und mit neuer Version gleich neu laden', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        const worker = findsNewVersionOnUpdate(s, 1);
+        activatesOnMessage(s, worker);
+        await s.updater.reportOutdated('client_outdated', url);
+        expect(s.updater.outdated.value).toBe(true);
+        expect(updateNotice(s.updater)).toBe('outdated');
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual([url()]);
+    });
+
+    it('client_outdated mitten in einer Eingabe: nur Hinweis, kein Neuladen', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        installNewVersion(s);
+        unregister.push(registerUnsavedInput(() => true));
+        await s.updater.reportOutdated('client_outdated', url);
+        expect(s.updater.ready.value).toBe(true);
+        expect(updateNotice(s.updater)).toBe('outdated');
+        expect(s.navigated).toEqual([]);
+    });
+
+    it('client_outdated ohne neue Version beim Server: Hinweis bleibt, kein Neuladen', async () => {
+        const s = setup();
+        await s.updater.reportOutdated('client_outdated', url);
+        expect(s.buildFetches).toBe(1);
+        expect(updateNotice(s.updater)).toBe('outdated');
+        expect(s.navigated).toEqual([]);
+    });
+
+    it('neuere X-Api-Version: prüfen, dann nach den Regeln (beim nächsten Seitenwechsel)', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        installNewVersion(s);
+        await s.updater.reportOutdated('newer_api', url);
+        expect(s.registration.updates).toBe(1);
+        expect(s.updater.ready.value).toBe(true);
+        expect(s.updater.outdated.value).toBe(false);
+        expect(updateNotice(s.updater)).toBeNull();
+        expect(s.navigated).toEqual([]);
+    });
+
+    it('höchstens alle OUTDATED_CHECK_INTERVAL_MS, das erste client_outdated aber sofort', async () => {
+        const s = setup();
+        await s.updater.reportOutdated('newer_api', url);
+        await s.updater.reportOutdated('newer_api', url);
+        expect(s.buildFetches).toBe(1);
+        await s.updater.reportOutdated('client_outdated', url);
+        expect(s.buildFetches).toBe(2);
+        await s.updater.reportOutdated('client_outdated', url);
+        expect(s.buildFetches).toBe(2);
+        s.now += OUTDATED_CHECK_INTERVAL_MS;
+        await s.updater.reportOutdated('client_outdated', url);
+        expect(s.buildFetches).toBe(3);
+    });
+
+    it('viele Antworten gleichzeitig: eine Prüfung', async () => {
+        const s = setup();
+        await Promise.all([
+            s.updater.reportOutdated('newer_api', url),
+            s.updater.reportOutdated('newer_api', url),
+            s.updater.reportOutdated('newer_api', url),
+        ]);
+        expect(s.buildFetches).toBe(1);
+        expect(s.registration.updates).toBe(1);
+    });
+
+    it('offline: keine Prüfung, Hinweis trotzdem', async () => {
+        const s = setup();
+        s.online = false;
+        await s.updater.reportOutdated('client_outdated', url);
+        expect(s.buildFetches).toBe(0);
+        expect(updateNotice(s.updater)).toBe('outdated');
     });
 });

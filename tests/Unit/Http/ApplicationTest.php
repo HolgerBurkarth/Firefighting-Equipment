@@ -15,6 +15,7 @@ use FirefightingEquipment\Http\AllowedOrigins;
 use FirefightingEquipment\Http\AppPath;
 use FirefightingEquipment\Http\Application;
 use FirefightingEquipment\Http\AppUrls;
+use FirefightingEquipment\Http\ClientApi;
 use FirefightingEquipment\Mail\ConfiguredMailer;
 use FirefightingEquipment\Http\ErrorReporter;
 use FirefightingEquipment\Http\HttpException;
@@ -47,6 +48,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Access::class)]
 #[UsesClass(AllowedOrigins::class)]
 #[UsesClass(AppPath::class)]
+#[UsesClass(ClientApi::class)]
 #[UsesClass(DatabaseError::class)]
 #[UsesClass(ErrorReporter::class)]
 #[UsesClass(HttpException::class)]
@@ -63,6 +65,9 @@ use PHPUnit\Framework\TestCase;
 final class ApplicationTest extends TestCase
 {
     private int $connectAttempts = 0;
+
+    /** Aufrufe der Handler aus countingHandler(). */
+    private int $handled = 0;
 
     /** @var list<string> */
     private array $log = [];
@@ -221,6 +226,109 @@ final class ApplicationTest extends TestCase
         self::assertSame('no-store', $headers['Cache-Control']);
         self::assertSame('nosniff', $headers['X-Content-Type-Options']);
         self::assertSame('application/json; charset=utf-8', $headers['Content-Type']);
+        self::assertSame((string) ClientApi::CURRENT, $headers['X-Api-Version']);
+    }
+
+    /**
+     * @return iterable<string, array{Request}>
+     */
+    public static function outdatedClients(): iterable
+    {
+        yield 'GET unter service' => [new Request('GET', '/firefighting/service/api/v1/health', ['x-client-api' => '0'])];
+        yield 'GET unter einer Stadt' => [new Request('GET', '/firefighting/immendingen/api/v1/tenant', ['x-client-api' => '0'])];
+        yield 'POST unter service' => [self::post('/firefighting/service/echo/1', ['content-type' => 'application/json', 'x-client-api' => '0'], '{}')];
+        yield 'POST unter einer Stadt' => [self::post('/firefighting/immendingen/echo/1', ['content-type' => 'application/json', 'x-client-api' => '0'], '{}')];
+    }
+
+    #[DataProvider('outdatedClients')]
+    public function testOutdatedClientIs409BeforeDatabaseAndHandler(Request $request): void
+    {
+        $service = Router::forService()
+            ->add('GET', 'api/v1/health', Access::Public, $this->countingHandler())
+            ->add('POST', 'echo/{id}', Access::Public, $this->countingHandler());
+        $tenant = Router::forTenant()
+            ->add('GET', 'api/v1/tenant', Access::Public, $this->countingHandler())
+            ->add('POST', 'echo/{id}', Access::Public, $this->countingHandler());
+
+        $response = new Application($service, $tenant, $this->failingDb(), $this->errorReporter())->handle($request);
+
+        self::assertSame(409, $response->statusCode());
+        self::assertSame(
+            '{"error":"client_outdated","message":"Diese Version der App ist veraltet – bitte aktualisieren.","details":{"min_client_api":1}}',
+            $response->body(),
+        );
+        self::assertSame((string) ClientApi::CURRENT, $response->headers()['X-Api-Version']);
+        self::assertSame(0, $this->connectAttempts);
+        self::assertSame(0, $this->handled);
+        self::assertSame([], $this->log);
+    }
+
+    /**
+     * @return iterable<string, array{string|null}>
+     */
+    public static function currentClients(): iterable
+    {
+        yield 'ohne Header' => [null];
+        yield 'aktuelle Nummer' => [(string) ClientApi::CURRENT];
+        yield 'neuere Nummer' => [(string) (ClientApi::CURRENT + 1)];
+        yield 'keine Nummer' => ['alt'];
+        yield 'führende Null' => ['00'];
+    }
+
+    #[DataProvider('currentClients')]
+    public function testCurrentClientReachesHandler(?string $header): void
+    {
+        $headers = ['content-type' => 'application/json', ...($header === null ? [] : ['x-client-api' => $header])];
+
+        $response = $this->echoApplication()->handle(self::post('/firefighting/service/echo/3', $headers, '{}'));
+
+        self::assertSame(200, $response->statusCode(), $response->body());
+    }
+
+    public function testMinimumOfApplicationApplies(): void
+    {
+        $app = new Application(
+            Router::forService()->add('GET', 'ping', Access::Public, $this->countingHandler()),
+            Router::forTenant(),
+            $this->failingDb(),
+            $this->errorReporter(),
+            minClientApi: 3,
+        );
+
+        $old = $app->handle(new Request('GET', '/firefighting/service/ping', ['x-client-api' => '2']));
+        self::assertSame(409, $old->statusCode());
+        self::assertSame(['min_client_api' => 3], json_decode($old->body(), true)['details']);
+
+        self::assertSame(200, $app->handle(new Request('GET', '/firefighting/service/ping', ['x-client-api' => '3']))->statusCode());
+        self::assertSame(200, $app->handle(new Request('GET', '/firefighting/service/ping'))->statusCode());
+        self::assertSame(2, $this->handled);
+    }
+
+    public function testOutdatedClientStillGets404And405And415(): void
+    {
+        $outdated = ['x-client-api' => '0'];
+
+        // Unbekannte Adresse, falsche Methode und abgelehnte ändernde Anfragen wie bisher.
+        self::assertSame(404, $this->application(Routes::service(), Routes::tenant())->handle(new Request('GET', '/firefighting/service/api/v1/unbekannt', $outdated))->statusCode());
+        self::assertSame(405, $this->application(Routes::service(), Routes::tenant())->handle(new Request('POST', '/firefighting/service/api/v1/health', $outdated))->statusCode());
+        self::assertSame(415, $this->echoApplication()->handle(self::post('/firefighting/service/echo/1', $outdated, '{}'))->statusCode());
+        self::assertSame(0, $this->connectAttempts);
+    }
+
+    private function countingHandler(): RequestHandler
+    {
+        return new class ($this->handled) implements RequestHandler {
+            public function __construct(private int &$handled)
+            {
+            }
+
+            public function handle(RequestContext $context): JsonResponse
+            {
+                $this->handled++;
+
+                return new JsonResponse(['ok' => true]);
+            }
+        };
     }
 
     /**

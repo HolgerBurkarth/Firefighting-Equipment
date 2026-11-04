@@ -1,7 +1,7 @@
 import { shallowRef } from 'vue';
 import { userLabel, type AuthState } from '../api/auth';
 import type { LocalDb } from '../runtime/localDb';
-import type { QueuedBooking } from './bookingQueue';
+import { readStoredQueue } from './bookingQueue';
 
 /**
  * Warteschlangen anderer Konten auf diesem Gerät (KONZEPT.md, "Offline-Modus – Entscheidungen",
@@ -112,9 +112,9 @@ export class OtherQueues {
                 continue;
             }
             const stored = await this.options.db.get('queue', `${this.area}:${id}`);
-            const count = Array.isArray(stored)
-                ? (stored as QueuedBooking[]).filter((booking) => booking.state !== 'done').length
-                : 0;
+            const count = readStoredQueue(stored).bookings.filter(
+                (booking) => booking.state !== 'done',
+            ).length;
             if (count > 0) {
                 found.push({ accountId: Number(id), name, count });
             }

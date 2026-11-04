@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Tausch am Handy</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 18px;border-radius:10px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:700;font-size:17px;cursor:pointer;box-sizing:border-box;width:100%}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.btn[disabled]{background:#E1E5EA;border-color:#E1E5EA;color:#5B6675;cursor:not-allowed}
+.scan{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:10px;border:1px solid #C9D1DA;background:#fff;cursor:pointer;flex-shrink:0}
+.slot{display:flex;flex-direction:column;gap:8px;background:#FFFFFF;border:2px solid #E1E5EA;border-radius:12px;padding:12px 14px}
+.chip{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.pick{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 12px;border-radius:10px;border:1px solid #C9D1DA;background:#fff;font:inherit;font-size:16px;cursor:pointer;width:100%;text-align:left;box-sizing:border-box}
+.opt{display:flex;gap:10px;align-items:center;min-height:44px;font-size:16px;cursor:pointer}
+.opt input{width:20px;height:20px;margin:0;accent-color:#B71C1C}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #F3F4F6; overflow: hidden">
+  <header style="background: #B71C1C; color: #FFFFFF; padding: 14px 16px; display: flex; align-items: center; gap: 12px">
+    <a href="#" aria-label="Zurück" style="color: #FFFFFF; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <span style="font-size: 19px; font-weight: 700">Tauschen</span>
+  </header>
+  <div style="flex: 1 1 auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; overflow: auto">
+    <div style="font-size: 15px; color: #3A4655">HLF 20 / Fach G1 <span class="chip" style="background: #EEF0F3; color: #3A4655">nie leer</span></div>
+
+    <sc-if value="{{open}}" hint-placeholder-val="{{ true }}">
+      <div class="slot">
+        <div style="font-weight: 700; font-size: 15px; color: #5B6675">HERAUS</div>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <div style="flex-grow: 1; display: flex; flex-direction: column"><span style="font-size: 20px; font-weight: 700">PA 3</span><span style="font-size: 14px; color: #3A4655">Atemschutzgerät</span></div>
+          <button class="scan" type="button" aria-label="Andere Ausrüstung scannen"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1B2430" stroke-width="2" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"></path><path d="M16 4h3a1 1 0 0 1 1 1v3"></path><path d="M20 16v3a1 1 0 0 1-1 1h-3"></path><path d="M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M4 12h16"></path></svg></button>
+        </div>
+        <fieldset style="border: 0; margin: 0; padding: 0">
+          <legend style="font-size: 14px; color: #5B6675; padding: 0">PA 3 kommt in die Sammelstelle als</legend>
+          <div style="display: flex; gap: 18px">
+            <sc-for list="{{outStates}}" as="o" hint-placeholder-count="2">
+              <label class="opt"><input type="radio" name="out" checked="{{o.checked}}" onChange="{{o.pick}}">{{o.label}}</label>
+            </sc-for>
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="slot" style="{{inStyle}}">
+        <div style="font-weight: 700; font-size: 15px; color: #5B6675">HINEIN</div>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <div style="flex-grow: 1; display: flex; flex-direction: column"><span style="font-size: 20px; font-weight: 700">{{inId}}</span><span style="font-size: 14px; color: #3A4655">{{inHint}}</span></div>
+          <button class="scan" type="button" aria-label="Ersatz scannen" onClick="{{scanIn}}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1B2430" stroke-width="2" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"></path><path d="M16 4h3a1 1 0 0 1 1 1v3"></path><path d="M20 16v3a1 1 0 0 1-1 1h-3"></path><path d="M8 20H5a1 1 0 0 1-1-1v-3"></path><path d="M4 12h16"></path></svg></button>
+        </div>
+        <sc-if value="{{showSuggest}}" hint-placeholder-val="{{ true }}">
+          <div style="font-size: 14px; color: #5B6675">Einsatzbereit im Lager Gerätehaus:</div>
+          <sc-for list="{{suggest}}" as="g" hint-placeholder-count="2">
+            <button class="pick" type="button" onClick="{{g.pick}}"><strong>{{g.id}}</strong><span style="color: #3A4655">{{g.note}}</span></button>
+          </sc-for>
+        </sc-if>
+      </div>
+
+      <button class="btn btn-primary" type="button" disabled="{{cannot}}" onClick="{{swap}}">Tauschen</button>
+      <p style="margin: 0; font-size: 14px; color: #5B6675">Beide Buchungen gehen zusammen – auch offline. Ohne Ersatz geht es hier nicht, weil das Fach nie leer sein darf.</p>
+    </sc-if>
+
+    <sc-if value="{{done}}" hint-placeholder-val="{{ false }}">
+      <div style="background: #E3F2E7; border: 1px solid #B9DCC2; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; color: #1B6330">
+        <div style="font-size: 17px; font-weight: 700">✓ Getauscht</div>
+        <div style="font-size: 16px; color: #1B2430">PA 3 → Kiste „Benutzt“ · {{outState}}</div>
+        <div style="font-size: 16px; color: #1B2430">{{inId}} → HLF 20 / Fach G1</div>
+        <button class="btn" type="button" onClick="{{reset}}">Fertig</button>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+var SUG = [{ id: 'PA 12', note: 'nächste Wartung 10/2027' }, { id: 'PA 16', note: 'nächste Wartung 03/2027' }];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { inId: '', out: 'benutzt', done: false }; }
+  renderVals() {
+    var s = this.state, self = this;
+    return {
+      open: !s.done, done: s.done,
+      outStates: ['benutzt', 'defekt'].map(function (x) { return { label: x, checked: s.out === x, pick: function () { self.setState({ out: x }); } }; }),
+      outState: s.out,
+      inId: s.inId || 'noch leer',
+      inHint: s.inId ? 'Atemschutzgerät · aus Lager Gerätehaus' : 'Ersatz scannen oder unten wählen',
+      inStyle: s.inId ? 'border-color: #1B6330' : 'border-color: #B71C1C; border-style: dashed',
+      showSuggest: !s.inId,
+      suggest: SUG.map(function (g) { return { id: g.id, note: g.note, pick: function () { self.setState({ inId: g.id }); } }; }),
+      scanIn: function () { self.setState({ inId: 'PA 12' }); },
+      cannot: !s.inId,
+      swap: function () { self.setState({ done: true }); },
+      reset: function () { self.setState({ inId: '', done: false }); }
+    };
+  }
+}
+</script>
+</body>
+</html>
