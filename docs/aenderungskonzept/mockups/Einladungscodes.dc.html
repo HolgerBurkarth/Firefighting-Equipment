@@ -70,7 +70,7 @@ a{color:#1D3557}a:hover{color:#0F1F33}
         <table style="width: 100%; border-collapse: collapse; min-width: 640px">
           <thead>
             <tr style="background: #F7F8FA">
-              <th class="th" scope="col">Code</th>
+              <th class="th" scope="col">Bezeichnung</th>
               <th class="th" scope="col">Rolle nach Freischaltung</th>
               <th class="th" scope="col">Gültig bis</th>
               <th class="th" scope="col" style="text-align: right">Registriert</th>
@@ -79,18 +79,18 @@ a{color:#1D3557}a:hover{color:#0F1F33}
           </thead>
           <tbody>
             <tr>
-              <td class="td" style="font-family: ui-monospace, monospace; letter-spacing: 1px">7KQ4-…-M2PX</td>
+              <td class="td" style="font-weight: 600">Aushang Gerätehaus</td>
               <td class="td"><span class="chip" style="background: #EEF0F3; color: #3A4655">Geräteträger</span></td>
               <td class="td">31.12.2026</td>
-              <td class="td" style="text-align: right">18</td>
-              <td class="td" style="text-align: right; white-space: nowrap"><button class="btn btn-quiet" type="button">Aushang drucken</button> <button class="btn btn-quiet" type="button">Widerrufen …</button></td>
+              <td class="td" style="text-align: right">18 von 50</td>
+              <td class="td" style="text-align: right; white-space: nowrap"><button class="btn btn-quiet" type="button">Widerrufen …</button></td>
             </tr>
             <tr>
-              <td class="td" style="font-family: ui-monospace, monospace; letter-spacing: 1px">R9TB-…-4WZE</td>
+              <td class="td" style="font-weight: 600">Neuer Gerätewart Jonas</td>
               <td class="td"><span class="chip" style="background: #E3ECF8; color: #1D3557">Gerätewart</span></td>
               <td class="td">16.11.2026</td>
-              <td class="td" style="text-align: right">1</td>
-              <td class="td" style="text-align: right; white-space: nowrap"><button class="btn btn-quiet" type="button">Code kopieren</button> <button class="btn btn-quiet" type="button">Widerrufen …</button></td>
+              <td class="td" style="text-align: right">1 von 1</td>
+              <td class="td" style="text-align: right; white-space: nowrap"><button class="btn btn-quiet" type="button">Widerrufen …</button></td>
             </tr>
           </tbody>
         </table>
@@ -108,9 +108,14 @@ a{color:#1D3557}a:hover{color:#0F1F33}
           </sc-for>
         </fieldset>
         <div class="field">
-          <label for="f-until">Gültig bis</label>
-          <input id="f-until" type="date" value="2026-12-31">
+          <label for="f-label">Bezeichnung (freiwillig)</label>
+          <input id="f-label" type="text" value="Aushang Gerätehaus">
         </div>
+        <div style="display: flex; gap: 12px">
+          <div class="field" style="flex: 1 1 0"><label for="f-days">Gültig (Tage)</label><input id="f-days" type="number" value="30"></div>
+          <div class="field" style="flex: 1 1 0"><label for="f-uses">Registrierungen höchstens</label><input id="f-uses" type="number" value="50"></div>
+        </div>
+        <p style="margin: 0; font-size: 14px; color: #5B6675">Den Code mit QR-Code und „Aushang drucken“ gibt es nur direkt nach dem Erstellen. Später kennt der Server nur noch eine Prüfsumme; für einen neuen Aushang einen neuen Code erstellen.</p>
         <p style="margin: 0; font-size: 14px; color: #5B6675">Die Rolle „Admin“ gibt es für Codes nicht: Wer einen Aushang fotografiert, soll nie Admin werden können. Admins ernennen Sie unter „Konten“.</p>
         <button class="btn btn-primary" type="button" style="align-self: flex-start">Code erstellen</button>
       </section>

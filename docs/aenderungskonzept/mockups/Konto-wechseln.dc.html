@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Konto wechseln (PC)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:'Source Sans 3',system-ui,sans-serif;color:#1B2430;background:#F3F4F6}
+a{color:#1D3557}
+.nav{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:#3A4655;text-decoration:none;font-size:16px;min-height:44px;box-sizing:border-box;background:transparent;border:0;font:inherit;font-size:16px;cursor:pointer;text-align:left;width:100%}
+.nav:hover{background:#F3E3E3;color:#1B2430}
+.nav.active{background:#F8E6E6;color:#1B2430;font-weight:600;box-shadow:inset 4px 0 0 #B71C1C}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid #C9D1DA;background:#fff;color:#1B2430;font:inherit;font-weight:600;font-size:15px;cursor:pointer;box-sizing:border-box;white-space:nowrap}
+.btn-primary{background:#B71C1C;border-color:#B71C1C;color:#fff}
+.chip{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.acc{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;border:2px solid #E1E5EA;background:#fff;cursor:pointer;width:100%;font:inherit;text-align:left;box-sizing:border-box;min-height:56px}
+.acc:hover{border-color:#C9D1DA;background:#F7F8FA}
+.logo{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0}
+.inp{font:inherit;font-size:16px;padding:10px 12px;border-radius:8px;border:2px solid #C9D1DA;min-height:44px;box-sizing:border-box;background:#fff;color:#1B2430;width:100%}
+</style>
+</helmet>
+<div style="display: flex; min-height: 100vh; align-items: stretch; position: relative">
+  <nav aria-label="Hauptmenü" style="flex: 0 0 260px; background: #FFFFFF; border-right: 1px solid #E1E5EA; display: flex; flex-direction: column; gap: 2px; padding: 16px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 6px 6px 18px 6px">
+      <div class="logo" style="width: 44px; height: 44px; background: #B71C1C; font-size: 18px">FF</div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 700; font-size: 16px">{{curCity}}</span>
+        <span style="font-size: 14px; color: #5B6675">Geräteverwaltung</span>
+      </div>
+    </div>
+    <a class="nav active" href="#">Dashboard</a>
+    <a class="nav" href="#">Suchen</a>
+    <a class="nav" href="#">Ausrüstung</a>
+    <a class="nav" href="#">Standorte</a>
+    <a class="nav" href="#">Termine</a>
+    <a class="nav" href="#">Wartung</a>
+    <a class="nav" href="#">Verleih</a>
+    <div style="flex-grow: 1; min-height: 24px"></div>
+    <div style="border-top: 1px solid #E1E5EA; padding-top: 8px; display: flex; flex-direction: column; gap: 2px">
+      <a class="nav" href="#">Einstellungen</a>
+      <button class="nav" type="button" aria-expanded="{{openAttr}}" onClick="{{toggle}}" style="{{accBtnStyle}}">
+        <span style="display: flex; flex-direction: column; flex-grow: 1; line-height: 1.25"><span style="font-weight: 600">Holger Burkarth</span><span style="font-size: 13px; color: #5B6675">{{curCity}} · {{curRole}}</span></span>
+        <span aria-hidden="true" style="font-size: 13px; color: #5B6675">⇄</span>
+      </button>
+      <a class="nav" href="#">Abmelden</a>
+    </div>
+  </nav>
+
+  <sc-if value="{{open}}" hint-placeholder-val="{{ true }}">
+    <section role="dialog" aria-label="Konto wechseln" style="position: absolute; left: 268px; bottom: 16px; width: 420px; background: #FFFFFF; border: 1px solid #E1E5EA; border-radius: 14px; box-shadow: 0 12px 32px rgba(27,36,48,0.18); padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; z-index: 5">
+      <div style="display: flex; align-items: center; gap: 8px"><h2 style="margin: 0; font-size: 18px; flex-grow: 1">Konto wechseln</h2><button class="btn" type="button" onClick="{{toggle}}" style="min-height: 36px; padding: 0 10px" aria-label="Schließen">✕</button></div>
+      <div style="font-size: 14px; color: #5B6675">Auf diesem Gerät angemeldet:</div>
+      <sc-for list="{{accounts}}" as="a" hint-placeholder-count="3">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <button class="acc" type="button" onClick="{{a.pick}}" style="{{a.style}}" aria-current="{{a.current}}">
+            <span class="logo" style="{{a.logoStyle}}">{{a.short}}</span>
+            <span style="display: flex; flex-direction: column; flex-grow: 1; line-height: 1.3"><span style="font-weight: 700">{{a.city}}</span><span style="font-size: 14px; color: #3A4655">{{a.name}} · {{a.role}}</span></span>
+            <span class="chip" style="{{a.chipStyle}}">{{a.chip}}</span>
+          </button>
+          <sc-if value="{{a.hasHint}}" hint-placeholder-val="{{ false }}"><div style="font-size: 13px; color: #7A4A00; padding-left: 60px">{{a.hint}}</div></sc-if>
+        </div>
+      </sc-for>
+      <sc-if value="{{adding}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #EEF0F3; padding-top: 12px">
+          <label for="addr" style="font-weight: 600; font-size: 15px">Adresse oder Kürzel der Stadt</label>
+          <input id="addr" class="inp" type="text" value="www.prodad.de/firefighting/geisingen/">
+          <div style="font-size: 13px; color: #5B6675">Danach öffnet sich die Anmeldung dieser Stadt. Jede Stadt hat ihr eigenes Konto und Passwort.</div>
+          <div style="display: flex; gap: 8px"><button class="btn btn-primary" type="button">Zur Anmeldung</button><button class="btn" type="button" onClick="{{toggleAdd}}">Abbrechen</button></div>
+        </div>
+      </sc-if>
+      <sc-if value="{{notAdding}}" hint-placeholder-val="{{ true }}">
+        <button class="btn" type="button" onClick="{{toggleAdd}}" style="align-self: flex-start">+ Weitere Stadt hinzufügen …</button>
+      </sc-if>
+      <p style="margin: 0; font-size: 13px; color: #5B6675">Die Liste steht nur auf diesem Gerät. Abmelden in einer Stadt entfernt sie aus der Liste.</p>
+    </section>
+  </sc-if>
+
+  <main style="flex: 1 1 auto; min-width: 0; padding: 28px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px">
+    <h1 style="margin: 0; font-size: 30px; font-weight: 700">Dashboard</h1>
+    <sc-if value="{{hasSwitched}}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 12px 14px; border-radius: 8px; background: #E3F2E7; color: #1B6330; font-size: 15px">✓ Gewechselt zu {{curCity}} · {{curRole}}. Die Seite der anderen Stadt lädt neu.</div>
+    </sc-if>
+    <div style="display: flex; gap: 16px; flex-wrap: wrap">
+      <div style="flex: 1 1 220px; height: 110px; background: #fff; border: 1px solid #E1E5EA; border-radius: 12px"></div>
+      <div style="flex: 1 1 220px; height: 110px; background: #fff; border: 1px solid #E1E5EA; border-radius: 12px"></div>
+      <div style="flex: 1 1 220px; height: 110px; background: #fff; border: 1px solid #E1E5EA; border-radius: 12px"></div>
+    </div>
+    <div style="height: 340px; background: #fff; border: 1px solid #E1E5EA; border-radius: 12px"></div>
+    <div style="font-size: 14px; color: #5B6675; max-width: 640px">Wechsel mit ungespeicherten Eingaben: erst Rückfrage „Ihre Eingaben auf dieser Seite gehen verloren. Trotzdem wechseln?“ (wie beim Aktualisieren).</div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+var ACC = [
+  { slug: 'immendingen', city: 'FF Immendingen', short: 'IM', color: '#B71C1C', name: 'Holger Burkarth', role: 'Admin', state: 'ok' },
+  { slug: 'hattingen', city: 'FF Hattingen', short: 'HA', color: '#1D3557', name: 'Holger Burkarth', role: 'Benutzer', state: 'ok', queue: 2 },
+  { slug: 'tuttlingen', city: 'FF Tuttlingen', short: 'TU', color: '#1B6330', name: 'H. Burkarth', role: 'Gerätewart', state: 'expired' }
+];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { cur: 'immendingen', open: true, adding: false, switched: false }; }
+  renderVals() {
+    var s = this.state, self = this;
+    var cur = ACC.filter(function (a) { return a.slug === s.cur; })[0];
+    return {
+      curCity: cur.city, curRole: cur.role,
+      open: s.open, openAttr: s.open ? 'true' : 'false',
+      accBtnStyle: s.open ? 'background: #F3E3E3' : '',
+      toggle: function () { self.setState({ open: !s.open, adding: false }); },
+      adding: s.adding, notAdding: !s.adding,
+      toggleAdd: function () { self.setState({ adding: !s.adding }); },
+      hasSwitched: s.switched,
+      accounts: ACC.map(function (a) {
+        var isCur = a.slug === s.cur;
+        var chip = isCur ? 'aktuell' : (a.state === 'expired' ? 'neu anmelden' : 'angemeldet');
+        return {
+          city: a.city, short: a.short, name: a.name, role: a.role, chip: chip,
+          current: isCur ? 'true' : 'false',
+          logoStyle: 'background: ' + a.color,
+          style: isCur ? 'border-color: #B71C1C; background: #FDF5F5' : '',
+          chipStyle: isCur ? 'background: #F8E6E6; color: #8E1515' : (a.state === 'expired' ? 'background: #FFF1DB; color: #7A4A00' : 'background: #E3F2E7; color: #1B6330'),
+          hasHint: !!a.queue || a.state === 'expired',
+          hint: a.state === 'expired' ? 'Anmeldung abgelaufen – beim Antippen öffnet sich die Anmeldung dieser Stadt.' : a.queue + ' nicht gesendete Buchungen – werden nach dem Wechsel gesendet.',
+          pick: function () { if (!isCur && a.state !== 'expired') self.setState({ cur: a.slug, open: false, switched: true }); }
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

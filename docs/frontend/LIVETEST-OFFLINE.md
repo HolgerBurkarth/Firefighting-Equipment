@@ -76,3 +76,24 @@ automatische Tests abgedeckt).
   confirmed_stale“ und „stale_action des Servers ebenso; clock_implausible ist ein Fehler zum
   Verwerfen“ (Vitest), `DeviceOfflineBookingTest::testStaleLimitAndConfirmation` (PHPUnit, Grenze
   `queue_max_age_days` und `confirmed_stale`).
+
+## Sperre für veraltete App-Versionen (Phase 0, Änderungskonzept 2026-11)
+
+Live geprüft am 04.11.2026 im Browser (Chrome, Test-Stadt, als Admin), Build `6e16dc5cc7cc`:
+
+- ☑ V1 Die App läuft mit der neuen Version (`data-build` = Build, Service Worker kontrolliert die
+  Seite), kein Hinweis „veraltet“, keine Konsolenfehler.
+- ☑ V2 `X-Api-Version: 1` an JSON-Antworten (`auth/me`, `devices`, auch 404) und am CSV-Export
+  (`devices/export`, im Browser gelesen, nicht gespeichert); `health` per curl ebenso.
+- ☑ V3 Anfrage mit `X-Client-Api: 0` → 409 `client_outdated`, `details {min_client_api: 1}`, Meldung
+  „Diese Version der App ist veraltet – bitte aktualisieren.“ (unter der Stadt und unter `service`);
+  ohne Header und mit `1` wie bisher.
+- ☐ V4 (offen, nicht live auslösbar: braucht `ClientApi::MIN` > 1 auf dem Server) Hinweis „Diese
+  Version ist veraltet – bitte aktualisieren.“ in der App, sofortiges Update ohne Eingabe, Eingaben
+  bleiben, wartende Offline-Buchung geht nach dem Update raus. Abgedeckt durch `appUpdate.spec.ts`
+  (Browser, Mail-Link mit `client_outdated` bzw. `X-Api-Version: 2`, in CI in allen fünf Profilen),
+  `appUpdate.spec.ts`, `bookingQueue.spec.ts`, `client.spec.ts` (Vitest). Live erst, wenn `MIN`
+  zum ersten Mal steigt (Phase 1, Schritt 1.7).
+- ☐ V5 (offen für Holger, iPhone) Warteschlange im neuen Format: offline buchen, dann online; die
+  Buchung geht wie bisher raus (gespeichert jetzt als `{format: 1, bookings}`; ältere Listen liest
+  die App weiter).
