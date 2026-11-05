@@ -122,3 +122,57 @@ neu nur das Feld `selectable` der Standorte (immer true).
   (Standort der Ebene 1 nur mit Fächern nicht wählbar), Buchen auf Ziel außerhalb (400), Gerät
   außerhalb (404), Log-Mails eines gefilterten Empfängers, leerer Filter lässt sich nicht speichern.
   Bis dahin per Test (`DeviceVisibilityMatrixTest`, Mail-Tests).
+
+## Schritt 1.5a – Rollen-API des Super-Admins (05.11.2026, Build `2cb1a11ff861`)
+
+Freigabe Holger nur für 1.5: unter `/service/` ausschließlich Rollen der Test-Stadt mit „Live-Test“
+im Namen anlegen, bearbeiten, kopieren, übernehmen und löschen; am Ende wieder gelöscht.
+
+- ☑ Deploy „Deployment erfolgreich“, „Keine offenen Migrationen.“, `build.json` = `2cb1a11ff861`,
+  `health` ok; `permission-catalog` ohne Sitzung 401.
+- ☑ Lesend als Super-Admin: Katalog (9 Bereiche, 4 Gruppen), Rollen der Test-Stadt (Admin mit 3
+  Konten, Benutzer mit 2 Konten und 3 offenen Codes), Auswahl für den Datenfilter (9 Standorte der
+  Ebene 1, 5 Typen).
+- ☑ Per API: „Live-Test 1.5a“ anlegen (201, Version 1, Standortfilter), speichern (Version 2),
+  veraltete Version → 409 `version_conflict` mit `details.role`, `users` mit Filter → 409 F3
+  (`details {areas: [users]}`), leerer Standortfilter → 400 mit Meldung, kopieren (Filter bleibt),
+  aus Immendingen übernehmen (nur gelesen; Rechte ja, Filter null), Admin löschen → 409, Benutzer
+  löschen → 409, alle drei Live-Test-Rollen gelöscht (200). Danach nur Admin und Benutzer.
+
+## Schritt 1.5b – Seiten „Rollen“ und „Rolle bearbeiten“ (05.11.2026, Build `115ba916adc7`)
+
+- ☑ Deploy „Deployment erfolgreich“, `build.json` = `115ba916adc7`, `health` ok; die offene Seite
+  lud die neue Version selbst („Neue Version wird geladen …“).
+- ☑ Stadtdetail Test-Feuerwehr mit Reitern „Übersicht“, „Admins und Benutzer“, „Rollen“; Tabelle:
+  Admin „fest“, „alles“, nur „Ansehen“; Benutzer „Standard“, „Suchen, Termine, Profil“, „Umbuchen,
+  Status setzen“, ohne „Löschen“.
+- ☑ „Neue Rolle“ „Live-Test 1.5b“: „Umbuchen“ grau mit „braucht …“, nach „Suchen: Ansehen“ wählbar;
+  „Nur ausgewählte“ ohne Auswahl zeigt die Meldung, mit einem Standort weg; Vorschau „Keine Konsole –
+  nur die Handy-Seiten.“, „Suchen · Profil“, „1 von 20 Standorten“; gespeichert, zurück zur Liste mit
+  „Rolle „Live-Test 1.5b“ angelegt.“, Zeile „1 Standort, alle Ausrüstungstypen“, 0 Personen.
+- ☑ F3: mit „Nur ausgewählte“ sind „Benutzer: Ansehen/Ändern“ und „CSV-Import“ grau („Mit „Sieht nur
+  …“ kein Zugriff.“); erst „Benutzer: Ansehen“, dann Filter → Hinweis „darf die Rolle nicht
+  verwalten: „Benutzer: Ansehen““, „Speichern“ → „Nicht gespeichert …“, keine Anfrage.
+- ☑ Bearbeiten und speichern (Termine dazu): Version 2, Bestätigung „gespeichert“; „Abbrechen“ ändert
+  nichts. „Die Änderung gilt sofort für 0 Personen.“
+- ☑ Versionskonflikt: Editor offen, Rolle per API geändert, „Speichern“ → Hinweis „inzwischen
+  geändert“, das Formular zeigt den neuen Namen.
+- ☑ „Kopieren“ öffnet „Live-Test 1.5b (Kopie)“ mit Bestätigung und Standortfilter; „Rolle löschen …“
+  mit Rückfrage, zurück zur Liste mit „gelöscht“.
+- ☑ „Rolle aus anderer Stadt übernehmen …“: Stadt (nur andere Städte), Rolle „Benutzer“ aus
+  Immendingen (nur gelesen), Name „Live-Test 1.5b Übernahme“ → Editor mit Hinweis „nur die Rechte“,
+  „Alle Standorte“; danach gelöscht.
+- ☑ „Live-Test 1.5b B löschen …“ in der Liste mit Rückfrage; danach nur Admin und Benutzer.
+- ☑ Admin „Ansehen“: „Rolle ansehen“, Hinweis „lässt sich nicht ändern“, kein „Speichern“, alle
+  Felder gesperrt. Keine Fehler in der Konsole.
+- ☒ → behoben: Die Vorschau zeigte für Suchen und Termine (Rechte von *Benutzer*) „Termine“ als
+  Konsole und „Dashboard“ in der Leiste; heute hat *Benutzer* nur die Handy-Seiten (F8). Korrektur:
+  Suchen und Termine allein sind keine Konsole (Commit „Rollen: Vorschau ohne Konsole bei Suchen und
+  Termine (Schritt 1.5b)“, live geprüft siehe unten).
+- ☐ Schmale Breiten und iPhone (Tabelle als Karten, Editor): offen für Holger; per Browser-Test in
+  allen fünf Profilen ohne waagerechten Überstand.
+- ☐ **Offen für Schritt 1.6:** Wie eine Rolle mit Filter in der App wirkt, lässt sich erst live
+  prüfen, wenn Rollen Konten zugewiesen werden (Liste, Suche, Scan, Verlauf mit „anderer Standort“,
+  Dashboard, Prüffristen, Protokoll, Exporte, Standortwahl, Buchen auf Ziel außerhalb 400, Gerät
+  außerhalb 404, Log-Mails eines gefilterten Empfängers). Bis dahin per Test
+  (`DeviceVisibilityMatrixTest`, Mail-Tests).

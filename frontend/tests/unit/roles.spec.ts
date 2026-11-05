@@ -254,6 +254,25 @@ describe('Formular', () => {
 });
 
 describe('Vorschau und Tabelle', () => {
+    it('Suchen und Termine sind Handy-Seiten, keine Konsole (wie heute Benutzer, F8)', () => {
+        expect(
+            rolePreview(
+                catalog(),
+                form({
+                    areas: { search: 'read', due: 'read' },
+                    actions: ['book.move', 'book.status'],
+                }),
+                null,
+            ),
+        ).toMatchObject({ menu: [], bar: ['Suchen', 'Termine', 'Profil'] });
+        expect(
+            rolePreview(catalog(), form({ areas: { due: 'write', log: 'read' } }), null),
+        ).toMatchObject({
+            menu: ['Termine', 'Protokoll'],
+            bar: ['Termine', 'Dashboard', 'Profil'],
+        });
+    });
+
     it('„So sieht es die Rolle“', () => {
         expect(
             rolePreview(

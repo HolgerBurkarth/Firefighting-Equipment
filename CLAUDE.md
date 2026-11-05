@@ -1014,7 +1014,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (Kästchen je Gruppe, grau mit „braucht „…: …““ ohne den Bereich, `actionState`), „4 · Sieht nur
   …“ (Standorte als Baum und Ausrüstungstypen, je „Alle“/„Nur ausgewählte“, gesperrte bzw.
   deaktivierte markiert; „3 · Einschränkungen“ erst ab Phase 2), rechts „So sieht es die Rolle“
-  (`rolePreview`: Menü am PC, Leiste am Handy, Darf, Sieht Ausrüstung) und „Die Änderung gilt sofort
+  (`rolePreview`: Menü am PC, Leiste am Handy, Darf, Sieht Ausrüstung; Suchen und Termine allein sind
+  keine Konsole, wie heute *Benutzer*, F8) und „Die Änderung gilt sofort
   für N Personen …“. F3 im Editor: mit „Sieht nur …“ sind die Stufen und Aktionen grau, die es dann
   nicht gibt (eine schon gewählte bleibt bedienbar, um sie zu entfernen), dazu `filter-conflicts`;
   Speichern geht erst ohne Probleme (`roleFormProblems`, Meldungen wie der Server, nie strenger).
