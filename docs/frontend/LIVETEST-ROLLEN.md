@@ -74,3 +74,26 @@ Routen unter Städten prüfen die Rechte der Rolle statt `fe_users.role`. Erwart
 - ☐ Als *Benutzer*: braucht eine Anmeldung mit Passwort (Holger). Erwartet wie bisher: Suchen,
   Umbuchen, Status, Prüffristen gehen; Konsole bzw. Admin-Routen 403 (per Test
   `TenantRoutePermissionsTest` für jede Route).
+
+## Schritt 1.3b – `auth/me` mit Rechten, Sitzungsdauer, Log-Mails (05.11.2026, Build `73499da67883`)
+
+Vorher zweiter Probelauf zu 0036 durch Holger: 0 zuzuordnen, 7 mit Rolle, 0 ohne Rolle, Super-Admin
+ohne Rolle. Deploy mit Sicherung `ff-db-20261105-065636Z-vor-migration-e047623.sql.gz`, `0039`
+(357 ms) und `0040` (475 ms) OK. Erwartet: für *Admin* und *Benutzer* keine sichtbare Änderung.
+
+- ☑ Deploy „Deployment erfolgreich“, 2 Migrationen ausgeführt, `build.json` = `73499da67883`,
+  `health` ok.
+- ☑ Als *Admin* (bestehende Sitzung): `auth/me` 200 mit `permissions`: alle 9 Bereiche (`dashboard`
+  und `search` `read`, sonst `write`), alle 9 Aktionen, `restrictions` leer, `filtered` false,
+  `version` 64 Hex-Zeichen und bei erneuter Abfrage gleich.
+- ☑ Sitzungsdauer *Admin* unverändert: Höchstdauer der Sitzung (`expires_at` − `created_at`) 30 Tage;
+  die bestehende Sitzung gilt weiter (keine neue Anmeldung nötig).
+- ☑ `auth/sessions`, `auth/notifications`, `client-config`, `users`, `device-summary`, `devices`,
+  `device-events`, `notices`, `inspection-due` je 200.
+- ☑ Benachrichtigung „Log“ ein- und wieder ausgeschaltet (`POST auth/notifications` true → false, je
+  200; Stand danach wie vorher: aus). Die neue CHECK nimmt den Wert an.
+- ☑ Dashboard, Einstellungen, Benutzer, Geräte, Protokoll laden, keine Fehler in der Konsole.
+- ☐ Als *Benutzer*: braucht eine Anmeldung mit Passwort (Holger). Erwartet: `permissions` mit
+  `search`/`due` `read`, `book.move`, `book.status`; Sitzung 90 Tage (Cookie `Max-Age` 7776000).
+- ☐ Log-Mails tatsächlich empfangen (Holger, Postfach): erwartet unverändert für Admins mit
+  eingeschalteter Option; per Test `UserRepositoryTest` gegen die alte Abfrage.
