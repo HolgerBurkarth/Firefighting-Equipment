@@ -195,6 +195,8 @@ test.describe('Schnellstart: Startbild', () => {
         page,
     }) => {
         const me = await holdMe(page);
+        const requested: string[] = [];
+        page.on('request', (request) => requested.push(request.url()));
         await page.goto('/firefighting/test/suchen');
         const splash = page.locator('#splash');
         await expect(splash).toHaveAttribute('data-step', 'session');
@@ -204,10 +206,14 @@ test.describe('Schnellstart: Startbild', () => {
         // Nur per CSS verzögert (Animation), dann voll sichtbar.
         await expect(splash).toHaveCSS('animation-delay', '0.4s');
         await expect(splash).toHaveCSS('opacity', '1');
-        await expect(splash.locator('.splash-art')).toHaveCSS(
-            'background-image',
-            /assets\/splash-light-[^/]+\.svg/,
+        // Bild als SVG im HTML (keine weitere Anfrage), Farben aus splash.css.
+        await expect(splash.getByRole('img', { name: 'Gezeichnetes Löschfahrzeug' })).toBeVisible();
+        await expect(splash.locator('.splash-art-disc')).toHaveCSS('fill', 'rgb(255, 255, 255)');
+        await expect(splash.locator('.splash-art-body').first()).toHaveCSS(
+            'fill',
+            'rgb(183, 28, 28)',
         );
+        expect(requested.filter((url) => /\.svg(\?|$)/.test(url))).toEqual([]);
         me.release(401, NOT_LOGGED_IN);
         await expect(page).toHaveURL(/\/firefighting\/test\/anmelden\?weiter=/);
         await expect(splash).toHaveCount(0);
@@ -220,10 +226,8 @@ test.describe('Schnellstart: Startbild', () => {
         const splash = page.locator('#splash');
         await expect(splash).toHaveAttribute('data-step', 'session');
         await expect(splash).toHaveCSS('background-color', 'rgb(18, 22, 28)');
-        await expect(splash.locator('.splash-art')).toHaveCSS(
-            'background-image',
-            /assets\/splash-dark-[^/]+\.svg/,
-        );
+        await expect(splash.locator('.splash-art-disc')).toHaveCSS('fill', 'rgb(30, 38, 49)');
+        await expect(splash.locator('.splash-art-window')).toHaveCSS('fill', 'rgb(143, 182, 232)');
         await expect(splash).toHaveCSS('animation-duration', '0s');
         await expect(splash.locator('.splash-bar')).toHaveCSS('transition-duration', '0s');
     });

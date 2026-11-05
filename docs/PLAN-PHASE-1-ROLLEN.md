@@ -113,8 +113,13 @@ Geräte stehen also erst nach rund 0,9 s, obwohl Sitzung und Offline-Kopie auf d
   kein `auth/me`. Zu prüfen beim Bau: ob die Weiche `/` ohne gespeicherte Sitzung gleich zur
   Anmeldung kann und ob ein Vorladen von `api/v1/tenant` aus `index.html` ohne Inline-Skript hilft.
 - **Startbild** nach dem Mockup:
-  - steht in `index.html` (außerhalb von `#app`), Bild (SVG) und Stil als eigene Dateien des Builds,
-    ohne Ausnahme in der CSP (per Test, wie die übrigen CSP-Regeln);
+  - steht in `index.html` (außerhalb von `#app`), Stil als eigene Datei des Builds, ohne Ausnahme in
+    der CSP (per Test, wie die übrigen CSP-Regeln). Das Bild (SVG) steht direkt in `index.html`
+    (Variante B, Holger 05.11.2026; „eigene Datei“ meinte nur: keine Ausnahme in der CSP): ohne
+    Skript, ohne `<style>` und ohne `style=""`, Farben über Klassen aus dem Stylesheet; es kommt mit
+    der ersten Antwort ohne weitere Anfrage. PHP bleibt dafür wie vor 1.7d (keine Auslieferung von
+    `image/svg+xml`; die zuerst gebaute Variante mit SVG-Dateien und eigener CSP wurde wieder
+    entfernt);
   - erst nach rund 0,4 s sichtbar, nur per CSS (Verzögerung einer Animation); ein schneller Start
     zeigt es also nie; die App entfernt es, sobald die erste Seite steht;
   - Ladebalken zuerst ohne Stand, danach in drei Schritten aus der App („App wird geladen“,

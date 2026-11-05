@@ -10,7 +10,7 @@
         <!-- Manifest nur unter Städten: setzt src/runtime/appearance.ts (linkManifest). -->
         <link rel="icon" type="image/png" href="api/v1/app-icon/192" vite-ignore />
         <link rel="apple-touch-icon" href="api/v1/app-icon/180" vite-ignore />
-        <!-- Startbild: Stil (im CSS des Builds) und Bilder als Dateien, keine Ausnahme in der CSP. -->
+        <!-- Startbild: Stil als Datei des Builds, Bild als SVG im HTML, keine Ausnahme in der CSP. -->
         <link rel="stylesheet" href="/src/styles/splash.css" />
     </head>
     <body>
@@ -19,7 +19,47 @@
             App entfernt es, sobald die erste Seite steht (src/runtime/splash.ts).
         -->
         <div id="splash" class="splash" data-step="start">
-            <div class="splash-art" role="img" aria-label="Gezeichnetes Löschfahrzeug"></div>
+            <!--
+                Gezeichnetes Löschfahrzeug (Mockup Startbild.dc.html), direkt im HTML: kommt mit der
+                ersten Antwort, ohne weitere Anfrage. Ohne Skript und ohne Stilangaben im HTML; die
+                Farben (hell und dunkel) setzen die Klassen in splash.css.
+            -->
+            <svg
+                class="splash-art"
+                role="img"
+                aria-label="Gezeichnetes Löschfahrzeug"
+                width="260"
+                height="190"
+                viewBox="0 0 260 190"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <circle class="splash-art-disc" cx="130" cy="96" r="88" />
+                <rect class="splash-art-ground" x="18" y="150" width="224" height="6" rx="3" />
+                <rect class="splash-art-body" x="44" y="74" width="122" height="66" rx="6" />
+                <rect class="splash-art-body" x="166" y="88" width="56" height="52" rx="8" />
+                <path class="splash-art-window" d="M180 92 h30 a6 6 0 0 1 6 6 v16 h-36 z" />
+                <rect class="splash-art-shutter" x="52" y="82" width="22" height="22" rx="3" />
+                <rect class="splash-art-shutter" x="78" y="82" width="22" height="22" rx="3" />
+                <rect class="splash-art-shutter" x="104" y="82" width="22" height="22" rx="3" />
+                <rect class="splash-art-shutter" x="130" y="82" width="28" height="22" rx="3" />
+                <rect class="splash-art-stripe" x="44" y="118" width="178" height="6" />
+                <rect class="splash-art-ladder" x="40" y="62" width="128" height="6" rx="3" />
+                <rect class="splash-art-ladder" x="48" y="56" width="4" height="12" />
+                <rect class="splash-art-ladder" x="72" y="56" width="4" height="12" />
+                <rect class="splash-art-ladder" x="96" y="56" width="4" height="12" />
+                <rect class="splash-art-ladder" x="120" y="56" width="4" height="12" />
+                <rect class="splash-art-ladder" x="144" y="56" width="4" height="12" />
+                <rect class="splash-art-ladder" x="40" y="52" width="128" height="6" rx="3" />
+                <rect class="splash-art-beacon" x="186" y="80" width="18" height="8" rx="3" />
+                <circle class="splash-art-tire" cx="78" cy="142" r="15" />
+                <circle class="splash-art-ladder" cx="78" cy="142" r="6" />
+                <circle class="splash-art-tire" cx="194" cy="142" r="15" />
+                <circle class="splash-art-ladder" cx="194" cy="142" r="6" />
+                <rect class="splash-art-shutter" x="186" y="122" width="12" height="3" rx="1.5" />
+                <rect class="splash-art-lamp" x="222" y="128" width="8" height="10" rx="2" />
+                <circle class="splash-art-stripe" cx="140" cy="130" r="7" />
+                <circle class="splash-art-shutter" cx="140" cy="130" r="3" />
+            </svg>
             <div class="splash-text">
                 <span class="splash-title" data-splash-title>Feuerwehr</span>
                 <span class="splash-subtitle">Geräteverwaltung</span>

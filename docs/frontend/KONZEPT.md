@@ -254,8 +254,9 @@ nicht live, durch automatische Tests abgedeckt; offen B8a (Kontowechsel ohne Abm
   der Start auf den Server wartet) und „Ausrüstung wird geladen …“. Hell und dunkel, ohne Bewegung bei
   „Bewegung reduzieren“.
 - Name und Farbe der Stadt aus dem letzten Besuch (gemerkt im Browser); beim ersten Besuch
-  „Feuerwehr“ in der Standardfarbe. Bilder und Stil sind Dateien des Builds (keine Ausnahme in der
-  CSP); die Bilder liefert PHP nur aus `assets/` und mit eigener CSP (`default-src 'none'`).
+  „Feuerwehr“ in der Standardfarbe. Keine Ausnahme in der CSP: Der Stil ist eine Datei des Builds,
+  das Bild (SVG) steht direkt in `index.html` (ohne Skript und Stilangaben, Farben über Klassen) und
+  kommt so mit der ersten Antwort ohne weitere Anfrage; PHP liefert keine SVG-Dateien aus.
 
 ## Updates der App
 Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
