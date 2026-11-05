@@ -177,3 +177,32 @@ im Namen anlegen, bearbeiten, kopieren, übernehmen und löschen; am Ende wieder
   Dashboard, Prüffristen, Protokoll, Exporte, Standortwahl, Buchen auf Ziel außerhalb 400, Gerät
   außerhalb 404, Log-Mails eines gefilterten Empfängers). Bis dahin per Test
   (`DeviceVisibilityMatrixTest`, Mail-Tests).
+
+## Schritt 1.6 – Rollen zuweisen und Einladungscodes mit Rolle (05.11.2026, Build `f4023178d8aa`)
+
+Rolle „Live-Test Filter“ (Test-Stadt, Suchen: Ansehen, Umbuchen, Status setzen; sieht nur HLF 20 und
+Atemschutzmaske) für den Test; Testkonto #7 „Holger Test 1“ (vorher *Benutzer*).
+
+- ☑ Deploy „Deployment erfolgreich“, `build.json` = `f4023178d8aa`, `health` ok.
+- ☑ Benutzerverwaltung als *Admin*: Rollenfilter „Alle (5) · Admin (3) · Benutzer (2)“, Spalte
+  „Rolle“. Stift an #7: Rollenwahl mit Beschreibung, „Sieht: …“ und „Sieht nur: HLF 20;
+  Atemschutzmaske“; nach Wahl „Live-Test Filter“ der Hinweis „Die neue Rolle gilt beim nächsten Aufruf
+  der App.“; gespeichert („Holger Test 1 hat jetzt die Rolle „Live-Test Filter“ …“), `users/7` mit
+  `role_id` 14, Kontoart `user`. Filter jetzt „Benutzer (1) · Live-Test Filter (1)“, Knopf „Live-Test
+  Filter“ zeigt nur #7. Keine Fehler in der Konsole.
+- ☑ Einladungscodes: „Neuer Einladungscode“ bietet nur *Benutzer* und „Live-Test Filter“ (ohne
+  *Admin*, mit Hinweis); Code „Live-Test 1.6 (wird widerrufen)“ (1 Tag, 1 Registrierung, Rolle
+  „Live-Test Filter“) erzeugt – Code und QR erscheinen, Spalte „Rolle nach Freischaltung“ = „Live-Test
+  Filter“, `invitation-codes` mit `role {id: 14}` – und sofort widerrufen („… ist widerrufen“; Nutzung
+  der Rolle danach 1 Konto, 0 Codes).
+- ☑ „Termine: Ansehen“ an „Live-Test Filter“ im Editor des Super-Admins ergänzt: „Rolle „Live-Test
+  Filter“ gespeichert.“, Version 2, Bereiche `search`/`due` `read`, Filter unverändert (ein erster
+  Versuch von Hand war nicht gespeichert worden, Version blieb 1).
+- ☐ **Wirkung des Filters in der App mit #7** (Anmeldung als #7 nur Holger). Erwartet nach Neuladen:
+  Suchen 10 Geräte (M1–M6, M8, M9, M31, M32); Prüffristen überfällig M1, M2, in 30 Tagen fällig M8;
+  M7 (Atemschutzmaske im Lager Gerätehaus, auch per Scan-Code `ARFK-1007`) und HRT 1 (Funkgerät auf
+  HLF 20) nicht auffindbar; Standortwahl nur HLF 20 mit Fächern. Ergebnis von Holger noch nicht
+  übermittelt.
+- ☑ Aufgeräumt: #7 über den Stift wieder *Benutzer* („… hat jetzt die Rolle „Benutzer“ …“,
+  `role_id` 4), „Live-Test Filter löschen …“ mit Rückfrage („gelöscht“); danach nur *Admin*
+  (3 Konten) und *Benutzer* (2 Konten, 3 Codes). Keine Fehler in der Konsole.
