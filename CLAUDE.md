@@ -2018,7 +2018,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Kurzbeschreibung bis 200 (leer = keine), je Stadt eindeutig ohne Groß-/Kleinschreibung (409
   `name_taken`); Aktionen ohne ihren Bereich bleiben gespeichert. Speichern ohne Unterschied erhöht
   `version` nicht; jede Änderung erhöht sie (damit `permissions.version`), Sitzungen bleiben (F1).
-  Kopie von *Admin* = gewöhnliche Rolle mit allen Rechten des Katalogs, ohne Beschreibung.
+  Kopie von *Admin* = gewöhnliche Rolle mit allen Rechten des Katalogs, ohne Beschreibung. Name einer
+  Kopie ohne Angabe „<Name> (Kopie)“, vergeben „<Name> (Kopie 2)“ …, einer Übernahme „<Name>“ bzw.
+  „<Name> (2)“ …; höchstens 50 Zeichen, gekürzt wird der Name der Vorlage (`availableName`, per Test).
 - `bin/tenant.php purge-device-data` entfernt vor dem Löschen der Standorte die Standortfilter
   (`fe_role_locations`) der Rollen der Stadt (sonst verhinderte der Fremdschlüssel das Löschen); die
   Rollen behalten `filter_locations = 1` und sehen danach nichts, bis neu ausgewählt wird (siehe

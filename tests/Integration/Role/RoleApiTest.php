@@ -432,13 +432,43 @@ final class RoleApiTest extends AuthTestCase
         self::assertSame(['search' => 'read', 'devices' => 'write'], $json['areas']);
         self::assertSame(['device.edit'], $json['actions']);
         self::assertSame([$hlf], $json['locations']);
-        self::assertSame('Gerätewart (Kopie) (2)', self::json($this->post('tenants/' . $this->tenantId . '/roles', ['copy_of' => $role]))['role']['name']);
+        self::assertSame('Gerätewart (Kopie 2)', self::json($this->post('tenants/' . $this->tenantId . '/roles', ['copy_of' => $role]))['role']['name']);
+        self::assertSame('Gerätewart (Kopie 3)', self::json($this->post('tenants/' . $this->tenantId . '/roles', ['copy_of' => $role]))['role']['name']);
         self::assertSame('Wart', self::json($this->post('tenants/' . $this->tenantId . '/roles', ['copy_of' => $role, 'name' => ' Wart ']))['role']['name']);
 
         self::assertError(409, 'name_taken', $this->post('tenants/' . $this->tenantId . '/roles', ['copy_of' => $role, 'name' => 'admin']));
         self::assertError(400, 'invalid_request', $this->post('tenants/' . $this->tenantId . '/roles', ['copy_of' => 999999]));
         self::assertError(400, 'invalid_request', $this->post('tenants/' . $this->tenant('tuttlingen')->id . '/roles', ['copy_of' => $role]), 'Rolle einer anderen Stadt');
         self::assertError(400, 'invalid_request', $this->post('tenants/' . $this->tenantId . '/roles', ['copy_of' => $role, 'areas' => []]));
+    }
+
+    /** Vorgabe Holger 05.11.2026: höchstens 50 Zeichen, gekürzt wird der Name der Vorlage. */
+    public function testCopyNameIsShortenedToFiftyCharacters(): void
+    {
+        $long = mb_substr(str_repeat('Gerätewart ', 5), 0, RoleDraft::MAX_NAME_LENGTH);
+        $role = $this->role($long, ['search' => 'read'], []);
+
+        $names = [];
+        for ($i = 0; $i < 3; ++$i) {
+            $copy = $this->post('tenants/' . $this->tenantId . '/roles', ['copy_of' => $role]);
+            self::assertSame(201, $copy->statusCode(), $copy->body());
+            $names[] = self::json($copy)['role']['name'];
+        }
+
+        self::assertSame([
+            'Gerätewart Gerätewart Gerätewart Gerätewar (Kopie)',
+            'Gerätewart Gerätewart Gerätewart Gerätew (Kopie 2)',
+            'Gerätewart Gerätewart Gerätewart Gerätew (Kopie 3)',
+        ], $names);
+        foreach ($names as $name) {
+            self::assertSame(RoleDraft::MAX_NAME_LENGTH, mb_strlen($name));
+        }
+        // Kein Leerzeichen vor der Klammer, wenn die Kürzung auf ein Wortende fällt.
+        $short = $this->role('Gerätewart Gerätewart Gerätewart Leitungs Nord', ['search' => 'read'], []);
+        self::assertSame(
+            'Gerätewart Gerätewart Gerätewart Leitungs (Kopie)',
+            self::json($this->post('tenants/' . $this->tenantId . '/roles', ['copy_of' => $short]))['role']['name'],
+        );
     }
 
     public function testCopyOfAdminIsAnOrdinaryRoleWithAllRights(): void

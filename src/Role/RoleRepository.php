@@ -266,14 +266,17 @@ final readonly class RoleRepository
     }
 
     /**
-     * Freier Name: $base, sonst „$base (2)“, „$base (3)“ … (gekürzt auf die Länge eines Namens).
-     * Nur ein Vorschlag; verbindlich bleibt der UNIQUE-Index beim Schreiben.
+     * Freier Name: ohne $copy $base, sonst „$base (2)“, „$base (3)“ …; mit $copy „$base (Kopie)“,
+     * sonst „$base (Kopie 2)“, „$base (Kopie 3)“ …. Gekürzt wird nur $base, sodass der Name höchstens
+     * RoleDraft::MAX_NAME_LENGTH Zeichen hat (Vorgabe Holger 05.11.2026). Nur ein Vorschlag;
+     * verbindlich bleibt der UNIQUE-Index beim Schreiben.
      */
-    public function availableName(Tenant $tenant, string $base): string
+    public function availableName(Tenant $tenant, string $base, bool $copy = false): string
     {
         $stmt = $this->pdo->prepare('SELECT 1 FROM fe_roles WHERE tenant_id = ? AND name = ?');
         for ($n = 1; ; ++$n) {
-            $suffix = $n === 1 ? '' : sprintf(' (%d)', $n);
+            $number = $n === 1 ? '' : ' ' . $n;
+            $suffix = $copy ? ' (Kopie' . $number . ')' : ($n === 1 ? '' : ' (' . $n . ')');
             $candidate = rtrim(mb_substr($base, 0, RoleDraft::MAX_NAME_LENGTH - mb_strlen($suffix))) . $suffix;
             $stmt->execute([$tenant->id, $candidate]);
             if ($stmt->fetchColumn() === false) {

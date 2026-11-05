@@ -8,6 +8,16 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-05 – „Rollen: Name der Kopie „(Kopie 2)“, höchstens 50 Zeichen“
+
+`POST tenants/{id}/roles {copy_of}` ohne `name` (nur unter `service`): Die Kopie heißt „<Name> (Kopie)“,
+ist der Name vergeben, „<Name> (Kopie 2)“, „(Kopie 3)“ … (bisher „<Name> (Kopie) (2)“). Der Name hat
+höchstens 50 Zeichen; gekürzt wird der Name der Vorlage, nie der Zusatz (bisher konnte „(Kopie)“
+abgeschnitten werden). Übernahme aus einer anderen Stadt unverändert („<Name>“, „<Name> (2)“).
+Warum: Festlegung Holger nach dem Live-Test von Schritt 1.5 (05.11.2026). Tests:
+`RoleApiTest::testCopyKeepsRightsAndFilters`, `testCopyNameIsShortenedToFiftyCharacters`.
+`CLAUDE.md` "Rollen und Rechte", Verwaltung der Rollen.
+
 ## 2026-11-05 – „Rollen: Verwaltung durch den Super-Admin im Backend (Phase 1, Schritt 1.5a)“
 
 Neue Routen nur unter `service` (alle `Access::SuperAdmin`, in `SuperAdminRoutesAccessTest`); unter
