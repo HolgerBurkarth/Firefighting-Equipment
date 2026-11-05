@@ -168,7 +168,8 @@ im Namen anlegen, bearbeiten, kopieren, übernehmen und löschen; am Ende wieder
 - ☒ → behoben: Die Vorschau zeigte für Suchen und Termine (Rechte von *Benutzer*) „Termine“ als
   Konsole und „Dashboard“ in der Leiste; heute hat *Benutzer* nur die Handy-Seiten (F8). Korrektur:
   Suchen und Termine allein sind keine Konsole (Commit „Rollen: Vorschau ohne Konsole bei Suchen und
-  Termine (Schritt 1.5b)“, live geprüft siehe unten).
+  Termine (Schritt 1.5b)“, Build `0b5260654530`): ☑ live, Rolle *Benutzer* nur geöffnet, nicht
+  gespeichert: „Keine Konsole – nur die Handy-Seiten.“, „Suchen · Termine · Profil“.
 - ☐ Schmale Breiten und iPhone (Tabelle als Karten, Editor): offen für Holger; per Browser-Test in
   allen fünf Profilen ohne waagerechten Überstand.
 - ☐ **Offen für Schritt 1.6:** Wie eine Rolle mit Filter in der App wirkt, lässt sich erst live
