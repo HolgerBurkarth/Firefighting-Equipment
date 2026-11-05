@@ -37,7 +37,12 @@ async function settle(): Promise<void> {
 
 describe('Refresher', () => {
     it('Mindestabstände wie beschlossen (visible 30 s)', () => {
-        expect(REFRESH_MIN_INTERVAL_MS).toEqual({ open: 5_000, visible: 30_000, changed: 0 });
+        expect(REFRESH_MIN_INTERVAL_MS).toEqual({
+            open: 5_000,
+            visible: 30_000,
+            changed: 0,
+            rights: 0,
+        });
     });
 
     it('legt gleichzeitige Aufrufe zusammen', async () => {

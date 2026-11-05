@@ -10,6 +10,18 @@ export type LoginNotice =
 /** Wartezeiten zwischen erneuten Versuchen von auth/me; der letzte Wert wiederholt sich. */
 export const RETRY_DELAYS_MS: readonly number[] = [2000, 4000, 8000, 15000];
 
+/**
+ * Anlass, die bekannte Sitzung erneut zu prüfen (Plan Phase 1, Schritt 1.7c): App wieder sichtbar
+ * bzw. 403 `forbidden` einer Anfrage (die Rechte der Rolle haben sich womöglich geändert).
+ */
+export type RecheckReason = 'visible' | 'forbidden';
+
+/** Mindestabstand seit der letzten bestätigten Sitzung je Anlass. */
+export const RECHECK_MIN_INTERVAL_MS: Readonly<Record<RecheckReason, number>> = {
+    visible: 30_000,
+    forbidden: 5_000,
+};
+
 const current = shallowRef<AuthState | null>(null);
 /** Ersatz, wenn sessionStorage fehlt oder gesperrt ist. */
 let noticeFallback: LoginNotice | null = null;
@@ -26,6 +38,9 @@ let known = false;
 let pending: Promise<AuthState | null> | null = null;
 /** Erhöht bei resetSession; eine ältere laufende Prüfung schreibt dann nichts mehr. */
 let generation = 0;
+/** Zeitpunkt (ms) der letzten vom Server bestätigten Sitzung (für recheckSession). */
+let confirmedAt: number | null = null;
+let recheck: Promise<void> | null = null;
 
 /** Angemeldetes Konto (null = nicht angemeldet oder noch unbekannt). */
 export const session = readonly(current);
@@ -146,6 +161,35 @@ function sameAccount(a: AuthState, b: AuthState): boolean {
     return a.user.id === b.user.id && a.tenant?.slug === b.tenant?.slug;
 }
 
+type PermissionsChangedListener = (state: AuthState) => void;
+
+const permissionsListeners = new Set<PermissionsChangedListener>();
+
+/**
+ * Wird aufgerufen, wenn dasselbe Konto neue Rechte hat (`permissions.version` anders, z. B. der
+ * Super-Admin hat die Rolle geändert; Plan Phase 1, Schritt 1.7c), mit dem neuen Stand. Menü, Leiste
+ * und Knöpfe folgen von selbst (`currentPermissions`); die Datenschicht lädt neu, die Offline-Kopie
+ * wird verworfen, der Router verlässt eine nicht mehr erlaubte Seite. Liefert eine Funktion zum
+ * Abmelden des Empfängers.
+ */
+export function onPermissionsChanged(listener: PermissionsChangedListener): () => void {
+    permissionsListeners.add(listener);
+    return () => permissionsListeners.delete(listener);
+}
+
+function notifyIfPermissionsChanged(previous: AuthState | null, next: AuthState | null): void {
+    if (
+        previous !== null &&
+        next !== null &&
+        sameAccount(previous, next) &&
+        (previous.permissions?.version ?? null) !== (next.permissions?.version ?? null)
+    ) {
+        for (const listener of permissionsListeners) {
+            listener(next);
+        }
+    }
+}
+
 /** Meldet das Ende, wenn bisher ein Konto angemeldet war und `next` ein anderes oder keins ist. */
 function notifyIfEnded(next: AuthState | null, reason: 'logout' | 'ended'): void {
     const previous = current.value;
@@ -172,14 +216,20 @@ function applySession(state: AuthState | null, reason: 'logout' | 'ended'): void
         usingStored.value = false;
     }
     notifyIfEnded(state, reason);
+    const previous = current.value;
     current.value = state;
     known = true;
+    confirmedAt = state === null ? null : Date.now();
     saveStored(state);
+    // Erst nach dem neuen Stand melden: Die Empfänger lesen ihn (currentPermissions, Router).
+    notifyIfPermissionsChanged(previous, state);
 }
 
 /** Vergisst die Sitzung (z. B. nach 401); der nächste Wächter fragt auth/me erneut. */
 export function resetSession(): void {
     generation += 1;
+    confirmedAt = null;
+    recheck = null;
     notifyIfEnded(null, 'ended');
     current.value = null;
     checkError.value = null;
@@ -287,6 +337,52 @@ export function ensureSession(options: EnsureSessionOptions = {}): Promise<AuthS
         pending = first;
     }
     return pending;
+}
+
+export interface RecheckOptions {
+    readonly fetchFn?: typeof fetch;
+    readonly now?: () => number;
+}
+
+/**
+ * Fragt auth/me für eine bekannte Sitzung erneut (Plan Phase 1, Schritt 1.7c): beim Zurückkehren
+ * in die App und nach 403 `forbidden`, höchstens eine Prüfung gleichzeitig, frühestens
+ * `RECHECK_MIN_INTERVAL_MS` nach der letzten bestätigten Sitzung. Neue Rechte übernimmt sie über
+ * setSession (dann `onPermissionsChanged`); eine echte Ablehnung (401, gesperrte bzw. unbekannte
+ * Stadt) führt wie bei der gespeicherten Sitzung zur Anmeldung (`onStoredSessionRejected`); eine
+ * Störung ändert nichts. Ohne bekannte Sitzung oder während die gespeicherte Sitzung noch geprüft
+ * wird, tut sie nichts.
+ */
+export function recheckSession(reason: RecheckReason, options: RecheckOptions = {}): Promise<void> {
+    if (!known || current.value === null || usingStored.value) {
+        return Promise.resolve();
+    }
+    if (recheck !== null) {
+        return recheck;
+    }
+    const now = options.now ?? Date.now;
+    if (confirmedAt !== null && now() - confirmedAt < RECHECK_MIN_INTERVAL_MS[reason]) {
+        return Promise.resolve();
+    }
+    const own = generation;
+    const running = fetchMe(options.fetchFn)
+        .then((result) => {
+            if (own !== generation) {
+                return;
+            }
+            if (result.ok) {
+                setSession(result.data);
+            } else if (!isTransientError(result.error)) {
+                storedRejectedHandler?.();
+            }
+        })
+        .finally(() => {
+            if (recheck === running) {
+                recheck = null;
+            }
+        });
+    recheck = running;
+    return running;
 }
 
 /**

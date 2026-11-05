@@ -1,8 +1,9 @@
 /**
  * Anlass einer Auffrischung (KONZEPT.md, "User am Handy – Entscheidungen", 14 und 23): Seite
- * geöffnet, App wieder sichtbar, eigene Änderung (z. B. Buchung).
+ * geöffnet, App wieder sichtbar, eigene Änderung (z. B. Buchung), neue Rechte der Rolle (`rights`,
+ * Plan Phase 1, Schritt 1.7c: andere Datenfilter, andere Bereiche).
  */
-export type RefreshReason = 'open' | 'visible' | 'changed';
+export type RefreshReason = 'open' | 'visible' | 'changed' | 'rights';
 
 /**
  * Mindestabstand je Anlass seit dem letzten erfolgreichen Laden. `visible` höchstens alle
@@ -13,13 +14,14 @@ export const REFRESH_MIN_INTERVAL_MS: Readonly<Record<RefreshReason, number>> = 
     open: 5_000,
     visible: 30_000,
     changed: 0,
+    rights: 0,
 };
 
 /**
  * Steuert, wann eine Datenquelle neu lädt: höchstens eine Abfrage gleichzeitig (weitere Aufrufer
- * warten auf sie), Mindestabstände je Anlass, `visible` erst, nachdem die Daten einmal angefordert
- * wurden (z. B. nicht auf der Anmeldeseite). Kommt `changed` während einer laufenden Abfrage, lädt
- * sie danach noch einmal: Sie begann womöglich vor der Änderung.
+ * warten auf sie), Mindestabstände je Anlass, `visible` und `rights` erst, nachdem die Daten einmal
+ * angefordert wurden (z. B. nicht auf der Anmeldeseite). Kommt `changed` bzw. `rights` während einer
+ * laufenden Abfrage, lädt sie danach noch einmal: Sie begann womöglich vor der Änderung.
  */
 export class Refresher {
     private running: Promise<void> | null = null;
@@ -35,12 +37,12 @@ export class Refresher {
     ) {}
 
     refresh(reason: RefreshReason): Promise<void> {
-        if (reason === 'visible' && !this.used) {
+        if ((reason === 'visible' || reason === 'rights') && !this.used) {
             return Promise.resolve();
         }
         this.used = true;
         if (this.running !== null) {
-            if (reason === 'changed') {
+            if (reason === 'changed' || reason === 'rights') {
                 this.again = true;
             }
             return this.running;

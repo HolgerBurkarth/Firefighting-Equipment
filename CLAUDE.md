@@ -292,7 +292,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   für alle Arbeiten an API und Frontend): Die App sendet bei JEDEM API-Aufruf `X-Client-Api: <n>`
   (`apiRequest`/`apiDownload` in `frontend/src/api/client.ts`, `ClientApi::HEADER`/`CURRENT` in
   `src/Http/ClientApi.php`; die Zahl steht in `resources/client-api.json`, abgeglichen von
-  `ClientApiTest` und `clientApi.spec.ts`; derzeit 1). Ein gewöhnlicher Header einer Anfrage an
+  `ClientApiTest` und `clientApi.spec.ts`; derzeit 2, seit Schritt 1.7c: Menü, Leiste und Knöpfe
+  folgen den Rechten statt `role`; vorher 1). Ein gewöhnlicher Header einer Anfrage an
   dieselbe Adresse: kein CORS-Preflight, `RequestGuard` prüft nur `Content-Type`, `Origin` und Body
   (per Test).
   - Grundregel: Die API nur erweitern (neue Felder optional, alte noch mindestens einen Deploy
@@ -462,7 +463,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (nur neuere Version, ausgesondert → aus der Liste). Auffrischen über `Refresher`
   (`refresh(reason)`): höchstens eine Abfrage gleichzeitig, `changed` während einer laufenden →
   danach noch einmal; Mindestabstand seit dem letzten Erfolg `REFRESH_MIN_INTERVAL_MS` (`open` 5 s,
-  `visible` 30 s, `changed` 0); `visible` erst, nachdem die Daten einmal angefordert wurden.
+  `visible` 30 s, `changed` 0, `rights` 0); `visible` und `rights` (neue Rechte, Schritt 1.7c) erst,
+  nachdem die Daten einmal angefordert wurden.
   `installDataLayer` (in `main.ts`, nur unter Städten): bei `visibilitychange` (sichtbar)
   `refresh('visible')`, bei `onSessionEnded` (`src/auth/session.ts`, mit bisherigem Konto und Grund
   `logout` = Abmelden beim Server erfolgreich, `ended` = `resetSession` z. B. nach 401 oder
@@ -844,7 +846,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `filterText`; die Listen lädt die Seite nur, wenn eine Rolle filtert); nicht vergebbare
   (`assignable` false) gesperrt mit `assign_blocker`, die bisherige bleibt sichtbar gewählt. Im
   Fenster „Bearbeiten“ bei *Admin* der Hinweis „Admins haben alle Rechte …“, bei geänderter Rolle
-  „Die neue Rolle gilt beim nächsten Aufruf der App.“ bzw. beim Wechsel zu oder von *Admin* „… auf
+  „Die neue Rolle gilt beim nächsten Aufruf der App. Handys laden dabei ihre Offline-Kopie neu.“
+  (seit 1.7c) bzw. beim Wechsel zu oder von *Admin* „… auf
   allen Geräten abgemeldet.“ (F1). Über der Liste „Rolle:“ als Knöpfe mit Anzahl
   (`roleFilterOptions`, `aria-pressed`, nur mit mehr als einer Rolle), Spalte „Rolle“ als Chip
   (`roleNameOf`), unten „Welche Rollen es gibt … legt der Super-Admin fest …“. Mehrfachauswahl (F6):
@@ -1065,8 +1068,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Ablehnung ruft `onStoredSessionRejected` (Router: wie 401, Anmeldung mit Rückkehradresse). Lokale
   Kopie `src/data/offline.ts` (`installOfflineCopy` in `main.ts`, IndexedDB über
   `src/runtime/localDb.ts`: Datenbank `ff-offline`, Tabellen `snapshots` und `queue`, im Test
-  `MemoryDb`): Schlüssel `<kürzel>:<konto-id>`, `OfflineSnapshot` (Format 1, `syncedAt`, Geräte,
-  `total`, Standorte); beim Bekanntwerden des Kontos `DeviceStore.restore`/`LocationStore.restore`
+  `MemoryDb`): Schlüssel `<kürzel>:<konto-id>`, `OfflineSnapshot` (Format 2, `syncedAt`, Geräte,
+  `total`, Standorte, `permissions` = `permissions.version` der Sitzung; Format 1 ohne wird noch
+  gelesen, die Rechte gelten dann als unbekannt; mit anderen Rechten geladen → nicht gezeigt und
+  gelöscht, `snapshotMatches`; neue Rechte während der Sitzung löschen sie, Schritt 1.7c); beim Bekanntwerden des Kontos `DeviceStore.restore`/`LocationStore.restore`
   (nur solange noch nichts geladen ist), gespeichert nach jedem vollständigen Laden der Geräte
   (`onLoaded`, Modus `local`; jedes solche Laden lädt auch die Standorte, `refresh('changed')`) bzw.
   der Standorte (nur nach Geräten vom Server); Abmelden und ein
@@ -1086,7 +1091,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   „Verwerfen“, `failed` mit „Verwerfen“; gespeichert mit Formatversion, siehe "Versionierung der
   API für das Frontend"). `send` der Reihe nach, älteste zuerst; ohne Verbindung,
   5xx, 401 und `client_outdated` wartet die Buchung weiter; `stale_action` → `stale`, andere 4xx (auch
-  `clock_implausible`) → `failed`. Gesendet beim Bekanntwerden des Kontos, nach jedem Laden der
+  `clock_implausible`; 403 `forbidden` mit „Dafür fehlen Ihnen inzwischen die Rechte.“, 1.7c) →
+  `failed`. Gesendet beim Bekanntwerden des Kontos, nach jedem Laden der
   Geräte, bei `online` und `visibilitychange` (nicht, solange der Browser offline meldet).
   `GET client-config` (`src/api/clientConfig.ts`, `readLimits`, eine Abfrage gleichzeitig) nach
   jedem vollständigen Laden der Geräte und vor dem ersten Senden eines Seitenaufrufs; Grenzen in
@@ -1946,7 +1952,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Super-Admin im Backend, siehe unten) und 1.5b (Seiten „Rollen“ und „Rolle bearbeiten“, siehe
   "Frontend"), 1.6a (Rollen zuweisen im Backend, siehe "Benutzerverwaltung durch den Admin") und
   1.6b (Rollen in der Benutzerverwaltung und bei Einladungscodes, siehe "Frontend"), 1.7a (Aktion
-  `csv.export` für die Exporte, F2) und 1.7b (App nach Rechten, siehe unten „App nach Rechten“). Schritt 1.7 ist geteilt (Holger 05.11.2026): 1.7a Backend,
+  `csv.export` für die Exporte, F2) 1.7b (App nach Rechten, siehe unten „App nach Rechten“) und 1.7c (Rechte ändern sich während der
+  Sitzung, `X-Client-Api` 2, ebenda). Schritt 1.7 ist geteilt (Holger 05.11.2026): 1.7a Backend,
   1.7b App nach Rechten (Wächter, Menü, Handy-Leiste, Knöpfe), 1.7c Rechte ändern sich während der
   Sitzung (Offline-Kopie, Warteschlange) mit `X-Client-Api` 2 und `ClientApi::MIN` = 1 (Variante B;
   über MIN = 2 wird in Schritt 1.8 entschieden, bevor Immendingen eigene Rollen bekommt).
@@ -2028,6 +2035,20 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `tests/e2e/permissions.spec.ts` (Gerätewart, nur ansehen, Benutzer ansehen, Handy nur umbuchen;
   jede nicht erlaubte Abfrage ließe ihn scheitern); `meBody` der Browser-Tests sendet `permissions`
   wie der Server (`ADMIN_RIGHTS`, `USER_RIGHTS`, `permissionsJson` in `tests/e2e/fixtures.ts`).
+  Rechte ändern sich während der Sitzung (Schritt 1.7c): `recheckSession` (`src/auth/session.ts`)
+  fragt `auth/me` bei `visibilitychange` (sichtbar) und nach 403 `forbidden` einer nicht öffentlichen
+  Anfrage oder eines Downloads (`setForbiddenHandler` in `client.ts`, beides in `main.ts`, nur unter
+  Städten), höchstens eine gleichzeitig, frühestens `RECHECK_MIN_INTERVAL_MS` nach der letzten
+  bestätigten Sitzung (`visible` 30 s, `forbidden` 5 s); Störung → nichts, echte Ablehnung → wie die
+  gespeicherte Sitzung zur Anmeldung. Neue `permissions.version` desselben Kontos (auch nach dem Start
+  mit gespeicherter Sitzung) meldet `onPermissionsChanged` mit dem neuen, schon gesetzten Stand: Menü,
+  Leiste und Knöpfe folgen `currentPermissions`, `installDataLayer` lädt alle schon angeforderten
+  Stores neu (`refresh('rights')`), die Offline-Kopie wird gelöscht und mit dem nächsten Laden neu
+  gespeichert, der Router verlässt eine nicht mehr erlaubte Seite still zur Startseite (nicht mit
+  ungespeicherten Eingaben; ein Speichern lehnt dann der Server ab). Tests: `permissionsChange.spec.ts`,
+  `offline.spec.ts`, `bookingQueue.spec.ts`, Browser `permissions.spec.ts` („Rechte ändern sich bei
+  offener App“, `page.clock`); die Browser-Tests prüfen `X-Client-Api` gegen
+  `resources/client-api.json`.
 - Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank): `Area` (`dashboard`,
   `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`; `maxLevel`:
   `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`

@@ -7,7 +7,7 @@ import { reportServerReached } from '../runtime/connectivity';
  * Änderungen erhöhen (CLAUDE.md, "Versionierung der API für das Frontend").
  */
 export const CLIENT_API_HEADER = 'X-Client-Api';
-export const CLIENT_API_VERSION = 1;
+export const CLIENT_API_VERSION = 2;
 /** Vertragsnummer des Servers in jeder JSON- und CSV-Antwort (ClientApi::RESPONSE_HEADER). */
 export const API_VERSION_HEADER = 'X-Api-Version';
 
@@ -54,6 +54,22 @@ let unauthorizedHandler: (() => void) | null = null;
 /** Wird bei 401 einer nicht öffentlichen Anfrage aufgerufen (der Router meldet dann ab). */
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
     unauthorizedHandler = handler;
+}
+
+let forbiddenHandler: (() => void) | null = null;
+
+/**
+ * Wird bei 403 `forbidden` einer nicht öffentlichen Anfrage aufgerufen: Die Rechte der Rolle haben
+ * sich womöglich geändert (main.ts: auth/me neu, Plan Phase 1, Schritt 1.7c).
+ */
+export function setForbiddenHandler(handler: (() => void) | null): void {
+    forbiddenHandler = handler;
+}
+
+function noticeForbidden(error: ApiError): void {
+    if (error.code === 'forbidden') {
+        forbiddenHandler?.();
+    }
 }
 
 let outdatedHandler: ((reason: OutdatedReason) => void) | null = null;
@@ -156,6 +172,9 @@ export async function apiRequest<T>(
         if (response.status === 401 && options.public !== true) {
             unauthorizedHandler?.();
         }
+        if (options.public !== true) {
+            noticeForbidden(error);
+        }
         return { ok: false, error };
     }
     noticeVersion(response, null);
@@ -214,6 +233,7 @@ export async function apiDownload(
         if (response.status === 401) {
             unauthorizedHandler?.();
         }
+        noticeForbidden(error);
         return { ok: false, error };
     }
     noticeVersion(response, null);

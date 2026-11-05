@@ -389,9 +389,105 @@ describe('lokale Kopie (Entscheidung 49)', () => {
         expect(await db.get('snapshots', 'test:7')).toBeNull();
     });
 
+    function withRights(areas: Readonly<Record<string, 'read' | 'write'>>) {
+        const parsed = parseAuthState(meBody('user', permissionsJson(areas)));
+        if (parsed === null) {
+            throw new Error('ungültig');
+        }
+        return parsed;
+    }
+
+    it('merkt sich die Rechte; mit anderen Rechten geladen: nicht gezeigt, verworfen (1.7c)', async () => {
+        const db = new MemoryDb();
+        const online = stores([device(1)]);
+        setSession(withRights({ search: 'read' }));
+        stop = installOfflineCopy({
+            area: 'test',
+            devices: online.deviceStore,
+            locations: online.locationStore,
+            db,
+        });
+        await online.deviceStore.refresh('open');
+        await flush();
+        const saved = parseSnapshot(await db.get('snapshots', 'test:7'));
+        expect(saved?.format).toBe(SNAPSHOT_FORMAT);
+        expect(saved?.permissions).toBe(withRights({ search: 'read' }).permissions?.version);
+        stop();
+        resetSession();
+
+        // Neuer Start mit anderen Rechten (z. B. anderer Datenfilter) ohne Verbindung.
+        const offline = stores('fail');
+        setSession(withRights({ search: 'read', due: 'read' }));
+        stop = installOfflineCopy({
+            area: 'test',
+            devices: offline.deviceStore,
+            locations: offline.locationStore,
+            db,
+        });
+        await flush();
+        expect(offline.deviceStore.state.mode).toBeNull();
+        expect(await db.get('snapshots', 'test:7')).toBeNull();
+    });
+
+    it('neue Rechte während der Sitzung verwerfen die Kopie (1.7c)', async () => {
+        const db = new MemoryDb();
+        const online = stores([device(1)]);
+        setSession(withRights({ search: 'read' }));
+        stop = installOfflineCopy({
+            area: 'test',
+            devices: online.deviceStore,
+            locations: online.locationStore,
+            db,
+        });
+        await online.deviceStore.refresh('open');
+        await flush();
+        expect(await db.get('snapshots', 'test:7')).not.toBeNull();
+        setSession(withRights({ search: 'read', devices: 'read' }));
+        await flush();
+        expect(await db.get('snapshots', 'test:7')).toBeNull();
+        expect(offlineData.syncedAt).toBeNull();
+        // Das nächste vollständige Laden speichert sie mit den neuen Rechten.
+        await online.deviceStore.refresh('changed');
+        await flush();
+        expect(parseSnapshot(await db.get('snapshots', 'test:7'))?.permissions).toBe(
+            withRights({ search: 'read', devices: 'read' }).permissions?.version,
+        );
+    });
+
+    it('Format 1 (vor 1.7c) wird gelesen, die Rechte gelten als unbekannt', async () => {
+        const db = new MemoryDb();
+        await db.put('snapshots', 'test:7', {
+            format: 1,
+            syncedAt: '2026-10-31T10:00:00Z',
+            devices: [device(5)],
+            total: 1,
+            locations: null,
+        });
+        expect(parseSnapshot(await db.get('snapshots', 'test:7'))?.permissions).toBeNull();
+        const s = stores('fail');
+        setSession(withRights({ search: 'read' }));
+        stop = installOfflineCopy({
+            area: 'test',
+            devices: s.deviceStore,
+            locations: s.locationStore,
+            db,
+        });
+        await flush();
+        expect(s.deviceStore.state.devices.map((d) => d.id)).toEqual([5]);
+    });
+
     it('Schlüssel, Prüfung und Text', () => {
         expect(snapshotKey('test', state())).toBe('test:7');
         expect(parseSnapshot({ format: 2 })).toBeNull();
+        expect(
+            parseSnapshot({
+                format: 3,
+                syncedAt: '2026-10-31T10:00:00Z',
+                devices: [],
+                total: 0,
+                locations: null,
+            }),
+        ).toBeNull();
         expect(parseSnapshot(null)).toBeNull();
         expect(syncedAtText('2026-10-31T13:02:00Z')).toMatch(/^31\.10\., \d\d:02$/);
     });

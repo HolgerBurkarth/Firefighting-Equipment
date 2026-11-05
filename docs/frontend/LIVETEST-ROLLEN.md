@@ -232,3 +232,26 @@ Atemschutzmaske) für den Test; Testkonto #7 „Holger Test 1“ (vorher *Benutz
 - ☐ Offen für Holger: *Benutzer* (#7) erhält beim Export 403 – per Test belegt
   (`TenantRoutePermissionsTest::testStandardRoleUserGetsForbiddenOnExports`); die App bietet *Benutzer*
   keinen Export an. Kommt in die iPhone-Liste nach 1.7c.
+
+## Schritt 1.7b – App nach Rechten (05.11.2026, Build `336343662d28`)
+
+- ☑ Deploy „Deployment erfolgreich“, `build.json` = `336343662d28`, `health` ok.
+- ☑ Update: Der Tab hatte noch eine ältere Zwischenversion; nach deren Übernahme sperrte die Sperre
+  gegen Neuladeschleifen (10 Minuten je Tab) das zweite Neuladen, Hinweis „Neue Version verfügbar.“,
+  nach „Jetzt aktualisieren“ Build `336343662d28` (wie vorgesehen, Zeitleiste `ff-update-trace`).
+- ☑ Als *Admin* in `test`: `auth/me` mit 9 Bereichen und 10 Aktionen; die gespeicherte Sitzung
+  (`ff-session:test`) enthält sie samt `version`.
+- ☑ Menü unverändert (Dashboard, Suchen, Geräte, Standorte, Gerätetypen, Benutzer, Protokoll mit
+  Zähler, Einstellungen); Dashboard mit allen Kacheln als Links, „Nicht einsatzbereit“ und „Letzte
+  Aktivitäten“.
+- ☑ Geräteliste: „Export (CSV)“, „Import (CSV)“, „Neues Gerät“, Kästchen je Zeile. Gerätedetail
+  (HRT 1): „Umbuchen / Status ändern“, „Bearbeiten“, „Prüfdatum ändern“, „Code zuordnen“,
+  „Aussondern“.
+- ☑ Umbuchen: Standort und Status, Link „Gerätedetail (Admin)“; Standortwahl mit „Ganzes Fahrzeug,
+  ohne Fach“ (ohne Speichern geschlossen).
+- ☑ Einstellungen mit Anzeigemodus, Erscheinungsbild, Benachrichtigung, Passwort, Geräten; Protokoll
+  mit beiden Reitern; Benutzer mit Stift und Kästchen; Standorte und Gerätetypen mit „Neu …“, Stift
+  und Namen als Links; Handy-Leiste Dashboard, Suchen, Prüffristen, Profil.
+- ☐ Offen für Holger: eine eigene Rolle live ansehen (z. B. „Live-Test Filter“ an #7: nur Handy-Seiten,
+  Standortwahl ohne „Ganzes Fahrzeug“ bei nur sichtbaren Fächern); der Agent meldet sich nicht als #7
+  an. Per Browser-Test belegt (`tests/e2e/permissions.spec.ts`). Kommt in die iPhone-Liste nach 1.7c.

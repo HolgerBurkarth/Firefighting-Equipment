@@ -6,8 +6,8 @@ import './styles/base.css';
 
 import { createApp } from 'vue';
 import App from './App.vue';
-import { setOutdatedHandler } from './api/client';
-import { configureStoredSession } from './auth/session';
+import { setForbiddenHandler, setOutdatedHandler } from './api/client';
+import { configureStoredSession, recheckSession } from './auth/session';
 import { bookingQueue, deviceStore, installDataLayer, locationStore, otherQueues } from './data';
 import { installBookingQueue, installOfflineCopy } from './data/offline';
 import { installServiceDataLayer } from './data/service';
@@ -46,6 +46,16 @@ if (base.isService) {
         queue: bookingQueue,
         devices: deviceStore,
         others: otherQueues,
+    });
+    // Rechte ändern sich während der Sitzung (Plan Phase 1, Schritt 1.7c): auth/me neu beim
+    // Zurückkehren in die App und nach 403 forbidden; neue Rechte übernimmt setSession.
+    setForbiddenHandler(() => {
+        void recheckSession('forbidden');
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            void recheckSession('visible');
+        }
     });
 }
 installConnectivity();

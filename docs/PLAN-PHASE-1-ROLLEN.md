@@ -251,6 +251,14 @@ Leiste, Stores und Offline-Kopie neu, Eingaben bleiben; Warteschlange 403 → `f
 gelten bis zur Antwort des Servers die Rechte aus der Kontoart: `admin` alle, `user` die der
 Standard-Rolle *Benutzer*.
 
+Umgesetzt in 1.7c (05.11.2026): `auth/me` neu beim Zurückkehren in die App (höchstens alle 30 s) und
+nach 403 `forbidden` (höchstens alle 5 s); neue `permissions.version` lädt alle schon geladenen Daten
+neu, löscht die Offline-Kopie (Format 2 mit `permissions`, Format 1 wird noch gelesen) und verlässt
+eine nicht mehr erlaubte Seite still zur Startseite, außer mit ungespeicherten Eingaben (die bleiben,
+ein Speichern lehnt der Server ab). Warteschlange 403 → `failed` mit „Dafür fehlen Ihnen inzwischen die
+Rechte.“. Der Hinweis im Fenster „Bearbeiten“ nennt jetzt „Handys laden dabei ihre Offline-Kopie
+neu.“. `X-Client-Api` 2, `ClientApi::MIN` 1.
+
 Festgelegt bei der Umsetzung von 1.7b (05.11.2026): „Einstellungen“ öffnet jede Rolle mit Konsole
 (Anzeigemodus, Passwort, angemeldete Geräte); Farbe und Logo nur mit `settings` Ändern (mit Ansehen
 nur ein Hinweis), die Benachrichtigung „Log“ nur mit `mail.log`. Startseite mit Konsole: Dashboard,

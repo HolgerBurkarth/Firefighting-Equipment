@@ -212,6 +212,17 @@ describe('BookingQueue', () => {
         expect(q.state.bookings).toEqual([]);
     });
 
+    it('403 forbidden (Rechte inzwischen weg): failed mit eigenem Text (Schritt 1.7c)', async () => {
+        const { q } = queue([
+            { ok: false, error: error('forbidden', 403, 'Dafür fehlt Ihnen das Recht.') },
+        ]);
+        await q.use('test:7');
+        await q.add(booking());
+        await q.send();
+        expect(q.state.bookings[0]?.state).toBe('failed');
+        expect(q.state.bookings[0]?.problem).toBe('Dafür fehlen Ihnen inzwischen die Rechte.');
+    });
+
     it('nach client_outdated sendet die neue Version dieselbe Buchung', async () => {
         const db = new MemoryDb();
         const old = queue([{ ok: false, error: error('client_outdated', 409) }], db);

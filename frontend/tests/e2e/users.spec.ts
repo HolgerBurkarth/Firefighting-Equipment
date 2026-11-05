@@ -416,7 +416,7 @@ test.describe('Benutzer', () => {
         await page.getByRole('button', { name: 'Anna B. bearbeiten' }).click();
         await page.getByRole('dialog').getByRole('radio', { name: 'Gerätewart' }).check();
         await expect(page.getByRole('dialog').getByTestId('role-hint')).toHaveText(
-            'Die neue Rolle gilt beim nächsten Aufruf der App.',
+            'Die neue Rolle gilt beim nächsten Aufruf der App. Handys laden dabei ihre Offline-Kopie neu.',
         );
         await page.getByRole('dialog').getByRole('radio', { name: 'Live-Test Filter' }).check();
         await expect(page.getByRole('dialog')).toContainText('Sieht nur:');

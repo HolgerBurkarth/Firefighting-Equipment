@@ -62,7 +62,7 @@ final class JsonResponseTest extends TestCase
             'Content-Type' => 'application/json; charset=utf-8',
             'Cache-Control' => 'no-store',
             'X-Content-Type-Options' => 'nosniff',
-            'X-Api-Version' => '1',
+            'X-Api-Version' => '2',
         ], $response->headers());
     }
 

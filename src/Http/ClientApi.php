@@ -21,8 +21,11 @@ final class ClientApi
     /** Header jeder JSON- und CSV-Antwort mit CURRENT (JsonResponse, CsvResponse). */
     public const string RESPONSE_HEADER = 'X-Api-Version';
 
-    /** Aktuelle Vertragsnummer; nur bei inkompatiblen Änderungen erhöhen. */
-    public const int CURRENT = 1;
+    /**
+     * Aktuelle Vertragsnummer; nur bei inkompatiblen Änderungen erhöhen. 2 seit Plan Phase 1, Schritt
+     * 1.7c: Menü, Leiste und Knöpfe folgen den Rechten der Rolle (`permissions`), nicht mehr `role`.
+     */
+    public const int CURRENT = 2;
 
     /** Kleinste Nummer, die der Server noch annimmt (MIN_CLIENT_API); höchstens CURRENT. */
     public const int MIN = 1;

@@ -58,7 +58,13 @@ import {
     type AdminUser,
     type BulkRoleResult,
 } from '../api/users';
-import { currentPermissions, onSessionEnded, session, setSession } from '../auth/session';
+import {
+    currentPermissions,
+    onPermissionsChanged,
+    onSessionEnded,
+    session,
+    setSession,
+} from '../auth/session';
 import { browserStorage } from '../runtime/theme';
 import { AdminDeviceList } from './adminDeviceList';
 import { AdminOverviewStore, overviewScope } from './adminOverview';
@@ -531,7 +537,7 @@ export function rememberLocation(id: number, storage = browserStorage()): void {
 }
 
 interface DataStore {
-    refresh(reason: 'visible'): Promise<void>;
+    refresh(reason: 'visible' | 'rights'): Promise<void>;
     clear(): void;
 }
 
@@ -568,6 +574,13 @@ export function installDataLayer(
             recentLocations.clear(storage, ended);
         }
     });
+    // Neue Rechte (Plan Phase 1, Schritt 1.7c): alles, was schon geladen war, neu (andere Datenfilter,
+    // andere Bereiche; das Dashboard fragt nach overviewScope). Eingaben auf der Seite bleiben.
+    const stopPermissions = onPermissionsChanged(() => {
+        for (const store of stores) {
+            void store.refresh('rights');
+        }
+    });
     const onVisibility = (): void => {
         if (doc.visibilityState === 'visible') {
             for (const store of stores) {
@@ -578,6 +591,7 @@ export function installDataLayer(
     doc.addEventListener('visibilitychange', onVisibility);
     return () => {
         stopSession();
+        stopPermissions();
         doc.removeEventListener('visibilitychange', onVisibility);
     };
 }
