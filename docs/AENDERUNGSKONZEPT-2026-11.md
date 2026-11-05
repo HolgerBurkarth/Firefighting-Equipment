@@ -1,6 +1,6 @@
 # Änderungskonzept: Rollen, Abläufe und Bestände
 
-Stand: 04.11.2026 · Holger Burkarth
+Stand: 05.11.2026 · Holger Burkarth
 
 > Abzug des Claude-Dokuments „Änderungskonzept: Rollen, Abläufe und Bestände“ (dort wird weiter gearbeitet; diese Datei wird bei Änderungen neu abgelegt). Die UI-Mockups dazu liegen als Referenz in [`aenderungskonzept/mockups/`](aenderungskonzept/mockups/LIESMICH.md) (Abzug des Designs „Mockups Änderungskonzept“ aus dem Claude-Projekt). **Für alles, was Nutzer sehen, gelten die Begriffe der Tabelle in Abschnitt 9**, nicht die Arbeitsbegriffe im übrigen Text.
 
@@ -262,7 +262,7 @@ Phase 1 ist die Grundlage für alles, was „nur Gerätewart“ oder „nur benu
 
 ## 12. Offene Entscheidungen
 
-Alle zwölf Fragen sind entschieden (E1–E10 am 02.11.2026, E11 und E12 am 03.11.2026; die Begriffe zu E11 am 04.11. festgelegt).
+Alle Fragen sind entschieden (E1–E10 am 02.11.2026, E11 und E12 am 03.11.2026, E13 am 04.11.2026, E14 am 05.11.2026).
 
 | Nr. | Frage | Empfehlung |
 | --- | --- | --- |
@@ -278,3 +278,5 @@ Alle zwölf Fragen sind entschieden (E1–E10 am 02.11.2026, E11 und E12 am 03.1
 | E10 | Schlauchlager: Mengentyp neben Einzelgeräten wie vorgeschlagen? | Entschieden (02.11.): Mengentyp neben Einzelgeräten; Bau erst nach Beschreibung des Ablaufs |
 | E11 | Begriffe in Alltagssprache: wer legt sie fest? | Entschieden (03.11.): fest für alle Städte. Am 04.11. nach Phils Liste in den Mockups geprüft und festgelegt (Tabelle in Abschnitt 9) |
 | E12 | Zählt eine große Wartung auch als kleine? | Entschieden (03.11.): je Wartung im Gerätetyp einstellbar („enthält auch …“); beim Eintragen bekommen die enthaltenen Wartungen dasselbe Datum. Bei der Rückkehr aus der Werkstatt kreuzt der Gerätewart an, welche Wartung gemacht wurde. |
+| E13 | Wann kommt der Zugang über Claude (MCP-Konnektor, Auftrag aus dem Chat vom 03.11.)? | Entschieden (04.11.): als eigene Phase direkt nach Phase 1, vor Phase 2. Der Rechte-Katalog aus Phase 1 sieht schon einen Platz dafür vor (je Konto aus/lesen/ändern, wirksam nur zusammen mit den Rechten der Rolle). Der MCP-Auftrag wird an das neue Rechtemodell und die festgelegten Begriffe angepasst, sobald der Plan für Phase 1 steht. |
+| E14 | Wie wechselt jemand mit Konten in mehreren Städten zwischen ihnen? | Entschieden (05.11.): Kontoliste auf dem Gerät („Konto wechseln“ im Menü und im Profil, Mockups Seite 8). Konten bleiben je Stadt getrennt, Anmeldung je Stadt und Gerät einmal; die Liste enthält nur Kürzel, Stadtname, Anzeigename und Rollenname. Schritt 1.9 nach der Umstellung der App auf Rechte. Plan Phase 1 freigegeben mit F1 A (nur Wechsel zu/weg von Admin meldet ab), F3 A (Verwaltung nur ohne Datenfilter), F5 A (Benutzerverwaltung mit Schutzregeln), F12 wie im Claude-Auftrag entschieden, sonst Vorschläge des Agenten. |
