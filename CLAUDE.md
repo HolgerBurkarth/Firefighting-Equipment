@@ -182,11 +182,16 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   haben Vorrang vor Platzhaltern. Falsche Methode → 405 mit `Allow` (sortiert). `HEAD` wird nicht
   wie `GET` behandelt. Alle Routen stehen in `Routes::service()` und `Routes::tenant()`.
 - Zugriffsregeln: Jede Route deklariert ihre Stufe (`Access`): `Public`, `Authenticated`,
-  `Admin` (nur unter einer Stadt), `SuperAdmin` (nur unter `service`); eine falsche Kombination
-  wirft beim Anlegen eine `LogicException`. Geprüft wird zentral in `Application`, nie im Handler:
-  keine oder ungültige Sitzung → 401 `not_authenticated` (ein mitgesendetes ungültiges Cookie
-  wird gelöscht), Rolle reicht nicht → 403 `forbidden`. Bei `Public` wird keine Sitzung geladen.
-  `health` und `tenant` bleiben öffentlich.
+  `SuperAdmin` (nur unter `service`) oder unter einer Stadt die nötigen Rechte
+  (`Permission\Requirement`, seit Schritt 1.3a, siehe "Rollen und Rechte"; `Authenticated` unter
+  einer Stadt nur für `auth/me`, `auth/sessions…`, `auth/password` und `client-config`, per Test);
+  eine falsche Kombination (`SuperAdmin` unter einer Stadt, `Requirement` unter `service`) wirft
+  beim Anlegen eine `LogicException`. Geprüft wird zentral in `Application`, nie im Handler: keine
+  oder ungültige Sitzung → 401 `not_authenticated` (ein mitgesendetes ungültiges Cookie wird
+  gelöscht), Rolle bzw. Rechte reichen nicht → 403 `forbidden`. Bei `Public` wird keine Sitzung
+  geladen. `health` und `tenant` bleiben öffentlich. „Admin“ bzw. `Access::Admin` in den Abschnitten
+  unten heißt seit 1.3a: verlangt Rechte, die von den Standard-Rollen nur *Admin* hat (genaue
+  Anforderung je Route in `Routes::tenant()` und der Tabelle in `TenantRoutePermissionsTest`).
 - Handler implementieren `RequestHandler` (Rückgabe `Response`, in der Regel `JsonResponse`) und
   erhalten `RequestContext` (Anfrage, Stadt oder
   `null` unter `service`, `LazyConnection`, `ErrorReporter`, Platzhalter `param()`, JSON-Body
@@ -1662,11 +1667,12 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   von `password-reset/request`, `register` und `email/resend` ist 0; `registeredAccount()` legt
   Konten im Status `unverified`/`pending` samt Einlader und Code an; `send()` verlangt eine
   JSON-Antwort, `sendAny()` liefert jede `Response`, `responseBody()` liest auch einen CSV-Download,
-  und zwar vor der nächsten Datenbankabfrage, da er ungepuffert liest). Rechte aller Admin-Routen
-  prüft `AdminRoutesAccessTest` (neue Admin-Routen dort eintragen), die der lesenden Routen unter
-  einer Stadt (`Access::Authenticated`, z. B. Gerätetypen, Standorte, Prüffristen)
-  `TenantReadRoutesAccessTest`
-  (neue dort eintragen).
+  und zwar vor der nächsten Datenbankabfrage, da er ungepuffert liest). Rechte aller Routen unter
+  einer Stadt prüft `TenantRoutePermissionsTest` (Tabelle Route → bisherige Stufe → Erfordernis;
+  neue Routen dort eintragen, sonst scheitert er). Zusätzlich prüfen weiterhin
+  `AdminRoutesAccessTest` (Routen, die nur *Admin* darf: Benutzer 403, Admin kommt durch und nichts
+  ändert sich bei Ablehnung) und `TenantReadRoutesAccessTest` (lesende Routen für *Admin* und
+  *Benutzer* 200); neue Routen dort eintragen, wenn sie in diese Gruppen gehören.
 
 ## E-Mail-Versand
 - Code in `src/Mail/`: `MailMessage` (Empfänger, Name, Betreff, Text), Schnittstelle `Mailer`
@@ -1824,8 +1830,37 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 
 ## Rollen und Rechte (Phase 1, im Aufbau)
 - Plan und Entscheidungen: `docs/PLAN-PHASE-1-ROLLEN.md` (freigegeben 05.11.2026; Schritte 1.1–1.9).
-  Stand: Schritte 1.1 und 1.2 (Schema, Standard-Rollen, jedes Konto einer Stadt mit Rolle). Die
-  Rechte prüft weiterhin `Access` über `fe_users.role`; Rollen wirken erst ab Schritt 1.3.
+  Stand: Schritte 1.1, 1.2 (Schema, Standard-Rollen, jedes Konto einer Stadt mit Rolle) und 1.3a
+  (Routen unter Städten prüfen Rechte der Rolle statt `fe_users.role`). Für *Admin* und *Benutzer*
+  verhält sich jede Route wie vorher (per Test). Sitzungsdauer, `auth/me` und Log-Mails richten sich
+  noch nach `fe_users.role` (Schritt 1.3b).
+- Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank): `Area` (`dashboard`,
+  `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`; `maxLevel`:
+  `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`
+  (`book.move`, `book.status`, `device.create`, `device.edit`, `device.retire`, `device.code`,
+  `devices.bulk`, `csv.import`, `mail.log`; `requires()`: Bereich, ohne den die Aktion nicht wirkt).
+  Neue Einträge nur mit ihrer Phase und einer Route, die sie prüft (CSV-Export hat in Phase 1 bewusst
+  keine Aktion: die Exporte verlangen wie bisher nur, Geräte zu sehen; F2 offen). `Permissions`
+  (`all()` für die Rolle Admin, alle Rechte auch künftige; `fromRows`: unbekannte Werte geben kein
+  Recht; `allows(area, level)`, `can(action)`), `PermissionRepository::forUser(tenant, userId)` (eine
+  Abfrage für Admin, sonst zwei; ohne Rolle keine Rechte), `Requirement` (Alternativen aus Rechten, die
+  alle erfüllt sein müssen: `area`, `action`, `anyOf`, `allOf`; `withFieldRule(feld, aktion,
+  liste?)`: steht das Feld im Body, auch mit `null`, bzw. in einem Eintrag der Liste, braucht es die
+  Aktion; `describe()` Kurzform), `Need`, `FieldRule`.
+- Prüfung in `Application` nach der Sitzung, vor dem Handler: Route mit `Requirement` → Rechte laden
+  (`RequestContext::permissions()`, nur bei solchen Routen), `allows(permissions, body)`, sonst 403
+  `forbidden` (Datenbankfehler 503). Handler prüfen keine Rechte; sie lesen sie nur, um Inhalte
+  anzupassen (bisher `GET device-summary`: `notices` nur mit `log` Ansehen). Feldregeln: `POST
+  devices/{id}/state` (`location_id` → `book.move`, `status` → `book.status`), `POST devices/bulk/state`
+  (dieselben je Eintrag in `devices`), `POST devices/{id}/fields` (`scan_code` → `device.code`, übrige
+  Stammdaten → `device.edit`), `POST devices/{id}/reinstate` (`identifier`, `device_type_id` →
+  `device.edit`, `scan_code` → `device.code`).
+- Tests: `TenantRoutePermissionsTest` (Tabelle aller Routen mit bisheriger Stufe und Erfordernis,
+  gleich den Deklarationen; je Route gleiches Verhalten wie bisher für Admin, Benutzer, ohne
+  Sitzung, Konto anderer Stadt, Super-Admin, gesperrte und nicht aktive Konten, unbekannte und
+  gesperrte Stadt; je Erfordernis eine Rolle mit genau den Rechten einer Alternative kommt durch,
+  ohne eines davon 403, ebenso je Feldregel), `AccessControlTest`, `PermissionRepositoryTest`,
+  `tests/Unit/Permission/PermissionsTest`.
 - Regel Kontoart ↔ Rolle (nur im Code, kein CHECK möglich): `fe_users.role = 'admin'` genau dann,
   wenn `role_id` die Rolle Admin der Stadt ist. Jeder Schreibweg von `UserRepository` setzt beides in
   derselben Anweisung (`register`, `insertInvitedAdmin` für `createTenantWithInvitedAdmin` und

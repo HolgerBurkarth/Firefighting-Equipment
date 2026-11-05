@@ -13,7 +13,8 @@ use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
 use FirefightingEquipment\Time\Clock;
 use FirefightingEquipment\Time\SystemClock;
-use FirefightingEquipment\User\UserRole;
+use FirefightingEquipment\Permission\Area;
+use FirefightingEquipment\Permission\AreaLevel;
 
 /**
  * GET api/v1/device-summary (angemeldet): Zahlen für die Startseite ohne ausgesonderte Geräte,
@@ -48,7 +49,7 @@ final readonly class DeviceSummaryHandler implements RequestHandler
                 'without_date' => $summary->withoutDate,
             ],
         ];
-        if ($context->auth()->user->role === UserRole::Admin) {
+        if ($context->permissions()->allows(Area::Log, AreaLevel::Read)) {
             $body['notices'] = ['open' => new DeviceNoticeRepository($context->db->get())->countOpen($tenant)];
         }
 

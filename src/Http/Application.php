@@ -15,6 +15,9 @@ use FirefightingEquipment\Mail\ConfiguredMailer;
 use FirefightingEquipment\Mail\Mailer;
 use FirefightingEquipment\Mail\SendmailMailer;
 use FirefightingEquipment\Offline\OfflineSettings;
+use FirefightingEquipment\Permission\PermissionRepository;
+use FirefightingEquipment\Permission\Permissions;
+use FirefightingEquipment\Permission\Requirement;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\Password\PasswordHasher;
 
@@ -27,7 +30,8 @@ use FirefightingEquipment\User\Password\PasswordHasher;
  * Datenbank und Sitzung), ändernde Anfragen prüfen (CSRF, JSON-Body; ohne Datenbank), Version der
  * App prüfen (X-Client-Api unter ClientApi::MIN: 409 client_outdated; ohne Datenbank), erst dann
  * die Stadt laden (Datenbank), Sitzung und Zugriffsstufe prüfen (nur bei Routen, die nicht
- * öffentlich sind), zum Schluss den Handler aufrufen. Unbekannte Adressen verbinden sich so nie
+ * öffentlich sind; unter einer Stadt die Rechte der Rolle samt Feldregeln, Requirement), zum
+ * Schluss den Handler aufrufen. Unbekannte Adressen verbinden sich so nie
  * mit der Datenbank.
  */
 final readonly class Application
@@ -83,14 +87,21 @@ final readonly class Application
             $tenant = $path->isService() ? null : $this->tenants->resolve($path->scope, $this->db);
 
             $auth = null;
+            $permissions = null;
             if ($route->access !== Access::Public) {
                 $auth = $this->authenticate($request, $tenant);
-                if (!$route->access->allows($auth->user->role)) {
+                if ($route->access instanceof Requirement) {
+                    // Nur unter einer Stadt (Router::forTenant); die Sitzung gehört zu einem Konto dieser Stadt.
+                    $permissions = $this->permissions($tenant ?? throw new \LogicException('Requirement ohne Stadt.'), $auth);
+                    if (!$route->access->allows($permissions, $body)) {
+                        throw HttpException::forbidden();
+                    }
+                } elseif (!$route->access->allows($auth->user->role)) {
                     throw HttpException::forbidden();
                 }
             }
 
-            $context = new RequestContext($request, $tenant, $this->db, $this->errors, $route->params, $body, $auth, $this->hasher, $this->mailer, $this->urls);
+            $context = new RequestContext($request, $tenant, $this->db, $this->errors, $route->params, $body, $auth, $this->hasher, $this->mailer, $this->urls, $permissions);
             $response = $route->handler->handle($context);
             // Kodierfehler hier abfangen, nicht erst beim Senden. Ein CSV-Download wird erst beim
             // Senden geschrieben (gestreamt); seine Abfrage hat der Handler schon ausgeführt.
@@ -132,6 +143,18 @@ final readonly class Application
             }
 
             throw $e;
+        }
+    }
+
+    /**
+     * @throws HttpException 503 database_unavailable
+     */
+    private function permissions(Tenant $tenant, AuthSession $auth): Permissions
+    {
+        try {
+            return new PermissionRepository($this->db->get())->forUser($tenant, $auth->user->id);
+        } catch (ConnectionException | \PDOException $e) {
+            throw HttpException::databaseUnavailable($e);
         }
     }
 

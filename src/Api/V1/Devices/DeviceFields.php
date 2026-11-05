@@ -185,6 +185,7 @@ final class DeviceFields
                 $context->hasher,
                 $context->mailer,
                 $context->urls,
+                $context->permissions,
             );
         }
 

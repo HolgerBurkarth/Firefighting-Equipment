@@ -8,6 +8,29 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-05 – „Rechte: Routen unter Städten prüfen die Rolle statt fe_users.role (Phase 1, Schritt 1.3a)“
+
+Keine sichtbare Änderung der API (Routen, Felder, Antworten, Fehlercodes unverändert); geändert hat
+sich, WIE `Application` den Zugriff unter einer Stadt prüft (Plan Phase 1, Abschnitte 2 und 3):
+
+- Statt `Access::Admin`/`Access::Authenticated` deklariert jede Route unter einer Stadt ein
+  `Permission\Requirement` (Bereiche mit Stufe, Aktionen, Feldregeln); `Access::Admin` gibt es nicht
+  mehr. `Access::Authenticated` bleibt nur für `auth/me`, `auth/sessions…`, `auth/password` und
+  `client-config`. Geprüft nach der Sitzung, vor dem Handler; abgelehnt wie bisher 403 `forbidden`.
+- Rechte aus der Rolle des Kontos (`fe_users.role_id`, `PermissionRepository`); die Rolle *Admin*
+  hat alle Rechte, *Benutzer* `search`/`due` Ansehen, `book.move`, `book.status`. Damit antwortet
+  jede Route für beide Standard-Rollen genau wie vorher (per Test je Route und Fall).
+- `GET device-summary`: `notices` jetzt bei `log` Ansehen statt bei Rolle `admin` (für die
+  Standard-Rollen gleich).
+- Exporte (`devices/export`, `device-events/export`) bewusst wie bisher für jedes Konto, das Geräte
+  sieht (Konflikt mit F2 „Benutzer ohne CSV-Export“, offen).
+- Neue Routen unter Städten in `TenantRoutePermissionsTest` eintragen (Tabelle Route → bisherige Stufe
+  → Erfordernis), sonst scheitert der Test.
+- Tests: `TenantRoutePermissionsTest`, `AccessControlTest`, `RouterTest`, `PermissionRepositoryTest`,
+  `tests/Unit/Permission/PermissionsTest`; `AdminRoutesAccessTest` und `TenantReadRoutesAccessTest`
+  unverändert grün.
+- Dokumentiert in `CLAUDE.md`, "HTTP und REST-API" (Zugriffsregeln) und "Rollen und Rechte".
+
 ## 2026-11-04 – „Sperre für veraltete App-Versionen: client_outdated und X-Api-Version (Phase 0)“
 
 Umsetzung des beschlossenen Plans „Versionierung der API für das Frontend“ (Änderungskonzept

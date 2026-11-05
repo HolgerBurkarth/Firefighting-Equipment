@@ -1231,10 +1231,14 @@ die API anlegen (Beispiele oben unter "Gerätetypen und Standorte" und
     - Bekannte Fehler als `HttpException` werfen (Fabriken in `src/Http/HttpException.php`, neue
       Codes dort ergänzen); alles andere wird automatisch zu 500.
 2. Route in `src/Http/Routes.php` mit Zugriffsstufe eintragen, z. B.
-   `->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceHandler())` in `tenant()`
-   (Städte) oder `service()` (Super-Admin). Stufen: `Public`, `Authenticated`, `Admin` (nur Städte),
-   `SuperAdmin` (nur `service`). Pfad ohne Slash am Anfang und Ende; ein Platzhalter `{name}` passt
-   nur auf positive Ganzzahlen.
+   `->add('GET', 'api/v1/devices/{id}', $seeDevices, new DeviceHandler())` in `tenant()` (Städte:
+   die nötigen Rechte als `Permission\Requirement`, z. B. `Requirement::area(Area::Due,
+   AreaLevel::Write)` oder `Requirement::action(Action::DeviceEdit)`) oder
+   `->add('GET', 'api/v1/tenants', Access::SuperAdmin, …)` in `service()` (Super-Admin). Ohne
+   Rechte: `Public`; `Authenticated` unter Städten nur für die Routen jedes angemeldeten Kontos
+   (`auth/*`, `client-config`). Neue Routen unter Städten in `TenantRoutePermissionsTest`
+   eintragen. Pfad ohne Slash am Anfang und Ende; ein Platzhalter `{name}` passt nur auf positive
+   Ganzzahlen.
 3. Tests: Unit-Test für die Logik, Integrationstest in `tests/Integration/Http/` (erbt von
    `DomainTestCase`) bzw. `tests/Integration/Auth/` (erbt von `AuthTestCase`, mit Anmeldung) für die
    Antworten mit echter Datenbank.

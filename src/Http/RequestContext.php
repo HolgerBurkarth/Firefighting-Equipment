@@ -9,6 +9,7 @@ use FirefightingEquipment\Database\LazyConnection;
 use FirefightingEquipment\Mail\Mailer;
 use FirefightingEquipment\Mail\Notifier;
 use FirefightingEquipment\Mail\SendmailMailer;
+use FirefightingEquipment\Permission\Permissions;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\Password\PasswordHasher;
 
@@ -38,6 +39,8 @@ final readonly class RequestContext
         public Mailer $mailer = new SendmailMailer(),
         /** Absolute Adressen für Mails (app.base_url). */
         public AppUrls $urls = new AppUrls(),
+        /** Rechte des Kontos; nur bei Routen mit Requirement (von Application geladen). */
+        public ?Permissions $permissions = null,
     ) {
     }
 
@@ -55,6 +58,15 @@ final readonly class RequestContext
     public function auth(): AuthSession
     {
         return $this->auth ?? throw new \LogicException('Route ohne Anmeldung: keine Sitzung vorhanden.');
+    }
+
+    /**
+     * Rechte des angemeldeten Kontos einer Route mit Requirement (von Application geprüft). Handler
+     * prüfen damit keine Zugriffe (das tut Application), sondern passen nur Inhalte an.
+     */
+    public function permissions(): Permissions
+    {
+        return $this->permissions ?? throw new \LogicException('Route ohne Requirement: keine Rechte geladen.');
     }
 
     /**
