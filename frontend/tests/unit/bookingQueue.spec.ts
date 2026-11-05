@@ -186,6 +186,32 @@ describe('BookingQueue', () => {
         expect(clock.q.state.bookings).toEqual([]);
     });
 
+    it('Gerät inzwischen außerhalb des Datenfilters (404, auch für dieselbe client_ref): failed, nicht waiting', async () => {
+        // Erster Versuch ohne Antwort (kam vielleicht an), die Wiederholung derselben client_ref
+        // findet das Gerät nicht mehr: Der Server antwortet 404 statt des gespeicherten Ergebnisses.
+        const { q, requests } = queue([
+            { ok: false, error: error('network', null) },
+            { ok: false, error: error('not_found', 404, 'Das Gerät wurde nicht gefunden.') },
+        ]);
+        await q.use('test:7');
+        await q.add(booking());
+        await q.send();
+        expect(q.state.bookings[0]?.state).toBe('waiting');
+
+        await q.send();
+        expect(requests.map((r) => r.request.clientRef)).toEqual([
+            '0b4d2a7c-1f3e-4c5a-9b8d-7e6f5a4b3c2d',
+            '0b4d2a7c-1f3e-4c5a-9b8d-7e6f5a4b3c2d',
+        ]);
+        expect(q.state.bookings[0]?.state).toBe('failed');
+        expect(q.state.bookings[0]?.problem).toBeTruthy();
+
+        await q.send();
+        expect(requests).toHaveLength(2);
+        q.discard('0b4d2a7c-1f3e-4c5a-9b8d-7e6f5a4b3c2d');
+        expect(q.state.bookings).toEqual([]);
+    });
+
     it('nach client_outdated sendet die neue Version dieselbe Buchung', async () => {
         const db = new MemoryDb();
         const old = queue([{ ok: false, error: error('client_outdated', 409) }], db);

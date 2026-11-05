@@ -9,9 +9,11 @@ use FirefightingEquipment\Api\V1\Devices\DeviceHistoryExportHandler;
 use FirefightingEquipment\Device\DeviceEventRepository;
 use FirefightingEquipment\Device\DeviceHistoryEntry;
 use FirefightingEquipment\Device\DeviceHistoryFilter;
-use FirefightingEquipment\Http\Access;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\Router;
+use FirefightingEquipment\Permission\Area;
+use FirefightingEquipment\Permission\AreaLevel;
+use FirefightingEquipment\Permission\Requirement;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
@@ -232,7 +234,7 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         foreach (['08:00:00', '08:01:00', '08:02:00'] as $i => $time) {
             $this->event('2026-06-15 ' . $time, ['event_type' => 'due_changed', 'to_due' => sprintf('2027-01-0%d', $i + 1)]);
         }
-        $app = $this->app(tenant: Router::forTenant()->add('GET', 'api/v1/device-events/export', Access::Authenticated, new DeviceHistoryExportHandler($this->clock, maxRows: 2)));
+        $app = $this->app(tenant: Router::forTenant()->add('GET', 'api/v1/device-events/export', Requirement::area(Area::Search, AreaLevel::Read), new DeviceHistoryExportHandler($this->clock, maxRows: 2)));
 
         [$response, $body] = $this->download('device-events/export', app: $app);
         self::assertSame(409, $response->statusCode(), $body);

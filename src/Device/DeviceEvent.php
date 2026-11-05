@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Device;
 
+use FirefightingEquipment\Permission\DeviceVisibility;
+
 /**
  * Ein Eintrag der Historie eines Geräts. Welche Angaben gefüllt sind, hängt von der Art ab
  * (siehe Migration 0015): created/imported nur $toLocation und $toStatus, state_changed je Paar
@@ -39,6 +41,38 @@ final readonly class DeviceEvent
         /** Kennung der Buchung vom Handy (client_ref), falls mitgesendet */
         public ?string $clientRef = null,
     ) {
+    }
+
+    /**
+     * Derselbe Eintrag; Standorte außerhalb des Datenfilters als „anderer Standort“.
+     */
+    public function maskedFor(DeviceVisibility $visibility): self
+    {
+        if ($visibility->isAll()) {
+            return $this;
+        }
+
+        return new self(
+            $this->id,
+            $this->type,
+            $this->userId,
+            $this->userName,
+            $this->fromLocation?->maskedFor($visibility),
+            $this->toLocation?->maskedFor($visibility),
+            $this->fromStatus,
+            $this->toStatus,
+            $this->fromDue,
+            $this->toDue,
+            $this->field,
+            $this->oldValue,
+            $this->newValue,
+            $this->comment,
+            $this->createdAt,
+            $this->clientOccurredAt,
+            $this->applied,
+            $this->notAppliedReason,
+            $this->clientRef,
+        );
     }
 
     /**

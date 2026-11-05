@@ -43,9 +43,11 @@ final class AuthJson
 
     /**
      * Wirksame Rechte der Rolle (Plan Phase 1, Abschnitt 5): Bereiche mit Stufe, Aktionen (nur die,
-     * deren Bereich vorhanden ist), Einschränkungen (erst ab Phase 2, bis dahin leer), Datenfilter
-     * und eine Kennung des Stands. `version` ändert sich mit der Rolle des Kontos, jeder Änderung
-     * der Rolle (fe_roles.version) und den Rechten selbst (auch einem erweiterten Katalog).
+     * deren Bereich vorhanden ist; mit Datenfilter ohne Verwaltung, F3), Einschränkungen (erst ab
+     * Phase 2, bis dahin leer), Datenfilter und eine Kennung des Stands. `version` ändert sich mit
+     * der Rolle des Kontos, jeder Änderung der Rolle (fe_roles.version), den Rechten selbst (auch
+     * einem erweiterten Katalog) und den Standorten bzw. Gerätetypen des Datenfilters (auch einem
+     * neuen Fach eines gewählten Standorts).
      *
      * @return array{areas: \stdClass, actions: list<string>, restrictions: list<string>, filtered: bool, version: string}
      */
@@ -58,7 +60,7 @@ final class AuthJson
             'restrictions' => [],
             'filtered' => $permissions->isFiltered(),
         ];
-        $json['version'] = hash('sha256', json_encode([$permissions->revision(), $json], JSON_THROW_ON_ERROR));
+        $json['version'] = hash('sha256', json_encode([$permissions->revision(), $permissions->visibility()->toArray(), $json], JSON_THROW_ON_ERROR));
 
         return $json;
     }

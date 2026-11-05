@@ -78,6 +78,32 @@ function notice(id: number, overrides: Record<string, unknown> = {}): Notice {
 }
 
 describe('API der Hinweise', () => {
+    it('Datenfilter: Standort außerhalb als „anderer Standort“ ohne ID und Pfad', () => {
+        const other = { id: null, name: 'anderer Standort', path: null };
+        const json = noticeJson(13);
+        const parsed = parseNotice({
+            ...json,
+            booking: { ...(json['booking'] as Record<string, unknown>), location: other },
+            other: { ...(json['other'] as Record<string, unknown>), location: other },
+        });
+        expect(parsed?.booking.location).toEqual({
+            id: null,
+            name: 'anderer Standort',
+            path: 'anderer Standort',
+        });
+        expect(parsed?.other.location.path).toBe('anderer Standort');
+        // Nur ID oder nur Pfad null ist ungültig.
+        expect(
+            parseNotice({
+                ...json,
+                other: {
+                    ...(json['other'] as Record<string, unknown>),
+                    location: { id: null, name: 'Lager', path: 'Lager' },
+                },
+            }),
+        ).toBeNull();
+    });
+
     it('liest einen Hinweis mit Buchung, anderem Stand und Verlauf', () => {
         const parsed = parseNotice(
             noticeJson(12, {

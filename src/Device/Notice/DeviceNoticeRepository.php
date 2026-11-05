@@ -6,6 +6,7 @@ namespace FirefightingEquipment\Device\Notice;
 
 use FirefightingEquipment\Device\DeviceEventLocation;
 use FirefightingEquipment\Device\DeviceStatus;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -14,10 +15,14 @@ use FirefightingEquipment\Tenant\Tenant;
  * (DeviceRepository::book); erledigt bzw. wieder geöffnet in einer eigenen Transaktion, jeweils mit
  * einem Eintrag im Verlauf. Es gibt bewusst keine Methode zum Löschen und kein automatisches
  * Erledigen.
+ *
+ * Datenfilter (DeviceVisibility, Pflicht im Konstruktor): nur Hinweise zu Geräten, die jetzt sichtbar
+ * sind (sonst wie fremd); Standorte außerhalb (Buchung, anderer Stand) als „anderer Standort“.
  */
 final readonly class DeviceNoticeRepository
 {
     private const string SELECT = 'SELECT n.id, n.kind, n.status, n.stale_confirmed, n.device_id, d.identifier AS device_identifier,'
+        . ' d.device_type_id AS device_type_id, d.location_id AS device_location_id,'
         . ' t.name AS type_name, b.client_ref, n.event_id, n.occurred_at, n.requested_status, n.other_occurred_at, n.other_status,'
         . ' n.created_at, n.updated_at, e.comment AS booking_comment,'
         . ' u.id AS u_id, u.status AS u_status, u.display_name AS u_display_name, u.name AS u_name, u.email AS u_email,'
@@ -38,7 +43,7 @@ final readonly class DeviceNoticeRepository
         . ' LEFT JOIN fe_locations op ON op.id = ol.parent_id AND op.tenant_id = n.tenant_id'
         . ' WHERE n.tenant_id = ?';
 
-    public function __construct(private \PDO $pdo)
+    public function __construct(private \PDO $pdo, private DeviceVisibility $visibility)
     {
     }
 
@@ -82,10 +87,17 @@ final readonly class DeviceNoticeRepository
         if ($limit < 1 || $offset < 0) {
             throw new \InvalidArgumentException('limit muss positiv, offset nicht negativ sein.');
         }
-        $where = $status === null ? '' : ' AND n.status = ?';
-        $params = $status === null ? [$tenant->id] : [$tenant->id, $status->value];
+        [$where, $params] = $this->visibility->sql('d');
+        $params = [$tenant->id, ...$params];
+        if ($status !== null) {
+            $where .= ' AND n.status = ?';
+            $params[] = $status->value;
+        }
 
-        $count = $this->pdo->prepare('SELECT COUNT(*) FROM fe_device_notices n WHERE n.tenant_id = ?' . $where);
+        $count = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM fe_device_notices n JOIN fe_devices d ON d.id = n.device_id AND d.tenant_id = n.tenant_id'
+            . ' WHERE n.tenant_id = ?' . $where,
+        );
         $count->execute($params);
         $total = (int) $count->fetchColumn();
 
@@ -98,8 +110,9 @@ final readonly class DeviceNoticeRepository
 
     public function find(Tenant $tenant, int $id): ?DeviceNotice
     {
-        $stmt = $this->pdo->prepare(self::SELECT . self::FROM . ' AND n.id = ?');
-        $stmt->execute([$tenant->id, $id]);
+        [$visible, $visibleParams] = $this->visibility->sql('d');
+        $stmt = $this->pdo->prepare(self::SELECT . self::FROM . $visible . ' AND n.id = ?');
+        $stmt->execute([$tenant->id, ...$visibleParams, $id]);
 
         return $this->withHistory($tenant, $stmt->fetchAll())[0] ?? null;
     }
@@ -118,8 +131,12 @@ final readonly class DeviceNoticeRepository
 
     public function countOpen(Tenant $tenant): int
     {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM fe_device_notices WHERE tenant_id = ? AND status = ?');
-        $stmt->execute([$tenant->id, NoticeStatus::Open->value]);
+        [$visible, $visibleParams] = $this->visibility->sql('d');
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM fe_device_notices n JOIN fe_devices d ON d.id = n.device_id AND d.tenant_id = n.tenant_id'
+            . ' WHERE n.tenant_id = ? AND n.status = ?' . $visible,
+        );
+        $stmt->execute([$tenant->id, NoticeStatus::Open->value, ...$visibleParams]);
 
         return (int) $stmt->fetchColumn();
     }
@@ -143,8 +160,12 @@ final readonly class DeviceNoticeRepository
 
         $this->pdo->beginTransaction();
         try {
-            $stmt = $this->pdo->prepare('SELECT status FROM fe_device_notices WHERE id = ? AND tenant_id = ? FOR UPDATE');
-            $stmt->execute([$id, $tenant->id]);
+            [$visible, $visibleParams] = $this->visibility->sql('d');
+            $stmt = $this->pdo->prepare(
+                'SELECT n.status FROM fe_device_notices n JOIN fe_devices d ON d.id = n.device_id AND d.tenant_id = n.tenant_id'
+                . ' WHERE n.id = ? AND n.tenant_id = ?' . $visible . ' FOR UPDATE',
+            );
+            $stmt->execute([$id, $tenant->id, ...$visibleParams]);
             $status = $stmt->fetchColumn();
             if ($status === false) {
                 throw NoticeNotFoundException::forId($id);
@@ -198,7 +219,10 @@ final readonly class DeviceNoticeRepository
             );
         }
 
-        return array_map(fn (array $row): DeviceNotice => self::hydrate($row, $history[(int) $row['id']] ?? []), $rows);
+        return array_map(
+            fn (array $row): DeviceNotice => self::hydrate($row, $history[(int) $row['id']] ?? [])->maskedFor($this->visibility),
+            $rows,
+        );
     }
 
     /**
@@ -229,6 +253,8 @@ final readonly class DeviceNoticeRepository
             self::utc((string) $row['updated_at']),
             $history,
             $row['booking_comment'] === null ? null : (string) $row['booking_comment'],
+            (int) $row['device_type_id'],
+            (int) $row['device_location_id'],
         );
     }
 

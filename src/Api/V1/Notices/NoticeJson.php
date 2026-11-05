@@ -82,10 +82,16 @@ final class NoticeJson
     }
 
     /**
-     * @return array{id: int, name: string, path: string}|null
+     * Außerhalb des Datenfilters {id: null, name: "anderer Standort", path: null}.
+     *
+     * @return array{id: ?int, name: string, path: ?string}|null
      */
     private static function location(?DeviceEventLocation $location): ?array
     {
-        return $location === null ? null : ['id' => $location->id, 'name' => $location->name, 'path' => $location->path()];
+        return $location === null ? null : [
+            'id' => $location->id,
+            'name' => $location->name,
+            'path' => $location->isMasked() ? null : $location->path(),
+        ];
     }
 }

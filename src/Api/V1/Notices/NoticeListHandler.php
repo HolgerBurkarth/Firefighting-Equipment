@@ -31,7 +31,7 @@ final readonly class NoticeListHandler implements RequestHandler
         $limit = $context->queryInt('limit', 1, DeviceListHandler::MAX_LIMIT) ?? DeviceListHandler::DEFAULT_LIMIT;
         $offset = $context->queryInt('offset', 0, DeviceListHandler::MAX_OFFSET) ?? 0;
 
-        $notices = new DeviceNoticeRepository($context->db->get());
+        $notices = new DeviceNoticeRepository($context->db->get(), $context->visibility());
         $page = $notices->list($tenant, $status, $limit, $offset);
 
         return new JsonResponse([

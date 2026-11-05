@@ -38,7 +38,7 @@ final readonly class DeviceActionHandler implements RequestHandler
     {
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
         $recorder = new DeviceEventRecorder();
-        $devices = new DeviceRepository($context->db->get(), $recorder);
+        $devices = new DeviceRepository($context->db->get(), $context->visibility(), $recorder);
 
         try {
             $device = match ($this->action) {
@@ -87,7 +87,7 @@ final readonly class DeviceActionHandler implements RequestHandler
         }
 
         if ($recorder->ids() !== []) {
-            DeviceLogNotifier::fromContext($context)->deviceChanged($tenant, $context->auth()->user, $device, $recorder->ids());
+            DeviceLogNotifier::fromContext($context)->deviceChanged($tenant, $context->auth()->user, $device, $recorder->ids(), $recorder->before());
         }
 
         return new JsonResponse(['device' => DeviceJson::device($device)], $this->action === DeviceAction::Create ? 201 : 200);

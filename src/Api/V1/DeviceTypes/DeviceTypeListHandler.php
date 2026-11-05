@@ -20,7 +20,7 @@ final readonly class DeviceTypeListHandler implements RequestHandler
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
         $includeInactive = $context->queryFlag('include_inactive');
 
-        $types = new DeviceTypeRepository($context->db->get())->listByTenant($tenant, $includeInactive);
+        $types = new DeviceTypeRepository($context->db->get(), $context->visibility())->listByTenant($tenant, $includeInactive);
 
         return new JsonResponse(['device_types' => array_map(DeviceTypeJson::deviceType(...), $types)]);
     }

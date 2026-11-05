@@ -7,12 +7,16 @@ namespace FirefightingEquipment\Tests\Integration\Notification;
 use FirefightingEquipment\Device\DeviceEventRecorder;
 use FirefightingEquipment\Device\DeviceEventRepository;
 use FirefightingEquipment\Device\DeviceRepository;
+use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
 use FirefightingEquipment\Http\AppUrls;
 use FirefightingEquipment\Http\ErrorReporter;
 use FirefightingEquipment\Mail\MailMessage;
 use FirefightingEquipment\Mail\Notifier;
+use FirefightingEquipment\Permission\DeviceVisibility;
+use FirefightingEquipment\Permission\PermissionRepository;
 use FirefightingEquipment\User\UserRepository;
 use FirefightingEquipment\Notification\DeviceLogNotifier;
+use FirefightingEquipment\Tests\Integration\Device\FilteredRoles;
 use FirefightingEquipment\Tests\Integration\Import\ImportApiTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -30,6 +34,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(DeviceEventRecorder::class)]
 final class DeviceLogNotificationTest extends ImportApiTestCase
 {
+    use FilteredRoles;
+
     private const string SUBJECT_PREFIX = 'Log Feuerwehr immendingen: ';
 
     protected function setUp(): void
@@ -246,6 +252,80 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         self::assertNoLink($this->mailer->sent[1]);
     }
 
+    /**
+     * Empfänger mit Datenfilter (nur HLF 20 mit Fächern): Mail nur, wenn das Gerät vorher oder
+     * nachher sichtbar ist; ein Standort außerhalb erscheint als „anderer Standort“.
+     */
+    public function testFilteredRecipientGetsMailsOnlyForDevicesItSees(): void
+    {
+        $this->filteredAccount('wache@example.org', ['filter_locations' => 1], [$this->hlf], [], account: ['notify_device_log' => 1]);
+        $all = ['log-admin@example.org', 'wache@example.org', 'chef@example.org'];
+        $withoutWatch = ['log-admin@example.org', 'chef@example.org'];
+
+        $id = $this->createViaApi('MA-01')['id'];
+        self::assertSame($all, $this->recipients(), 'angelegt in G1');
+        $this->mailer->sent = [];
+        $this->createViaApi('MA-02', ['location_id' => $this->room]);
+        self::assertSame($withoutWatch, $this->recipients(), 'angelegt im Lager');
+
+        $this->mailer->sent = [];
+        self::assertSame(200, $this->api('POST', "devices/{$id}/state", ['version' => 1, 'location_id' => $this->room])->statusCode());
+        self::assertSame($all, $this->recipients(), 'vorher sichtbar');
+        self::assertStringContainsString('Standort: HLF 20 / G1 → anderer Standort', $this->mailer->sent[1]->text);
+        self::assertStringNotContainsString('Lager', $this->mailer->sent[1]->text);
+        self::assertStringContainsString('Standort: HLF 20 / G1 → Lager', $this->mailer->sent[0]->text, 'Admin: echter Standort');
+
+        $this->mailer->sent = [];
+        self::assertSame(200, $this->api('POST', "devices/{$id}/state", ['version' => 2, 'status' => 'defective'])->statusCode());
+        self::assertSame($withoutWatch, $this->recipients(), 'weder vorher noch nachher sichtbar');
+    }
+
+    public function testFilteredRecipientGetsOnlyItsRowsOfBulkActionsAndImports(): void
+    {
+        $this->filteredAccount('wache@example.org', ['filter_locations' => 1], [$this->hlf], [], account: ['notify_device_log' => 1]);
+        $first = $this->createViaApi('MA-01')['id'];
+        $second = $this->createViaApi('MA-02', ['location_id' => $this->room])['id'];
+        $third = $this->createViaApi('MA-03', ['location_id' => $this->room])['id'];
+        $this->mailer->sent = [];
+
+        $this->api('POST', 'devices/bulk/state', ['devices' => [
+            ['id' => $first, 'version' => 1, 'status' => 'defective'],
+            ['id' => $second, 'version' => 1, 'status' => 'defective'],
+        ]]);
+        self::assertSame(['log-admin@example.org', 'wache@example.org', 'chef@example.org'], $this->recipients());
+        self::assertSame(self::SUBJECT_PREFIX . '2 Geräte – Status defekt', $this->mailer->sent[0]->subject);
+        self::assertSame(self::SUBJECT_PREFIX . 'MA-01 Status defekt', $this->mailer->sent[1]->subject, 'nur ein sichtbares Gerät: die Mail zum Gerät');
+        self::assertStringNotContainsString('MA-02', $this->mailer->sent[1]->text);
+
+        $this->mailer->sent = [];
+        $this->api('POST', 'devices/bulk/state', ['devices' => [
+            ['id' => $second, 'version' => 2, 'status' => 'maintenance'],
+            ['id' => $third, 'version' => 1, 'status' => 'maintenance'],
+        ]]);
+        self::assertSame(['log-admin@example.org', 'chef@example.org'], $this->recipients(), 'nichts Sichtbares: keine Mail');
+
+        $this->mailer->sent = [];
+        $this->import(self::csv([
+            ['MA-02', 'Atemschutzmaske', 'HLF 20 / G1', '', '', '', '', '', '', ''],
+            ['MA-03', 'Atemschutzmaske', 'Lager', 'einsatzbereit', '', '', '', '', '', ''],
+            ['MA-04', 'Atemschutzmaske', 'HLF 20', '', '', '', '', '', '', ''],
+            ['MA-05', 'Atemschutzmaske', 'Lager', '', '', '', '', '', '', ''],
+        ]));
+        self::assertSame(['log-admin@example.org', 'wache@example.org', 'chef@example.org'], $this->recipients());
+        self::assertSame(self::SUBJECT_PREFIX . 'CSV-Import: 2 neu, 2 geändert', $this->mailer->sent[0]->subject);
+        $watch = $this->mailer->sent[1];
+        self::assertSame(self::SUBJECT_PREFIX . 'CSV-Import: 1 neu, 1 geändert', $watch->subject);
+        self::assertStringContainsString('Zeile 2: MA-02 geändert: Standort anderer Standort → HLF 20 / G1', $watch->text);
+        self::assertStringContainsString('Zeile 4: MA-04 neu: ', $watch->text);
+        self::assertStringNotContainsString('MA-03', $watch->text);
+        self::assertStringNotContainsString('MA-05', $watch->text);
+        self::assertStringNotContainsString('Lager', $watch->text);
+
+        $this->mailer->sent = [];
+        $this->import(self::csv([['MA-06', 'Atemschutzmaske', 'Lager', '', '', '', '', '', '', '']]));
+        self::assertSame(['log-admin@example.org', 'chef@example.org'], $this->recipients());
+    }
+
     public function testImportMailListsAtMostFiftyRows(): void
     {
         $rows = [];
@@ -313,13 +393,15 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         });
         $notifier = new DeviceLogNotifier(
             new UserRepository($this->pdo()),
-            new DeviceEventRepository($this->pdo()),
+            new DeviceEventRepository($this->pdo(), DeviceVisibility::all()),
             new Notifier($this->mailer, $errors),
             $errors,
             AppUrls::fixed(self::BASE_URL),
+            new PermissionRepository($this->pdo()),
+            new DeviceNoticeRepository($this->pdo(), DeviceVisibility::all()),
             timeBudgetSeconds: 0.0,
         );
-        $device = new DeviceRepository($this->pdo())->find($this->tenant('immendingen'), $id) ?? throw new \LogicException('Gerät fehlt.');
+        $device = new DeviceRepository($this->pdo(), DeviceVisibility::all())->find($this->tenant('immendingen'), $id) ?? throw new \LogicException('Gerät fehlt.');
         $actor = new UserRepository($this->pdo())->findById($this->adminId) ?? throw new \LogicException('Konto fehlt.');
 
         self::assertSame(0, $notifier->deviceChanged($this->tenant('immendingen'), $actor, $device, [$eventId]));

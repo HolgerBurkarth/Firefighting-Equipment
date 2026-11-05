@@ -12,6 +12,7 @@ use FirefightingEquipment\Device\Booking\ClientRef;
 use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\DeviceStateChange;
 use FirefightingEquipment\Offline\ActionTime;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tests\Support\TestDatabase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -285,7 +286,7 @@ final class DeviceOfflineBookingTest extends DeviceApiTestCase
         $at = ActionTime::fromString($this->at('-1 minute'));
         $ref = ClientRef::fromString($this->ref());
         try {
-            new DeviceRepository($this->pdo())->book($this->tenant('immendingen'), $this->userId, $id, 1, $change, null, new BookingRequest($ref, $at, false, BookingRequest::hash($id, 1, $change, null, $at)));
+            new DeviceRepository($this->pdo(), DeviceVisibility::all())->book($this->tenant('immendingen'), $this->userId, $id, 1, $change, null, new BookingRequest($ref, $at, false, BookingRequest::hash($id, 1, $change, null, $at)));
             self::fail('Die Buchung hat nicht auf die Sperre der zweiten Verbindung gewartet.');
         } catch (\PDOException $e) {
             self::assertSame(self::ER_LOCK_WAIT_TIMEOUT, $e->errorInfo[1] ?? null, $e->getMessage());
@@ -309,7 +310,7 @@ final class DeviceOfflineBookingTest extends DeviceApiTestCase
         $change = new DeviceStateChange($this->room, null);
         $at = ActionTime::fromString($this->at('-1 minute'));
         try {
-            new DeviceRepository($this->pdo())->book($this->tenant('immendingen'), $this->userId, $id, 1, $change, null, new BookingRequest(ClientRef::fromString($this->ref()), $at, false, BookingRequest::hash($id, 1, $change, null, $at)));
+            new DeviceRepository($this->pdo(), DeviceVisibility::all())->book($this->tenant('immendingen'), $this->userId, $id, 1, $change, null, new BookingRequest(ClientRef::fromString($this->ref()), $at, false, BookingRequest::hash($id, 1, $change, null, $at)));
             self::fail('Die Buchung hat nicht auf die Sperre des Standorts gewartet.');
         } catch (\PDOException $e) {
             self::assertSame(self::ER_LOCK_WAIT_TIMEOUT, $e->errorInfo[1] ?? null, $e->getMessage());

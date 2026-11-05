@@ -317,7 +317,7 @@ durch und verlangt den Parameter. Ein Gerät außerhalb des Filters gilt wie ein
 | Letzte Aktivitäten | `DeviceEventRepository::listForTenant` (`GET device-events`) | Ereignisse von Geräten, die JETZT sichtbar sind (Regel: Typ und aktueller Standort); Standorte maskiert wie oben | Liste, `total` |
 | Verlauf exportieren | `countHistory`/`exportHistory` | wie Letzte Aktivitäten; Grenze `MAX_ROWS` zählt nur Sichtbare | CSV-Zeilen, 409-Grenze |
 | CSV-Export Geräte | `DeviceRepository::export` | Filter wie Liste | CSV-Zeilen |
-| CSV-Import | `DeviceImportPlanner`, Vorlage, „Gültige Werte“ | Vorschlag: nur für Rollen ohne Datenfilter (F3); sonst Vorlage/Werte gefiltert, Zeilen zu unsichtbaren Geräten und Zielen außerhalb als Fehler | je nach Entscheidung |
+| CSV-Import | `DeviceImportPlanner`, Vorlage, „Gültige Werte“ | Entschieden (F3): nur für Rollen ohne Datenfilter; mit Datenfilter wirkt `csv.import` nicht (403), der Import sieht daher immer alle Geräte (`DeviceVisibility::all()`) | Rolle mit Filter und `csv.import` in der Datenbank: 403 |
 | Hinweise | `DeviceNoticeRepository::list`/`find` (`GET notices`, `{id}`, `resolve`, `reopen`) | nur Hinweise zu sichtbaren Geräten; `open` gezählt ebenso | Liste, Zahl, 404 |
 | Mails „Log“, Hinweis-Mails | `UserRepository::listDeviceLogRecipients`, `DeviceLogNotifier` | Empfänger brauchen `mail.log`; je Empfänger dessen Sichtbarkeit: Einzelmail nur, wenn das Gerät für ihn sichtbar ist (vorher oder nachher), Sammelmail (Import, Sammelaktion) nur mit seinen Zeilen, ohne sichtbare Zeilen keine Mail. Super-Admins: alle. | Empfänger mit Filter bekommt keine bzw. gekürzte Mail |
 | Offline-Kopie | `GET devices`, `GET locations` (Snapshot) | folgt aus den gefilterten Antworten; Wechsel der Rechte → Kopie neu (Abschnitt 7) | Browser-Test: Kopie enthält nur Sichtbares |
@@ -325,8 +325,43 @@ durch und verlangt den Parameter. Ein Gerät außerhalb des Filters gilt wie ein
 | Sperren eines Standorts | `LocationRepository::lock` (Anzahl in `details`) | zählt alle Geräte (Regel der Datenbank), nur mit `locations` Ändern erreichbar; Vorschlag F3: Verwaltung nur ohne Datenfilter | – |
 
 Ein gemeinsamer Integrationstest (`DeviceVisibilityMatrixTest`) legt zwei Typen × drei Standorte (mit
-Fach) an, je ein Gerät, und ruft jede Zeile der Tabelle einmal mit der Rolle *Admin* und einmal mit
-einer Rolle „sieht nur HLF 20 und Atemschutzmaske“ auf.
+Fach) an, je ein Gerät, und ruft jede Zeile der Tabelle einmal mit der Rolle *Admin* und mit drei
+Rollen auf (Vorgabe Holger 05.11.2026): nur Standortfilter „HLF 20“, nur Typfilter
+„Atemschutzmaske“, beide (verknüpft mit UND).
+
+Ergänzungen und Festlegungen zu Schritt 1.4 (Holger, 05.11.2026; umgesetzt 05.11.2026):
+
+- **Leerer Filter**: `filter_locations` bzw. `filter_device_types` an, aber keine Standorte bzw. Typen
+  gewählt: Die Rolle sieht nichts (keine Geräte, Standorte bzw. Typen, Hinweise, Verlauf; Anlegen
+  400). Per Test je Filterart und für beide. Der Editor (Schritt 1.5) lässt das gar nicht speichern:
+  400 `invalid_request` mit Meldung (z. B. „Bitte mindestens einen Standort wählen oder ‚Alle
+  Standorte‘.“).
+- **Masken überall**: Ein Standort außerhalb des Filters erscheint als „anderer Standort“ (`id` und
+  `path` `null`, `name` „anderer Standort“) im Verlauf (Gerät, Letzte Aktivitäten, Export als Text),
+  in Hinweisen (`booking.location`, `other.location`) und in den Mails „Log“ und Hinweis-Mails.
+  `details.device` bei `version_conflict` und `device` in den Ergebnissen der Sammelaktionen zeigen
+  nie einen Standort außerhalb: Ist das Gerät inzwischen außerhalb, gilt es wie fremd (404 ohne
+  `details` bzw. Eintrag `error` `not_found` mit `device` `null`), ein sichtbares Gerät steht immer
+  an einem sichtbaren Standort. Per Test.
+- **Wiederholung und Warteschlange**: Wird eine gespeicherte `client_ref` wiederholt, nachdem das
+  Gerät für das Konto unsichtbar wurde, ist die Antwort 404 (auch offline und in der Sammelaktion).
+  Die Warteschlange der App setzt die Buchung dann auf `failed` (andere 4xx), nicht `waiting`. Beides
+  per Test (`DeviceVisibilityMatrixTest`, `bookingQueue.spec.ts`).
+- **Umsetzung abweichend vom Text oben**: Die Repositorys (`DeviceRepository`,
+  `DeviceEventRepository`, `DeviceNoticeRepository`, `LocationRepository`, `DeviceTypeRepository`)
+  verlangen `DeviceVisibility` im Konstruktor (Pflicht, ohne Standardwert) statt in jeder Methode;
+  jede Instanz nennt den Filter also ausdrücklich, der Reflection-Test prüft die Konstruktoren
+  (`DeviceVisibilityTest`). Handler übergeben `RequestContext::visibility()`, Kommandozeile, Import
+  und Mails `DeviceVisibility::all()` (Mails maskieren je Empfänger).
+- **F3 auch zur Laufzeit**: `Permissions` gibt einer Rolle mit Datenfilter `users` nicht,
+  `locations`/`device_types` höchstens Ansehen und `csv.import` nicht, auch wenn die Datenbank sie
+  enthält (zusätzlich zur Prüfung beim Speichern in 1.5).
+- **Standorte**: Ein Standort der Ebene 1, von dem nur Fächer sichtbar sind, kommt mit `selectable`
+  false und `device_count` `null` (neues Feld `selectable`, sonst true); als Ziel einer Buchung 400.
+  Ein neues Fach eines gewählten Standorts der Ebene 1 gehört sofort dazu (`permissions.version`
+  ändert sich). Die App liest `selectable` ab Schritt 1.7; bis dahin zählt sie `null` als 0.
+- **Mails**: „vorher“ ist der Stand beim Sperren des Geräts (`DeviceEventRecorder::before`). Eine
+  Sammelaktion, von der ein Empfänger nur ein Gerät sieht, ergibt für ihn die Mail zum Gerät.
 
 ## 5. Standard-Rollen, Schutzregeln, Einladungscodes, Seiten
 
@@ -393,7 +428,9 @@ Klasse` (wird eine Rolle strenger, gilt die kürzere Höchstdauer sofort).
 - Seite „Rolle bearbeiten“ (`staedte/<id>/rollen/<rolle>`): Name, Kurzbeschreibung; „1 · Ansichten
   und Bereiche“ (je Bereich Knöpfe Kein Zugriff/Ansehen/Ändern mit `aria-pressed`); „2 · Aktionen“
   (Kästchen nach Gruppen, grau mit „braucht ‚…: …‘“); „3 · Einschränkungen“ (erst ab Phase 2
-  sichtbar); „4 · Sieht nur …“ (Standorte und Ausrüstungstypen, je Alle/Nur ausgewählte); rechts
+  sichtbar); „4 · Sieht nur …“ (Standorte und Ausrüstungstypen, je Alle/Nur ausgewählte; „Nur
+  ausgewählte“ ohne Auswahl lässt sich nicht speichern, der Server antwortet 400 mit Meldung, siehe
+  Abschnitt 4); rechts
   „So sieht es die Rolle“ (Menü am PC, Leiste am Handy, Darf, Sieht Ausrüstung) und „Die Änderung
   gilt sofort für N Personen …“; Speichern, Abbrechen, „Rolle löschen …“ (gesperrt mit Personen).
   Ungespeichert über `useUnsavedInput`.

@@ -33,7 +33,7 @@ final readonly class DeviceSummaryHandler implements RequestHandler
     {
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
 
-        $summary = new DeviceRepository($context->db->get())->summary($tenant, InspectionWindow::from($this->clock));
+        $summary = new DeviceRepository($context->db->get(), $context->visibility())->summary($tenant, InspectionWindow::from($this->clock));
         $byStatus = [];
         foreach ($summary->byStatus as $status => $count) {
             $byStatus[] = ['status' => $status, 'status_label' => DeviceStatus::from($status)->label(), 'count' => $count];
@@ -50,7 +50,7 @@ final readonly class DeviceSummaryHandler implements RequestHandler
             ],
         ];
         if ($context->permissions()->allows(Area::Log, AreaLevel::Read)) {
-            $body['notices'] = ['open' => new DeviceNoticeRepository($context->db->get())->countOpen($tenant)];
+            $body['notices'] = ['open' => new DeviceNoticeRepository($context->db->get(), $context->visibility())->countOpen($tenant)];
         }
 
         return new JsonResponse($body);

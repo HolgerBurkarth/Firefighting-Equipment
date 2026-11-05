@@ -9,7 +9,8 @@ use FirefightingEquipment\Device\Location;
 
 /**
  * JSON-Darstellung eines Standorts. Ebene 1 zusätzlich mit device_count_total (einschließlich der
- * Unterstandorte) und children; Unterstandorte ohne diese Felder. Zeiten in UTC.
+ * Unterstandorte) und children; Unterstandorte ohne diese Felder. Zeiten in UTC. Gerätezahlen nur
+ * sichtbarer Geräte; selectable false (Datenfilter: nur Fächer sichtbar) mit device_count null.
  */
 final class LocationJson
 {
@@ -26,7 +27,9 @@ final class LocationJson
             'level' => $location->level(),
             'parent_id' => $location->parentId,
             'active' => $location->active,
-            'device_count' => $location->deviceCount,
+            // Nicht wählbar (Datenfilter, nur Fächer sichtbar): ohne Gerätezahl.
+            'selectable' => $location->selectable,
+            'device_count' => $location->selectable ? $location->deviceCount : null,
         ];
         if ($location->level() === 1) {
             $json['device_count_total'] = $location->deviceCountTotal;

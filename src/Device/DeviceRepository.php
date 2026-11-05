@@ -16,6 +16,7 @@ use FirefightingEquipment\Device\Notice\NewNotice;
 use FirefightingEquipment\Device\Notice\NoticeKind;
 use FirefightingEquipment\Device\Booking\DuplicateClientRefException;
 use FirefightingEquipment\Offline\ActionTime;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -26,6 +27,10 @@ use FirefightingEquipment\Tenant\Tenant;
  * Scan-Code vergeben ist, entscheidet der UNIQUE-Index auf identifier_key bzw. scan_code_key (Fehler
  * 1062, unterschieden am Namen des Index), nicht eine Vorabfrage. Verletzt eine Änderung beide,
  * meldet MariaDB nur den ersten.
+ *
+ * Datenfilter (DeviceVisibility, Pflicht im Konstruktor): Jede Abfrage sieht nur Geräte, deren Typ
+ * und Standort sichtbar sind; ein Gerät außerhalb gilt wie ein fremdes (DeviceNotFoundException),
+ * ein Ziel-Standort bzw. Gerätetyp außerhalb wie ein unbekannter (InvalidDeviceValueException).
  *
  * Sperren gegen gleichzeitige Änderungen (siehe LocationRepository): Ziel-Standort und Gerätetyp
  * werden mit LOCK IN SHARE MODE gelesen und erst dann auf active geprüft, bevor das Gerät
@@ -65,7 +70,7 @@ final readonly class DeviceRepository
      * @param DeviceEventRecorder|null $recorder erhält die IDs der Ereignisse der letzten erfolgreichen
      *                                           Änderung (für die Benachrichtigung „Log“)
      */
-    public function __construct(private \PDO $pdo, private ?DeviceEventRecorder $recorder = null)
+    public function __construct(private \PDO $pdo, private DeviceVisibility $visibility, private ?DeviceEventRecorder $recorder = null)
     {
     }
 
@@ -78,7 +83,7 @@ final readonly class DeviceRepository
             throw new \InvalidArgumentException('limit muss positiv, offset nicht negativ sein.');
         }
 
-        [$where, $params] = self::where($filter);
+        [$where, $params] = $this->where($filter);
         $params = [$tenant->id, ...$params];
 
         $count = $this->pdo->prepare('SELECT COUNT(*)' . self::FROM . $where);
@@ -100,7 +105,7 @@ final readonly class DeviceRepository
      */
     public function export(Tenant $tenant, DeviceFilter $filter, DeviceSort $sort = DeviceSort::Identifier, SortDirection $direction = SortDirection::Asc): \Generator
     {
-        [$where, $params] = self::where($filter);
+        [$where, $params] = $this->where($filter);
 
         return UnbufferedQuery::rows(
             $this->pdo,
@@ -124,7 +129,7 @@ final readonly class DeviceRepository
             throw new \InvalidArgumentException('Die Prüffristen filtern nur nach Gerätetyp und Standort.');
         }
 
-        [$where, $params] = self::where($filter);
+        [$where, $params] = $this->where($filter);
         [$condition, $order, $dates] = match ($section) {
             InspectionSection::Overdue => [' AND d.next_inspection_due < ?', 'd.next_inspection_due, NATURAL_SORT_KEY(d.identifier), d.id', [$window->today]],
             InspectionSection::DueSoon => [' AND d.next_inspection_due BETWEEN ? AND ?', 'd.next_inspection_due, NATURAL_SORT_KEY(d.identifier), d.id', [$window->today, $window->until]],
@@ -150,12 +155,13 @@ final readonly class DeviceRepository
      */
     public function summary(Tenant $tenant, InspectionWindow $window): DeviceSummary
     {
+        [$visible, $visibleParams] = $this->visibility->sql('d');
         $stmt = $this->pdo->prepare(
             'SELECT d.status, COUNT(*) AS devices, SUM(d.next_inspection_due < ?) AS overdue,'
             . ' SUM(d.next_inspection_due BETWEEN ? AND ?) AS due_soon, SUM(d.next_inspection_due IS NULL) AS without_date'
-            . " FROM fe_devices d WHERE d.tenant_id = ? AND d.status <> 'retired' GROUP BY d.status",
+            . " FROM fe_devices d WHERE d.tenant_id = ? AND d.status <> 'retired'" . $visible . ' GROUP BY d.status',
         );
-        $stmt->execute([$window->today, $window->today, $window->until, $tenant->id]);
+        $stmt->execute([$window->today, $window->today, $window->until, $tenant->id, ...$visibleParams]);
 
         $byStatus = [];
         foreach (DeviceStatus::cases() as $status) {
@@ -174,10 +180,14 @@ final readonly class DeviceRepository
         return new DeviceSummary($window, $byStatus, $overdue, $dueSoon, $withoutDate);
     }
 
+    /**
+     * Ein Gerät (auch ausgesondert); außerhalb des Datenfilters null wie ein fremdes.
+     */
     public function find(Tenant $tenant, int $id): ?Device
     {
-        $stmt = $this->pdo->prepare(self::SELECT . self::FROM . ' AND d.id = ?');
-        $stmt->execute([$tenant->id, $id]);
+        [$visible, $visibleParams] = $this->visibility->sql('d');
+        $stmt = $this->pdo->prepare(self::SELECT . self::FROM . $visible . ' AND d.id = ?');
+        $stmt->execute([$tenant->id, ...$visibleParams, $id]);
         $row = $stmt->fetch();
 
         return is_array($row) ? self::hydrate($row) : null;
@@ -209,10 +219,11 @@ final readonly class DeviceRepository
             $this->pdo->prepare('SELECT id FROM fe_devices WHERE tenant_id = ? AND identifier_key IN (' . $in . ') FOR UPDATE')
                 ->execute([$tenant->id, ...$keys]);
         }
+        [$visible, $visibleParams] = $this->visibility->sql('d');
         $stmt = $this->pdo->prepare(
-            self::SELECT . ', d.identifier_key' . self::FROM . ' AND d.identifier_key IN (' . $in . ')' . ($lock ? ' LOCK IN SHARE MODE' : ''),
+            self::SELECT . ', d.identifier_key' . self::FROM . $visible . ' AND d.identifier_key IN (' . $in . ')' . ($lock ? ' LOCK IN SHARE MODE' : ''),
         );
-        $stmt->execute([$tenant->id, ...$keys]);
+        $stmt->execute([$tenant->id, ...$visibleParams, ...$keys]);
 
         $devices = [];
         foreach ($stmt->fetchAll() as $row) {
@@ -244,10 +255,11 @@ final readonly class DeviceRepository
             $this->pdo->prepare('SELECT id FROM fe_devices WHERE tenant_id = ? AND scan_code_key IN (' . $in . ') FOR UPDATE')
                 ->execute([$tenant->id, ...$scanCodes]);
         }
+        [$visible, $visibleParams] = $this->visibility->sql('d');
         $stmt = $this->pdo->prepare(
-            self::SELECT . self::FROM . ' AND d.scan_code_key IN (' . $in . ')' . ($lock ? ' LOCK IN SHARE MODE' : ''),
+            self::SELECT . self::FROM . $visible . ' AND d.scan_code_key IN (' . $in . ')' . ($lock ? ' LOCK IN SHARE MODE' : ''),
         );
-        $stmt->execute([$tenant->id, ...$scanCodes]);
+        $stmt->execute([$tenant->id, ...$visibleParams, ...$scanCodes]);
 
         $devices = [];
         foreach ($stmt->fetchAll() as $row) {
@@ -453,7 +465,7 @@ final readonly class DeviceRepository
 
             // Hinweis an die Admins: nur Offline-Buchungen mit besonderem Ergebnis oder nach Rückfrage.
             $kind = NoticeKind::forResult($reason, $booking->staleConfirmed);
-            $noticeId = $kind === null || $booking->occurredAt === null || $before === null ? null : new DeviceNoticeRepository($this->pdo)->create(
+            $noticeId = $kind === null || $booking->occurredAt === null || $before === null ? null : new DeviceNoticeRepository($this->pdo, $this->visibility)->create(
                 $tenant,
                 new NewNotice($kind, $booking->staleConfirmed, $id, $bookingId, $eventId, $userId, $booking->occurredAt, $change, $before),
             );
@@ -462,7 +474,8 @@ final readonly class DeviceRepository
         });
 
         return new BookingResult(
-            $this->find($tenant, $id) ?? throw new \LogicException('Gerät nach der Änderung nicht gefunden.'),
+            // Inzwischen außerhalb des Datenfilters (anderer Vorgang nach dem Commit): wie fremd.
+            $this->find($tenant, $id) ?? throw DeviceNotFoundException::forId($id),
             $result[0],
             $result[1],
             $booking !== null && $booking->staleConfirmed,
@@ -742,7 +755,10 @@ final readonly class DeviceRepository
             throw DeviceNotFoundException::forId($id);
         }
 
-        return $this->find($tenant, $id) ?? throw DeviceNotFoundException::forId($id);
+        $current = $this->find($tenant, $id) ?? throw DeviceNotFoundException::forId($id);
+        $this->recorder?->before($current);
+
+        return $current;
     }
 
     /**
@@ -778,14 +794,14 @@ final readonly class DeviceRepository
     /**
      * @return array{string, bool} [Name, aktiv]
      *
-     * @throws InvalidDeviceValueException unbekannt oder fremd
+     * @throws InvalidDeviceValueException unbekannt, fremd oder außerhalb des Datenfilters
      */
     private function lockDeviceType(Tenant $tenant, int $typeId): array
     {
         $stmt = $this->pdo->prepare('SELECT name, active FROM fe_device_types WHERE id = ? AND tenant_id = ? LOCK IN SHARE MODE');
         $stmt->execute([$typeId, $tenant->id]);
         $type = $stmt->fetch();
-        if (!is_array($type)) {
+        if (!is_array($type) || !$this->visibility->allowsDeviceType($typeId)) {
             throw new InvalidDeviceValueException('Der Gerätetyp wurde nicht gefunden.');
         }
 
@@ -808,7 +824,7 @@ final readonly class DeviceRepository
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return array<string, mixed>|null null: unbekannt, fremd oder außerhalb des Datenfilters
      */
     private function lockLocation(Tenant $tenant, int $locationId): ?array
     {
@@ -816,7 +832,7 @@ final readonly class DeviceRepository
         $stmt->execute([$locationId, $tenant->id]);
         $row = $stmt->fetch();
 
-        return is_array($row) ? $row : null;
+        return is_array($row) && $this->visibility->allowsLocation($locationId) ? $row : null;
     }
 
     /**
@@ -840,12 +856,13 @@ final readonly class DeviceRepository
     }
 
     /**
+     * Bedingungen nach FROM: Datenfilter, dann der Filter der Anfrage.
+     *
      * @return array{string, list<int|string>} SQL aus diesem Code und Parameter
      */
-    private static function where(DeviceFilter $filter): array
+    private function where(DeviceFilter $filter): array
     {
-        $where = '';
-        $params = [];
+        [$where, $params] = $this->visibility->sql('d');
         if ($filter->deviceTypeId !== null) {
             $where .= ' AND d.device_type_id = ?';
             $params[] = $filter->deviceTypeId;
@@ -884,7 +901,8 @@ final readonly class DeviceRepository
     {
         $id = $this->atomically($work);
 
-        return $this->find($tenant, $id) ?? throw new \LogicException('Gerät nach der Änderung nicht gefunden.');
+        // Inzwischen außerhalb des Datenfilters (anderer Vorgang nach dem Commit): wie fremd.
+        return $this->find($tenant, $id) ?? throw DeviceNotFoundException::forId($id);
     }
 
     /**

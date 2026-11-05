@@ -9,6 +9,7 @@ use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\DeviceStateChange;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\LocationRepository;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tests\Support\TestDatabase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -31,7 +32,7 @@ final class DeviceLocationLockingTest extends DeviceApiTestCase
         $before = $this->deviceSnapshot();
 
         $this->whileConcurrent('FOR UPDATE', $this->room, function () use ($device): void {
-            new DeviceRepository($this->pdo())->changeState(
+            new DeviceRepository($this->pdo(), DeviceVisibility::all())->changeState(
                 $this->tenant('immendingen'),
                 $this->adminId,
                 $device['id'],
@@ -50,7 +51,7 @@ final class DeviceLocationLockingTest extends DeviceApiTestCase
         $before = $this->deviceSnapshot();
 
         $this->whileConcurrent('FOR UPDATE', $this->room, function () use ($id): void {
-            new DeviceRepository($this->pdo())->reinstate($this->tenant('immendingen'), $this->adminId, $id, 1, new DeviceReinstatement(DeviceStatus::Ready), null);
+            new DeviceRepository($this->pdo(), DeviceVisibility::all())->reinstate($this->tenant('immendingen'), $this->adminId, $id, 1, new DeviceReinstatement(DeviceStatus::Ready), null);
         });
 
         self::assertSame($before, $this->deviceSnapshot());
@@ -62,7 +63,7 @@ final class DeviceLocationLockingTest extends DeviceApiTestCase
         $before = $this->pdo()->query('SELECT * FROM fe_locations ORDER BY id')->fetchAll();
 
         $this->whileConcurrent('LOCK IN SHARE MODE', $this->room, function (): void {
-            new LocationRepository($this->pdo())->lock($this->tenant('immendingen'), $this->room);
+            new LocationRepository($this->pdo(), DeviceVisibility::all())->lock($this->tenant('immendingen'), $this->room);
         });
 
         self::assertSame($before, $this->pdo()->query('SELECT * FROM fe_locations ORDER BY id')->fetchAll());

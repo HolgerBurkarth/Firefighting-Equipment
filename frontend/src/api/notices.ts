@@ -1,5 +1,5 @@
 import { apiRequest, isRecord, type ApiResult } from './client';
-import type { EventLocation } from './deviceEvents';
+import { parseEventLocation, type EventLocation } from './deviceEvents';
 import { isCount, isId, isStatus, isUtcTime, nullableString, type DeviceStatus } from './devices';
 
 /** Status eines Hinweises (NoticeStatus). */
@@ -93,15 +93,7 @@ function parseUser(json: unknown): NoticeUser | null {
 }
 
 function parseLocation(json: unknown): EventLocation | null {
-    if (
-        !isRecord(json) ||
-        !isId(json['id']) ||
-        typeof json['name'] !== 'string' ||
-        typeof json['path'] !== 'string'
-    ) {
-        return null;
-    }
-    return { id: json['id'], name: json['name'], path: json['path'] };
+    return parseEventLocation(json);
 }
 
 function parseHistoryEntry(json: unknown): NoticeHistoryEntry | null {

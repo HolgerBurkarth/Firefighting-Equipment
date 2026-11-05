@@ -58,6 +58,18 @@ describe('parseLocationTree', () => {
         ]);
     });
 
+    it('Datenfilter: Standort, von dem nur Fächer sichtbar sind, ohne Gerätezahl (null) zählt 0', () => {
+        const tree = parseLocationTree({
+            locations: [
+                locationJson({ selectable: false, device_count: null, device_count_total: 3 }),
+            ],
+        });
+        expect(tree?.[0]?.deviceCount).toBe(0);
+        expect(tree?.[0]?.deviceCountTotal).toBe(3);
+        // Ohne selectable false bleibt eine fehlende Zahl ungültig.
+        expect(parseLocationTree({ locations: [locationJson({ device_count: null })] })).toBeNull();
+    });
+
     it('Raum ohne Unterstandorte', () => {
         const tree = parseLocationTree({
             locations: [

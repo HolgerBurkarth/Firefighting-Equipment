@@ -8,24 +8,32 @@ use FirefightingEquipment\Role\Role;
 use FirefightingEquipment\Role\SystemRole;
 
 /**
- * Rechte eines Kontos in der aktuellen Anfrage, gebildet aus seiner Rolle. Die Rolle Admin hat
- * immer alle Rechte, auch künftige. Werte der Datenbank, die der Katalog (noch) nicht kennt,
- * geben kein Recht.
+ * Rechte eines Kontos in der aktuellen Anfrage, gebildet aus seiner Rolle, mit ihrem Datenfilter
+ * (DeviceVisibility). Die Rolle Admin hat immer alle Rechte, auch künftige, und keinen Filter. Werte
+ * der Datenbank, die der Katalog (noch) nicht kennt, geben kein Recht.
+ *
+ * F3 (Plan Phase 1): Mit Datenfilter wirken Standorte und Gerätetypen nur bis Ansehen, Benutzer gar
+ * nicht und der CSV-Import nicht, auch wenn die Rolle sie in der Datenbank hätte (der Editor der
+ * Rollen lässt das ab Schritt 1.5 nicht speichern).
  */
 final readonly class Permissions
 {
+    private DeviceVisibility $visibility;
+
     /**
-     * @param array<string, AreaLevel> $areas    Bereich (Wert von Area) → Stufe
+     * @param array<string, AreaLevel> $areas      Bereich (Wert von Area) → Stufe
      * @param list<Action>             $actions
-     * @param string|null              $revision Rolle und ihr Stand („<id>:<version>“), null ohne Rolle
+     * @param DeviceVisibility|null    $visibility null = alle
+     * @param string|null              $revision   Rolle und ihr Stand („<id>:<version>“), null ohne Rolle
      */
     private function __construct(
         private bool $all,
         private array $areas,
         private array $actions,
-        private bool $filtered = false,
+        ?DeviceVisibility $visibility = null,
         private ?string $revision = null,
     ) {
+        $this->visibility = $visibility ?? DeviceVisibility::all();
     }
 
     public static function all(): self
@@ -80,13 +88,16 @@ final readonly class Permissions
     }
 
     /**
-     * Dieselben Rechte mit Angaben zur Rolle, aus der sie stammen (für permissions in auth/me).
-     *
-     * @param bool $filtered Rolle mit Datenfilter „Sieht nur …“ (wirkt ab Schritt 1.4)
+     * Dieselben Rechte mit Angaben zur Rolle, aus der sie stammen (für permissions in auth/me), und
+     * ihrem Datenfilter.
      */
-    public function ofRole(int $roleId, int $roleVersion, bool $filtered): self
+    public function ofRole(int $roleId, int $roleVersion, DeviceVisibility $visibility): self
     {
-        return new self($this->all, $this->areas, $this->actions, $filtered, $roleId . ':' . $roleVersion);
+        if ($this->all && !$visibility->isAll()) {
+            throw new \LogicException('Die Rolle Admin hat keinen Datenfilter.');
+        }
+
+        return new self($this->all, $this->areas, $this->actions, $visibility, $roleId . ':' . $roleVersion);
     }
 
     public function isAll(): bool
@@ -96,7 +107,20 @@ final readonly class Permissions
 
     public function level(Area $area): ?AreaLevel
     {
-        return $this->all ? $area->maxLevel() : ($this->areas[$area->value] ?? null);
+        if ($this->all) {
+            return $area->maxLevel();
+        }
+        $level = $this->areas[$area->value] ?? null;
+        if ($level === null || $this->visibility->isAll()) {
+            return $level;
+        }
+
+        // F3: mit Datenfilter keine Verwaltung.
+        return match ($area) {
+            Area::Users => null,
+            Area::Locations, Area::DeviceTypes => AreaLevel::Read,
+            default => $level,
+        };
     }
 
     public function allows(Area $area, AreaLevel $level): bool
@@ -106,7 +130,13 @@ final readonly class Permissions
 
     public function isFiltered(): bool
     {
-        return $this->filtered;
+        return !$this->visibility->isAll();
+    }
+
+    /** Welche Geräte, Standorte und Gerätetypen das Konto sieht. */
+    public function visibility(): DeviceVisibility
+    {
+        return $this->visibility;
     }
 
     /** Rolle und ihr Stand („<id>:<version>“); null ohne Rolle. */
@@ -149,7 +179,7 @@ final readonly class Permissions
         if ($this->all) {
             return true;
         }
-        if (!in_array($action, $this->actions, true)) {
+        if (!in_array($action, $this->actions, true) || ($action === Action::CsvImport && $this->isFiltered())) {
             return false;
         }
         $required = $action->requires();

@@ -52,7 +52,7 @@ final readonly class DeviceStateHandler implements RequestHandler
         $deviceId = $context->param('id');
         $pdo = $context->db->get();
         $recorder = new DeviceEventRecorder();
-        $booker = new DeviceBooker($tenant, new DeviceRepository($pdo, $recorder), new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo));
+        $booker = new DeviceBooker($tenant, new DeviceRepository($pdo, $context->visibility(), $recorder), new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo, $context->visibility()));
 
         try {
             $version = DeviceFields::version($context);
@@ -79,9 +79,9 @@ final readonly class DeviceStateHandler implements RequestHandler
 
         // Nach dem Commit: Hinweis-Mail (ersetzt die Mail zum Vorgang) bzw. Benachrichtigung „Log“.
         if ($result->noticeId !== null) {
-            DeviceLogNotifier::fromContext($context)->notice($tenant, $context->auth()->user, $result->noticeId, new DeviceNoticeRepository($pdo));
+            DeviceLogNotifier::fromContext($context)->notice($tenant, $context->auth()->user, $result->noticeId);
         } elseif ($recorder->ids() !== []) {
-            DeviceLogNotifier::fromContext($context)->deviceChanged($tenant, $context->auth()->user, $result->device, $recorder->ids());
+            DeviceLogNotifier::fromContext($context)->deviceChanged($tenant, $context->auth()->user, $result->device, $recorder->ids(), $recorder->before());
         }
 
         return self::response($result);

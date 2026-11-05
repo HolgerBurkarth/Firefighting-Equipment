@@ -15,6 +15,7 @@ use FirefightingEquipment\Device\DeviceTypeRepository;
 use FirefightingEquipment\Device\LocationRepository;
 use FirefightingEquipment\Device\NewDevice;
 use FirefightingEquipment\Device\ScanCode;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Time\GermanFormat;
 
@@ -58,7 +59,8 @@ final readonly class DeviceImportPlanner
         $active = array_values(array_filter($file->rows, static fn (ImportRow $row): bool => !$row->retired));
 
         $keys = $this->identifierKeys($active);
-        $repository = new DeviceRepository($this->pdo);
+        // F3: den CSV-Import erreichen nur Rollen ohne Datenfilter (Permissions), er sieht alle Geräte.
+        $repository = new DeviceRepository($this->pdo, DeviceVisibility::all());
         $devices = $repository->findByIdentifierKeys($tenant, array_values(array_unique($keys)), $lock);
         $scanCodes = self::scanCodes($active);
         $owners = $repository->findByScanCodes($tenant, array_values(array_unique($scanCodes)), $lock);
@@ -119,7 +121,7 @@ final readonly class DeviceImportPlanner
                 if ($type === null) {
                     $typeSuggestions ??= ImportSuggestions::forNames(array_map(
                         static fn (DeviceType $t): string => $t->name->value,
-                        new DeviceTypeRepository($this->pdo)->listByTenant($tenant, false),
+                        new DeviceTypeRepository($this->pdo, DeviceVisibility::all())->listByTenant($tenant, false),
                     ));
                     $suggestions = $unknownTypes['v:' . $row->deviceType] ??= $typeSuggestions->suggest($row->deviceType);
                     $errors[] = self::unknown(sprintf('Der Gerätetyp „%s“ ist nicht bekannt.', $row->deviceType), $suggestions);
@@ -130,7 +132,7 @@ final readonly class DeviceImportPlanner
                 $candidates = $locations[$row->location] ?? [];
                 if ($candidates === []) {
                     $locationSuggestions ??= ImportSuggestions::forLocations(
-                        DeviceImportTemplate::paths(new LocationRepository($this->pdo)->tree($tenant, false)),
+                        DeviceImportTemplate::paths(new LocationRepository($this->pdo, DeviceVisibility::all())->tree($tenant, false)),
                     );
                     $suggestions = $unknownLocations['v:' . $row->location] ??= $locationSuggestions->suggest($row->location);
                     $errors[] = self::unknown(sprintf('Der Standort „%s“ ist nicht bekannt.', $row->location), $suggestions);

@@ -36,8 +36,8 @@ final readonly class DeviceImportTemplateHandler implements RequestHandler
     {
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
         $pdo = $context->db->get();
-        $types = new DeviceTypeRepository($pdo)->listByTenant($tenant, false);
-        $tree = new LocationRepository($pdo)->tree($tenant, false);
+        $types = new DeviceTypeRepository($pdo, $context->visibility())->listByTenant($tenant, false);
+        $tree = new LocationRepository($pdo, $context->visibility())->tree($tenant, false);
         $today = LocalDate::today($this->clock);
         $identity = static fn (mixed $row): array => $row;
 
