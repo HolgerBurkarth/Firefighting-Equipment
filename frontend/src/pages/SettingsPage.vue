@@ -1,10 +1,20 @@
 <script setup lang="ts">
-import { useTemplateRef } from 'vue';
+import { computed, useTemplateRef } from 'vue';
+import { allows, can } from '../api/permissions';
+import { currentPermissions } from '../auth/session';
 import AppearanceSettings from '../components/AppearanceSettings.vue';
 import NotificationSetting from '../components/NotificationSetting.vue';
 import PasswordChangeForm from '../components/PasswordChangeForm.vue';
 import SessionList from '../components/SessionList.vue';
 import ThemeModeSetting from '../components/ThemeModeSetting.vue';
+
+/**
+ * Farbe und Logo nur mit „Einstellungen: Ändern“, die Benachrichtigung „Log“ nur mit der Aktion
+ * „Log-Mails empfangen“ (Plan Phase 1, Schritt 1.7b); Anzeigemodus, Passwort und Geräte immer.
+ */
+const canAppearance = computed(() => allows(currentPermissions.value, 'settings', 'write'));
+const seesAppearance = computed(() => allows(currentPermissions.value, 'settings'));
+const canMailLog = computed(() => can(currentPermissions.value, 'mail.log'));
 
 const sessionList = useTemplateRef<InstanceType<typeof SessionList>>('sessionList');
 
@@ -25,9 +35,12 @@ function onPasswordChanged(): void {
         <h1>Einstellungen</h1>
     </div>
     <ThemeModeSetting />
-    <AppearanceSettings />
+    <AppearanceSettings v-if="canAppearance" />
+    <p v-else-if="seesAppearance" class="hint" data-testid="appearance-read-only">
+        Farbe und Logo der Feuerwehr dürfen Sie nicht ändern.
+    </p>
     <div class="settings-row">
-        <NotificationSetting />
+        <NotificationSetting v-if="canMailLog" />
         <PasswordChangeForm @changed="onPasswordChanged" />
     </div>
     <SessionList ref="sessionList" />

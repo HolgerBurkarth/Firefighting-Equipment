@@ -58,10 +58,10 @@ import {
     type AdminUser,
     type BulkRoleResult,
 } from '../api/users';
-import { onSessionEnded, session, setSession } from '../auth/session';
+import { currentPermissions, onSessionEnded, session, setSession } from '../auth/session';
 import { browserStorage } from '../runtime/theme';
 import { AdminDeviceList } from './adminDeviceList';
-import { AdminOverviewStore } from './adminOverview';
+import { AdminOverviewStore, overviewScope } from './adminOverview';
 import { AssignableRoleStore } from './assignableRoles';
 import { DeviceHistory } from './deviceHistory';
 import { DeviceStore } from './deviceStore';
@@ -87,7 +87,9 @@ import { recentLocations } from './recentLocations';
 export const deviceStore = new DeviceStore();
 export const locationStore = new LocationStore();
 /** Dashboard und Zähler im Menü der Admin-Konsole. */
-export const adminOverview = new AdminOverviewStore();
+export const adminOverview = new AdminOverviewStore(undefined, undefined, () =>
+    overviewScope(currentPermissions.value),
+);
 /** Verwaltung des Admins: Standortbaum mit gesperrten Standorten, alle Gerätetypen. */
 export const adminLocationStore = new LocationStore(() => fetchAllLocations());
 export const deviceTypeStore = new DeviceTypeStore();

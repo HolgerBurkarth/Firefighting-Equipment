@@ -19,6 +19,11 @@ export interface SubLocation {
 /** Standort der Ebene 1 mit seinen Unterstandorten (LocationJson). */
 export interface Location extends SubLocation {
     readonly kindLabel: string;
+    /**
+     * false: Die Rolle sieht nur Fächer dieses Standorts (Datenfilter, Schritt 1.4); er selbst ist
+     * kein Ziel. Fehlt bei älteren Antworten und Offline-Kopien, daher nur über `isSelectable` lesen.
+     */
+    readonly selectable?: boolean;
     /** Einschließlich aller Unterstandorte, auch nicht aufgeführter. */
     readonly deviceCountTotal: number;
     readonly children: readonly SubLocation[];
@@ -34,8 +39,8 @@ function isCount(value: unknown): value is number {
 
 /**
  * Gerätezahl direkt am Standort; ein Standort, von dem die Rolle nur Fächer sieht (Datenfilter,
- * `selectable` false), kommt ohne Zahl (null) und zählt hier mit 0. Wählbar macht ihn die App erst
- * ab Schritt 1.7 von den Rechten abhängig. Ungültig: null.
+ * `selectable` false), kommt ohne Zahl (null) und zählt hier mit 0; Ziel ist er dann nicht
+ * (`isSelectable`). Ungültig: null.
  */
 function directCount(json: Record<string, unknown>): number | null {
     const count = json['device_count'];
@@ -98,7 +103,23 @@ export function parseLocation(json: unknown): Location | null {
         }
         children.push(child);
     }
-    return { id, name, kind, kindLabel, active, deviceCount, deviceCountTotal, children };
+    const selectable = json['selectable'] !== false;
+    return {
+        id,
+        name,
+        kind,
+        kindLabel,
+        active,
+        selectable,
+        deviceCount,
+        deviceCountTotal,
+        children,
+    };
+}
+
+/** Darf der Standort der Ebene 1 selbst Ziel sein (nicht nur seine Fächer, Datenfilter)? */
+export function isSelectable(location: Location): boolean {
+    return location.selectable !== false;
 }
 
 export function parseLocationTree(json: unknown): readonly Location[] | null {

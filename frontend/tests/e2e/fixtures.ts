@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test as base, expect, type Page, type Route } from '@playwright/test';
 import { isAbortedFontDownload } from './support/consoleErrors';
 import { startPhpServer, workerPorts, type PhpServer } from './support/phpServer';
@@ -50,9 +51,46 @@ export type ApiMocks = Readonly<
 >;
 
 /** Antwort von auth/me bzw. auth/login wie AuthJson::me in PHP. */
+/** Rechte-Katalog wie GET permission-catalog (gemeinsame Datei mit PHP). */
+const CATALOG = JSON.parse(
+    readFileSync(
+        new URL('../../../tests/Fixtures/permission-catalog.json', import.meta.url),
+        'utf8',
+    ),
+) as {
+    areas: { key: string; levels: string[] }[];
+    action_groups: { actions: { key: string }[] }[];
+};
+
+/** `permissions` wie AuthJson::permissions (Bereich → Stufe, Aktionen, Datenfilter). */
+export function permissionsJson(
+    areas: Readonly<Record<string, 'read' | 'write'>>,
+    actions: readonly string[] = [],
+    filtered = false,
+): Record<string, unknown> {
+    return { areas, actions, restrictions: [], filtered, version: `v-${JSON.stringify(areas)}` };
+}
+
+/** Rechte der Standard-Rollen, wie der Server sie in auth/me sendet (Admin: alles). */
+export const ADMIN_RIGHTS = permissionsJson(
+    Object.fromEntries(
+        CATALOG.areas.map((area) => [area.key, area.levels.includes('write') ? 'write' : 'read']),
+    ),
+    CATALOG.action_groups.flatMap((group) => group.actions.map((action) => action.key)),
+);
+export const USER_RIGHTS = permissionsJson({ search: 'read', due: 'read' }, [
+    'book.move',
+    'book.status',
+]);
+
+/**
+ * Antwort von auth/me bzw. auth/login wie AuthJson::me; `permissions` ohne Angabe die der
+ * Standard-Rolle der Kontoart (unter `service` null), wie der Server sie sendet.
+ */
 export function meBody(
     role: 'user' | 'admin' | 'superadmin',
     displayName = 'Anna',
+    permissions?: Record<string, unknown>,
 ): Record<string, unknown> {
     return {
         user: {
@@ -66,6 +104,9 @@ export function meBody(
         },
         tenant: role === 'superadmin' ? null : { slug: 'test', name: 'Feuerwehr Test' },
         session: { id: 3, device_label: 'Chrome auf Windows', current: true },
+        permissions:
+            permissions ??
+            (role === 'superadmin' ? null : role === 'admin' ? ADMIN_RIGHTS : USER_RIGHTS),
     };
 }
 

@@ -3,7 +3,13 @@ import { defineComponent } from 'vue';
 import { createMemoryHistory, type Router } from 'vue-router';
 import { apiRequest } from '../../src/api/client';
 import { parseAuthState, type UserRole } from '../../src/api/auth';
-import { afterLogin, landingRoute, safeReturnPath } from '../../src/auth/redirect';
+import {
+    afterLogin,
+    canOpenRoute,
+    consoleRoute,
+    landingRoute,
+    safeReturnPath,
+} from '../../src/auth/redirect';
 import {
     resetSession,
     session,
@@ -15,7 +21,7 @@ import { createAppRouter } from '../../src/router';
 import { ADMIN_MENU, ADMIN_SETTINGS, SERVICE_MENU } from '../../src/router/adminMenu';
 import { parseAppBase, type AppBase } from '../../src/runtime/appBase';
 import { respond } from './support/fetch';
-import { meBody } from './support/me';
+import { meBody, permissionsJson } from './support/me';
 
 function base(url: string): AppBase {
     const parsed = parseAppBase(url);
@@ -30,6 +36,21 @@ const SERVICE = base('https://www.prodad.de/firefighting/service/');
 
 function state(role: UserRole) {
     return parseAuthState(meBody(role));
+}
+
+/** Konto der Kontoart `user` mit einer eigenen Rolle (Rechte aus auth/me). */
+function custom(
+    areas: Readonly<Record<string, 'read' | 'write'>>,
+    actions: readonly string[] = [],
+) {
+    return parseAuthState(meBody('user', permissionsJson(areas, actions)));
+}
+
+function account(value: ReturnType<typeof parseAuthState>) {
+    if (value === null) {
+        throw new Error('auth/me ungültig');
+    }
+    return value;
 }
 
 // Die Tests prüfen Wächter, Adressen und meta, nicht die Seiten (die testen eigene Dateien). Mit den
@@ -158,7 +179,9 @@ describe('Wächter', () => {
         setSession(state('admin'));
         const route = (await routerAt('/einstellungen')).currentRoute.value;
         expect(route.name).toBe('settings');
-        expect(route.meta.roles).toEqual(['admin']);
+        // Konten der Stadt, geöffnet nach den Rechten (jede Konsole, Schritt 1.7b).
+        expect(route.meta.roles).toEqual(['user', 'admin']);
+        expect(route.meta.rights).toBeTypeOf('function');
         setSession(state('user'));
         expect((await routerAt('/einstellungen')).currentRoute.value.name).toBe('search');
         setSession(state('superadmin'));
@@ -307,11 +330,94 @@ describe('Rückkehr nach der Anmeldung', () => {
 
     it('nur Seiten, die die Rolle öffnen darf', async () => {
         const router = await routerAt('/anmelden');
-        expect(afterLogin(router, 'admin', '/dashboard')).toBe('/dashboard');
-        expect(afterLogin(router, 'user', '/dashboard')).toEqual(landingRoute('user'));
-        expect(afterLogin(router, 'user', '/anmelden')).toEqual(landingRoute('user'));
-        expect(afterLogin(router, 'user', '/gibt-es-nicht')).toEqual(landingRoute('user'));
-        expect(afterLogin(router, 'admin', '//boese.example/')).toEqual(landingRoute('admin'));
-        expect(afterLogin(router, 'admin', undefined)).toEqual({ name: 'dashboard' });
+        const admin = account(state('admin'));
+        const user = account(state('user'));
+        expect(afterLogin(router, admin, '/dashboard')).toBe('/dashboard');
+        expect(afterLogin(router, user, '/dashboard')).toEqual({ name: 'search' });
+        expect(afterLogin(router, user, '/anmelden')).toEqual({ name: 'search' });
+        expect(afterLogin(router, user, '/gibt-es-nicht')).toEqual({ name: 'search' });
+        expect(afterLogin(router, admin, '//boese.example/')).toEqual({ name: 'dashboard' });
+        expect(afterLogin(router, admin, undefined)).toEqual({ name: 'dashboard' });
+        expect(landingRoute(router, admin)).toEqual({ name: 'dashboard' });
+        expect(landingRoute(router, user)).toEqual({ name: 'search' });
+    });
+
+    it('nach den Rechten einer eigenen Rolle (Schritt 1.7b)', async () => {
+        const router = await routerAt('/anmelden');
+        const keeper = account(custom({ devices: 'write', search: 'read' }, ['device.edit']));
+        expect(afterLogin(router, keeper, '/geraete/7/details')).toBe('/geraete/7/details');
+        expect(afterLogin(router, keeper, '/benutzer')).toEqual({ name: 'devices' });
+        expect(afterLogin(router, keeper, '/geraete/neu')).toEqual({ name: 'devices' });
+    });
+});
+
+describe('Rechte der Rolle (Plan Phase 1, Schritt 1.7b)', () => {
+    it.each([
+        ['/geraete', { devices: 'read' }, [], 'devices'],
+        ['/geraete/12/details', { devices: 'read' }, [], 'device-details'],
+        ['/geraete/12', { devices: 'read' }, [], 'device'],
+        ['/geraete/12', { search: 'read' }, [], 'device'],
+        ['/geraete/neu', { devices: 'write' }, ['device.create'], 'device-new'],
+        ['/geraete/import', { devices: 'write' }, ['csv.import'], 'device-import'],
+        ['/standorte', { locations: 'read' }, [], 'locations'],
+        ['/geraetetypen', { device_types: 'read' }, [], 'device-types'],
+        ['/benutzer', { users: 'read' }, [], 'users'],
+        ['/protokoll', { log: 'read' }, [], 'notices'],
+        ['/protokoll/7', { log: 'read' }, [], 'notice'],
+        ['/dashboard', { dashboard: 'read' }, [], 'dashboard'],
+        ['/suchen', { search: 'read' }, [], 'search'],
+        ['/prueffristen', { due: 'read' }, [], 'inspections'],
+        ['/einstellungen', { log: 'read' }, [], 'settings'],
+    ] as const)('%s mit %j öffnet sich', async (path, areas, actions, name) => {
+        setSession(custom(areas, actions));
+        expect((await routerAt(path)).currentRoute.value.name).toBe(name);
+    });
+
+    it.each([
+        ['/geraete', { log: 'read' }, [], 'notices'],
+        ['/geraete/neu', { devices: 'write' }, [], 'devices'],
+        ['/geraete/import', { devices: 'write' }, ['device.create'], 'devices'],
+        ['/benutzer', { devices: 'read' }, [], 'devices'],
+        ['/dashboard', { users: 'read' }, [], 'users'],
+        ['/dashboard', { search: 'read', due: 'read' }, [], 'search'],
+        ['/suchen', { due: 'read' }, [], 'inspections'],
+        ['/prueffristen', {}, [], 'profile'],
+        ['/einstellungen', { search: 'read' }, [], 'search'],
+        ['/geraete/12', { due: 'read' }, [], 'inspections'],
+    ] as const)('%s mit %j: still zur Startseite %s', async (path, areas, actions, name) => {
+        setSession(custom(areas, actions));
+        expect((await routerAt(path)).currentRoute.value.name).toBe(name);
+    });
+
+    it('Startseite: Dashboard, sonst erste erlaubte Seite der Konsole, sonst Handy-Seiten', async () => {
+        const router = await routerAt('/anmelden');
+        const at = (areas: Readonly<Record<string, 'read' | 'write'>>) =>
+            landingRoute(router, account(custom(areas)));
+        expect(at({ dashboard: 'read', devices: 'read' })).toEqual({ name: 'dashboard' });
+        expect(at({ devices: 'read', users: 'read' })).toEqual({ name: 'devices' });
+        expect(at({ search: 'read', settings: 'read' })).toEqual({ name: 'settings' });
+        expect(at({ search: 'read', due: 'read' })).toEqual({ name: 'search' });
+        expect(at({ due: 'read' })).toEqual({ name: 'inspections' });
+        expect(at({})).toEqual({ name: 'profile' });
+        // „Dashboard“ der Handy-Leiste (F8): nur mit Konsole.
+        expect(consoleRoute(router, account(custom({ search: 'read', due: 'read' })))).toBeNull();
+        expect(consoleRoute(router, account(custom({ search: 'read', log: 'read' })))).toEqual({
+            name: 'notices',
+        });
+    });
+
+    it('canOpenRoute auch für Seiten mit Platzhalter (ohne Parameter)', async () => {
+        const router = await routerAt('/anmelden');
+        const reader = account(custom({ devices: 'read' }));
+        expect(canOpenRoute(router, 'device-details', reader)).toBe(true);
+        expect(canOpenRoute(router, 'notice', reader)).toBe(false);
+        expect(canOpenRoute(router, 'gibt-es-nicht', reader)).toBe(false);
+    });
+
+    it('Konto ohne Rechte vom Server (App vor 1.7): Rechte der Kontoart', async () => {
+        setSession(state('user'));
+        expect((await routerAt('/geraete')).currentRoute.value.name).toBe('search');
+        setSession(state('admin'));
+        expect((await routerAt('/geraete')).currentRoute.value.name).toBe('devices');
     });
 });

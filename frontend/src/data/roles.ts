@@ -319,7 +319,16 @@ export function rolePreview(
     // Suchen und Termine gibt es auch als Handy-Seiten; eine Konsole (und „Dashboard“ in der Leiste,
     // F8) erst mit einem anderen Bereich, wie heute bei der Standard-Rolle Benutzer.
     const hasConsole = visible.some((area) => !HANDY_AREAS.includes(area.key));
-    const menu = hasConsole ? visible.filter((area) => area.key !== 'search').map(menuLabel) : [];
+    // „Einstellungen“ (Anzeigemodus, Passwort, Geräte) hat jede Konsole (Schritt 1.7b), Farbe und
+    // Logo nur mit dem Bereich `settings`.
+    const menu = hasConsole
+        ? [
+              ...visible
+                  .filter((area) => area.key !== 'search' && area.key !== 'settings')
+                  .map(menuLabel),
+              AREA_MENU_LABELS['settings'] ?? 'Einstellungen',
+          ]
+        : [];
     const bar: string[] = [];
     if (visible.some((area) => area.key === 'search')) {
         bar.push('Suchen');

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isSelectable } from '../api/locations';
 import { computed, onMounted, ref, useId, watch } from 'vue';
 import {
     BOOKABLE_STATUSES,
@@ -6,6 +7,8 @@ import {
     type BookableStatus,
     type DeviceListItem,
 } from '../api/devices';
+import { can } from '../api/permissions';
+import { currentPermissions } from '../auth/session';
 import { adminLocationStore, bulkChangeState } from '../data';
 import { MAX_COMMENT_LENGTH } from '../data/booking';
 import {
@@ -32,6 +35,9 @@ const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{ done: [run: BulkRun] }>();
 
 const KEEP = 'keep';
+/** Standort bzw. Status nur mit der Aktion der Rolle (Feldregeln von POST devices/bulk/state). */
+const canMove = computed(() => can(currentPermissions.value, 'book.move'));
+const canSetStatus = computed(() => can(currentPermissions.value, 'book.status'));
 
 const id = useId();
 const location = ref(KEEP);
@@ -70,7 +76,9 @@ const locationOptions = computed((): SelectOption[] => {
         if (!entry.active) {
             continue;
         }
-        options.push({ value: String(entry.id), label: entry.name });
+        if (isSelectable(entry)) {
+            options.push({ value: String(entry.id), label: entry.name });
+        }
         for (const child of entry.children) {
             if (child.active) {
                 options.push({
@@ -141,10 +149,10 @@ async function submit(): Promise<void> {
         :return-focus="returnFocus"
         @submit="submit"
     >
-        <div class="field">
+        <div v-if="canMove" class="field">
             <AppSelect v-model="location" label="Neuer Standort" :options="locationOptions" />
         </div>
-        <fieldset class="statuses">
+        <fieldset v-if="canSetStatus" class="statuses">
             <legend class="field-label">Neuer Status</legend>
             <label class="check">
                 <input v-model="status" type="radio" :name="`${id}-status`" :value="KEEP" />

@@ -251,6 +251,15 @@ Leiste, Stores und Offline-Kopie neu, Eingaben bleiben; Warteschlange 403 → `f
 gelten bis zur Antwort des Servers die Rechte aus der Kontoart: `admin` alle, `user` die der
 Standard-Rolle *Benutzer*.
 
+Festgelegt bei der Umsetzung von 1.7b (05.11.2026): „Einstellungen“ öffnet jede Rolle mit Konsole
+(Anzeigemodus, Passwort, angemeldete Geräte); Farbe und Logo nur mit `settings` Ändern (mit Ansehen
+nur ein Hinweis), die Benachrichtigung „Log“ nur mit `mail.log`. Startseite mit Konsole: Dashboard,
+sonst die erste erlaubte Seite des Menüs, sonst „Einstellungen“; ohne Konsole „Suchen“, sonst
+„Prüffristen“, sonst „Profil“. Ohne Recht auf das Ziel sind Kacheln, Geräte und Namen keine Links.
+Eine Rolle nur mit „Termine“ liest die Prüffristen vom Server (`inspection-due`), ihre Karten öffnen
+kein Umbuchen. Die Vorschau „So sieht es die Rolle“ (1.5b) nennt „Einstellungen“ entsprechend bei
+jeder Rolle mit Konsole.
+
 **`X-Client-Api`, Variante B** (Rückfrage vom 05.11.2026, Entscheidung Holger): `X-Client-Api` 2,
 `ClientApi::MIN` bleibt 1. Begründung: Die API bleibt kompatibel (nur Erweiterungen; der Export
 mit 403 für *Benutzer* trifft eine alte App nicht, sie bietet ihn *Benutzer* nie an); inkompatibel

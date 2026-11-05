@@ -3,6 +3,7 @@ import type { ApiError, ApiResult } from '../api/client';
 import { fetchTenantEvents, type TenantEventEntry } from '../api/deviceEvents';
 import { fetchDevicePage, type DeviceListItem, type DevicePage } from '../api/devices';
 import { fetchDeviceSummary, type DeviceSummaryCounts } from '../api/deviceSummary';
+import { allows, type Permissions } from '../api/permissions';
 import { fetchUsers, type AdminUser } from '../api/users';
 import { Refresher, type RefreshReason } from './refresher';
 
@@ -10,14 +11,49 @@ import { Refresher, type RefreshReason } from './refresher';
 export const NOT_READY_LIMIT = 10;
 export const ACTIVITY_LIMIT = 8;
 
-/** Zahlen und Listen der Startseite des Admins (Dashboard) und die Zähler im Menü. */
+/**
+ * Zahlen und Listen der Startseite des Admins (Dashboard) und die Zähler im Menü. Was die Rolle nicht
+ * abfragen darf, ist null (Plan Phase 1, Schritt 1.7b; `overviewScope`).
+ */
 export interface AdminOverview {
-    readonly summary: DeviceSummaryCounts;
+    readonly summary: DeviceSummaryCounts | null;
     /** Registrierungen, die auf Freischaltung warten. */
-    readonly pendingUsers: number;
+    readonly pendingUsers: number | null;
     /** Defekte zuerst, dann in Wartung (je nach Kennung); `total` = alle nicht einsatzbereiten. */
-    readonly notReady: { readonly devices: readonly DeviceListItem[]; readonly total: number };
-    readonly activity: readonly TenantEventEntry[];
+    readonly notReady: {
+        readonly devices: readonly DeviceListItem[];
+        readonly total: number;
+    } | null;
+    readonly activity: readonly TenantEventEntry[] | null;
+}
+
+/** Welche der vier Abfragen die Rolle stellen darf (wie die Routen im Backend). */
+export interface OverviewScope {
+    /** GET device-summary: `dashboard` oder `due` Ansehen. */
+    readonly summary: boolean;
+    /** GET users?status=pending: `users` Ansehen. */
+    readonly pendingUsers: boolean;
+    /** GET devices (nur für das Dashboard): `dashboard` und `search` oder `devices` Ansehen. */
+    readonly notReady: boolean;
+    /** GET device-events: `dashboard` oder `log` Ansehen. */
+    readonly activity: boolean;
+}
+
+export const FULL_SCOPE: OverviewScope = {
+    summary: true,
+    pendingUsers: true,
+    notReady: true,
+    activity: true,
+};
+
+export function overviewScope(permissions: Permissions | null): OverviewScope {
+    const dashboard = allows(permissions, 'dashboard');
+    return {
+        summary: dashboard || allows(permissions, 'due'),
+        pendingUsers: allows(permissions, 'users'),
+        notReady: dashboard && (allows(permissions, 'search') || allows(permissions, 'devices')),
+        activity: dashboard || allows(permissions, 'log'),
+    };
 }
 
 export interface AdminOverviewState {
@@ -75,6 +111,7 @@ export class AdminOverviewStore {
     constructor(
         private readonly loaders: AdminOverviewLoaders = DEFAULT_LOADERS,
         private readonly now: () => number = Date.now,
+        private readonly scope: () => OverviewScope = () => FULL_SCOPE,
     ) {
         this.refresher = new Refresher(() => this.load(), now);
     }
@@ -96,29 +133,34 @@ export class AdminOverviewStore {
     private async load(): Promise<boolean> {
         const generation = this.generation;
         this.current.value = { ...this.current.value, loading: true };
+        const scope = this.scope();
+        const skip = Promise.resolve(null);
         const [summary, pendingUsers, notReady, activity] = await Promise.all([
-            this.loaders.summary(),
-            this.loaders.pendingUsers(),
-            this.loaders.notReady(),
-            this.loaders.activity(),
+            scope.summary ? this.loaders.summary() : skip,
+            scope.pendingUsers ? this.loaders.pendingUsers() : skip,
+            scope.notReady ? this.loaders.notReady() : skip,
+            scope.activity ? this.loaders.activity() : skip,
         ]);
         if (generation !== this.generation) {
             return false;
         }
-        if (!summary.ok || !pendingUsers.ok || !notReady.ok || !activity.ok) {
-            this.current.value = {
-                ...this.current.value,
-                loading: false,
-                error: firstError([summary, pendingUsers, notReady, activity]),
-            };
+        const results = [summary, pendingUsers, notReady, activity].filter(
+            (result) => result !== null,
+        );
+        const error = firstError(results);
+        if (error !== null) {
+            this.current.value = { ...this.current.value, loading: false, error };
             return false;
         }
+        const data = <T>(result: ApiResult<T> | null): T | null =>
+            result?.ok === true ? result.data : null;
+        const page = data(notReady);
         this.current.value = {
             overview: {
-                summary: summary.data,
-                pendingUsers: pendingUsers.data.length,
-                notReady: { devices: notReady.data.devices, total: notReady.data.total },
-                activity: activity.data.events,
+                summary: data(summary),
+                pendingUsers: data(pendingUsers)?.length ?? null,
+                notReady: page === null ? null : { devices: page.devices, total: page.total },
+                activity: data(activity)?.events ?? null,
             },
             loading: false,
             error: null,

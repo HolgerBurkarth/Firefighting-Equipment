@@ -5,7 +5,8 @@ import { useRoute, useRouter } from 'vue-router';
 import type { ApiError, ApiResult } from '../api/client';
 import type { AssignableRole } from '../api/roles';
 import type { AdminUser } from '../api/users';
-import { session } from '../auth/session';
+import { allows } from '../api/permissions';
+import { currentPermissions, session } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
@@ -73,6 +74,8 @@ function selectTab(value: string | number): void {
 const state = computed(() => userStore.state);
 const users = computed(() => state.value.users ?? []);
 const ownId = computed(() => session.value?.user.id ?? null);
+/** Freischalten, Bearbeiten, Rolle zuweisen nur mit „Benutzer: Ändern“ (Plan Phase 1, 1.7b). */
+const canWrite = computed(() => allows(currentPermissions.value, 'users', 'write'));
 const pending = computed(() => pendingUsers(users.value));
 
 const roleState = computed(() => assignableRoleStore.state);
@@ -573,7 +576,7 @@ onMounted(() => {
                             <span class="hint">{{ registrationText(user) }}</span>
                             <span class="hint">Rolle: {{ roleNameOf(user) }}</span>
                         </div>
-                        <div class="pending-actions">
+                        <div v-if="canWrite" class="pending-actions">
                             <button
                                 class="btn btn-accent"
                                 type="button"
@@ -712,7 +715,7 @@ onMounted(() => {
                 <table class="list-table" data-testid="user-table">
                     <thead>
                         <tr>
-                            <th scope="col" class="cell-select">
+                            <th v-if="canWrite" scope="col" class="cell-select">
                                 <label class="select-box">
                                     <input
                                         type="checkbox"
@@ -737,7 +740,7 @@ onMounted(() => {
                                     }}</span>
                                 </button>
                             </th>
-                            <th scope="col" class="col-actions">
+                            <th v-if="canWrite" scope="col" class="col-actions">
                                 <span class="visually-hidden">Aktionen</span>
                             </th>
                         </tr>
@@ -749,7 +752,7 @@ onMounted(() => {
                             :class="{ 'row-locked': user.locked }"
                             :data-testid="`user-${String(user.id)}`"
                         >
-                            <td class="cell-select">
+                            <td v-if="canWrite" class="cell-select">
                                 <label v-if="selectable(user, ownId)" class="select-box">
                                     <input
                                         type="checkbox"
@@ -789,7 +792,7 @@ onMounted(() => {
                                 >
                             </td>
                             <td class="col-created">{{ createdText(user) }}</td>
-                            <td class="col-actions">
+                            <td v-if="canWrite" class="col-actions">
                                 <button
                                     v-if="user.status === 'unverified'"
                                     class="btn small-btn"

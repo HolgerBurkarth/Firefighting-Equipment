@@ -86,7 +86,7 @@ async function onSubmit(): Promise<void> {
     busy.value = false;
     if (result.ok) {
         setSession(result.data);
-        await router.replace(afterLogin(router, result.data.user.role, route.query['weiter']));
+        await router.replace(afterLogin(router, result.data, route.query['weiter']));
         return;
     }
     error.value = result.error;

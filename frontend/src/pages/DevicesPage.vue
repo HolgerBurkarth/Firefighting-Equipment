@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vu
 import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
 import { downloadDeviceExport, type DeviceListItem, type DeviceSort } from '../api/devices';
+import { allows, can } from '../api/permissions';
+import { currentPermissions } from '../auth/session';
 import AppSelect, { type SelectOption } from '../components/AppSelect.vue';
 import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
 import DeviceBulkDueDialog from '../components/DeviceBulkDueDialog.vue';
@@ -441,16 +443,38 @@ onMounted(() => {
     void deviceTypeStore.refresh('open');
     void adminLocationStore.refresh('open');
 });
+
+/** Knöpfe nach den Rechten der Rolle (Plan Phase 1, Schritt 1.7b); der Server prüft ohnehin. */
+const canExport = computed(() => can(currentPermissions.value, 'csv.export'));
+const canImport = computed(() => can(currentPermissions.value, 'csv.import'));
+const canCreate = computed(() => can(currentPermissions.value, 'device.create'));
+const canBulkDue = computed(() => allows(currentPermissions.value, 'due', 'write'));
+const canBulkState = computed(
+    () =>
+        can(currentPermissions.value, 'book.move') || can(currentPermissions.value, 'book.status'),
+);
+/** Auswahl nur mit Sammelaktionen und mindestens einer davon. */
+const canBulk = computed(
+    () => can(currentPermissions.value, 'devices.bulk') && (canBulkDue.value || canBulkState.value),
+);
 </script>
 
 <template>
     <div class="page-head">
         <h1>Geräte</h1>
-        <button class="btn" type="button" :disabled="exporting" @click="exportList">
+        <button
+            v-if="canExport"
+            class="btn"
+            type="button"
+            :disabled="exporting"
+            @click="exportList"
+        >
             {{ exporting ? 'Export läuft …' : 'Export (CSV)' }}
         </button>
-        <RouterLink class="btn" :to="{ name: 'device-import' }">Import (CSV)</RouterLink>
-        <RouterLink class="btn btn-accent" :to="{ name: 'device-new' }">
+        <RouterLink v-if="canImport" class="btn" :to="{ name: 'device-import' }"
+            >Import (CSV)</RouterLink
+        >
+        <RouterLink v-if="canCreate" class="btn btn-accent" :to="{ name: 'device-new' }">
             <svg
                 width="18"
                 height="18"
@@ -590,10 +614,22 @@ onMounted(() => {
 
     <div v-if="selected.size > 0" class="selection-bar" data-testid="selection-bar">
         <span class="selection-count" role="status">{{ selectedText }}</span>
-        <button ref="dueButton" class="btn" type="button" @click="openBulk('inspection-due')">
+        <button
+            v-if="canBulkDue"
+            ref="dueButton"
+            class="btn"
+            type="button"
+            @click="openBulk('inspection-due')"
+        >
             Prüfdatum setzen …
         </button>
-        <button ref="stateButton" class="btn btn-accent" type="button" @click="openBulk('state')">
+        <button
+            v-if="canBulkState"
+            ref="stateButton"
+            class="btn btn-accent"
+            type="button"
+            @click="openBulk('state')"
+        >
             Umbuchen / Status ändern …
         </button>
         <button class="link-button" type="button" @click="clearSelection">Auswahl aufheben</button>
@@ -634,7 +670,7 @@ onMounted(() => {
         <table class="list-table" data-testid="device-table">
             <thead>
                 <tr>
-                    <th scope="col" class="cell-select">
+                    <th v-if="canBulk" scope="col" class="cell-select">
                         <label class="select-box">
                             <input
                                 type="checkbox"
@@ -670,7 +706,7 @@ onMounted(() => {
                     :data-testid="`device-row-${String(device.id)}`"
                     @click="openRow($event, device)"
                 >
-                    <td class="cell-select">
+                    <td v-if="canBulk" class="cell-select">
                         <label class="select-box">
                             <input
                                 type="checkbox"

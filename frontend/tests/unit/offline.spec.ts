@@ -35,7 +35,7 @@ import {
 import { OtherQueues, otherQueueText } from '../../src/data/otherQueues';
 import { MemoryDb } from '../../src/runtime/localDb';
 import { respond } from './support/fetch';
-import { meBody } from './support/me';
+import { meBody, permissionsJson } from './support/me';
 
 class MemoryStorage {
     readonly items = new Map<string, string>();
@@ -103,6 +103,16 @@ describe('gespeicherte Sitzung (Offline-Modus, Entscheidung 50)', () => {
         expect(JSON.stringify(stored)).not.toContain('session');
         resetSession();
         expect(storage.getItem(KEY)).toBeNull();
+    });
+
+    it('merkt sich die Rechte der Rolle mit Kennung (offline gelten sie, Schritt 1.7b)', () => {
+        const json = meBody('user', permissionsJson({ devices: 'write' }, ['device.edit'], true));
+        const parsed = parseAuthState(json);
+        expect(parsed).not.toBeNull();
+        setSession(parsed);
+        const stored = parseAuthState(JSON.parse(storage.getItem(KEY) ?? 'null'));
+        expect(stored?.permissions).toEqual(parsed?.permissions);
+        expect(stored?.permissions?.version).toBe(parsed?.permissions?.version);
     });
 
     it('bei einer Störung sofort mit der gespeicherten Sitzung, im Hintergrund weiter fragen', async () => {

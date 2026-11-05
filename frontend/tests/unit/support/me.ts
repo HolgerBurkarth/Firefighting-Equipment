@@ -1,7 +1,22 @@
 import type { UserRole } from '../../../src/api/auth';
 
-/** Antwort von auth/me bzw. auth/login wie AuthJson::me in PHP. */
-export function meBody(role: UserRole = 'admin'): Record<string, unknown> {
+/** `permissions` wie AuthJson::permissions in PHP (Bereich → Stufe, Aktionen). */
+export function permissionsJson(
+    areas: Readonly<Record<string, 'read' | 'write'>>,
+    actions: readonly string[] = [],
+    filtered = false,
+): Record<string, unknown> {
+    return { areas, actions, restrictions: [], filtered, version: `v-${JSON.stringify(areas)}` };
+}
+
+/**
+ * Antwort von auth/me bzw. auth/login wie AuthJson::me in PHP. Ohne `permissions` wie eine Antwort
+ * vor Schritt 1.3b (die App nimmt dann die Rechte der Kontoart).
+ */
+export function meBody(
+    role: UserRole = 'admin',
+    permissions?: Record<string, unknown>,
+): Record<string, unknown> {
     return {
         user: {
             id: 7,
@@ -14,5 +29,6 @@ export function meBody(role: UserRole = 'admin'): Record<string, unknown> {
         },
         tenant: role === 'superadmin' ? null : { slug: 'test', name: 'Feuerwehr Test' },
         session: { id: 3, device_label: 'Firefox auf Windows', current: true },
+        ...(permissions !== undefined && { permissions }),
     };
 }

@@ -417,7 +417,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
-  `client.ts`; `appearance.ts`, `devices.ts`, `deviceBulk.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
+  `client.ts`; `permissions.ts` Rechte der Rolle aus `auth/me`; `appearance.ts`, `devices.ts`, `deviceBulk.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
   `deviceTypes.ts`, `inspections.ts`, `invitationCodes.ts`, `locations.ts`, `notices.ts`, `tenants.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
   Gerätetypen, Benutzer, Hinweise und das Dashboard; unter `service` `service.ts`),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
@@ -562,8 +562,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   direkt geöffneten Link). Die Seite zeigt die Bestätigung (`BookingNoticeMessage`, holt sie per
   `takeBookingNotice`): „Suchen“ bis zur nächsten Eingabe, „Prüffristen“, die Geräteliste, das
   Gerätedetail und der Hinweis des Protokolls in der Admin-Konsole bis zum Verlassen (Gerätedetail
-  und Hinweis bis zur nächsten Aktion). Für
-  Admins zusätzlich der Link „Gerätedetail (Admin)“ unter „Details und Verlauf“. Nach jeder Buchung `locationStore.refresh('changed')` und
+  und Hinweis bis zur nächsten Aktion). Mit
+  Recht auf das Gerätedetail zusätzlich der Link „Gerätedetail (Admin)“ unter „Details und Verlauf“;
+  Standort nur mit `book.move`, Status nur mit `book.status`, ohne beide nur „Sie dürfen dieses Gerät
+  nur ansehen, nicht umbuchen.“ (`device-view-only`, Schritt 1.7b). Nach jeder Buchung `locationStore.refresh('changed')` und
   `adminDeviceList.refresh('changed')` (nur, wenn die Geräteliste schon geladen ist)
   (Gerätezahlen). Browser-Tests mit der
   Umbuchen-Ansicht simulieren `GET api/v1/devices/{id}` (`deviceDetail`) und `GET api/v1/locations`
@@ -649,7 +651,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Zähler an Einträgen (`badge`:
   `pendingUsers`, `openNotices`) aus `adminOverview`; `sections` hebt einen Eintrag auch auf
   Unterseiten hervor („Geräte“ auf dem Gerätedetail). Auf den Handy-Seiten behält der Admin die Leiste
-  unten mit „Dashboard“. Dashboard (`AdminDashboardPage`, Mockup „Main“) aus `adminOverview`
+  unten mit „Dashboard“. Seit Schritt 1.7b nach den Rechten (siehe "Rollen und Rechte", App): Menü
+  nur mit Seiten, die die Rolle öffnen darf; `adminOverview` fragt nur, was sie darf (`overviewScope`,
+  der Rest `null`), das Dashboard zeigt nur diese Teile, Kacheln und Geräte sind nur mit Recht auf
+  das Ziel Links. Dashboard (`AdminDashboardPage`, Mockup „Main“) aus `adminOverview`
   (`src/data/adminOverview.ts`, `AdminOverviewStore` mit `Refresher`, in `installDataLayer`): vier
   Abfragen gleichzeitig, `GET device-summary`, `GET users?status=pending`, `GET
   devices?status=maintenance,defective&sort=status&dir=desc&limit=10` (`NOT_READY_LIMIT`) und `GET
@@ -1035,7 +1040,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (Kästchen je Gruppe, grau mit „braucht „…: …““ ohne den Bereich, `actionState`), „4 · Sieht nur
   …“ (Standorte als Baum und Ausrüstungstypen, je „Alle“/„Nur ausgewählte“, gesperrte bzw.
   deaktivierte markiert; „3 · Einschränkungen“ erst ab Phase 2), rechts „So sieht es die Rolle“
-  (`rolePreview`: Menü am PC, Leiste am Handy, Darf, Sieht Ausrüstung; Suchen und Termine allein sind
+  (`rolePreview`: Menü am PC mit „Einstellungen“ bei jeder Konsole wie die App seit 1.7b, Leiste am
+  Handy, Darf, Sieht Ausrüstung; Suchen und Termine allein sind
   keine Konsole, wie heute *Benutzer*, F8) und „Die Änderung gilt sofort
   für N Personen …“. F3 im Editor: mit „Sieht nur …“ sind die Stufen und Aktionen grau, die es dann
   nicht gibt (eine schon gewählte bleibt bedienbar, um sie zu entfernen), dazu `filter-conflicts`;
@@ -1110,9 +1116,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`installBookingQueue`). Live-Test-Liste `docs/frontend/LIVETEST-OFFLINE.md` (echtes Offline nur
   Holger am iPhone).
 - Anmeldung im Frontend (Konzept: KONZEPT.md "Anmeldung und Registrierung"): Routen mit `meta`
-  `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles`; optional `layout` (`App.vue`):
+  `public` (ohne `auth/me`), `landing` (Weiche `/`) oder `roles` (unter Städten zusätzlich `rights`,
+  `src/router/pageRights.ts`, Schritt 1.7b); optional `layout` (`App.vue`):
   ohne Angabe Kopfleiste und Inhalt, `user` Handy-Seiten mit Begrüßung „Hallo <Anzeigename>“ und
-  Leiste unten (`UserTabBar`: Suchen, Prüffristen, Profil; für Admins vorne zusätzlich Dashboard),
+  Leiste unten (`UserTabBar`: Suchen, Prüffristen, Profil je nach Rechten; mit einer Seite der Konsole
+  vorne zusätzlich „Dashboard“ = `consoleRoute`, F8),
   `focus` bildschirmfüllend ohne Kopfleiste der App, die Seite zeigt `FocusHeader` (Zurück über
   `goBack` in `src/router/back.ts`: vorige Seite der App laut `history.state.back`, sonst
   „Suchen“), `admin` Seiten der Admin-Konsole mit deren Menü (siehe „Admin-Konsole“ unten).
@@ -1120,13 +1128,15 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Platzhalter im Backend) für `user` und `admin` (KONZEPT.md "User am Handy – Entscheidungen").
   Der Wächter fragt `auth/me`
   höchstens einmal je Seitenaufruf (`ensureSession`); ohne Sitzung → `anmelden?weiter=…`, falsche
-  Rolle → Startseite der Rolle (`landingRoute`: `user` → `suchen`, `admin`/`superadmin` →
-  `dashboard`). Nur eine echte Antwort entscheidet über die Sitzung (401 = nicht angemeldet,
+  Rolle bzw. fehlende Rechte (`canOpen`) → still zur Startseite (`landingRoute` in
+  `src/auth/redirect.ts`: Super-Admin `dashboard`; sonst mit Konsole `consoleRoute` = Dashboard bzw.
+  erste erlaubte Seite des Menüs ohne „Suchen“, sonst „Einstellungen“; ohne Konsole `suchen`, sonst
+  `prueffristen`, sonst `profil`; *Admin* → `dashboard`, *Benutzer* → `suchen` wie bisher). Nur eine echte Antwort entscheidet über die Sitzung (401 = nicht angemeldet,
   403/404 der Stadt ebenso endgültig): Bei einer Störung (`isTransientError`: keine Verbindung,
   `invalid_response`, 5xx) führt der Wächter nie zur Anmeldung, sondern wartet und fragt erneut
   (`RETRY_DELAYS_MS` 2/4/8/15 s, sofort bei `online`); solange zeigt `App.vue` den Hinweis aus
   `sessionCheckError`. Rückkehradressen nur über `safeReturnPath`/`afterLogin` (Pfad der App, kein `//`,
-  Schema oder Backslash, Rolle muss die Seite öffnen dürfen). Unter `service` gibt es `suchen`,
+  Schema oder Backslash, das Konto muss die Seite öffnen dürfen, `canOpen`). Unter `service` gibt es `suchen`,
   `registrieren`, `email-bestaetigen` und `einladung-annehmen` nicht. Fehlertexte nur über
   `errorMessage` (`src/auth/errorMessages.ts`), Code klein daneben (`ErrorNotice`). Abmelden vergisst
   die Sitzung erst nach Erfolg beim Server. Anrede immer „Sie“. Bausteine in `src/components/`:
@@ -1935,8 +1945,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (Datenfilter „Sieht nur …“ in allen Abfragen und Mails), 1.5a (Verwaltung der Rollen durch den
   Super-Admin im Backend, siehe unten) und 1.5b (Seiten „Rollen“ und „Rolle bearbeiten“, siehe
   "Frontend"), 1.6a (Rollen zuweisen im Backend, siehe "Benutzerverwaltung durch den Admin") und
-  1.6b (Rollen in der Benutzerverwaltung und bei Einladungscodes, siehe "Frontend") und 1.7a (Aktion
-  `csv.export` für die Exporte, F2). Schritt 1.7 ist geteilt (Holger 05.11.2026): 1.7a Backend,
+  1.6b (Rollen in der Benutzerverwaltung und bei Einladungscodes, siehe "Frontend"), 1.7a (Aktion
+  `csv.export` für die Exporte, F2) und 1.7b (App nach Rechten, siehe unten „App nach Rechten“). Schritt 1.7 ist geteilt (Holger 05.11.2026): 1.7a Backend,
   1.7b App nach Rechten (Wächter, Menü, Handy-Leiste, Knöpfe), 1.7c Rechte ändern sich während der
   Sitzung (Offline-Kopie, Warteschlange) mit `X-Client-Api` 2 und `ClientApi::MIN` = 1 (Variante B;
   über MIN = 2 wird in Schritt 1.8 entschieden, bevor Immendingen eigene Rollen bekommt).
@@ -1986,7 +1996,38 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   leer, `filtered` = Rolle mit Datenfilter (`Permissions::isFiltered`), `version` = SHA-256 über
   Rolle und `fe_roles.version` (`Permissions::revision`, „<id>:<version>“), die Rechte und die IDs
   des Datenfilters (`DeviceVisibility::toArray`, ändert sich auch mit einem neuen Fach). Die App
-  liest das Feld ab Schritt 1.7.
+  liest das Feld seit Schritt 1.7b (siehe „App nach Rechten“).
+- App nach Rechten (Schritt 1.7b): `src/api/permissions.ts` (`parsePermissions`: unbekannte
+  Bereiche, Stufen und Aktionen geben kein Recht, Stufe höchstens `AREA_MAX_LEVELS`; `allows(p,
+  bereich, stufe)`, `can(p, aktion)`; `AREA_MAX_LEVELS`/`PERMISSION_ACTIONS` per Test gleich
+  `tests/Fixtures/permission-catalog.json`, `USER_PERMISSIONS` gleich `DefaultRoles`), `AuthState.
+  permissions` (null unter `service` und ohne Feld), gespeichert auch in der gespeicherten Sitzung
+  (`ff-session:<kürzel>`, offline gelten sie). `permissionsOf`: ohne Rechte vom Server die der
+  Kontoart (`admin` alle = `ADMIN_PERMISSIONS`, `user` = `USER_PERMISSIONS`); `currentPermissions`
+  (`src/auth/session.ts`) für Seiten und Bausteine. Seiten unter Städten: `meta.roles` = Konten der
+  Stadt, `meta.rights` aus `PAGE_RIGHTS` (`src/router/pageRights.ts`; wie die Abfragen der Seite:
+  `suchen` `search`, `prueffristen` `due`, `geraete/<id>` `search` oder `devices`, `geraete` und
+  Gerätedetail `devices`, `geraete/neu` `device.create`, `geraete/import` `csv.import`,
+  `standorte`, `geraetetypen`, `benutzer`, `protokoll` je ihr Bereich, `dashboard` `dashboard`,
+  `einstellungen` jede Konsole `hasConsole` = ein Bereich außer `search`/`due`; `profil` jedes Konto);
+  Prüfung `canOpen`/`canOpenRoute` (`meta` aus `router.getRoutes()`, nie `resolve`: Seiten mit
+  Platzhalter). Knöpfe: Geräteliste „Export (CSV)“ `csv.export`, „Import (CSV)“ `csv.import`, „Neues
+  Gerät“ `device.create`, Kästchen nur mit `devices.bulk` und einer Sammelaktion („Prüfdatum setzen“
+  `due` Ändern, „Umbuchen / Status ändern“ `book.move`/`book.status`, im Fenster Standort bzw. Status
+  je nach Aktion); Gerätedetail je Aktion (`book.*`, `device.edit`, `due` Ändern, `device.code`,
+  `device.retire`; beim Wiederaufnehmen Kennung und Typ nur mit `device.edit`, Scan-Code nur mit
+  `device.code`); Standorte und Gerätetypen ändern nur mit Ändern, der Name nur mit `devices` als Link;
+  Benutzer und Einladungscodes ändern nur mit `users` Ändern; Protokoll „Verlauf exportieren“ nur mit
+  `csv.export`, Erledigen/Wieder öffnen nur mit `log` Ändern, „Gerät jetzt“ nur mit `search` oder
+  `devices`; Einstellungen Farbe und Logo nur mit `settings` Ändern (mit Ansehen ein Hinweis),
+  Benachrichtigung „Log“ nur mit `mail.log`; Prüffristen ohne `search` und `devices` vom Server
+  (`inspection-due`) und Karten ohne Link (`DeviceCard` `link`). Standorte mit `selectable` false
+  (nur Fächer sichtbar) sind kein Ziel (`isSelectable`, fehlt = wählbar): in der Standortwahl ohne
+  „Ganzes Fahrzeug“, in Auswahllisten nur die Fächer. Tests: `permissions.spec.ts`, `router.spec.ts`
+  (eigene Rollen), `adminOverview.spec.ts`, `offline.spec.ts` (Unit), Browser
+  `tests/e2e/permissions.spec.ts` (Gerätewart, nur ansehen, Benutzer ansehen, Handy nur umbuchen;
+  jede nicht erlaubte Abfrage ließe ihn scheitern); `meBody` der Browser-Tests sendet `permissions`
+  wie der Server (`ADMIN_RIGHTS`, `USER_RIGHTS`, `permissionsJson` in `tests/e2e/fixtures.ts`).
 - Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank): `Area` (`dashboard`,
   `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`; `maxLevel`:
   `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`

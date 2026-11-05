@@ -1,4 +1,5 @@
 import { apiRequest, isRecord, type ApiResult } from './client';
+import { parsePermissions, type Permissions } from './permissions';
 
 /** Rollen wie UserRole in PHP. */
 export type UserRole = 'user' | 'admin' | 'superadmin';
@@ -18,6 +19,11 @@ export interface AuthState {
     readonly user: SessionUser;
     /** Stadt des Kontos; null beim Super-Admin. */
     readonly tenant: { readonly slug: string; readonly name: string } | null;
+    /**
+     * Rechte der Rolle (`permissions`, seit Schritt 1.3b); null unter `service` und in Antworten bzw.
+     * gespeicherten Sitzungen ohne das Feld (dann gelten die der Kontoart, `permissionsOf`).
+     */
+    readonly permissions: Permissions | null;
 }
 
 function optionalString(value: unknown): string | null | undefined {
@@ -64,7 +70,11 @@ export function parseAuthState(json: unknown): AuthState | null {
         }
         tenant = { slug: tenantJson['slug'], name: tenantJson['name'] };
     }
-    return { user: { id, email, name, displayName, role }, tenant };
+    const permissions = parsePermissions(json['permissions']);
+    if (permissions === undefined) {
+        return null;
+    }
+    return { user: { id, email, name, displayName, role }, tenant, permissions };
 }
 
 /** Antworten mit einer Meldung des Servers (202 bei Mail-Abläufen, 200 bei Abmelden u. a.). */
