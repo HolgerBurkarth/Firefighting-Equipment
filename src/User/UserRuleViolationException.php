@@ -50,7 +50,7 @@ final class UserRuleViolationException extends UserException
     public static function deviceLogNotAllowed(int $id): self
     {
         return new self(sprintf(
-            'Für das Konto #%d gibt es die Benachrichtigung „Log“ nicht: Sie steht nur Admins und Super-Admins zur Verfügung.',
+            'Für das Konto #%d gibt es die Benachrichtigung „Log“ nicht: Sie steht nur Super-Admins und Konten zur Verfügung, deren Rolle Log-Mails empfangen darf.',
             $id,
         ));
     }

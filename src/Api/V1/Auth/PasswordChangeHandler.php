@@ -79,7 +79,7 @@ final readonly class PasswordChangeHandler implements RequestHandler
         return new JsonResponse(
             AuthJson::me($started->auth, $context->tenant),
             200,
-            ['Set-Cookie' => SessionCookie::issue($context->tenant, $started->token, SessionLifetime::maxSeconds($user->role))],
+            ['Set-Cookie' => SessionCookie::issue($context->tenant, $started->token, SessionLifetime::maxSeconds($started->auth->sessionClass()))],
         );
     }
 }

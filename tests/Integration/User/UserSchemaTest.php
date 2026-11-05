@@ -352,15 +352,17 @@ final class UserSchemaTest extends AuthSchemaTestCase
         );
     }
 
-    public function testDeviceLogNotificationIsAcceptedForAdminsAndSuperadmins(): void
+    public function testDeviceLogNotificationIsAcceptedForAccountsThatAreNotDeleted(): void
     {
+        // Seit Migration 0040 entscheidet die Rolle (Aktion mail.log) im Code, nicht die Kontoart.
         $tenantId = $this->createTenant();
         $admin = $this->createUser($tenantId, ['role' => 'admin', 'notify_device_log' => 1]);
         $superadmin = $this->createUser(null, ['role' => 'superadmin', 'notify_device_log' => 1]);
-        $user = $this->createUser($tenantId);
+        $user = $this->createUser($tenantId, ['notify_device_log' => 1]);
+        $off = $this->createUser($tenantId);
 
         self::assertSame(
-            [[$admin, 1], [$superadmin, 1], [$user, 0]],
+            [[$admin, 1], [$superadmin, 1], [$user, 1], [$off, 0]],
             $this->pdo()->query('SELECT id, notify_device_log FROM fe_users ORDER BY id')->fetchAll(\PDO::FETCH_NUM),
         );
     }
@@ -370,8 +372,8 @@ final class UserSchemaTest extends AuthSchemaTestCase
      */
     public static function invalidDeviceLogNotifications(): iterable
     {
-        yield 'Benutzer' => [['notify_device_log' => 1]];
         yield 'gelöschter Admin' => [['role' => 'admin', 'notify_device_log' => 1] + self::anonymized()];
+        yield 'gelöschter Benutzer' => [['notify_device_log' => 1] + self::anonymized()];
         yield 'Wert 2' => [['role' => 'admin', 'notify_device_log' => 2]];
     }
 
@@ -387,13 +389,16 @@ final class UserSchemaTest extends AuthSchemaTestCase
         self::assertSame(0, $this->countRows('fe_users'));
     }
 
-    public function testDatabaseRejectsDemotingAdminWithDeviceLogNotification(): void
+    public function testDatabaseRejectsAnonymizingWithDeviceLogNotification(): void
     {
         $id = $this->createUser($this->createTenant(), ['role' => 'admin', 'notify_device_log' => 1]);
 
         $this->assertRejected(
             self::ER_CONSTRAINT_FAILED,
-            fn () => $this->pdo()->exec("UPDATE fe_users SET role = 'user' WHERE id = " . $id),
+            fn () => $this->pdo()->exec(
+                "UPDATE fe_users SET status = 'deleted', email = NULL, email_verified_at = NULL, password_hash = NULL,"
+                . " name = NULL, display_name = NULL, deleted_at = UTC_TIMESTAMP() WHERE id = " . $id,
+            ),
         );
     }
 

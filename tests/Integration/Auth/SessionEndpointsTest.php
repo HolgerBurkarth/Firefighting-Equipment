@@ -9,6 +9,7 @@ use FirefightingEquipment\Api\V1\Auth\MeHandler;
 use FirefightingEquipment\Api\V1\Auth\SessionDeleteHandler;
 use FirefightingEquipment\Api\V1\Auth\SessionListHandler;
 use FirefightingEquipment\Http\Routes;
+use FirefightingEquipment\Permission\Action;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 #[CoversClass(MeHandler::class)]
@@ -38,6 +39,51 @@ final class SessionEndpointsTest extends AuthTestCase
         self::assertTrue($data['session']['current']);
     }
 
+    public function testMePermissionsOfAdminAreTheWholeCatalog(): void
+    {
+        $this->account('immendingen', 'admin@example.org', ['role' => 'admin']);
+        $cookie = $this->loginCookie('immendingen', 'admin@example.org');
+
+        $permissions = self::json($this->send('GET', self::url('immendingen', 'auth/me'), cookie: $cookie))['permissions'];
+
+        self::assertSame(
+            ['dashboard' => 'read', 'search' => 'read', 'devices' => 'write', 'locations' => 'write', 'device_types' => 'write',
+                'due' => 'write', 'log' => 'write', 'users' => 'write', 'settings' => 'write'],
+            $permissions['areas'],
+        );
+        self::assertSame(array_map(static fn (Action $a): string => $a->value, Action::cases()), $permissions['actions']);
+        self::assertSame([], $permissions['restrictions']);
+        self::assertFalse($permissions['filtered']);
+        self::assertMatchesRegularExpression('/\A[0-9a-f]{64}\z/', $permissions['version']);
+    }
+
+    public function testMePermissionsOfUserRoleAndVersionFollowsTheRole(): void
+    {
+        $id = $this->account('immendingen', 'user@example.org');
+        $cookie = $this->loginCookie('immendingen', 'user@example.org');
+        $me = fn (): array => self::json($this->send('GET', self::url('immendingen', 'auth/me'), cookie: $cookie))['permissions'];
+
+        $first = $me();
+        self::assertSame(['search' => 'read', 'due' => 'read'], $first['areas']);
+        self::assertSame(['book.move', 'book.status'], $first['actions']);
+        self::assertFalse($first['filtered']);
+        self::assertSame($first, $me(), 'gleicher Stand, gleiche Version');
+
+        $tenantId = $this->tenant('immendingen')->id;
+        $this->pdo()->exec('UPDATE fe_roles SET version = version + 1 WHERE id = ' . (int) $this->systemRoleId($tenantId, 'user'));
+        $bumped = $me();
+        self::assertSame($first['areas'], $bumped['areas']);
+        self::assertNotSame($first['version'], $bumped['version'], 'neuer Stand der Rolle');
+
+        $roleId = $this->insert('fe_roles', ['tenant_id' => $tenantId, 'name' => 'Wache 2', 'filter_locations' => 1]);
+        $this->pdo()->exec('UPDATE fe_users SET role_id = ' . $roleId . ' WHERE id = ' . $id);
+        $other = $me();
+        self::assertSame([], $other['areas'], 'ohne Bereiche ein leeres Objekt');
+        self::assertStringContainsString('"areas":{}', $this->send('GET', self::url('immendingen', 'auth/me'), cookie: $cookie)->body());
+        self::assertTrue($other['filtered']);
+        self::assertNotSame($bumped['version'], $other['version']);
+    }
+
     public function testMeForSuperAdminUnderServiceOnly(): void
     {
         $this->account(null, 'chef@example.org');
@@ -46,6 +92,7 @@ final class SessionEndpointsTest extends AuthTestCase
         $data = self::json($this->send('GET', self::url(null, 'auth/me'), cookie: $cookie));
         self::assertSame('superadmin', $data['user']['role']);
         self::assertNull($data['tenant']);
+        self::assertNull($data['permissions'], 'Super-Admins haben keine Rolle');
 
         self::assertError(401, 'not_authenticated', $this->send('GET', self::url('immendingen', 'auth/me'), cookie: $cookie));
     }

@@ -8,6 +8,44 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-05 – „Rechte: auth/me mit permissions, Sitzungsdauer und Log-Mails aus der Rolle (Phase 1, Schritt 1.3b)“
+
+Für die Standard-Rollen *Admin* und *Benutzer* bleibt das Verhalten gleich (per Test); neu ist ein
+Feld in `auth/me` und, dass Sitzungsdauer und Log-Mails aus den Rechten der Rolle folgen (Plan
+Phase 1, Abschnitt 5, F9, F11):
+
+- `GET auth/me` und `POST auth/login`/`auth/password` (gleiche Antwort `AuthJson::me`): neues Feld
+  `permissions` = `{areas: {<bereich>: "read"|"write"}, actions: [...], restrictions: [], filtered:
+  bool, version: "<64 Hex>"}`, unter `service` `null`. Nur wirksame Rechte (Aktionen nur mit ihrem
+  Bereich), Reihenfolge des Katalogs; `areas` immer ein Objekt (`{}` ohne Bereiche); `restrictions`
+  bis Phase 2 leer; `filtered` = Rolle mit Datenfilter (wirkt ab 1.4); `version` = SHA-256 über
+  Rolle, `fe_roles.version` und die Rechte (ändert sich auch, wenn der Katalog wächst). Die App
+  liest das Feld noch nicht (ab Schritt 1.7). *Admin*: alle Bereiche und Aktionen; *Benutzer*:
+  `search`/`due` `read`, `book.move`, `book.status`.
+- Sitzungsdauer aus den Rechten (`SessionClass`, `SessionLifetime` je Klasse): kurz 7 / 30 Tage
+  (Rolle *Admin*, `users` oder `settings` mindestens Ansehen, ein Bereich auf Ändern oder eine
+  wirksame Aktion außer `book.*` und `mail.log`), lang 30 / 90 Tage (sonst), Super-Admin unverändert
+  1 / 12 Stunden. `resume` prüft zusätzlich `created_at` + Höchstdauer der aktuellen Klasse (eine
+  strengere Rolle gilt sofort). Cookie-`Max-Age` und `expires_at` wie bisher aus der Klasse beim
+  Anmelden. Die Rechte lädt jetzt `SessionManager::resume` einmal je Anfrage
+  (`AuthSession::$permissions`), `Application` nimmt sie von dort.
+- Log-Mails: Empfänger unter einer Stadt sind Konten, deren Rolle `mail.log` hat
+  (`PermissionRepository::grantsActionSql`, wie `Permissions::can`), statt Kontoart `admin`; dazu
+  wie bisher alle Super-Admins, je aktiv, nicht gesperrt, Option an. Einschalten
+  (`auth/notifications`, `UserRepository::setDeviceLogNotification`) nur mit `mail.log` bzw. als
+  Super-Admin, Ausschalten immer. Für die Standard-Rollen dieselben Empfänger wie vorher (Abgleich
+  mit der alten Abfrage im Test).
+- Migrationen 0039 (alte CHECK `chk_fe_users_notify_device_log` entfernen) und 0040 (neue CHECK:
+  0/1, nie bei `deleted`). Reine Lockerung, ändert keine Daten; jede Zeile der alten CHECK erfüllt
+  die neue (per Test, auch über alle Kombinationen von Kontoart, Status und Wert).
+- Tests: `SessionClassTest`, `SessionLifetimeTest`, `SessionManagerTest` (Standard-Rollen 7/30 und
+  30/90 Tage, eigene Rolle, strengere Rolle), `LoginTest`, `SessionEndpointsTest`
+  (`permissions`), `PermissionRepositoryTest` (Rolle, Filter, SQL gleich `can`),
+  `UserRepositoryTest` (Empfänger wie vorher, eigene Rolle mit `mail.log`), `UserSchemaTest`,
+  `NotifyDeviceLogCheckMigrationTest`.
+- Dokumentiert in `CLAUDE.md`, "Benutzer und Anmeldung" (Sitzungsdauer, Benachrichtigung „Log“),
+  "Anmeldung und Sitzungen im Code", "Rollen und Rechte", "Benachrichtigung „Log“".
+
 ## 2026-11-05 – „Rechte: Routen unter Städten prüfen die Rolle statt fe_users.role (Phase 1, Schritt 1.3a)“
 
 Keine sichtbare Änderung der API (Routen, Felder, Antworten, Fehlercodes unverändert); geändert hat
@@ -23,7 +61,7 @@ sich, WIE `Application` den Zugriff unter einer Stadt prüft (Plan Phase 1, Absc
 - `GET device-summary`: `notices` jetzt bei `log` Ansehen statt bei Rolle `admin` (für die
   Standard-Rollen gleich).
 - Exporte (`devices/export`, `device-events/export`) bewusst wie bisher für jedes Konto, das Geräte
-  sieht (Konflikt mit F2 „Benutzer ohne CSV-Export“, offen).
+  sieht (F2 „Benutzer ohne CSV-Export“ kommt mit Schritt 1.7, Aktion `csv.export`).
 - Neue Routen unter Städten in `TenantRoutePermissionsTest` eintragen (Tabelle Route → bisherige Stufe
   → Erfordernis), sonst scheitert der Test.
 - Tests: `TenantRoutePermissionsTest`, `AccessControlTest`, `RouterTest`, `PermissionRepositoryTest`,

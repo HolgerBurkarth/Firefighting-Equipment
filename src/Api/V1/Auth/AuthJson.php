@@ -6,6 +6,9 @@ namespace FirefightingEquipment\Api\V1\Auth;
 
 use FirefightingEquipment\Auth\AuthSession;
 use FirefightingEquipment\Auth\Session;
+use FirefightingEquipment\Permission\Action;
+use FirefightingEquipment\Permission\AreaLevel;
+use FirefightingEquipment\Permission\Permissions;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -34,7 +37,30 @@ final class AuthJson
             ],
             'tenant' => $tenant === null ? null : ['slug' => $tenant->slug->value, 'name' => $tenant->name->value],
             'session' => self::session($auth->session, $auth->session->id),
+            'permissions' => $auth->permissions === null ? null : self::permissions($auth->permissions),
         ];
+    }
+
+    /**
+     * Wirksame Rechte der Rolle (Plan Phase 1, Abschnitt 5): Bereiche mit Stufe, Aktionen (nur die,
+     * deren Bereich vorhanden ist), Einschränkungen (erst ab Phase 2, bis dahin leer), Datenfilter
+     * und eine Kennung des Stands. `version` ändert sich mit der Rolle des Kontos, jeder Änderung
+     * der Rolle (fe_roles.version) und den Rechten selbst (auch einem erweiterten Katalog).
+     *
+     * @return array{areas: \stdClass, actions: list<string>, restrictions: list<string>, filtered: bool, version: string}
+     */
+    public static function permissions(Permissions $permissions): array
+    {
+        $json = [
+            // Als Objekt, auch ohne Bereiche ({} statt []).
+            'areas' => (object) array_map(static fn (AreaLevel $level): string => $level->value, $permissions->areas()),
+            'actions' => array_map(static fn (Action $action): string => $action->value, $permissions->actions()),
+            'restrictions' => [],
+            'filtered' => $permissions->isFiltered(),
+        ];
+        $json['version'] = hash('sha256', json_encode([$permissions->revision(), $json], JSON_THROW_ON_ERROR));
+
+        return $json;
     }
 
     /**

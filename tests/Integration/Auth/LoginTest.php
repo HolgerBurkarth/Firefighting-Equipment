@@ -11,10 +11,10 @@ use FirefightingEquipment\Auth\AccountUnavailableException;
 use FirefightingEquipment\Auth\Authenticator;
 use FirefightingEquipment\Auth\InvalidCredentialsException;
 use FirefightingEquipment\Auth\LoginThrottle;
+use FirefightingEquipment\Auth\SessionClass;
 use FirefightingEquipment\Auth\SessionLifetime;
 use FirefightingEquipment\Tests\Support\TestPasswordHasher;
 use FirefightingEquipment\User\Password\PasswordHasher;
-use FirefightingEquipment\User\UserRole;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -88,9 +88,10 @@ final class LoginTest extends AuthTestCase
      */
     public static function maxAgePerRole(): iterable
     {
-        yield 'user' => ['immendingen', 'user', SessionLifetime::maxSeconds(UserRole::User)];
-        yield 'admin' => ['immendingen', 'admin', SessionLifetime::maxSeconds(UserRole::Admin)];
-        yield 'superadmin' => [null, 'superadmin', SessionLifetime::maxSeconds(UserRole::SuperAdmin)];
+        // Standard-Rollen wie vor Schritt 1.3b: Benutzer 90 Tage, Admin 30 Tage.
+        yield 'user' => ['immendingen', 'user', 90 * 86400];
+        yield 'admin' => ['immendingen', 'admin', 30 * 86400];
+        yield 'superadmin' => [null, 'superadmin', SessionLifetime::maxSeconds(SessionClass::SuperAdmin)];
     }
 
     public function testSuperAdminLogsInOnlyUnderService(): void
