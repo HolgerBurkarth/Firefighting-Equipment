@@ -81,6 +81,14 @@ Vorgaben von Ziel 4 unten; wo der Begleittext des Mockups abweicht (dort „nach
   (`START_CHECK_TIMEOUT_MS`) auf `build.json` bzw. die Registrierung, bevor die erste Seite erscheint.
 - Antworten von STRATO: rund 0,2–0,3 s je Anfrage.
 
+**Vorher mit Messskript** (05.11.2026, Build `08c676252d25`, `npm run measure:start`, Chromium in
+Handy-Breite, je 5 Durchgänge, Zeit bis das Feld „E-Mail“ steht): erster Besuch 1,86 s (1,79–4,44 s),
+gedrosselt (`--slow`) 1,84 s; weiterer Start mit Service Worker 0,49 s (0,45–0,59 s), gedrosselt
+0,63 s. Angemeldet als *Admin* auf `suchen` (Claude in Chrome, Resource Timing ab Navigation, zwei
+Starts): `tenant`, `auth/me` und `build.json` gleichzeitig ab rund 0,07–0,1 s, fertig nach 0,32–0,6 s;
+erst danach die Seite (`SearchPage`) und `devices` (Beginn 0,37–0,65 s, Antwort 0,83–0,89 s). Die
+Geräte stehen also erst nach rund 0,9 s, obwohl Sitzung und Offline-Kopie auf dem Gerät liegen.
+
 **Ziele**
 
 - **Start wartet nicht auf die Update-Prüfung**: Die Seite erscheint sofort, die Prüfung läuft im
