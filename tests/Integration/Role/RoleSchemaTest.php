@@ -21,7 +21,7 @@ final class RoleSchemaTest extends DeviceSchemaTestCase
     {
         parent::setUp();
 
-        $this->tenantId = $this->createTenant();
+        $this->tenantId = $this->createTenant(withDefaultRoles: false);
     }
 
     public function testValidRoleIsAcceptedWithDefaults(): void
@@ -47,7 +47,7 @@ final class RoleSchemaTest extends DeviceSchemaTestCase
     public function testSameNameInOtherTenantIsAccepted(): void
     {
         $this->createRole($this->tenantId, ['name' => 'Gerätewart', 'system_key' => 'user']);
-        $this->createRole($this->createTenant('tuttlingen'), ['name' => 'Gerätewart', 'system_key' => 'user']);
+        $this->createRole($this->createTenant('tuttlingen', false), ['name' => 'Gerätewart', 'system_key' => 'user']);
 
         self::assertSame(2, $this->countRows('fe_roles'));
     }
@@ -210,7 +210,7 @@ final class RoleSchemaTest extends DeviceSchemaTestCase
     public function testChildRowsMustBelongToTenantOfRole(): void
     {
         $roleId = $this->createRole($this->tenantId);
-        $otherTenantId = $this->createTenant('tuttlingen');
+        $otherTenantId = $this->createTenant('tuttlingen', false);
         $otherLocationId = $this->createLocation($otherTenantId);
         $otherTypeId = $this->createDeviceType($otherTenantId);
 
@@ -247,22 +247,13 @@ final class RoleSchemaTest extends DeviceSchemaTestCase
     public function testUserRoleMustBelongToSameTenant(): void
     {
         $roleId = $this->createRole($this->tenantId);
-        $otherTenantId = $this->createTenant('tuttlingen');
+        $otherTenantId = $this->createTenant('tuttlingen', false);
 
         $userId = $this->createUser($this->tenantId, ['role_id' => $roleId]);
         self::assertSame($roleId, (int) $this->pdo()->query('SELECT role_id FROM fe_users WHERE id = ' . $userId)->fetchColumn());
 
         $this->assertRejected(self::ER_NO_REFERENCED_ROW, fn () => $this->createUser($otherTenantId, ['role_id' => $roleId]));
         $this->assertRejected(self::ER_NO_REFERENCED_ROW, fn () => $this->createUser($this->tenantId, ['role_id' => 999]));
-    }
-
-    public function testRoleIdIsOptionalForNow(): void
-    {
-        $userId = $this->createUser($this->tenantId);
-        $superadminId = $this->createSuperadmin();
-
-        $stmt = $this->pdo()->query('SELECT role_id FROM fe_users WHERE id IN (' . $userId . ', ' . $superadminId . ')');
-        self::assertSame([null, null], $stmt->fetchAll(\PDO::FETCH_COLUMN));
     }
 
     public function testRoleOfAnAccountCannotBeDeleted(): void

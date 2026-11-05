@@ -35,6 +35,17 @@ final readonly class UserRepository
     public const int UNVERIFIED_RETENTION_DAYS = 7;
 
     private const int ER_DUP_ENTRY = 1062;
+
+    /**
+     * Rolle zur Kontoart (fe_users.role admin/user → Standard-Rolle mit diesem system_key), damit
+     * role und role_id in derselben Anweisung zusammenpassen (Plan Phase 1, Abschnitt 1). Erster
+     * Parameter: die Kontoart. Variante für UPDATE (Stadt aus der Zeile) und für INSERT (Stadt als
+     * Parameter davor).
+     */
+    private const string SYSTEM_ROLE_ID =
+        '(SELECT r.id FROM fe_roles r WHERE r.tenant_id = fe_users.tenant_id AND r.system_key = ?)';
+    private const string SYSTEM_ROLE_ID_OF_TENANT = 'SELECT r.id FROM fe_roles r WHERE r.tenant_id = ? AND r.system_key = ?';
+
     private const string COLUMNS = 'id, tenant_id, role, status, email, name, display_name, email_verified_at,'
         . ' locked_at, deleted_at, created_at, updated_at, protected, notify_device_log';
 
@@ -286,7 +297,11 @@ final readonly class UserRepository
             self::assertNotLastAdministrator($user, $group);
 
             // Die Benachrichtigung „Log“ gibt es nur für Admins (CHECK chk_fe_users_notify_device_log).
-            $this->update($user->id, 'role = ?, notify_device_log = ?', [$role->value, $role === UserRole::User ? '0' : ($user->notifyDeviceLog ? '1' : '0')]);
+            $this->update(
+                $user->id,
+                'role = ?, role_id = ' . self::SYSTEM_ROLE_ID . ', notify_device_log = ?',
+                [$role->value, $role->value, $role === UserRole::User ? '0' : ($user->notifyDeviceLog ? '1' : '0')],
+            );
             $this->endSessions($user->id);
 
             return true;
@@ -310,7 +325,11 @@ final readonly class UserRepository
                 throw UserRuleViolationException::notPending($user->id);
             }
 
-            $this->update($user->id, "status = 'active', display_name = ?, role = ?", [$displayName->value, $role->value]);
+            $this->update(
+                $user->id,
+                "status = 'active', display_name = ?, role = ?, role_id = " . self::SYSTEM_ROLE_ID,
+                [$displayName->value, $role->value, $role->value],
+            );
         });
 
         return $this->findById($id) ?? throw UserNotFoundException::forId($id);
@@ -468,9 +487,10 @@ final readonly class UserRepository
 
             $codes->countUse($codeId);
             $this->pdo->prepare(
-                'INSERT INTO fe_users (tenant_id, role, status, email, password_hash, name, invitation_code_id,'
-                . " created_at, updated_at) VALUES (?, 'user', 'unverified', ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-            )->execute([$tenant->id, $email->value, $passwordHash, $name->value, $codeId]);
+                'INSERT INTO fe_users (tenant_id, role, role_id, status, email, password_hash, name, invitation_code_id,'
+                . " created_at, updated_at) VALUES (?, 'user', (" . self::SYSTEM_ROLE_ID_OF_TENANT . "), 'unverified', ?, ?, ?, ?,"
+                . ' UTC_TIMESTAMP(), UTC_TIMESTAMP())',
+            )->execute([$tenant->id, $tenant->id, UserRole::User->value, $email->value, $passwordHash, $name->value, $codeId]);
             $id = (int) $this->pdo->lastInsertId();
 
             return new Registration($this->findById($id) ?? throw new \LogicException('Angelegtes Konto nicht gefunden.'), true);
@@ -815,9 +835,9 @@ final readonly class UserRepository
     private function insertInvitedAdmin(Tenant $tenant, EmailAddress $email): AdminInvitation
     {
         $user = $this->insert(
-            'INSERT INTO fe_users (tenant_id, role, status, email, created_at, updated_at)'
-            . " VALUES (?, 'admin', 'invited', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-            [$tenant->id, $email->value],
+            'INSERT INTO fe_users (tenant_id, role, role_id, status, email, created_at, updated_at)'
+            . " VALUES (?, 'admin', (" . self::SYSTEM_ROLE_ID_OF_TENANT . "), 'invited', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$tenant->id, $tenant->id, UserRole::Admin->value, $email->value],
             $email,
         );
         $token = new UserTokenRepository($this->pdo)->replace($user->id, TokenPurpose::SetPassword);

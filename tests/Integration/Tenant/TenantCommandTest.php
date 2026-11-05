@@ -292,9 +292,10 @@ final class TenantCommandTest extends DomainTestCase
         $stmt = $this->pdo()->prepare('SELECT id FROM fe_tenants WHERE slug = ?');
         $stmt->execute([$slug]);
         $this->pdo()->prepare(
-            'INSERT INTO fe_users (tenant_id, role, status, email, email_verified_at, password_hash, name, display_name)'
-            . " VALUES (?, 'user', 'active', ?, UTC_TIMESTAMP(), ?, 'Max', 'Max')",
-        )->execute([(int) $stmt->fetchColumn(), $email, '$argon2id$v=19$m=1024,t=1,p=1$test']);
+            'INSERT INTO fe_users (tenant_id, role, role_id, status, email, email_verified_at, password_hash, name, display_name)'
+            . " SELECT r.tenant_id, 'user', r.id, 'active', ?, UTC_TIMESTAMP(), ?, 'Max', 'Max' FROM fe_roles r"
+            . " WHERE r.tenant_id = ? AND r.system_key = 'user'",
+        )->execute([$email, '$argon2id$v=19$m=1024,t=1,p=1$test', (int) $stmt->fetchColumn()]);
 
         return (int) $this->pdo()->lastInsertId();
     }

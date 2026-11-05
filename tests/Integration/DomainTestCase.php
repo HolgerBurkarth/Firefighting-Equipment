@@ -18,6 +18,9 @@ abstract class DomainTestCase extends IntegrationTestCase
 
     private static bool $migrated = false;
 
+    /** Test, dessen Zeilen noch in der Datenbank stehen (geprüft vor dem Leeren). */
+    private static ?string $previousTest = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -28,6 +31,25 @@ abstract class DomainTestCase extends IntegrationTestCase
             self::$migrated = true;
         }
 
+        if (self::$previousTest !== null) {
+            $this->assertAccountRolesFitAccountKinds(self::$previousTest);
+        }
         TestDatabase::clearDomainTables($this->pdo());
+        self::$previousTest = static::class . '::' . $this->name();
+    }
+
+    /**
+     * Regel aus dem Plan Phase 1 (nur im Code gesichert, kein CHECK möglich): fe_users.role = 'admin'
+     * genau dann, wenn role_id die Rolle Admin der Stadt ist. Geprüft über alle Zeilen, die der
+     * vorige Test hinterlassen hat, also nach jedem Schreibweg jedes Tests.
+     */
+    private function assertAccountRolesFitAccountKinds(string $test): void
+    {
+        $mismatched = $this->pdo()->query(
+            'SELECT GROUP_CONCAT(u.id ORDER BY u.id) FROM fe_users u JOIN fe_roles r ON r.id = u.role_id'
+            . " WHERE (u.role = 'admin') <> (r.system_key <=> 'admin')",
+        )->fetchColumn();
+
+        self::assertNull($mismatched, sprintf('Konten mit Rolle, die nicht zur Kontoart passt (nach %s): %s', $test, (string) $mismatched));
     }
 }

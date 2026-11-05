@@ -247,7 +247,9 @@ final class UserSchemaTest extends AuthSchemaTestCase
 
     public function testDatabaseRejectsUnknownTenant(): void
     {
-        $this->assertRejected(self::ER_NO_REFERENCED_ROW, fn () => $this->createUser(999));
+        // Mit gültiger Rolle einer anderen Stadt, sonst schlüge zuerst chk_fe_users_role_id an.
+        $roleId = $this->systemRoleId($this->createTenant('tuttlingen'), 'user');
+        $this->assertRejected(self::ER_NO_REFERENCED_ROW, fn () => $this->createUser(999, ['role_id' => $roleId]));
     }
 
     public function testDatabaseRejectsInvitationCodeOfOtherTenant(): void
