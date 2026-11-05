@@ -56,7 +56,8 @@ Weiterhin nur nach Rückfrage („❓ RÜCKFRAGE“):
 
 - Migration 0036 (Schritt 1.2) ändert bestehende Daten: vor dem Ausführen Probelauf auf einer Kopie
   und die genauen Änderungen zeigen.
-- `X-Client-Api` 2 und `ClientApi::MIN` = 2 in Schritt 1.7.
+- `ClientApi::MIN` = 2: entschieden wird in Schritt 1.8, bevor Immendingen eigene Rollen bekommt
+  (Schritt 1.7 hebt nur `X-Client-Api` auf 2, MIN bleibt 1; siehe Schritt 1.7 unten).
 - Die Rollentabelle für Immendingen (Abschnitt 6) bleibt ein Vorschlag; echte Städte werden nicht
   angefasst.
 
@@ -164,6 +165,28 @@ von „nur *Admin* entzieht *Admin*“); der Katalog für „Sieht: …“ kommt
 `permission-catalog` unter Städten, die Route bleibt dem Super-Admin). In 1.6b: Der Aushang
 nennt die Rolle nicht (nur Liste und der neue Code; der Admin kann sie beim Freischalten ändern);
 der Hinweis im Fenster sagt nicht „das Handy lädt seine Offline-Kopie neu“, das kommt erst mit 1.7.
+
+Schritt 1.7 (05.11.2026) in drei Teilen (Freigabe Holger 05.11.2026): **1.7a** Backend (Aktion
+`csv.export` für die Exporte, F2: *Benutzer* bekommt dort 403), **1.7b** App nach Rechten
+(`permissions` aus `auth/me` auch in der gespeicherten Sitzung, Seiten mit Rechten statt Rollen,
+ohne Recht still zur Startseite der Rolle, Menü, Handy-Leiste, Knöpfe, Dashboard nur mit erlaubten
+Abfragen, `selectable` in der Standortwahl), **1.7c** Rechte ändern sich während der Sitzung
+(`auth/me` neu nach 403 und beim Zurückkehren in die App, bei neuer `permissions.version` Menü,
+Leiste, Stores und Offline-Kopie neu, Eingaben bleiben; Warteschlange 403 → `failed`) mit
+`X-Client-Api` 2. Jeder Teil mit CI, Deploy und Live-Test; die Liste für *Benutzer* am iPhone
+(Konto #7) nach 1.7c. Ohne gespeicherte Rechte (Sitzung aus einer App vor 1.7, Start offline)
+gelten bis zur Antwort des Servers die Rechte aus der Kontoart: `admin` alle, `user` die der
+Standard-Rolle *Benutzer*.
+
+**`X-Client-Api`, Variante B** (Rückfrage vom 05.11.2026, Entscheidung Holger): `X-Client-Api` 2,
+`ClientApi::MIN` bleibt 1. Begründung: Die API bleibt kompatibel (nur Erweiterungen; der Export
+mit 403 für *Benutzer* trifft eine alte App nicht, sie bietet ihn *Benutzer* nie an); inkompatibel
+ist nur die Bedeutung von `role` für die Oberfläche (eine alte App zeigt bei eigenen Rollen falsche
+Menüs und Knöpfe, der Server verhindert falsche Buchungen). Mit MIN = 2 scheiterte während des
+Deploys jede Anfrage einer alten App mit 409 `client_outdated` (offene Eingaben gingen beim Update
+verloren); mit Variante B arbeitet sie weiter, jede Antwort trägt `X-Api-Version: 2`, die App prüft
+sofort und aktualisiert beim nächsten Seitenwechsel. Über MIN = 2 wird in Schritt 1.8 entschieden,
+bevor Immendingen eigene Rollen bekommt.
 
 Bewusst **nicht** in Phase 1:
 
@@ -528,9 +551,10 @@ Gerätewart oder Geräteträger wird, legt der Admin danach fest.
 - **`X-Client-Api`**: Alle Änderungen sind Erweiterungen (neue Felder, neue Routen, `role` bleibt).
   Eine alte App (n = 1) richtet Menü und Knöpfe aber nach `role` aus: Ein Gerätewart (Kontoart
   `user`) sähe dort nur die Handy-Seiten, ein Geräteträger die Termine (dann 403). Falsch buchen kann
-  sie nicht (der Server prüft), aber sie zeigt Falsches. Empfehlung: **n = 2 und `ClientApi::MIN`
-  = 2 im Schritt 1.7**, mit dem die App auf Rechte umstellt (vorher Rückfrage, CLAUDE.md). Dann lädt
-  jede alte App beim ersten Aufruf die neue Version (Phase 0).
+  sie nicht (der Server prüft), aber sie zeigt Falsches. Entschieden (Variante B, 05.11.2026):
+  **n = 2 im Schritt 1.7c**, mit dem die App auf Rechte umgestellt ist; **`ClientApi::MIN` bleibt 1**
+  (über 2 wird in Schritt 1.8 entschieden). Eine alte App sieht `X-Api-Version: 2`, prüft sofort und
+  lädt die neue Version beim nächsten Seitenwechsel (Phase 0).
 
 ## 8. Oberflächentexte
 
@@ -572,8 +596,8 @@ Offen dazu: F14 (Adressen wie `geraete`, `prueffristen` und Spalten der CSV).
 | 1.4 | Datenfilter in allen Abfragen und Mails, `DeviceVisibilityMatrixTest`, Reflection-Test | groß | CI |
 | 1.5 | Super-Admin: API und Seiten „Rollen“, „Rolle bearbeiten“, Kopieren, Übernehmen, Löschen | mittel | live in `test` |
 | 1.6 | Admin: `GET roles`, Rolle zuweisen (einzeln, mehrere), Freischalten und Einladungscodes mit Rolle | mittel | live in `test` |
-| 1.7 | App auf Rechte umstellen (Menü, Wächter, Handy-Leiste, Knöpfe, Offline-Kopie mit `permissions.version`), ⚠ `X-Client-Api` 2 und `MIN` 2 nach Rückfrage; Aktion `csv.export` für die Exporte (F2, *Benutzer* dann 403) | mittel | live in `test`, Handy (Holger) |
-| 1.8 | Live-Test aller Rollen in `test` (LIVETEST-Datei), Rollen für Immendingen nur nach Freigabe durch Holger | klein | – |
+| 1.7 | App auf Rechte umstellen (Menü, Wächter, Handy-Leiste, Knöpfe, Offline-Kopie mit `permissions.version`), `X-Client-Api` 2 mit `MIN` 1 (Variante B); Aktion `csv.export` für die Exporte (F2, *Benutzer* dann 403). Geteilt in 1.7a/b/c (siehe oben) | mittel | je Teil live in `test`, Handy (Holger) nach 1.7c |
+| 1.8 | Live-Test aller Rollen in `test` (LIVETEST-Datei), Entscheidung über `ClientApi::MIN` = 2, Rollen für Immendingen nur nach Freigabe durch Holger | klein | – |
 | 1.9 | „Konto wechseln“ (Kontoliste auf dem Gerät, Menü und Profil, siehe „Entscheidungen“) | mittel | live in `test` (zweite Stadt nur lokal/im Test) |
 
 Reihenfolge: 1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 → 1.7 → 1.8 → 1.9. 1.5/1.6 können neue Rollen erst
@@ -590,7 +614,8 @@ anlegen, wenn 1.3 und 1.4 live sind (sonst wirkte ein Filter nicht).
 - Migration 0036 auf Produktivdaten (Sicherung, Probelauf `--dry-run`, Zählung vorher/nachher).
 - Laufzeit: zusätzliche Abfragen je Anfrage für die Rolle; IN-Listen bei großen Filtern (eine
   Feuerwehr hat wenige Standorte, unkritisch).
-- Alte Apps zeigen bis zum Update Falsches (gelöst durch n = 2 in 1.7).
+- Alte Apps zeigen bis zum Update Falsches (n = 2 in 1.7c löst die sofortige Prüfung aus; MIN = 2
+  entscheidet 1.8).
 - CI wird länger (Matrix-Test, Rechte-Test je Route).
 
 **Fragen** (alle entschieden am 05.11.2026, siehe „Entscheidungen“)

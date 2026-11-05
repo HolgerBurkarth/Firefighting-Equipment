@@ -37,7 +37,7 @@ trait FilteredRoles
         foreach ($areas as $area => $level) {
             $this->insert('fe_role_areas', ['role_id' => $roleId, 'tenant_id' => $tenantId, 'area' => $area, 'level' => $level]);
         }
-        foreach (['book.move', 'book.status', 'device.create', 'device.edit', 'device.retire', 'device.code', 'devices.bulk', 'mail.log', ...$extraActions] as $action) {
+        foreach (['book.move', 'book.status', 'device.create', 'device.edit', 'device.retire', 'device.code', 'devices.bulk', 'csv.export', 'mail.log', ...$extraActions] as $action) {
             $this->insert('fe_role_actions', ['role_id' => $roleId, 'tenant_id' => $tenantId, 'action' => $action]);
         }
         foreach ($locationIds as $locationId) {

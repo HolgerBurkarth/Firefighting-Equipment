@@ -213,7 +213,7 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
     public function testOnlyEventsOfOwnTenant(): void
     {
         $this->event('2026-06-15 08:00:00', ['event_type' => 'created', 'to_location_id' => $this->g1, 'to_status' => 'ready']);
-        $otherUser = $this->account('tuttlingen', 'user@example.org');
+        $otherUser = $this->account('tuttlingen', 'user@example.org', ['role' => 'admin']);
         $otherDevice = $this->createDevice($this->otherTenantId, $this->otherTypeId, $this->otherLocation, ['identifier' => 'MA-99']);
         $this->insert('fe_device_events', [
             'tenant_id' => $this->otherTenantId, 'device_id' => $otherDevice, 'user_id' => $otherUser, 'event_type' => 'created',
@@ -275,6 +275,6 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
 
     private function get400(string $path): JsonResponse
     {
-        return $this->api('GET', $path, cookie: $this->user);
+        return $this->api('GET', $path, cookie: $this->admin);
     }
 }

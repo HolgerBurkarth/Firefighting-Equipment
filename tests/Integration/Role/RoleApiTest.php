@@ -74,7 +74,8 @@ final class RoleApiTest extends AuthTestCase
         $actions = array_column(array_merge(...array_column($catalog['action_groups'], 'actions')), null, 'key');
         self::assertFalse($actions['csv.import']['with_filter'], 'F3');
         self::assertNull($actions['mail.log']['requires']);
-        self::assertCount(9, $actions);
+        self::assertSame(['key' => 'csv.export', 'label' => 'CSV-Export', 'requires' => ['area' => 'devices', 'level' => 'read'], 'with_filter' => true], $actions['csv.export']);
+        self::assertCount(10, $actions);
     }
 
     public function testListShowsDefaultRolesWithUsage(): void
@@ -176,7 +177,7 @@ final class RoleApiTest extends AuthTestCase
         yield 'Bereiche als Liste' => [['areas' => ['search']], 'Das Feld "areas" muss ein Objekt Bereich → Stufe sein.'];
         yield 'Stufe unbekannt' => [['areas' => ['search' => 'none']], 'Die Stufe für „Suchen und Ausrüstung ansehen“ muss "read" oder "write" sein.'];
         yield 'Dashboard ändern' => [['areas' => ['dashboard' => 'write']], 'Für „Dashboard“ gibt es nur „Ansehen“.'];
-        yield 'Aktion unbekannt' => [['actions' => ['csv.export']], 'Unbekannte Aktion „csv.export“.'];
+        yield 'Aktion unbekannt' => [['actions' => ['book.used']], 'Unbekannte Aktion „book.used“.'];
         yield 'Standorte leer' => [['locations' => []], 'Bitte mindestens einen Standort wählen oder „Alle Standorte“.'];
         yield 'Typen leer' => [['device_types' => []], 'Bitte mindestens einen Ausrüstungstyp wählen oder „Alle Ausrüstungstypen“.'];
         yield 'Standort keine Zahl' => [['locations' => ['1']], 'Das Feld "locations" darf nur positive ganze Zahlen enthalten.'];
@@ -483,7 +484,7 @@ final class RoleApiTest extends AuthTestCase
         self::assertSame(['read'], array_values(array_unique([$copy['areas']['dashboard'], $copy['areas']['search']])));
         self::assertSame('write', $copy['areas']['users']);
         self::assertCount(9, $copy['areas']);
-        self::assertCount(9, $copy['actions']);
+        self::assertCount(10, $copy['actions']);
     }
 
     /** F10: Übernahme aus einer anderen Stadt mit den Rechten, ohne Datenfilter. */

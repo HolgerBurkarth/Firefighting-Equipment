@@ -31,6 +31,7 @@ const ALL_ACTIONS = [
     'device.code',
     'devices.bulk',
     'csv.import',
+    'csv.export',
     'mail.log',
 ];
 

@@ -89,9 +89,9 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'POST api/v1/locations/{id}/lock' => ['admin', 'locations:write'],
         'POST api/v1/locations/{id}/unlock' => ['admin', 'locations:write'],
         'GET api/v1/devices' => ['authenticated', 'search:read | devices:read'],
-        // Exporte in Phase 1 wie bisher für jedes Konto, das Geräte sieht (Plan, F2 offen).
-        'GET api/v1/devices/export' => ['authenticated', 'search:read | devices:read'],
-        'GET api/v1/device-events/export' => ['authenticated', 'search:read | devices:read | log:read'],
+        // Exporte seit Schritt 1.7a nur mit csv.export (Plan, F2; Benutzer siehe CHANGED_FOR_USER).
+        'GET api/v1/devices/export' => ['authenticated', 'csv.export'],
+        'GET api/v1/device-events/export' => ['authenticated', 'csv.export & log:read'],
         'GET api/v1/device-events' => ['admin', 'dashboard:read | log:read'],
         'POST api/v1/devices' => ['admin', 'device.create'],
         'GET api/v1/devices/import/template' => ['admin', 'csv.import'],
@@ -123,6 +123,12 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'GET api/v1/auth/me', 'GET api/v1/auth/sessions', 'DELETE api/v1/auth/sessions/{id}',
         'POST api/v1/auth/sessions/logout-others', 'POST api/v1/auth/password', 'GET api/v1/client-config',
     ];
+
+    /**
+     * Gewollte Änderung für die Standard-Rolle Benutzer (Plan, F2, Schritt 1.7a): bisher erlaubt,
+     * jetzt 403, weil Benutzer kein csv.export hat. Admin kommt weiterhin durch.
+     */
+    private const array CHANGED_FOR_USER = ['GET api/v1/devices/export', 'GET api/v1/device-events/export'];
 
     private int $roleCounter = 0;
 
@@ -187,7 +193,7 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         $expected = [
             'ohne Sitzung' => $legacy === 'public',
             'Admin' => true,
-            'Benutzer' => $legacy !== 'admin',
+            'Benutzer' => $legacy !== 'admin' && !in_array($route, self::CHANGED_FOR_USER, true),
         ];
         foreach (['gesperrt', 'gesperrter Admin', 'nicht aktiv', 'Admin anderer Stadt', 'Super-Admin'] as $actor) {
             $expected[$actor] = $legacy === 'public';
@@ -247,6 +253,23 @@ final class TenantRoutePermissionsTest extends AuthTestCase
                 $this->passesWith($method, $path, [...$base, Need::action($rule->action)], $body),
                 sprintf('%s: %s mit Recht', $route, $rule->key()),
             );
+        }
+    }
+
+    public function testStandardRoleUserGetsForbiddenOnExports(): void
+    {
+        $this->account('immendingen', 'admin@example.org', ['role' => 'admin']);
+        $this->account('immendingen', 'user@example.org');
+        $admin = $this->loginCookie('immendingen', 'admin@example.org');
+        $user = $this->loginCookie('immendingen', 'user@example.org');
+
+        foreach (self::CHANGED_FOR_USER as $route) {
+            [, $path] = explode(' ', $route, 2);
+            self::assertSame(['forbidden', 403], $this->errorOf('GET', 'immendingen', $path, $user), $route);
+            $response = $this->sendAny('GET', '/firefighting/immendingen/' . $path, null, $admin);
+            self::assertInstanceOf(CsvResponse::class, $response, $route);
+            self::assertSame(200, $response->statusCode(), $route);
+            $this->responseBody($response);
         }
     }
 

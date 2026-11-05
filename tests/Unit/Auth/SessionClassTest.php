@@ -46,6 +46,8 @@ final class SessionClassTest extends TestCase
         yield 'Einstellungen ansehen' => [[[Area::Settings, AreaLevel::Read]], [], SessionClass::Short];
         yield 'Termine ändern' => [[[Area::Due, AreaLevel::Write]], [], SessionClass::Short];
         yield 'Stammdaten bearbeiten' => [[[Area::Devices, AreaLevel::Write]], [Action::DeviceEdit], SessionClass::Short];
+        yield 'CSV-Export' => [[[Area::Devices, AreaLevel::Read]], [Action::CsvExport], SessionClass::Short];
+        yield 'CSV-Export ohne Ausrüstungsliste wirkt nicht' => [[[Area::Search, AreaLevel::Read]], [Action::CsvExport], SessionClass::Long];
         yield 'Aktion ohne ihren Bereich wirkt nicht' => [[[Area::Devices, AreaLevel::Read]], [Action::DeviceEdit, Action::CsvImport], SessionClass::Long];
     }
 

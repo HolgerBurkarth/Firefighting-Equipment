@@ -8,6 +8,31 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-05 – „Rollen: Aktion csv.export für die CSV-Exporte, Benutzer 403 (Phase 1, Schritt 1.7a)“
+
+Plan Phase 1, Entscheidung F2 (Holger, 05.11.2026), Schritt 1.7a. **Gewollte Verhaltensänderung für
+die Standard-Rolle *Benutzer*:** Sie erhält bei beiden Exporten jetzt 403 `forbidden` (bisher 200);
+die App bot *Benutzer* den Export nie an.
+
+- Neue Aktion `csv.export` („CSV-Export“, braucht `devices` Ansehen, auch mit Datenfilter erlaubt,
+  Gruppe „Mehrere Ausrüstungen“) im Katalog (`GET permission-catalog`, `GET roles` → `catalog`,
+  `permissions.actions` in `auth/me`). *Admin* hat sie automatisch, *Benutzer* nicht; eigene Rollen
+  können sie bekommen.
+- `GET devices/export`: bisher `search` oder `devices` Ansehen, jetzt `csv.export`.
+- `GET device-events/export`: bisher `search`, `devices` oder `log` Ansehen, jetzt `csv.export` und
+  `log` Ansehen.
+- Vorlage und gültige Werte des Imports (`GET devices/import/template`, `…/values`) bleiben bei
+  `csv.import`.
+- Sitzungsdauer: Eine eigene Rolle mit wirksamem `csv.export` hat die kurze Dauer (7 / 30 Tage), da
+  es eine Aktion außer `book.*` und `mail.log` ist. Für die Standard-Rollen unverändert.
+- `permissions.version` ändert sich dadurch nicht (gespeicherte Rechte der Rollen sind dieselben).
+
+Tests: `TenantRoutePermissionsTest` (Tabelle, `CHANGED_FOR_USER`, neuer Test
+`testStandardRoleUserGetsForbiddenOnExports`), `TenantReadRoutesAccessTest` (Exporte nur Admin,
+Benutzer 403), `RoleApiTest` (Katalog), `PermissionCatalogFixtureTest` (`permission-catalog.json`
+neu geschrieben), `SessionClassTest`, Export-Tests als Admin. `CLAUDE.md` "Rollen und Rechte",
+"CSV-Export (API)", "Standorte und Geräte" (Rechte).
+
 ## 2026-11-05 – „Rollen: Rollen zuweisen, Freischalten und Einladungscodes mit Rolle im Backend (Phase 1, Schritt 1.6a)“
 
 Plan Phase 1, Abschnitt 5 „Zuweisung durch den Admin“ und „Einladungscodes mit Rolle“, Vorgaben Holger

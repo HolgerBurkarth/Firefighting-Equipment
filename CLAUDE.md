@@ -1935,10 +1935,16 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (Datenfilter „Sieht nur …“ in allen Abfragen und Mails), 1.5a (Verwaltung der Rollen durch den
   Super-Admin im Backend, siehe unten) und 1.5b (Seiten „Rollen“ und „Rolle bearbeiten“, siehe
   "Frontend"), 1.6a (Rollen zuweisen im Backend, siehe "Benutzerverwaltung durch den Admin") und
-  1.6b (Rollen in der Benutzerverwaltung und bei Einladungscodes, siehe "Frontend").
+  1.6b (Rollen in der Benutzerverwaltung und bei Einladungscodes, siehe "Frontend") und 1.7a (Aktion
+  `csv.export` für die Exporte, F2). Schritt 1.7 ist geteilt (Holger 05.11.2026): 1.7a Backend,
+  1.7b App nach Rechten (Wächter, Menü, Handy-Leiste, Knöpfe), 1.7c Rechte ändern sich während der
+  Sitzung (Offline-Kopie, Warteschlange) mit `X-Client-Api` 2 und `ClientApi::MIN` = 1 (Variante B;
+  über MIN = 2 wird in Schritt 1.8 entschieden, bevor Immendingen eigene Rollen bekommt).
   Für *Admin* und *Benutzer* verhält sich jede Route wie vorher (per Test), ebenso Sitzungsdauer und
-  Empfänger der Log-Mails; neu sind das Feld `selectable` der Standorte, Felder und Routen der
-  Benutzerverwaltung und dass ein Rollenwechsel ohne *Admin* die Sitzungen nicht beendet (F1).
+  Empfänger der Log-Mails; einzige gewollte Ausnahme: *Benutzer* bekommt bei beiden Exporten seit
+  1.7a 403 `forbidden` (kein `csv.export`; die App bietet ihm den Export nirgends an). Neu sind
+  außerdem das Feld `selectable` der Standorte, Felder und Routen der Benutzerverwaltung und dass ein
+  Rollenwechsel ohne *Admin* die Sitzungen nicht beendet (F1).
 - Datenfilter (Schritt 1.4, Plan Abschnitt 4 mit den Festlegungen vom 05.11.2026):
   `Permission\DeviceVisibility` (je Art `null` = alle, sonst erlaubte IDs; ein Standort der Ebene 1
   schließt seine Fächer ein, auch später angelegte; eingeschaltet ohne Auswahl = nichts; Gerät
@@ -1985,10 +1991,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`; `maxLevel`:
   `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`
   (`book.move`, `book.status`, `device.create`, `device.edit`, `device.retire`, `device.code`,
-  `devices.bulk`, `csv.import`, `mail.log`; `requires()`: Bereich, ohne den die Aktion nicht wirkt).
-  Neue Einträge nur mit ihrer Phase und einer Route, die sie prüft (CSV-Export hat in Phase 1 bewusst
-  noch keine Aktion: die Exporte verlangen wie bisher nur, Geräte zu sehen; F2 entschieden, mit
-  Schritt 1.7 kommt `csv.export`, *Benutzer* dann 403). `Permissions`
+  `devices.bulk`, `csv.import`, `csv.export` (seit Schritt 1.7a, braucht `devices` Ansehen, auch mit
+  Datenfilter; F2), `mail.log`; `requires()`: Bereich, ohne den die Aktion nicht wirkt; `group()`:
+  Gruppe im Editor, `csv.export` unter „Mehrere Ausrüstungen“).
+  Neue Einträge nur mit ihrer Phase und einer Route, die sie prüft. `Permissions`
   (`all()` für die Rolle Admin, alle Rechte auch künftige; `fromRows`: unbekannte Werte geben kein
   Recht; `allows(area, level)`, `can(action)`), `PermissionRepository::forUser(tenant, userId)` (eine
   Abfrage für Admin, sonst zwei; ohne Rolle keine Rechte), `Requirement` (Alternativen aus Rechten, die
@@ -2156,10 +2162,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Schema-Tests in
   `tests/Integration/Device/` (`DeviceSchemaTestCase`), Zeilen per SQL über
   den Trait `DeviceRows` (auch in API-Tests auf Basis von `AuthTestCase`).
-- Rechte: `user` darf ansehen, umbuchen, Status setzen (einsatzbereit, in Wartung, defekt) und CSV
-  exportieren. `admin` zusätzlich: aussondern und wieder aufnehmen, Prüfdatum ("nächste Prüfung
-  fällig") ändern, Geräte anlegen und Stammdaten bearbeiten, Gerätetypen und Standorte verwalten,
-  CSV importieren.
+- Rechte (Standard-Rollen; genau je Route siehe "Rollen und Rechte"): `user` darf ansehen, umbuchen
+  und Status setzen (einsatzbereit, in Wartung, defekt); CSV-Export seit Schritt 1.7a nicht mehr
+  (Aktion `csv.export`, F2). `admin` zusätzlich: CSV exportieren, aussondern und wieder aufnehmen,
+  Prüfdatum ("nächste Prüfung fällig") ändern, Geräte anlegen und Stammdaten bearbeiten, Gerätetypen
+  und Standorte verwalten, CSV importieren.
 - Gerät (`fe_devices`): Pflicht Kennung, Gerätetyp, Standort, Status; optional Scan-Code,
   Seriennummer, Hersteller, Modell (zwei Felder), Beschaffungsdatum, Notiz (höchstens 1000 Zeichen), nächste
   Prüfung fällig. Datumsfelder sind `DATE` zwischen 1950-01-01 und 2099-12-31 (fängt Tippfehler wie
@@ -2596,8 +2603,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   keine Migration.
 
 ## CSV-Export (API)
-- Nur unter Städten (unter `service` 404), beide `Access::Authenticated` (in
-  `TenantReadRoutesAccessTest`): `GET devices/export` und `GET device-events/export`. Code:
+- Nur unter Städten (unter `service` 404), `GET devices/export` mit der Aktion `csv.export`, `GET
+  device-events/export` mit `csv.export` und `log` Ansehen (seit Schritt 1.7a, F2; *Benutzer* 403,
+  `TenantRoutePermissionsTest`, `TenantReadRoutesAccessTest`). Code:
   `src/Csv/CsvFormat.php` (Format), `src/Http/CsvResponse.php` (Download),
   `src/Database/UnbufferedQuery.php`, `src/Time/GermanFormat.php`, `LocalDate::startOfDayUtc`,
   `src/Api/V1/Devices/` (`DeviceExportHandler`, `DeviceHistoryExportHandler`, `DeviceCsv` mit
