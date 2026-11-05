@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { userLabel } from '../api/auth';
 import type { ApiError } from '../api/client';
+import { canOpenRoute } from '../auth/redirect';
 import { logout, session } from '../auth/session';
 import { adminOverview, bookingQueue } from '../data';
 import { unsentWarning } from '../data/bookingQueue';
@@ -35,7 +36,14 @@ const busy = ref(false);
 const error = ref<ApiError | null>(null);
 
 const accountName = computed(() => (session.value === null ? '' : userLabel(session.value.user)));
-const entries = computed(() => (props.service ? SERVICE_MENU : ADMIN_MENU));
+/** Nur Seiten, die das Konto öffnen darf (Rechte der Rolle, Plan Phase 1, Schritt 1.7b). */
+function allowed(name: string): boolean {
+    return session.value !== null && canOpenRoute(router, name, session.value);
+}
+const entries = computed(() =>
+    (props.service ? SERVICE_MENU : ADMIN_MENU).filter((entry) => allowed(entry.route)),
+);
+const settingsAllowed = computed(() => allowed(ADMIN_SETTINGS.route));
 const logo = computed(() =>
     props.service ? null : (tenantState.value.tenant?.logoUrls?.['192'] ?? null),
 );
@@ -45,7 +53,9 @@ function badgeCount(badge: AdminMenuBadge | undefined): number {
     if (badge === undefined || overview === null || props.service) {
         return 0;
     }
-    return badge === 'pendingUsers' ? overview.pendingUsers : (overview.summary.openNotices ?? 0);
+    return badge === 'pendingUsers'
+        ? (overview.pendingUsers ?? 0)
+        : (overview.summary?.openNotices ?? 0);
 }
 
 const BADGE_LABELS: Readonly<Record<AdminMenuBadge, (n: number) => string>> = {
@@ -130,6 +140,7 @@ async function onLogout(): Promise<void> {
 
         <div class="menu-footer">
             <RouterLink
+                v-if="settingsAllowed"
                 class="menu-link"
                 active-class="menu-link-active"
                 :to="{ name: ADMIN_SETTINGS.route }"

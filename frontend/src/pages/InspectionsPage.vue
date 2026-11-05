@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import type { ApiError } from '../api/client';
 import type { InspectionOverview } from '../api/inspections';
+import { allows } from '../api/permissions';
+import { currentPermissions } from '../auth/session';
 import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
 import DeviceCard from '../components/DeviceCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
@@ -12,6 +14,14 @@ import { inspectionOverview, inspectionText } from '../data/inspections';
 import { useNow } from '../runtime/now';
 
 const list = computed(() => deviceStore.state);
+/**
+ * Ohne Suchen und Geräteliste (nur „Termine“) gibt es keine lokale Geräteliste (GET devices): dann
+ * immer die Abschnitte vom Server und Karten ohne Link auf das Umbuchen (Schritt 1.7b).
+ */
+const withDevices = computed(
+    () => allows(currentPermissions.value, 'search') || allows(currentPermissions.value, 'devices'),
+);
+const fromServer = computed(() => !withDevices.value || list.value.mode === 'server');
 const now = useNow();
 /** Ergebnis der eben gespeicherten Buchung (Entscheidung 22), bis die Seite verlassen wird. */
 const bookingNotice = takeBookingNotice();
@@ -40,18 +50,22 @@ watch(list, (state) => {
 
 /** Lokal aus der Geräteliste (heute in der Ortszeit), sonst vom Server. */
 const overview = computed<InspectionOverview | null>(() => {
-    if (list.value.mode === 'local') {
-        return inspectionOverview(list.value.devices, localDateKey(now.value));
+    if (fromServer.value) {
+        return serverOverview.value;
     }
-    return list.value.mode === 'server' ? serverOverview.value : null;
+    return list.value.mode === 'local'
+        ? inspectionOverview(list.value.devices, localDateKey(now.value))
+        : null;
 });
-const error = computed(() => (list.value.mode === 'server' ? serverError.value : list.value.error));
+const error = computed(() => (fromServer.value ? serverError.value : list.value.error));
 
 onMounted(() => {
-    if (list.value.mode === 'server') {
+    if (fromServer.value) {
         void loadServer();
     }
-    void deviceStore.refresh('open');
+    if (withDevices.value) {
+        void deviceStore.refresh('open');
+    }
 });
 
 onBeforeUnmount(() => {
@@ -59,10 +73,12 @@ onBeforeUnmount(() => {
 });
 
 function retry(): void {
-    if (list.value.mode === 'server') {
+    if (fromServer.value) {
         void loadServer();
     }
-    void deviceStore.refresh('changed');
+    if (withDevices.value) {
+        void deviceStore.refresh('changed');
+    }
 }
 
 function countText(total: number): string {
@@ -103,7 +119,7 @@ function countText(total: number): string {
             </p>
             <ul v-else class="device-list" data-testid="overdue-list">
                 <li v-for="entry in overview.overdue.entries" :key="entry.device.id">
-                    <DeviceCard :device="entry.device">
+                    <DeviceCard :device="entry.device" :link="withDevices">
                         <span class="inspection inspection-overdue" data-testid="inspection-due">
                             {{ inspectionText(entry, true) }}
                         </span>
@@ -131,7 +147,7 @@ function countText(total: number): string {
             </p>
             <ul v-else class="device-list" data-testid="due-soon-list">
                 <li v-for="entry in overview.dueSoon.entries" :key="entry.device.id">
-                    <DeviceCard :device="entry.device">
+                    <DeviceCard :device="entry.device" :link="withDevices">
                         <span class="inspection inspection-soon" data-testid="inspection-due">
                             {{ inspectionText(entry, false) }}
                         </span>

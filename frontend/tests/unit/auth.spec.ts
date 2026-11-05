@@ -29,6 +29,8 @@ describe('parseAuthState', () => {
                 role: 'admin',
             },
             tenant: { slug: 'test', name: 'Feuerwehr Test' },
+            // Ohne `permissions` (Antwort vor Schritt 1.3b): Rechte der Kontoart.
+            permissions: null,
         });
     });
 

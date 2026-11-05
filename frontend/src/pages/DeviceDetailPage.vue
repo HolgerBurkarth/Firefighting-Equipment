@@ -3,6 +3,8 @@ import { computed, onMounted, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
 import type { DeviceDetail } from '../api/devices';
+import { allows, can } from '../api/permissions';
+import { currentPermissions } from '../auth/session';
 import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
 import DeviceCodeDialog from '../components/DeviceCodeDialog.vue';
 import DeviceDueDialog from '../components/DeviceDueDialog.vue';
@@ -68,6 +70,18 @@ function show(name: DialogName, event: Event): void {
 }
 
 const retired = computed(() => device.value?.status === 'retired');
+
+/** Aktionen nach den Rechten der Rolle (Plan Phase 1, Schritt 1.7b). */
+const may = computed(() => {
+    const permissions = currentPermissions.value;
+    return {
+        book: can(permissions, 'book.move') || can(permissions, 'book.status'),
+        edit: can(permissions, 'device.edit'),
+        due: allows(permissions, 'due', 'write'),
+        code: can(permissions, 'device.code'),
+        retire: can(permissions, 'device.retire'),
+    };
+});
 const due = computed(() =>
     device.value === null
         ? null
@@ -187,21 +201,33 @@ onMounted(() => {
                 Dieses Gerät ist ausgesondert: Es fehlt in Suche, Prüffristen und Gerätezahlen und
                 lässt sich nicht umbuchen oder bearbeiten.
             </p>
-            <button class="btn btn-accent" type="button" @click="show('reinstate', $event)">
+            <button
+                v-if="may.retire"
+                class="btn btn-accent"
+                type="button"
+                @click="show('reinstate', $event)"
+            >
                 Wieder aufnehmen
             </button>
         </div>
 
-        <div v-else class="actions">
+        <div v-else-if="may.book || may.edit || may.due || may.code" class="actions">
             <RouterLink
+                v-if="may.book"
                 class="btn btn-accent action-main"
                 :to="{ name: 'device', params: { id: device.id } }"
             >
                 Umbuchen / Status ändern
             </RouterLink>
-            <button class="btn" type="button" @click="show('edit', $event)">Bearbeiten</button>
-            <button class="btn" type="button" @click="show('due', $event)">Prüfdatum ändern</button>
-            <button class="btn" type="button" @click="show('code', $event)">Code zuordnen</button>
+            <button v-if="may.edit" class="btn" type="button" @click="show('edit', $event)">
+                Bearbeiten
+            </button>
+            <button v-if="may.due" class="btn" type="button" @click="show('due', $event)">
+                Prüfdatum ändern
+            </button>
+            <button v-if="may.code" class="btn" type="button" @click="show('code', $event)">
+                Code zuordnen
+            </button>
         </div>
 
         <div class="columns">
@@ -212,7 +238,7 @@ onMounted(() => {
                 </section>
 
                 <section
-                    v-if="!retired"
+                    v-if="!retired && may.retire"
                     class="danger-zone"
                     aria-labelledby="retire-heading"
                     data-testid="danger-zone"

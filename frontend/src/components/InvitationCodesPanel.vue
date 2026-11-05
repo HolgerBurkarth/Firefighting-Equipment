@@ -2,6 +2,8 @@
 import { computed, ref, shallowRef, useId, watch } from 'vue';
 import type { ApiError } from '../api/client';
 import type { CreatedInvitationCode, InvitationCode } from '../api/invitationCodes';
+import { allows } from '../api/permissions';
+import { currentPermissions } from '../auth/session';
 import {
     assignableRoleStore,
     createInvitationCode,
@@ -35,6 +37,9 @@ import ErrorNotice from './ErrorNotice.vue';
 import FormDialog from './FormDialog.vue';
 import InvitationPoster from './InvitationPoster.vue';
 import QrCode from './QrCode.vue';
+
+/** Anlegen und Widerrufen nur mit „Benutzer: Ändern“ (Plan Phase 1, Schritt 1.7b). */
+const canWrite = computed(() => allows(currentPermissions.value, 'users', 'write'));
 
 /**
  * Reiter „Einladungscodes“ der Benutzerverwaltung (KONZEPT.md "Admin-Konsole – Entscheidungen",
@@ -249,7 +254,13 @@ function retry(): void {
                 Mit einem Einladungscode registrieren sich neue Mitglieder selbst; danach schalten
                 Sie jede Registrierung frei.
             </p>
-            <button class="btn btn-accent" type="button" :disabled="busy" @click="openDialog">
+            <button
+                v-if="canWrite"
+                class="btn btn-accent"
+                type="button"
+                :disabled="busy"
+                @click="openDialog"
+            >
                 Neuer Einladungscode
             </button>
         </div>
@@ -387,7 +398,7 @@ function retry(): void {
                         </td>
                         <td class="col-actions">
                             <button
-                                v-if="isUsable(code)"
+                                v-if="canWrite && isUsable(code)"
                                 class="btn small-btn"
                                 type="button"
                                 :disabled="busy"

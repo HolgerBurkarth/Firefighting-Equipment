@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
+import { RouterLink, useRouter, type RouteLocationRaw } from 'vue-router';
+import { canOpenRoute } from '../auth/redirect';
+import { session } from '../auth/session';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { adminOverview } from '../data';
@@ -19,19 +22,48 @@ import { useNow } from '../runtime/now';
  * (GET device-events). Die Kacheln führen zur gefilterten Geräteliste bzw. zu den Prüffristen.
  */
 const now = useNow();
+const router = useRouter();
 const state = computed(() => adminOverview.state);
 const overview = computed(() => state.value.overview);
 
+/** Ziele nur, wenn die Rolle die Seite öffnen darf (Plan Phase 1, Schritt 1.7b). */
+function allowed(name: string): boolean {
+    return session.value !== null && canOpenRoute(router, name, session.value);
+}
+
+/** Kachel als Link (RouterLink) oder, ohne Recht auf das Ziel, als einfacher Kasten. */
+function tileLink(name: string, to: RouteLocationRaw) {
+    return allowed(name)
+        ? { is: RouterLink, attrs: { to, class: 'tile-link' } }
+        : { is: 'div', attrs: {} };
+}
+
+/** Gerät öffnen: Gerätedetail, sonst die Umbuchen-Ansicht, sonst kein Link. */
+function deviceLink(id: number): RouteLocationRaw | null {
+    if (allowed('device-details')) {
+        return { name: 'device-details', params: { id } };
+    }
+    return allowed('device') ? { name: 'device', params: { id } } : null;
+}
+
+const NOT_READY_QUERY = { status: 'maintenance,defective' };
+
 const tiles = computed(() => {
     const data = overview.value;
-    if (data === null) {
+    if (data?.summary == null) {
         return null;
     }
     return {
+        summary: data.summary,
         readiness: readinessTile(data.summary),
         notReady: notReadyTile(data.summary),
         inspection: inspectionTile(data.summary),
-        open: openItemsTile(data.summary.openNotices ?? 0, data.pendingUsers),
+        open: openItemsTile(data.summary.openNotices ?? 0, data.pendingUsers ?? 0),
+        links: {
+            readiness: tileLink('devices', { name: 'devices' }),
+            notReady: tileLink('devices', { name: 'devices', query: NOT_READY_QUERY }),
+            inspection: tileLink('inspections', { name: 'inspections' }),
+        },
     };
 });
 
@@ -46,7 +78,7 @@ const loadedAt = computed(() => {
 
 const moreNotReady = computed(() => {
     const list = overview.value?.notReady;
-    return list === undefined ? 0 : list.total - list.devices.length;
+    return list === undefined || list === null ? 0 : list.total - list.devices.length;
 });
 
 function retry(): void {
@@ -76,9 +108,10 @@ onMounted(() => {
 
     <template v-if="tiles !== null && overview !== null">
         <div class="tiles">
-            <RouterLink
-                class="tile tile-link tile-ready"
-                :to="{ name: 'devices' }"
+            <component
+                :is="tiles.links.readiness.is"
+                v-bind="tiles.links.readiness.attrs"
+                class="tile tile-ready"
                 data-testid="tile-readiness"
             >
                 <span class="tile-label">Einsatzbereitschaft</span>
@@ -90,37 +123,39 @@ onMounted(() => {
                     :value="tiles.readiness.percent"
                     aria-label="Anteil einsatzbereit"
                 />
-            </RouterLink>
-            <RouterLink
-                class="tile tile-link tile-defective"
-                :to="{ name: 'devices', query: { status: 'maintenance,defective' } }"
+            </component>
+            <component
+                :is="tiles.links.notReady.is"
+                v-bind="tiles.links.notReady.attrs"
+                class="tile tile-defective"
                 data-testid="tile-not-ready"
             >
                 <span class="tile-label">Nicht einsatzbereit</span>
                 <span class="tile-value tile-value-defective">{{ tiles.notReady.value }}</span>
                 <span class="tile-detail">{{ tiles.notReady.detail }}</span>
-            </RouterLink>
-            <RouterLink
-                class="tile tile-link tile-maintenance"
-                :to="{ name: 'inspections' }"
+            </component>
+            <component
+                :is="tiles.links.inspection.is"
+                v-bind="tiles.links.inspection.attrs"
+                class="tile tile-maintenance"
                 data-testid="tile-inspection"
             >
                 <span class="tile-label">Prüffristen</span>
                 <span class="tile-value tile-value-maintenance">{{ tiles.inspection.value }}</span>
                 <span class="tile-detail">{{ tiles.inspection.detail }}</span>
-            </RouterLink>
+            </component>
             <div class="tile tile-accent" data-testid="tile-open">
                 <span class="tile-label">Offene Hinweise</span>
                 <span class="tile-value">{{ tiles.open.value }}</span>
                 <span class="tile-detail">{{ tiles.open.detail }}</span>
                 <RouterLink
-                    v-if="(overview.summary.openNotices ?? 0) > 0"
+                    v-if="(tiles.summary.openNotices ?? 0) > 0 && allowed('notices')"
                     class="tile-action"
                     :to="{ name: 'notices' }"
                     >Hinweise ansehen</RouterLink
                 >
                 <RouterLink
-                    v-if="overview.pendingUsers > 0"
+                    v-if="(overview.pendingUsers ?? 0) > 0 && allowed('users')"
                     class="tile-action"
                     :to="{ name: 'users' }"
                     >Freischaltungen ansehen</RouterLink
@@ -129,7 +164,11 @@ onMounted(() => {
         </div>
 
         <div class="lists">
-            <section class="card list" aria-labelledby="not-ready-title">
+            <section
+                v-if="overview.notReady !== null"
+                class="card list"
+                aria-labelledby="not-ready-title"
+            >
                 <h2 id="not-ready-title">Nicht einsatzbereit</h2>
                 <p v-if="overview.notReady.devices.length === 0" class="hint">
                     Alle Geräte sind einsatzbereit.
@@ -137,8 +176,9 @@ onMounted(() => {
                 <ul v-else class="rows" data-testid="not-ready-list">
                     <li v-for="device in overview.notReady.devices" :key="device.id">
                         <RouterLink
+                            v-if="deviceLink(device.id) !== null"
                             class="row row-link"
-                            :to="{ name: 'device-details', params: { id: device.id } }"
+                            :to="deviceLink(device.id) ?? {}"
                         >
                             <span class="row-identifier">{{ device.identifier }}</span>
                             <span class="row-text">
@@ -146,19 +186,30 @@ onMounted(() => {
                             </span>
                             <StatusBadge :status="device.status" :label="device.statusLabel" />
                         </RouterLink>
+                        <div v-else class="row">
+                            <span class="row-identifier">{{ device.identifier }}</span>
+                            <span class="row-text">
+                                {{ device.deviceType.name }} · {{ device.location.path }}
+                            </span>
+                            <StatusBadge :status="device.status" :label="device.statusLabel" />
+                        </div>
                     </li>
                 </ul>
                 <RouterLink
-                    v-if="moreNotReady > 0"
+                    v-if="moreNotReady > 0 && allowed('devices')"
                     class="more-link"
-                    :to="{ name: 'devices', query: { status: 'maintenance,defective' } }"
+                    :to="{ name: 'devices', query: NOT_READY_QUERY }"
                     data-testid="not-ready-more"
                 >
                     … und {{ moreNotReady }} weitere
                 </RouterLink>
             </section>
 
-            <section class="card list" aria-labelledby="activity-title">
+            <section
+                v-if="overview.activity !== null"
+                class="card list"
+                aria-labelledby="activity-title"
+            >
                 <h2 id="activity-title">Letzte Aktivitäten</h2>
                 <p v-if="overview.activity.length === 0" class="hint">Noch keine Einträge.</p>
                 <ul v-else class="rows" data-testid="activity-list">
@@ -174,14 +225,14 @@ onMounted(() => {
                         <span class="activity-text">
                             <span>
                                 <RouterLink
+                                    v-if="deviceLink(event.device.id) !== null"
                                     class="activity-device"
-                                    :to="{
-                                        name: 'device-details',
-                                        params: { id: event.device.id },
-                                    }"
+                                    :to="deviceLink(event.device.id) ?? {}"
                                 >
                                     {{ event.device.identifier }}</RouterLink
-                                >
+                                ><span v-else class="activity-device">{{
+                                    event.device.identifier
+                                }}</span>
                                 {{ event.typeLabel }} · {{ event.userName }}
                             </span>
                             <span v-if="activityDetail(event, now) !== ''" class="activity-detail">

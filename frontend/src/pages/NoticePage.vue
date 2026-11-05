@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
 import type { DeviceDetail } from '../api/devices';
 import type { Notice } from '../api/notices';
+import { allows, can } from '../api/permissions';
+import { canOpenRoute } from '../auth/redirect';
+import { currentPermissions, session } from '../auth/session';
 import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
@@ -60,7 +63,23 @@ async function load(): Promise<void> {
     }
 }
 
+/** Nach den Rechten der Rolle (Plan Phase 1, Schritt 1.7b). */
+const may = computed(() => {
+    const permissions = currentPermissions.value;
+    const state = session.value;
+    return {
+        resolve: allows(permissions, 'log', 'write'),
+        // „Gerät jetzt“: GET devices/{id} braucht Suchen oder die Geräteliste.
+        device: allows(permissions, 'search') || allows(permissions, 'devices'),
+        book: can(permissions, 'book.move') || can(permissions, 'book.status'),
+        details: state !== null && canOpenRoute(router, 'device-details', state),
+    };
+});
+
 async function loadDevice(deviceId: number): Promise<void> {
+    if (!may.value.device) {
+        return;
+    }
     const result = await deviceStore.fetchCurrent(deviceId);
     if (result.ok) {
         device.value = result.data;
@@ -204,9 +223,13 @@ onMounted(() => {
             >
         </div>
         <p class="lead">
-            <RouterLink :to="{ name: 'device-details', params: { id: notice.device.id } }">
+            <RouterLink
+                v-if="may.details"
+                :to="{ name: 'device-details', params: { id: notice.device.id } }"
+            >
                 {{ notice.device.identifier }}
             </RouterLink>
+            <template v-else>{{ notice.device.identifier }}</template>
             · {{ notice.device.deviceType }} · Hinweis vom {{ dateTimeText(notice.createdAt) }}
         </p>
         <p v-if="explanation !== null" class="explanation" data-testid="notice-explanation">
@@ -297,19 +320,24 @@ onMounted(() => {
                 >
             </section>
 
-            <section class="card state" aria-labelledby="now-heading" data-testid="device-now">
+            <section
+                v-if="may.device"
+                class="card state"
+                aria-labelledby="now-heading"
+                data-testid="device-now"
+            >
                 <h2 id="now-heading">Gerät jetzt</h2>
                 <template v-if="device !== null">
                     <span class="now-location">{{ device.location.path }}</span>
                     <StatusBadge :status="device.status" :label="device.statusLabel" />
                     <RouterLink
-                        v-if="device.status !== 'retired'"
+                        v-if="device.status !== 'retired' && may.book"
                         class="btn btn-accent"
                         :to="{ name: 'device', params: { id: device.id } }"
                     >
                         Umbuchen / Status ändern
                     </RouterLink>
-                    <p v-else class="hint">
+                    <p v-else-if="device.status === 'retired'" class="hint">
                         Das Gerät ist ausgesondert; im Gerätedetail lässt es sich wieder aufnehmen.
                     </p>
                 </template>
@@ -318,7 +346,7 @@ onMounted(() => {
             </section>
         </div>
 
-        <div class="actions">
+        <div v-if="may.resolve" class="actions">
             <button
                 v-if="notice.status === 'open'"
                 class="btn btn-accent"

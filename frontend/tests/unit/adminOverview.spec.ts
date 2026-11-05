@@ -8,8 +8,11 @@ import {
     ACTIVITY_LIMIT,
     AdminOverviewStore,
     NOT_READY_LIMIT,
+    overviewScope,
     type AdminOverviewLoaders,
 } from '../../src/data/adminOverview';
+import { ADMIN_PERMISSIONS, parsePermissions, USER_PERMISSIONS } from '../../src/api/permissions';
+import { permissionsJson } from './support/me';
 import {
     activityDetail,
     inspectionTile,
@@ -229,6 +232,45 @@ function loaders(fail: { value: boolean }, calls: string[]): AdminOverviewLoader
 }
 
 describe('AdminOverviewStore', () => {
+    it('fragt nur, was die Rolle darf; der Rest ist null (Schritt 1.7b)', async () => {
+        const calls: string[] = [];
+        const rights = parsePermissions(permissionsJson({ users: 'read', log: 'read' })) ?? null;
+        const store = new AdminOverviewStore(
+            loaders({ value: false }, calls),
+            () => 1000,
+            () => overviewScope(rights),
+        );
+        await store.refresh('open');
+        expect(calls).toEqual(['pendingUsers', 'activity']);
+        expect(store.state.error).toBeNull();
+        expect(store.state.overview?.summary).toBeNull();
+        expect(store.state.overview?.notReady).toBeNull();
+        expect(store.state.overview?.pendingUsers).toBe(1);
+        expect(store.state.overview?.activity).toHaveLength(2);
+    });
+
+    it('Bereiche je Abfrage wie die Routen im Backend', () => {
+        expect(overviewScope(ADMIN_PERMISSIONS)).toEqual({
+            summary: true,
+            pendingUsers: true,
+            notReady: true,
+            activity: true,
+        });
+        expect(overviewScope(USER_PERMISSIONS)).toEqual({
+            summary: true,
+            pendingUsers: false,
+            notReady: false,
+            activity: false,
+        });
+        const dashboardOnly = parsePermissions(permissionsJson({ dashboard: 'read' })) ?? null;
+        expect(overviewScope(dashboardOnly)).toEqual({
+            summary: true,
+            pendingUsers: false,
+            notReady: false,
+            activity: true,
+        });
+    });
+
     it('lädt alle vier Quellen und behält bei einem Fehler den bisherigen Stand', async () => {
         const fail = { value: false };
         const calls: string[] = [];
@@ -238,8 +280,8 @@ describe('AdminOverviewStore', () => {
         expect(store.state.error).toBeNull();
         expect(store.state.loadedAt).toBe(1000);
         expect(store.state.overview?.pendingUsers).toBe(1);
-        expect(store.state.overview?.notReady.total).toBe(3);
-        expect(store.state.overview?.activity.map((e) => e.id)).toEqual([1, 2]);
+        expect(store.state.overview?.notReady?.total).toBe(3);
+        expect(store.state.overview?.activity?.map((e) => e.id)).toEqual([1, 2]);
 
         fail.value = true;
         await store.refresh('changed');

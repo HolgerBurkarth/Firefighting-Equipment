@@ -42,13 +42,20 @@ import {
 } from '../data/recentLocations';
 import { closeQueryView, returnTo } from '../router/back';
 import { useUnsavedInput } from '../runtime/unsavedInput';
-import { session } from '../auth/session';
+import { can } from '../api/permissions';
+import { canOpenRoute } from '../auth/redirect';
+import { currentPermissions, session } from '../auth/session';
 
 const route = useRoute();
 const router = useRouter();
 const deviceId = Number(route.params['id']);
-/** Admins öffnen von hier das Gerätedetail (Bearbeiten, Aussondern, Wieder aufnehmen). */
-const isAdmin = computed(() => session.value?.user.role === 'admin');
+/** Mit Recht auf das Gerätedetail der Link dorthin (Bearbeiten, Aussondern, Wieder aufnehmen). */
+const showsDetailLink = computed(
+    () => session.value !== null && canOpenRoute(router, 'device-details', session.value),
+);
+/** Umbuchen bzw. Status setzen nur mit der Aktion der Rolle (Plan Phase 1, Schritt 1.7b). */
+const canMove = computed(() => can(currentPermissions.value, 'book.move'));
+const canSetStatus = computed(() => can(currentPermissions.value, 'book.status'));
 
 /**
  * Die Standortwahl ist eine Ansicht dieser Seite, geöffnet über `?standortwahl=1`: Eingaben bleiben
@@ -433,7 +440,23 @@ async function save(): Promise<void> {
                 Details und Verlauf
             </button>
             <RouterLink
-                v-if="isAdmin"
+                v-if="showsDetailLink"
+                class="details-link"
+                :to="{ name: 'device-details', params: { id: deviceId } }"
+            >
+                Gerätedetail (Admin)
+            </RouterLink>
+        </div>
+
+        <div v-else-if="!canMove && !canSetStatus" class="device-content">
+            <div class="notice notice-info" role="status" data-testid="device-view-only">
+                <p>Sie dürfen dieses Gerät nur ansehen, nicht umbuchen.</p>
+            </div>
+            <button ref="detailsLink" class="details-link" type="button" @click="openDetails">
+                Details und Verlauf
+            </button>
+            <RouterLink
+                v-if="showsDetailLink"
                 class="details-link"
                 :to="{ name: 'device-details', params: { id: deviceId } }"
             >
@@ -455,7 +478,7 @@ async function save(): Promise<void> {
                     </p>
                 </div>
 
-                <section class="device-section" aria-labelledby="location-heading">
+                <section v-if="canMove" class="device-section" aria-labelledby="location-heading">
                     <h2 id="location-heading" class="device-heading">Standort</h2>
                     <button
                         v-for="choice in locationChoices"
@@ -516,7 +539,11 @@ async function save(): Promise<void> {
                     </button>
                 </section>
 
-                <section class="device-section" aria-labelledby="status-heading">
+                <section
+                    v-if="canSetStatus"
+                    class="device-section"
+                    aria-labelledby="status-heading"
+                >
                     <h2 id="status-heading" class="device-heading">Status</h2>
                     <div class="status-choices">
                         <button
@@ -574,7 +601,7 @@ async function save(): Promise<void> {
                     Details und Verlauf
                 </button>
                 <RouterLink
-                    v-if="isAdmin"
+                    v-if="showsDetailLink"
                     class="details-link"
                     :to="{ name: 'device-details', params: { id: deviceId } }"
                 >

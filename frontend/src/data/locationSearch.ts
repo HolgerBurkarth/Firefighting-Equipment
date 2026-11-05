@@ -1,4 +1,4 @@
-import type { Location, LocationKind } from '../api/locations';
+import { isSelectable, type Location, type LocationKind } from '../api/locations';
 import { searchKey, searchTokens } from './deviceSearch';
 
 /**
@@ -66,26 +66,33 @@ function childEntries(location: Location): PickerEntry[] {
 }
 
 export function locationGroups(tree: readonly Location[]): PickerGroup[] {
-    return tree
-        .filter((location) => location.active)
-        .map((location) => {
-            const children = childEntries(location);
-            return {
-                entry: groupEntry(location),
-                children:
-                    children.length === 0
-                        ? []
-                        : [
-                              {
-                                  ...groupEntry(location),
-                                  label: WHOLE_LABELS[location.kind],
-                                  deviceCount: null,
-                                  whole: true,
-                              },
-                              ...children,
-                          ],
-            };
+    const groups: PickerGroup[] = [];
+    for (const location of tree.filter((entry) => entry.active)) {
+        const children = childEntries(location);
+        if (!isSelectable(location)) {
+            // Nur Fächer sichtbar (Datenfilter): kein „Ganzes Fahrzeug“, ohne Fächer keine Gruppe.
+            if (children.length > 0) {
+                groups.push({ entry: groupEntry(location), children });
+            }
+            continue;
+        }
+        groups.push({
+            entry: groupEntry(location),
+            children:
+                children.length === 0
+                    ? []
+                    : [
+                          {
+                              ...groupEntry(location),
+                              label: WHOLE_LABELS[location.kind],
+                              deviceCount: null,
+                              whole: true,
+                          },
+                          ...children,
+                      ],
         });
+    }
+    return groups;
 }
 
 /**
@@ -105,7 +112,7 @@ export function searchLocations(tree: readonly Location[], query: string): Picke
     const hits: PickerEntry[] = [];
     for (const location of tree.filter((entry) => entry.active)) {
         const entry = groupEntry(location);
-        if (matches(entry.path)) {
+        if (isSelectable(location) && matches(entry.path)) {
             hits.push(entry);
         }
         hits.push(...childEntries(location).filter((child) => matches(child.path)));

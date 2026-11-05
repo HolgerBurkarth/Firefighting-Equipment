@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue';
 import type { ApiError } from '../api/client';
 import type { DeviceType } from '../api/deviceTypes';
+import { allows } from '../api/permissions';
+import { currentPermissions } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
@@ -16,6 +18,10 @@ import {
     type SortDir,
 } from '../data/masterData';
 import { useUnsavedInput } from '../runtime/unsavedInput';
+
+/** Ändern nur mit „Gerätetypen: Ändern“; der Name führt nur mit Recht zur Geräteliste (1.7b). */
+const canWrite = computed(() => allows(currentPermissions.value, 'device_types', 'write'));
+const canListDevices = computed(() => allows(currentPermissions.value, 'devices'));
 
 /**
  * Gerätetypen der Stadt (KONZEPT.md, "Bereiche des Admins"): Liste mit Name und Gerätezahl,
@@ -202,7 +208,12 @@ onMounted(() => {
 <template>
     <div class="page-head">
         <h1>Gerätetypen</h1>
-        <button class="btn btn-accent" type="button" @click="openDialog(null, $event)">
+        <button
+            v-if="canWrite"
+            class="btn btn-accent"
+            type="button"
+            @click="openDialog(null, $event)"
+        >
             Neuer Gerätetyp
         </button>
     </div>
@@ -305,11 +316,12 @@ onMounted(() => {
                     <td>
                         <div class="cell-name">
                             <RouterLink
+                                v-if="canListDevices"
                                 class="type-name"
                                 :to="{ name: 'devices', query: { typ: String(type.id) } }"
                                 :title="`Geräte vom Typ ${type.name}`"
                                 >{{ type.name }}</RouterLink
-                            >
+                            ><span v-else class="type-name">{{ type.name }}</span>
                             <span v-if="!type.active" class="badge badge-retired">
                                 deaktiviert
                             </span>
@@ -318,6 +330,7 @@ onMounted(() => {
                     <td class="col-count">{{ deviceCountText(type.deviceCount) }}</td>
                     <td class="col-actions">
                         <button
+                            v-if="canWrite"
                             class="icon-btn"
                             type="button"
                             :aria-label="`${type.name} bearbeiten`"

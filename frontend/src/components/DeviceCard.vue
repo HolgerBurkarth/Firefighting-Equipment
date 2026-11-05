@@ -1,16 +1,28 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router';
 import type { DeviceSummary } from '../api/devices';
 import StatusBadge from './StatusBadge.vue';
 
-/** `changeTime`: letzte Umbuchung/Statusänderung als Text („vor 5 Min.“), nur unter „Zuletzt benutzt“. */
-defineProps<{ device: DeviceSummary; changeTime?: string | null }>();
+/**
+ * `changeTime`: letzte Umbuchung/Statusänderung als Text („vor 5 Min.“), nur unter „Zuletzt benutzt“.
+ * `link` false: ohne Recht auf die Umbuchen-Ansicht nur eine Karte, kein Link (Schritt 1.7b).
+ */
+withDefaults(
+    defineProps<{
+        device: DeviceSummary;
+        changeTime?: string | null;
+        link?: boolean;
+    }>(),
+    { changeTime: null, link: true },
+);
 </script>
 
 <!-- Gerät als Karte (Mockup UserStart); Antippen öffnet das Umbuchen (Entscheidung 15). -->
 <template>
-    <RouterLink
+    <component
+        :is="link ? RouterLink : 'div'"
+        v-bind="link ? { to: { name: 'device', params: { id: device.id } } } : {}"
         class="device-card"
-        :to="{ name: 'device', params: { id: device.id } }"
         data-testid="device-card"
     >
         <span class="device-identifier">{{ device.identifier }}</span>
@@ -24,7 +36,7 @@ defineProps<{ device: DeviceSummary; changeTime?: string | null }>();
             <slot />
         </span>
         <StatusBadge :status="device.status" :label="device.statusLabel" />
-    </RouterLink>
+    </component>
 </template>
 
 <style scoped>

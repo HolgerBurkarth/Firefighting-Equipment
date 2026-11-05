@@ -3,6 +3,8 @@ import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
 import { computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { NoticeFilter } from '../api/notices';
+import { allows, can } from '../api/permissions';
+import { currentPermissions } from '../auth/session';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import HistoryExportPanel from '../components/HistoryExportPanel.vue';
 import { noticeList } from '../data';
@@ -40,8 +42,13 @@ function replaceQuery(tab: Tab, next: NoticeFilter): void {
     });
 }
 
+/** Verlauf exportieren nur mit „CSV-Export“ (GET device-events/export, Plan Phase 1, F2). */
+const canExport = computed(
+    () => can(currentPermissions.value, 'csv.export') && allows(currentPermissions.value, 'log'),
+);
+
 const tab = computed<Tab>({
-    get: () => (route.query['ansicht'] === EXPORT_VIEW ? 'export' : 'notices'),
+    get: () => (route.query['ansicht'] === EXPORT_VIEW && canExport.value ? 'export' : 'notices'),
     set: (value) => {
         replaceQuery(value, filter.value);
     },
@@ -91,7 +98,9 @@ function retry(): void {
                     >{{ state.open }}</span
                 >
             </TabsTrigger>
-            <TabsTrigger class="tab" value="export">Verlauf exportieren</TabsTrigger>
+            <TabsTrigger v-if="canExport" class="tab" value="export"
+                >Verlauf exportieren</TabsTrigger
+            >
         </TabsList>
 
         <TabsContent class="tab-panel" value="notices">
@@ -193,7 +202,7 @@ function retry(): void {
             </div>
         </TabsContent>
 
-        <TabsContent class="tab-panel" value="export" :unmount-on-hide="false">
+        <TabsContent v-if="canExport" class="tab-panel" value="export" :unmount-on-hide="false">
             <HistoryExportPanel :active="tab === 'export'" />
         </TabsContent>
     </TabsRoot>

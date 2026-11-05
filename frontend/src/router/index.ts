@@ -9,7 +9,8 @@ import {
 } from 'vue-router';
 import { setUnauthorizedHandler } from '../api/client';
 import type { AuthState, UserRole } from '../api/auth';
-import { landingRoute } from '../auth/redirect';
+import type { Permissions } from '../api/permissions';
+import { canOpen, landingRoute } from '../auth/redirect';
 import {
     ensureSession,
     onStoredSessionRejected,
@@ -17,6 +18,7 @@ import {
     setLoginNotice,
 } from '../auth/session';
 import type { AppBase } from '../runtime/appBase';
+import { PAGE_RIGHTS } from './pageRights';
 
 declare module 'vue-router' {
     interface RouteMeta {
@@ -26,6 +28,11 @@ declare module 'vue-router' {
         landing?: boolean;
         /** Rollen, die die Seite öffnen dürfen (nicht öffentliche Seiten). */
         roles?: readonly UserRole[];
+        /**
+         * Unter einer Stadt zusätzlich die nötigen Rechte der Rolle (src/router/pageRights.ts);
+         * ohne Angabe genügt die Rolle (z. B. Profil, Seiten des Super-Admins).
+         */
+        rights?: (permissions: Permissions) => boolean;
         /**
          * Darstellung (App.vue): ohne Angabe Kopfleiste und Inhalt; `user` Handy-Seiten mit Leiste
          * unten (Suchen, Prüffristen, Profil); `focus` bildschirmfüllend ohne Kopfleiste der App
@@ -38,8 +45,11 @@ declare module 'vue-router' {
 
 export type PageLayout = 'user' | 'focus' | 'admin';
 
-/** Handy-Seiten: User und Admin (KONZEPT.md, "User am Handy – Entscheidungen", 19). */
-const DEVICE_ROLES: readonly UserRole[] = ['user', 'admin'];
+/**
+ * Konten einer Stadt (Kontoart `user` und `admin`); was sie sehen, entscheiden die Rechte der Rolle
+ * (`rights`, Plan Phase 1, Schritt 1.7b).
+ */
+const TENANT_ROLES: readonly UserRole[] = ['user', 'admin'];
 
 /** Pfade relativ zum Basispfad; deutsche Adressen wie die Mail-Links (AppUrls in PHP). */
 export function createRoutes(base: AppBase): RouteRecordRaw[] {
@@ -78,7 +88,7 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
                 : () => import('../pages/AdminDashboardPage.vue'),
             meta: base.isService
                 ? { roles: ['superadmin'], layout: 'admin' }
-                : { roles: ['admin'], layout: 'admin' },
+                : { roles: TENANT_ROLES, rights: PAGE_RIGHTS.dashboard, layout: 'admin' },
         },
     ];
     if (base.isService) {
@@ -150,73 +160,73 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             path: '/suchen',
             name: 'search',
             component: () => import('../pages/SearchPage.vue'),
-            meta: { roles: DEVICE_ROLES, layout: 'user' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.search, layout: 'user' },
         });
         routes.push({
             path: '/prueffristen',
             name: 'inspections',
             component: () => import('../pages/InspectionsPage.vue'),
-            meta: { roles: DEVICE_ROLES, layout: 'user' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.inspections, layout: 'user' },
         });
         routes.push({
             path: '/profil',
             name: 'profile',
             component: () => import('../pages/ProfilePage.vue'),
-            meta: { roles: DEVICE_ROLES, layout: 'user' },
+            meta: { roles: TENANT_ROLES, layout: 'user' },
         });
         routes.push({
             // Filter in der Adresse (src/data/deviceList.ts), z. B. geraete?status=defective.
             path: '/geraete',
             name: 'devices',
             component: () => import('../pages/DevicesPage.vue'),
-            meta: { roles: ['admin'], layout: 'admin' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.devices, layout: 'admin' },
         });
         routes.push({
             // Neues Gerät mit „Speichern und nächstes“ (KONZEPT.md, Entscheidung 32).
             path: '/geraete/neu',
             name: 'device-new',
             component: () => import('../pages/DeviceNewPage.vue'),
-            meta: { roles: ['admin'], layout: 'admin' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS['device-new'], layout: 'admin' },
         });
         routes.push({
             // CSV-Import mit Vorlage und Vorschau (KONZEPT.md, Entscheidung 32).
             path: '/geraete/import',
             name: 'device-import',
             component: () => import('../pages/DeviceImportPage.vue'),
-            meta: { roles: ['admin'], layout: 'admin' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS['device-import'], layout: 'admin' },
         });
         routes.push({
             path: '/standorte',
             name: 'locations',
             component: () => import('../pages/LocationsPage.vue'),
-            meta: { roles: ['admin'], layout: 'admin' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.locations, layout: 'admin' },
         });
         routes.push({
             path: '/geraetetypen',
             name: 'device-types',
             component: () => import('../pages/DeviceTypesPage.vue'),
-            meta: { roles: ['admin'], layout: 'admin' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS['device-types'], layout: 'admin' },
         });
         routes.push({
             // Nur positive Ganzzahlen ohne führende Null (wie die Platzhalter im Backend).
             path: '/geraete/:id([1-9]\\d{0,17})',
             name: 'device',
             component: () => import('../pages/DevicePage.vue'),
-            meta: { roles: DEVICE_ROLES, layout: 'focus' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.device, layout: 'focus' },
         });
         routes.push({
             // Gerätedetail für Admins (KONZEPT.md, "Admin-Konsole – Entscheidungen", 33).
             path: '/geraete/:id([1-9]\\d{0,17})/details',
             name: 'device-details',
             component: () => import('../pages/DeviceDetailPage.vue'),
-            meta: { roles: ['admin'], layout: 'admin' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS['device-details'], layout: 'admin' },
         });
         routes.push({
             // Benutzerverwaltung (Ziel der Mail „Neue Registrierung“, AppUrls::users).
             path: '/benutzer',
             name: 'users',
             component: () => import('../pages/UsersPage.vue'),
-            meta: { roles: ['admin'], layout: 'admin' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.users, layout: 'admin' },
         });
         routes.push({
             // Protokoll: Hinweise zu Offline-Buchungen und Export des Verlaufs (KONZEPT.md,
@@ -224,7 +234,7 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             path: '/protokoll',
             name: 'notices',
             component: () => import('../pages/NoticesPage.vue'),
-            meta: { roles: ['admin'], layout: 'admin' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.notices, layout: 'admin' },
         });
         routes.push({
             // Einstellungen: Anzeigemodus, Erscheinungsbild der Stadt, Benachrichtigung „Log“,
@@ -232,14 +242,14 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             path: '/einstellungen',
             name: 'settings',
             component: () => import('../pages/SettingsPage.vue'),
-            meta: { roles: ['admin'], layout: 'admin' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.settings, layout: 'admin' },
         });
         routes.push({
             // Ein Hinweis (Ziel der Hinweis-Mails, AppUrls::notice).
             path: '/protokoll/:id([1-9]\\d{0,17})',
             name: 'notice',
             component: () => import('../pages/NoticePage.vue'),
-            meta: { roles: ['admin'], layout: 'admin' },
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.notice, layout: 'admin' },
         });
     }
     routes.push({
@@ -253,19 +263,21 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
 
 /**
  * Entscheidung des Wächters bei bekannter Sitzung: true = Seite öffnen, sonst Umleitung. Ohne
- * Sitzung zur Anmeldung (mit Rückkehradresse), mit falscher Rolle zur Startseite der Rolle.
+ * Sitzung zur Anmeldung (mit Rückkehradresse), ohne passende Rolle bzw. Rechte still zur Startseite
+ * der Rolle.
  */
 export function guardDecision(
+    router: Router,
     to: RouteLocationNormalized,
     state: AuthState | null,
 ): true | RouteLocationRaw {
     if (to.meta.landing === true) {
-        return state === null ? { name: 'login' } : landingRoute(state.user.role);
+        return state === null ? { name: 'login' } : landingRoute(router, state);
     }
     if (state === null) {
         return { name: 'login', query: { weiter: to.fullPath } };
     }
-    return to.meta.roles?.includes(state.user.role) === true ? true : landingRoute(state.user.role);
+    return canOpen(to.meta, state) ? true : landingRoute(router, state);
 }
 
 export function createAppRouter(base: AppBase, history?: RouterHistory): Router {
@@ -278,7 +290,7 @@ export function createAppRouter(base: AppBase, history?: RouterHistory): Router 
         if (to.meta.public === true) {
             return true;
         }
-        return guardDecision(to, await ensureSession());
+        return guardDecision(router, to, await ensureSession());
     });
 
     // 401 einer geschützten Anfrage: Sitzung abgelaufen → Anmeldung, danach zurück.

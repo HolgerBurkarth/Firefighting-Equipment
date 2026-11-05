@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue';
 import type { ApiError } from '../api/client';
 import type { Location, LocationKind, SubLocation } from '../api/locations';
+import { allows } from '../api/permissions';
+import { currentPermissions } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
@@ -17,6 +19,10 @@ import {
     sameName,
 } from '../data/masterData';
 import { useUnsavedInput } from '../runtime/unsavedInput';
+
+/** Ändern nur mit „Standorte: Ändern“; der Name führt nur mit Recht zur Geräteliste (1.7b). */
+const canWrite = computed(() => allows(currentPermissions.value, 'locations', 'write'));
+const canListDevices = computed(() => allows(currentPermissions.value, 'devices'));
 
 /**
  * Standorte der Stadt als Baum (KONZEPT.md, "Bereiche des Admins"): Fahrzeuge, Räume und Externe
@@ -258,7 +264,12 @@ onMounted(() => {
 <template>
     <div class="page-head">
         <h1>Standorte</h1>
-        <button class="btn btn-accent" type="button" @click="openDialog({ mode: 'new' }, $event)">
+        <button
+            v-if="canWrite"
+            class="btn btn-accent"
+            type="button"
+            @click="openDialog({ mode: 'new' }, $event)"
+        >
             Neuer Standort
         </button>
     </div>
@@ -334,11 +345,12 @@ onMounted(() => {
                 </svg>
                 <span class="node-text">
                     <RouterLink
+                        v-if="canListDevices"
                         class="node-name"
                         :to="{ name: 'devices', query: { standort: String(group.location.id) } }"
                         :title="`Geräte in ${group.location.name}`"
                         >{{ group.location.name }}</RouterLink
-                    >
+                    ><span v-else class="node-name">{{ group.location.name }}</span>
                     <span class="node-meta">
                         {{ group.location.kindLabel }} ·
                         {{ deviceCountText(group.location.deviceCountTotal) }}
@@ -346,7 +358,7 @@ onMounted(() => {
                 </span>
                 <span v-if="!group.location.active" class="badge badge-retired">gesperrt</span>
                 <button
-                    v-if="group.location.active"
+                    v-if="canWrite && group.location.active"
                     class="icon-btn"
                     type="button"
                     :aria-label="`Fach in ${group.location.name} anlegen`"
@@ -367,6 +379,7 @@ onMounted(() => {
                     </svg>
                 </button>
                 <button
+                    v-if="canWrite"
                     class="icon-btn"
                     type="button"
                     :aria-label="`${group.location.name} bearbeiten`"
@@ -409,15 +422,17 @@ onMounted(() => {
                     </svg>
                     <span class="node-text">
                         <RouterLink
+                            v-if="canListDevices"
                             class="node-name"
                             :to="{ name: 'devices', query: { standort: String(child.id) } }"
                             :title="`Geräte in ${group.location.name} / ${child.name}`"
                             >{{ child.name }}</RouterLink
-                        >
+                        ><span v-else class="node-name">{{ child.name }}</span>
                         <span class="node-meta">{{ deviceCountText(child.deviceCount) }}</span>
                     </span>
                     <span v-if="!child.active" class="badge badge-retired">gesperrt</span>
                     <button
+                        v-if="canWrite"
                         class="icon-btn"
                         type="button"
                         :aria-label="`${group.location.name} / ${child.name} bearbeiten`"

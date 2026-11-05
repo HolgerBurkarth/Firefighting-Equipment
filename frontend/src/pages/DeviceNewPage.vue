@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isSelectable } from '../api/locations';
 import {
     computed,
     nextTick,
@@ -85,7 +86,9 @@ const locationOptions = computed((): SelectOption[] => {
         if (!location.active) {
             continue;
         }
-        options.push({ value: String(location.id), label: location.name });
+        if (isSelectable(location)) {
+            options.push({ value: String(location.id), label: location.name });
+        }
         for (const child of location.children) {
             if (child.active) {
                 options.push({

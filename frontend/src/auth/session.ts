@@ -1,6 +1,7 @@
-import { readonly, shallowRef } from 'vue';
+import { computed, readonly, shallowRef } from 'vue';
 import type { ApiError } from '../api/client';
 import { fetchMe, logout as apiLogout, parseAuthState, type AuthState } from '../api/auth';
+import { permissionsOf } from '../api/permissions';
 
 /** Hinweis für die Anmeldeseite nach Abmelden, Ablauf der Sitzung, neuem Passwort oder Einladung. */
 export type LoginNotice =
@@ -28,6 +29,12 @@ let generation = 0;
 
 /** Angemeldetes Konto (null = nicht angemeldet oder noch unbekannt). */
 export const session = readonly(current);
+
+/**
+ * Rechte des angemeldeten Kontos (für Seiten, Menü, Leiste und Knöpfe); null ohne Sitzung und unter
+ * `service`. Ohne `permissions` vom Server die der Kontoart (`permissionsOf`).
+ */
+export const currentPermissions = computed(() => permissionsOf(current.value));
 
 /** Speicher für die letzte bestätigte Sitzung (localStorage), nur unter Städten. */
 export interface StoredSessionStorage {
@@ -75,6 +82,16 @@ function storedJson(state: AuthState): Record<string, unknown> {
             role: state.user.role,
         },
         tenant: state.tenant,
+        // Offline gelten die Rechte der gespeicherten Sitzung (Plan Phase 1, Abschnitt 7).
+        ...(state.permissions !== null && {
+            permissions: {
+                areas: state.permissions.areas,
+                actions: state.permissions.actions,
+                restrictions: [],
+                filtered: state.permissions.filtered,
+                version: state.permissions.version,
+            },
+        }),
     };
 }
 

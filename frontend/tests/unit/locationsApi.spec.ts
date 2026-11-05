@@ -51,6 +51,7 @@ describe('parseLocationTree', () => {
                 kind: 'vehicle',
                 kindLabel: 'Fahrzeug',
                 active: true,
+                selectable: true,
                 deviceCount: 1,
                 deviceCountTotal: 4,
                 children: [{ id: 11, name: 'G1', kind: 'vehicle', active: true, deviceCount: 3 }],
@@ -66,6 +67,7 @@ describe('parseLocationTree', () => {
         });
         expect(tree?.[0]?.deviceCount).toBe(0);
         expect(tree?.[0]?.deviceCountTotal).toBe(3);
+        expect(tree?.[0]?.selectable).toBe(false);
         // Ohne selectable false bleibt eine fehlende Zahl ungültig.
         expect(parseLocationTree({ locations: [locationJson({ device_count: null })] })).toBeNull();
     });

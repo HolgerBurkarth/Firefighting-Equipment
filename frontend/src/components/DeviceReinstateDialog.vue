@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isSelectable } from '../api/locations';
 import { computed, ref, useId, watch } from 'vue';
 import type { ApiError } from '../api/client';
 import {
@@ -7,6 +8,8 @@ import {
     STATUS_LABELS,
     type DeviceDetail,
 } from '../api/devices';
+import { can } from '../api/permissions';
+import { currentPermissions } from '../auth/session';
 import { adminLocationStore, deviceTypeStore, reinstateDevice } from '../data';
 import { MAX_COMMENT_LENGTH } from '../data/booking';
 import {
@@ -46,6 +49,12 @@ const form = ref<ReinstateForm>(reinstateFormFromDevice(props.device));
 const suggested = ref<ReinstateForm>(form.value);
 const comment = ref('');
 const busy = ref(false);
+/**
+ * Kennung und Gerätetyp nur mit „Stammdaten bearbeiten“, der Scan-Code nur mit „Code zuordnen“
+ * (Feldregeln von POST devices/{id}/reinstate); ohne sie bleiben die bisherigen Werte.
+ */
+const canEdit = computed(() => can(currentPermissions.value, 'device.edit'));
+const canCode = computed(() => can(currentPermissions.value, 'device.code'));
 const identifierError = ref<string | null>(null);
 const scanCodeError = ref<string | null>(null);
 const error = ref<ApiError | null>(null);
@@ -75,7 +84,11 @@ useUnsavedInput(() => unsaved.value);
 const locations = computed(() => {
     const known = new Map<number, { path: string; active: boolean; level: 1 | 2 }>();
     for (const location of adminLocationStore.state.locations ?? []) {
-        known.set(location.id, { path: location.name, active: location.active, level: 1 });
+        known.set(location.id, {
+            path: location.name,
+            active: location.active && isSelectable(location),
+            level: 1,
+        });
         for (const child of location.children) {
             known.set(child.id, {
                 path: `${location.name} / ${child.name}`,
@@ -228,7 +241,7 @@ async function submit(): Promise<void> {
                 {{ locationProblem }}
             </p>
         </div>
-        <label class="field">
+        <label v-if="canEdit" class="field">
             <span class="field-label">Kennung</span>
             <input
                 v-model="form.identifier"
@@ -243,11 +256,11 @@ async function submit(): Promise<void> {
                 {{ shownIdentifierProblem }}
             </p>
         </label>
-        <div class="field">
+        <div v-if="canEdit" class="field">
             <AppSelect v-model="typeValue" label="Gerätetyp" :options="typeOptions" />
             <p v-if="typeProblem !== null" class="field-error">{{ typeProblem }}</p>
         </div>
-        <div v-if="device.scanCode !== null" class="field">
+        <div v-if="device.scanCode !== null && canCode" class="field">
             <label class="check">
                 <input v-model="form.keepScanCode" type="checkbox" @change="scanCodeError = null" />
                 Scan-Code {{ scanCodeDisplay(device.scanCode) }} behalten

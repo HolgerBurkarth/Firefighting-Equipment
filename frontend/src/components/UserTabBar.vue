@@ -1,16 +1,28 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { canOpenRoute, consoleRoute } from '../auth/redirect';
 import { session } from '../auth/session';
 
-/** Admins öffnen die Handy-Seiten auch; für sie zusätzlich der Weg zurück zum Dashboard. */
-const isAdmin = computed(() => session.value?.user.role === 'admin');
+const router = useRouter();
+
+/**
+ * Mit einer Seite der Konsole vorne „Dashboard“ (F8: führt ohne Dashboard zur ersten erlaubten
+ * Seite); Suchen und Prüffristen nur mit ihrem Recht; Profil immer.
+ */
+const consoleStart = computed(() =>
+    session.value === null ? null : consoleRoute(router, session.value),
+);
+function allowed(name: string): boolean {
+    return session.value !== null && canOpenRoute(router, name, session.value);
+}
 </script>
 
 <!-- Leiste unten der Handy-Seiten (Layout "user"): Suchen, Prüffristen, Profil. -->
 <template>
     <nav class="tab-bar" aria-label="Hauptmenü">
         <div class="tab-bar-inner">
-            <RouterLink v-if="isAdmin" class="tab" :to="{ name: 'dashboard' }">
+            <RouterLink v-if="consoleStart !== null" class="tab" :to="consoleStart">
                 <svg
                     width="24"
                     height="24"
@@ -27,7 +39,7 @@ const isAdmin = computed(() => session.value?.user.role === 'admin');
                 </svg>
                 Dashboard
             </RouterLink>
-            <RouterLink class="tab" :to="{ name: 'search' }">
+            <RouterLink v-if="allowed('search')" class="tab" :to="{ name: 'search' }">
                 <svg
                     width="24"
                     height="24"
@@ -42,7 +54,7 @@ const isAdmin = computed(() => session.value?.user.role === 'admin');
                 </svg>
                 Suchen
             </RouterLink>
-            <RouterLink class="tab" :to="{ name: 'inspections' }">
+            <RouterLink v-if="allowed('inspections')" class="tab" :to="{ name: 'inspections' }">
                 <svg
                     width="24"
                     height="24"

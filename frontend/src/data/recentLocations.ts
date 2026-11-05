@@ -1,4 +1,4 @@
-import type { Location } from '../api/locations';
+import { isSelectable, type Location } from '../api/locations';
 import { RecentIds } from './recentIds';
 
 /**
@@ -29,7 +29,9 @@ export function locationPaths(tree: readonly Location[]): Map<number, LocationCh
         if (!location.active) {
             continue;
         }
-        paths.set(location.id, { id: location.id, path: location.name });
+        if (isSelectable(location)) {
+            paths.set(location.id, { id: location.id, path: location.name });
+        }
         for (const child of location.children) {
             if (child.active) {
                 paths.set(child.id, { id: child.id, path: `${location.name} / ${child.name}` });
