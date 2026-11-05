@@ -36,3 +36,9 @@ Konzept: [`../../AENDERUNGSKONZEPT-2026-11.md`](../../AENDERUNGSKONZEPT-2026-11.
 | 8 · Konto wechseln | `Handy-Konto-wechseln.dc.html` | Handy · Konto wechseln im Profil | 12 (E14) |
 
 Geändert am 05.11.2026: `Einladungscodes.dc.html` zeigt bei bestehenden Codes die Bezeichnung statt Codeteilen und keinen Nachdruck (Plan Phase 1, F4); das Formular hat wieder Bezeichnung, Gültig (Tage) und Registrierungen höchstens.
+
+Ergänzt am 05.11.2026 (Schritt 1.7d „Schnellstart“, Ziel 4), von Holger freigegeben:
+
+| Seite | Datei | Inhalt |
+| --- | --- | --- |
+| 9 · Startbild | `Startbild.dc.html` | Startbild beim Laden (Handy): gezeichnetes Löschfahrzeug, Name, Ladebalken mit drei Schritten, hell/dunkel |

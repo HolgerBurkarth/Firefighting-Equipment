@@ -68,9 +68,10 @@ Präzisiert am 05.11.2026 (Holger): Ziele 1, 3 und 5 (Update-Prüfung im Hinterg
 Laden, Messung) hängen nicht an 1.7c; Ziel 2 (Start mit gespeicherter Sitzung und Offline-Kopie)
 erst nach 1.7c; Ziel 4 (Startbild) erst, wenn Holger das Mockup freigibt. Reihenfolge: 1.7b → 1.7c →
 1.7d.
-Mockup Seite 9 `Startbild.dc.html` (liegt noch nicht im Repository, vor dem Bau unter
-[`aenderungskonzept/mockups/`](aenderungskonzept/mockups/LIESMICH.md) ablegen; das Bild ist ein
-Vorschlag, Holger und Phil sehen es sich noch an).
+Mockup Seite 9 [`Startbild.dc.html`](aenderungskonzept/mockups/Startbild.dc.html), von Holger
+freigegeben am 05.11.2026 (Ziel 4 wird trotzdem erst mit 1.7d nach 1.7c gebaut). Es gelten die
+Vorgaben von Ziel 4 unten; wo der Begleittext des Mockups abweicht (dort „nach rund 0,3 s“ bzw.
+„unter 0,5 s“), gilt der Plan: sichtbar erst nach rund 0,4 s.
 
 **Gemessen am 05.11.2026** in `test` (Anmeldeseite, Handy-Breite):
 
