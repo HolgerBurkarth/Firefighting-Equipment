@@ -933,7 +933,7 @@ onMounted(() => {
                 {{
                     (chosenRole?.systemKey === 'admin') !== (target?.role === 'admin')
                         ? 'Mit diesem Wechsel wird die Person auf allen Geräten abgemeldet.'
-                        : 'Die neue Rolle gilt beim nächsten Aufruf der App.'
+                        : 'Die neue Rolle gilt beim nächsten Aufruf der App. Handys laden dabei ihre Offline-Kopie neu.'
                 }}
             </p>
         </fieldset>

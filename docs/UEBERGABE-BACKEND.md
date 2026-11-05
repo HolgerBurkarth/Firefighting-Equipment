@@ -8,6 +8,25 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-05 – „Rollen: Rechte ändern sich während der Sitzung, X-Client-Api 2 (Phase 1, Schritt 1.7c)“
+
+Plan Phase 1, Schritt 1.7c, `X-Client-Api` Variante B (Holger, 05.11.2026).
+
+- `ClientApi::CURRENT` = 2 (`resources/client-api.json` ebenso): Jede JSON- und CSV-Antwort trägt
+  `X-Api-Version: 2`, die App sendet `X-Client-Api: 2`. Grund: Menü, Leiste und Knöpfe der App folgen
+  seit 1.7b den Rechten (`permissions`), nicht mehr `role`; eine App mit 1 zeigte bei eigenen Rollen
+  Falsches. Sie sieht `X-Api-Version: 2`, prüft sofort auf ein Update und lädt die neue Version beim
+  nächsten Seitenwechsel.
+- `ClientApi::MIN` bleibt 1: Anfragen mit `X-Client-Api: 1` (oder ohne) gehen weiter durch, keine
+  409 `client_outdated`. Über MIN = 2 wird in Schritt 1.8 entschieden.
+- Sonst keine Änderung an Routen, Feldern oder Fehlern. Die App fragt `auth/me` jetzt zusätzlich beim
+  Zurückkehren in die App (höchstens alle 30 s) und nach 403 `forbidden` (höchstens alle 5 s).
+
+Tests: `ClientApiTest` (Datei = `CURRENT`), `JsonResponseTest`, `CsvResponseTest`, `DeviceExportTest`
+(Header `2`); Frontend `clientApi.spec.ts`, `client.spec.ts`, Browser-Tests prüfen jede Anfrage auf
+`X-Client-Api` laut Datei. `CLAUDE.md` "Versionierung der API für das Frontend", "Rollen und Rechte"
+(App nach Rechten).
+
 ## 2026-11-05 – „Rollen: Aktion csv.export für die CSV-Exporte, Benutzer 403 (Phase 1, Schritt 1.7a)“
 
 Plan Phase 1, Entscheidung F2 (Holger, 05.11.2026), Schritt 1.7a. **Gewollte Verhaltensänderung für

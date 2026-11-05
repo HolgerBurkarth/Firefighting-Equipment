@@ -165,6 +165,9 @@ function problemText(code: string, message: string | null): string {
             return 'Diese Buchung ist älter als erlaubt.';
         case 'client_ref_conflict':
             return 'Diese Buchung passt nicht mehr zu einer schon gesendeten.';
+        case 'forbidden':
+            // Die Rolle darf inzwischen nicht mehr umbuchen bzw. den Status setzen (Schritt 1.7c).
+            return 'Dafür fehlen Ihnen inzwischen die Rechte.';
         default:
             return message ?? 'Der Server hat die Buchung abgelehnt.';
     }

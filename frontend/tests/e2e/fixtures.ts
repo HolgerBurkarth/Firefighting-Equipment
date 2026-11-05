@@ -51,6 +51,15 @@ export type ApiMocks = Readonly<
 >;
 
 /** Antwort von auth/me bzw. auth/login wie AuthJson::me in PHP. */
+/** Vertragsnummer der App (gemeinsame Datei mit PHP, CLAUDE.md "Versionierung der API"). */
+const CLIENT_API = String(
+    (
+        JSON.parse(
+            readFileSync(new URL('../../../resources/client-api.json', import.meta.url), 'utf8'),
+        ) as { client_api: number }
+    ).client_api,
+);
+
 /** Rechte-Katalog wie GET permission-catalog (gemeinsame Datei mit PHP). */
 const CATALOG = JSON.parse(
     readFileSync(
@@ -219,8 +228,8 @@ async function fulfillApi(
     // Jeder Aufruf der App (über apiRequest) trägt die Vertragsnummer; Bilder und das Manifest
     // lädt der Browser selbst, ohne den Header.
     const byApp = path.startsWith('api/') && !/^api\/v1\/(app-icon|tenant\/logo)\//.test(path);
-    if (byApp && route.request().headers()['x-client-api'] !== '1') {
-        problems.push(`Ohne X-Client-Api: 1: ${method} ${path}`);
+    if (byApp && route.request().headers()['x-client-api'] !== CLIENT_API) {
+        problems.push(`Ohne X-Client-Api: ${CLIENT_API}: ${method} ${path}`);
     }
     if (mock !== undefined) {
         const request = { area, method, path, url, body: requestBody(route) };

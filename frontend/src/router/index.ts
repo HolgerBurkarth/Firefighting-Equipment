@@ -13,11 +13,13 @@ import type { Permissions } from '../api/permissions';
 import { canOpen, landingRoute } from '../auth/redirect';
 import {
     ensureSession,
+    onPermissionsChanged,
     onStoredSessionRejected,
     resetSession,
     setLoginNotice,
 } from '../auth/session';
 import type { AppBase } from '../runtime/appBase';
+import { hasUnsavedInput } from '../runtime/unsavedInput';
 import { PAGE_RIGHTS } from './pageRights';
 
 declare module 'vue-router' {
@@ -306,6 +308,20 @@ export function createAppRouter(base: AppBase, history?: RouterHistory): Router 
     setUnauthorizedHandler(toLogin);
     // Offline mit der gespeicherten Sitzung gearbeitet, dann lehnt der Server sie ab: ebenso.
     onStoredSessionRejected(toLogin);
+
+    // Neue Rechte während der Sitzung (Plan Phase 1, Schritt 1.7c): Darf die Rolle die Seite nicht
+    // mehr öffnen, still zur Startseite, nur ohne ungespeicherte Eingaben (die bleiben stehen; ein
+    // Speichern lehnt der Server dann mit 403 ab).
+    onPermissionsChanged((state) => {
+        const here = router.currentRoute.value;
+        if (here.meta.public === true || here.matched.length === 0 || hasUnsavedInput.value) {
+            return;
+        }
+        const decision = guardDecision(router, here, state);
+        if (decision !== true) {
+            void router.replace(decision);
+        }
+    });
 
     return router;
 }

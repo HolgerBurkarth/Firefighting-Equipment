@@ -126,7 +126,7 @@ describe('fetchDevicePage', () => {
         expect(requests[0]?.url).toMatch(
             /\/firefighting\/test\/api\/v1\/devices\?limit=200&offset=0$/,
         );
-        expect(requests[0]?.headers[CLIENT_API_HEADER]).toBe('1');
+        expect(requests[0]?.headers[CLIENT_API_HEADER]).toBe('2');
     });
 
     it('kodiert den Suchbegriff', async () => {

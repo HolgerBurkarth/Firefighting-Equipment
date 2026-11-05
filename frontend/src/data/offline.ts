@@ -4,7 +4,7 @@ import type { ApiResult } from '../api/client';
 import { fetchClientConfig, type ClientConfig } from '../api/clientConfig';
 import type { DeviceListItem } from '../api/devices';
 import type { Location } from '../api/locations';
-import { onSessionEnded, session } from '../auth/session';
+import { onPermissionsChanged, onSessionEnded, session } from '../auth/session';
 import { connectivity, onBackOnline } from '../runtime/connectivity';
 import { browserLocalDb, type LocalDb } from '../runtime/localDb';
 import { pendingDevice, type BookingQueue, type QueueLimits } from './bookingQueue';
@@ -12,13 +12,19 @@ import type { DeviceStore } from './deviceStore';
 import type { LocationStore } from './locationStore';
 import type { OtherQueues } from './otherQueues';
 
-/** Format der lokalen Kopie; ein anderes wird ignoriert (und beim nächsten Laden ersetzt). */
-export const SNAPSHOT_FORMAT = 1;
+/**
+ * Format der lokalen Kopie: 2 seit Plan Phase 1, Schritt 1.7c (mit `permissions`). Format 1 (ohne)
+ * wird noch gelesen, die Rechte gelten dann als unbekannt; andere werden ignoriert (und beim nächsten
+ * Laden ersetzt). Eine ältere App liest Format 2 nicht (sie kennt nur 1).
+ */
+export const SNAPSHOT_FORMAT = 2;
+const READABLE_FORMATS: readonly number[] = [1, SNAPSHOT_FORMAT];
 
 /**
  * Lokale Kopie der Daten eines Kontos (KONZEPT.md, "Offline-Modus – Entscheidungen", 49): alle
- * Geräte (nur bis MAX_LOCAL_DEVICES), die Standorte und der Zeitpunkt der letzten vollständigen
- * Synchronisierung (Uhr des Handys, ISO-Zeit in UTC).
+ * Geräte (nur bis MAX_LOCAL_DEVICES), die Standorte, der Zeitpunkt der letzten vollständigen
+ * Synchronisierung (Uhr des Handys, ISO-Zeit in UTC) und die Kennung der Rechte, mit denen sie
+ * geladen wurde (`permissions.version`; null = unbekannt, Format 1 oder ohne Rechte vom Server).
  */
 export interface OfflineSnapshot {
     readonly format: typeof SNAPSHOT_FORMAT;
@@ -26,6 +32,7 @@ export interface OfflineSnapshot {
     readonly devices: readonly DeviceListItem[];
     readonly total: number;
     readonly locations: readonly Location[] | null;
+    readonly permissions: string | null;
 }
 
 /** Schlüssel der Kopie: Stadt und Konto (ein anderes Konto auf demselben Handy sieht sie nicht). */
@@ -33,20 +40,38 @@ export function snapshotKey(area: string, account: AuthState): string {
     return `${area}:${String(account.user.id)}`;
 }
 
-/** Prüft eine gelesene Kopie grob (sie stammt aus dem eigenen Speicher); sonst null. */
+/**
+ * Prüft eine gelesene Kopie grob (sie stammt aus dem eigenen Speicher); sonst null. Format 1 kommt
+ * als Format 2 mit unbekannten Rechten zurück.
+ */
 export function parseSnapshot(value: unknown): OfflineSnapshot | null {
     if (typeof value !== 'object' || value === null) {
         return null;
     }
-    const snapshot = value as Partial<OfflineSnapshot>;
-    return snapshot.format === SNAPSHOT_FORMAT &&
+    const snapshot = value as Partial<Omit<OfflineSnapshot, 'format'>> & { format?: unknown };
+    const permissions = snapshot.format === 1 ? null : (snapshot.permissions ?? null);
+    return typeof snapshot.format === 'number' &&
+        READABLE_FORMATS.includes(snapshot.format) &&
         typeof snapshot.syncedAt === 'string' &&
         !Number.isNaN(Date.parse(snapshot.syncedAt)) &&
         Array.isArray(snapshot.devices) &&
         typeof snapshot.total === 'number' &&
-        (snapshot.locations === null || Array.isArray(snapshot.locations))
-        ? (snapshot as OfflineSnapshot)
+        (snapshot.locations === null || Array.isArray(snapshot.locations)) &&
+        (permissions === null || typeof permissions === 'string')
+        ? {
+              ...(snapshot as Omit<OfflineSnapshot, 'format' | 'permissions'>),
+              format: SNAPSHOT_FORMAT,
+              permissions,
+          }
         : null;
+}
+
+/**
+ * Gehört die Kopie zu den Rechten der Sitzung? Unbekannt auf einer Seite (Format 1, Sitzung ohne
+ * Rechte vom Server) gilt als passend; verschieden nie (andere Datenfilter, andere Bereiche).
+ */
+export function snapshotMatches(snapshot: OfflineSnapshot, version: string | null): boolean {
+    return snapshot.permissions === null || version === null || snapshot.permissions === version;
 }
 
 const syncedAt = shallowRef<string | null>(null);
@@ -81,9 +106,18 @@ export function installOfflineCopy(options: OfflineCopyOptions): () => void {
     const keyNow = (): string | null =>
         session.value === null ? null : snapshotKey(options.area, session.value);
 
+    const versionNow = (): string | null => session.value?.permissions?.version ?? null;
+
     async function restore(key: string): Promise<void> {
         const snapshot = parseSnapshot(await db.get('snapshots', key));
         if (snapshot === null || keyNow() !== key) {
+            return;
+        }
+        if (!snapshotMatches(snapshot, versionNow())) {
+            // Mit anderen Rechten geladen (Plan Phase 1, Schritt 1.7c): nicht zeigen, verwerfen.
+            writes = writes.then(async () => {
+                await db.delete('snapshots', key);
+            });
             return;
         }
         const restored = options.devices.restore(snapshot.devices, snapshot.total);
@@ -111,6 +145,7 @@ export function installOfflineCopy(options: OfflineCopyOptions): () => void {
             devices: state.devices,
             total: state.total,
             locations: options.locations.state.locations,
+            permissions: versionNow(),
         };
         syncedAt.value = snapshot.syncedAt;
         // Nacheinander schreiben, damit eine ältere Kopie nie eine neuere überschreibt.
@@ -141,6 +176,16 @@ export function installOfflineCopy(options: OfflineCopyOptions): () => void {
         void options.locations.refresh('changed');
     });
     const stopLocations = options.locations.onLoaded(save);
+    // Neue Rechte: Die Kopie stammt aus den alten (andere Datenfilter). Verwerfen; die Datenschicht
+    // lädt neu (installDataLayer, Anlass `rights`), danach wird sie mit den neuen gespeichert.
+    const stopPermissions = onPermissionsChanged((account) => {
+        const key = snapshotKey(options.area, account);
+        loadedAt = null;
+        syncedAt.value = null;
+        writes = writes.then(async () => {
+            await db.delete('snapshots', key);
+        });
+    });
     const stopEnded = onSessionEnded((ended, reason) => {
         syncedAt.value = null;
         if (reason !== 'ended') {
@@ -154,6 +199,7 @@ export function installOfflineCopy(options: OfflineCopyOptions): () => void {
         stopSession();
         stopDevices();
         stopLocations();
+        stopPermissions();
         stopEnded();
     };
 }

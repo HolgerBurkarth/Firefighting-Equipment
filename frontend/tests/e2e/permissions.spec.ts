@@ -202,3 +202,60 @@ test.describe('Handy: nur umbuchen, kein Status', () => {
         await expect(page.getByText('Ganzes Fahrzeug, ohne Fach')).toHaveCount(0);
     });
 });
+
+test.describe('Rechte ändern sich bei offener App (Schritt 1.7c)', () => {
+    // auth/me liefert zuerst eine Rolle mit Geräteliste, nach dem Wechsel nur noch Suchen.
+    let rights: Record<string, unknown> = permissionsJson({ devices: 'read', search: 'read' });
+
+    test.beforeEach(() => {
+        rights = permissionsJson({ devices: 'read', search: 'read' });
+    });
+
+    test.use({
+        api: {
+            'GET api/v1/auth/me': () => ({ status: 200, body: meBody('user', 'Gerd', rights) }),
+            'GET api/v1/devices': devicesEndpoint([DEVICE]),
+            'GET api/v1/device-types': { status: 200, body: { device_types: [] } },
+            ...LOCATIONS,
+        },
+    });
+
+    test('zurück in die App: auth/me neu, nicht mehr erlaubte Seite still verlassen', async ({
+        page,
+        apiRequests,
+    }) => {
+        await page.clock.install();
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await page.goto('/firefighting/test/geraete');
+        await expect(page.getByRole('heading', { name: 'Geräte', level: 1 })).toBeVisible();
+        const checks = (): number =>
+            apiRequests.filter((request) => request.url.endsWith('/api/v1/auth/me')).length;
+        expect(checks()).toBe(1);
+
+        // Sichtbar werden innerhalb von 30 s fragt nicht erneut (RECHECK_MIN_INTERVAL_MS).
+        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+        expect(checks()).toBe(1);
+
+        rights = permissionsJson({ search: 'read' });
+        await page.clock.runFor(31_000);
+        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
+        expect(checks()).toBe(2);
+        await expect(
+            page.getByRole('navigation', { name: 'Hauptmenü' }).getByRole('link'),
+        ).toHaveText(['Suchen', 'Profil']);
+        // Die gespeicherte Sitzung trägt die neuen Rechte.
+        await expect
+            .poll(() =>
+                page.evaluate(
+                    () =>
+                        (
+                            JSON.parse(localStorage.getItem('ff-session:test') ?? 'null') as {
+                                permissions?: { areas?: Record<string, string> };
+                            } | null
+                        )?.permissions?.areas,
+                ),
+            )
+            .toEqual({ search: 'read' });
+    });
+});
