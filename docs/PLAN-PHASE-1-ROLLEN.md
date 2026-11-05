@@ -1,6 +1,7 @@
 # Plan Phase 1: Rollen und Rechte
 
-Stand: 04.11.2026 · Entwurf des Agenten, wartet auf Freigabe durch Holger. Noch kein Code.
+Stand: 05.11.2026 · Freigegeben durch Holger am 05.11.2026 (Entscheidungen siehe unten, sie gehen
+den Vorschlägen im Text vor). Entwurf vom 04.11.2026.
 
 Grundlage: [`AENDERUNGSKONZEPT-2026-11.md`](AENDERUNGSKONZEPT-2026-11.md) Abschnitt 1 und 9,
 Mockups der Seiten 1 und 2 in [`aenderungskonzept/mockups/`](aenderungskonzept/mockups/LIESMICH.md)
@@ -26,7 +27,64 @@ Mit ⚠ markiert: Schritte, die bestehende Daten ändern oder vor dem Bau eine E
   jede Abfrage mit und ohne Filter.
 - Für die Standard-Rollen *Admin* und *Benutzer* ändert sich nichts; neue Rollen gibt es erst, wenn
   der Super-Admin sie anlegt. Immendingen wird nicht angefasst.
-- Acht Schritte (1.1–1.8), davon zwei groß; eine Migration ändert bestehende Daten (⚠ 1.2).
+- Neun Schritte (1.1–1.9), davon zwei groß; eine Migration ändert bestehende Daten (⚠ 1.2).
+
+## Entscheidungen (05.11.2026)
+
+Freigabe durch Holger am 05.11.2026. Wo hier nichts anderes steht, gelten die Vorschläge des Plans.
+Diese Entscheidungen gehen dem übrigen Text vor; Abschnitte, die davon abweichen, gelten als
+angepasst.
+
+| Nr. | Entscheidung |
+| --- | --- |
+| F1 | Ein Rollenwechsel beendet die Sitzungen des Kontos nur, wenn die Rolle *Admin* dazukommt oder wegfällt (also wenn sich die Kontoart `admin` ↔ `user` ändert). Jeder andere Wechsel wirkt ab der nächsten Anfrage (`Permissions` wird je Anfrage gebildet). CLAUDE.md („Rollenwechsel beendet alle Sitzungen“) wird mit Schritt 1.6 entsprechend angepasst. |
+| F2 | Wie vorgeschlagen: Die Standard-Rolle *Benutzer* bekommt kein `csv.export`. |
+| F3 | Die vier Rechte `locations` Ändern, `device_types` Ändern, `csv.import` und `users` (Ansehen und Ändern: „Benutzer verwalten“) gibt es nur für Rollen ohne Datenfilter „Sieht nur …“. Im Editor der Rollen sind sie bei Rollen mit Datenfilter ausgegraut, mit Hinweis. Der Server lehnt eine Rolle mit Datenfilter und einem dieser Rechte mit 409 `rule_violation` ab (beim Speichern der Rolle, in beide Richtungen: Filter setzen bei vorhandenem Recht ebenso). |
+| F4 | Wie vorgeschlagen: Einladungscodes behalten Bezeichnung, „Gültig (Tage)“ und „Registrierungen höchstens“; kein Nachdruck bestehender Codes, keine Teile des Codes gespeichert (die korrigierten Mockups `Einladungscodes` folgen dem). |
+| F5 | Auch andere Rollen als *Admin* dürfen Benutzer verwalten, wenn sie das Recht `users` Ändern haben (nur ohne Datenfilter, F3). Es gelten alle Schutzregeln: Nur ein Admin vergibt oder entzieht die Rolle *Admin*, und nur ein Admin sperrt oder löscht Admins (bzw. ändert deren Anzeigenamen oder Rolle). Niemand ändert sich selbst. Der letzte aktive Admin bleibt. Zusätzlich (Vorschlag Abschnitt 5): Wer eine Rolle zuweist, freischaltet oder einen Einladungscode mit Rolle anlegt, braucht alle Rechte dieser Rolle. |
+| F6 | Mehrfachauswahl in der Benutzerliste bietet nur „Rolle zuweisen …“. |
+| F7 | Reiter „Übersicht“ im Stadtdetail des Super-Admins = der heutige Kopf der Stadt (Name, Status, Zahlen, Umbenennen, Sperren). |
+| F8 | Wie vorgeschlagen: Der Eintrag „Dashboard“ der Handy-Leiste erscheint, sobald die Rolle eine Seite der Konsole hat; ohne `dashboard` führt er zur ersten erlaubten Seite. |
+| F9 | Wie vorgeschlagen: `mail.log` ist eine Aktion der Rolle; die persönliche Einstellung (an/aus) bleibt zusätzlich. |
+| F10 | Wie vorgeschlagen: „Rolle aus anderer Stadt übernehmen“ übernimmt die Rechte, nicht die Datenfilter. |
+| F11 | Wie vorgeschlagen: Sitzungsdauer aus den Rechten (kurz/lang, Abschnitt 5), keine Einstellung je Rolle. |
+| F12 | Zugang über Claude (wie im Chat zum Claude-Konnektor entschieden): Für Konten ohne Rolle *Admin* gibt ein Admin der Stadt Claude Zugriff; für Konten mit Rolle *Admin* gibt nur der Super-Admin den Zugriff; Super-Admins erhalten keinen Zugriff; niemand gibt sich den Zugriff selbst. Umgesetzt erst in der MCP-Phase. Phase 1 plant nur so, dass es passt: `fe_users.claude_access` und `fe_sessions.channel` (Abschnitt 1) kommen dann als reine Erweiterung; nichts in Phase 1 darf diese Spalten oder Werte belegen. |
+| F13 | Wie vorgeschlagen: Prüfdatum einzeln ändern = `due` Ändern, keine eigene Aktion. |
+| F14 | Wie vorgeschlagen: Adressen (`geraete`, `prueffristen`, Mail-Links) bleiben; die CSV nimmt später alte und neue Überschriften an. Die Umstellung der Begriffe bleibt ein eigener späterer Schritt (Abschnitt 8). |
+
+Weiterhin nur nach Rückfrage („❓ RÜCKFRAGE“):
+
+- Migration 0036 (Schritt 1.2) ändert bestehende Daten: vor dem Ausführen Probelauf auf einer Kopie
+  und die genauen Änderungen zeigen.
+- `X-Client-Api` 2 und `ClientApi::MIN` = 2 in Schritt 1.7.
+- Die Rollentabelle für Immendingen (Abschnitt 6) bleibt ein Vorschlag; echte Städte werden nicht
+  angefasst.
+
+### Schritt 1.9 „Konto wechseln“ (Konzept E14, Mockups Seite 8)
+
+Mockups `Konto-wechseln` (Admin-Konsole) und `Handy-Konto-wechseln` (Profil) in
+[`aenderungskonzept/mockups/`](aenderungskonzept/mockups/LIESMICH.md).
+
+- **Kontoliste auf dem Gerät**: Wer in mehreren Städten ein Konto hat, sieht eine Liste auf dem
+  Gerät. localStorage (ein Schlüssel für alle Städte, da die Liste städteübergreifend ist) enthält je
+  Eintrag nur Kürzel, Name der Stadt, Anzeigename und Rollenname; keine Tokens, keine E-Mail, keine
+  IDs außer der Konto-ID zum Zuordnen der Warteschlange (`ff-queue-owners`, IndexedDB `queue`). Ein
+  Eintrag kommt bei jeder bestätigten Sitzung dazu bzw. wird aktualisiert; Abmelden in einer Stadt
+  entfernt ihn.
+- **Ort in der App**: Admin-Konsole unten im Menü der Name des Kontos als Knopf, darüber öffnet sich
+  die Liste; am Handy der Abschnitt „Konto wechseln“ im Profil.
+- **Wechseln** ist eine volle Navigation auf `/firefighting/<kürzel>/`. Die Sitzungen bleiben
+  getrennt (Cookies gelten je Pfad). Mit ungespeicherten Eingaben fragt die App erst: „Ihre Eingaben
+  auf dieser Seite gehen verloren. Trotzdem wechseln?“, Standard „Abbrechen“ (`ConfirmDialog`).
+- **Kennzeichen je Eintrag**: „aktuell“, „angemeldet“ oder „neu anmelden“ (aus der gespeicherten
+  Sitzung der Stadt, `ff-session:<kürzel>`; ohne sie „neu anmelden“). Bei „neu anmelden“ führt
+  Antippen zur Anmeldung dieser Stadt mit Rückkehr. Nicht gesendete Buchungen eines Kontos zeigt der
+  Eintrag als Hinweis.
+- **„+ Weitere Stadt hinzufügen …“**: Eingabe von Adresse oder Kürzel; geprüft wie `TenantSlug`
+  (`slugProblem`), dann zur Anmeldung dieser Stadt.
+- **Super-Admin**: `service` gehört nicht in die Liste und zeigt keine.
+- **Tests**: Browser-Tests mit zwei Städten (zwei Bereiche im selben Testserver), Unit-Tests der
+  Liste.
 
 ## 1. Datenmodell
 
@@ -74,7 +132,7 @@ Zeilen der Testdatenbank.
 - **Gültigkeitsdauer**: wie die Sitzungsdauer der Rolle (Abschnitt 5, Inaktivität und Höchstdauer);
   OAuth-Tokens laufen spätestens mit der Höchstdauer ab, Sperren, Rollenwechsel und Passwortänderung
   beenden sie wie jede Sitzung.
-- **Setzen**: offene Frage F12.
+- **Setzen**: entschieden, siehe F12 unter „Entscheidungen“.
 
 ## 2. Rechte-Katalog
 
@@ -420,8 +478,9 @@ Offen dazu: F14 (Adressen wie `geraete`, `prueffristen` und Spalten der CSV).
 | 1.6 | Admin: `GET roles`, Rolle zuweisen (einzeln, mehrere), Freischalten und Einladungscodes mit Rolle | mittel | live in `test` |
 | 1.7 | App auf Rechte umstellen (Menü, Wächter, Handy-Leiste, Knöpfe, Offline-Kopie mit `permissions.version`), ⚠ `X-Client-Api` 2 und `MIN` 2 nach Rückfrage | mittel | live in `test`, Handy (Holger) |
 | 1.8 | Live-Test aller Rollen in `test` (LIVETEST-Datei), Rollen für Immendingen nur nach Freigabe durch Holger | klein | – |
+| 1.9 | „Konto wechseln“ (Kontoliste auf dem Gerät, Menü und Profil, siehe „Entscheidungen“) | mittel | live in `test` (zweite Stadt nur lokal/im Test) |
 
-Reihenfolge: 1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 → 1.7 → 1.8. 1.5/1.6 können neue Rollen erst
+Reihenfolge: 1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 → 1.7 → 1.8 → 1.9. 1.5/1.6 können neue Rollen erst
 anlegen, wenn 1.3 und 1.4 live sind (sonst wirkte ein Filter nicht).
 
 **Risiken**
@@ -438,7 +497,7 @@ anlegen, wenn 1.3 und 1.4 live sind (sonst wirkte ein Filter nicht).
 - Alte Apps zeigen bis zum Update Falsches (gelöst durch n = 2 in 1.7).
 - CI wird länger (Matrix-Test, Rechte-Test je Route).
 
-**Offene Fragen**
+**Fragen** (alle entschieden am 05.11.2026, siehe „Entscheidungen“)
 
 - F1: Beendet ein Rollenwechsel die Sitzungen? Heute ja (CLAUDE.md); das Mockup sagt „gilt beim
   nächsten Aufruf“. Vorschlag: Wechsel von oder zu *Admin* beendet sie (wie heute), andere nicht.
