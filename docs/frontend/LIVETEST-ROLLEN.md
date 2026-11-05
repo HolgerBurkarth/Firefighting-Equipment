@@ -278,6 +278,24 @@ nach einmaliger Wiederholung mit `--failed` grün.
   iPhone-Liste unten (B bis D, Konto #7). Zusätzlich per Test belegt (`permissionsChange.spec.ts`,
   `bookingQueue.spec.ts`, Browser `permissions.spec.ts`).
 
+## Schritt 1.7d – Schnellstart (05.11.2026, Build `9de6683e1f98`)
+
+CI grün im ersten Lauf (Commits „Schnellstart: Startbild als SVG direkt in index.html …“ und
+„Live-Test: iPhone-Liste zu Schritt 1.7c …“, alle Teile von 1.7d zusammen deployt).
+
+- ☑ Deploy „Deployment erfolgreich“, `build.json` = `9de6683e1f98`, `health` ok.
+- ☑ Update: Der Tab übernahm die neue Version selbst (Zeitleiste `start build=9de6683e1f98`, danach
+  vom Service Worker gesteuert).
+- ☑ Als *Admin* auf `suchen`: erste Seite nach 0,09–0,10 s, Geräte aus der Offline-Kopie nach 0,10 s,
+  `auth/me` und `devices` im Hintergrund; `build.json` blockiert den Start nicht mehr.
+- ☑ Startbild: Die App-Seite enthält das SVG direkt (26 Formen, kein `style=`, kein `<style>`), keine
+  Anfrage nach einer `.svg`, `assets/*.svg` → 404. Beim schnellen Start erscheint es nicht (sofort
+  entfernt). Eine Kopie im Schritt `session` live eingefügt: sichtbar, Farben aus `splash.css`
+  (dunkel: Scheibe `rgb(30, 38, 49)`, Fahrzeug `rgb(183, 28, 28)`), wieder entfernt.
+- ☑ Keine Fehler und keine CSP-Meldungen in der Konsole.
+- ☐ Offen für Holger: Startbild am iPhone bei langsamem Netz bzw. nach dem Schließen der App, hell
+  und dunkel; Start als #7 mit gespeicherter Sitzung (fühlbar sofort, grauer Streifen nur offline).
+
 ## iPhone-Liste für Holger mit Konto #7 (nach Schritt 1.7c)
 
 Am 05.11.2026 von Holger vollständig bestanden (iPhone als #7, PC als Admin und Super-Admin).

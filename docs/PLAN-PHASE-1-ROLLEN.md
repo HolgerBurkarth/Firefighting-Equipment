@@ -89,6 +89,14 @@ Starts): `tenant`, `auth/me` und `build.json` gleichzeitig ab rund 0,07–0,1 s,
 erst danach die Seite (`SearchPage`) und `devices` (Beginn 0,37–0,65 s, Antwort 0,83–0,89 s). Die
 Geräte stehen also erst nach rund 0,9 s, obwohl Sitzung und Offline-Kopie auf dem Gerät liegen.
 
+**Nachher mit Messskript** (05.11.2026, Build `9de6683e1f98`, gleiche Messung): erster Besuch 1,66 s
+(1,49–1,84 s), gedrosselt 1,63 s; weiterer Start mit Service Worker 0,08 s (0,07–0,09 s), gedrosselt
+0,08 s. Angemeldet als *Admin* auf `suchen` (Claude in Chrome, zwei Starts): Marke `ff:first-page`
+nach 0,09–0,10 s, `ff:search-data` (Geräte aus der Offline-Kopie) nach 0,10 s; `auth/me` (Antwort
+0,46–0,47 s) und `devices` (0,52–0,54 s) laufen im Hintergrund. Ziel erreicht: „Suchen“ mit Daten
+unter 1 s (vorher rund 0,9 s, jetzt 0,1 s); erster Besuch etwas schneller (1,86 → 1,66 s), dort
+bestimmen die Antworten von STRATO die Zeit.
+
 **Ziele**
 
 - **Start wartet nicht auf die Update-Prüfung**: Die Seite erscheint sofort, die Prüfung läuft im
