@@ -1824,9 +1824,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 
 ## Rollen und Rechte (Phase 1, im Aufbau)
 - Plan und Entscheidungen: `docs/PLAN-PHASE-1-ROLLEN.md` (freigegeben 05.11.2026; Schritte 1.1–1.9).
-  Stand: Schritt 1.1 (Schema und Standard-Rollen) und Teil 1 von 1.2 (Schreibwege setzen
-  `role_id`, Probelauf); Migrationen 0036–0038 folgen nach Freigabe. Die Rechte prüft weiterhin
-  `Access` über `fe_users.role`; Rollen wirken erst ab Schritt 1.3.
+  Stand: Schritte 1.1 und 1.2 (Schema, Standard-Rollen, jedes Konto einer Stadt mit Rolle). Die
+  Rechte prüft weiterhin `Access` über `fe_users.role`; Rollen wirken erst ab Schritt 1.3.
 - Regel Kontoart ↔ Rolle (nur im Code, kein CHECK möglich): `fe_users.role = 'admin'` genau dann,
   wenn `role_id` die Rolle Admin der Stadt ist. Jeder Schreibweg von `UserRepository` setzt beides in
   derselben Anweisung (`register`, `insertInvitedAdmin` für `createTenantWithInvitedAdmin` und
@@ -1853,8 +1852,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `fe_role_device_types` (Datenfilter; Ebene 1 schließt Fächer ein). Alle Untertabellen mit
   `tenant_id` und zusammengesetztem Fremdschlüssel auf `fe_roles (id, tenant_id)` mit `ON DELETE
   CASCADE` (nur dort; Fremdschlüssel auf `fe_users`, Standorte und Gerätetypen kaskadieren nie).
-  `fe_users.role_id` (NULL bis Schritt 1.2, Fremdschlüssel `(role_id, tenant_id)`, Super-Admins ohne
-  Rolle); `fe_users.role` bleibt als Kontoart (`admin` = hat die Rolle Admin).
+  `fe_users.role_id` (Fremdschlüssel `(role_id, tenant_id)`; Migration `0036` hat am 05.11.2026 nach
+  Freigabe und Probelauf auf dem Server alle bestehenden Konten der Kontoart entsprechend zugeordnet,
+  `0037` CHECK `chk_fe_users_role_id`: Konto einer Stadt genau dann mit Rolle, Super-Admins nie);
+  `fe_users.role` bleibt als Kontoart (`admin` = hat die Rolle Admin). `fe_invitation_codes.role_id`
+  (Migration `0038`, NULL = Standard-Rolle Benutzer, Fremdschlüssel `(role_id, tenant_id)`; genutzt
+  ab Schritt 1.6). Tests `RoleAssignmentMigrationTest` (0036 ändert genau die gezählten Konten, 0037
+  läuft danach durch bzw. scheitert ohne Standard-Rolle).
 - Standard-Rollen (`src/Role/DefaultRoles`): *Admin* („Alle Rechte, nicht änderbar“, ohne Zeilen in
   `fe_role_areas`/`fe_role_actions`: alle Rechte, auch künftige) und *Benutzer* („Wie bisher; bekommt
   jede neue Stadt“: `search` und `due` Ansehen, `book.move`, `book.status`). Bestehende Städte per
