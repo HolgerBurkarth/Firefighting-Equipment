@@ -61,6 +61,74 @@ Weiterhin nur nach Rückfrage („❓ RÜCKFRAGE“):
 - Die Rollentabelle für Immendingen (Abschnitt 6) bleibt ein Vorschlag; echte Städte werden nicht
   angefasst.
 
+### Schritt 1.7d „Schnellstart“ (Wunsch Holger 05.11.2026, nach 1.7c, vor 1.8)
+
+Erst umsetzen, wenn 1.7c live ist (der Sofortstart braucht die gespeicherte `permissions.version`).
+Mockup Seite 9 `Startbild.dc.html` (liegt noch nicht im Repository, vor dem Bau unter
+[`aenderungskonzept/mockups/`](aenderungskonzept/mockups/LIESMICH.md) ablegen; das Bild ist ein
+Vorschlag, Holger und Phil sehen es sich noch an).
+
+**Gemessen am 05.11.2026** in `test` (Anmeldeseite, Handy-Breite):
+
+- Erster Besuch: rund 4,5 s bei nur 166 KB. Die Anfragen laufen nacheinander: Seite →
+  Programmteile → `tenant`/`auth/me` → Seite → Logo.
+- Weitere Starts mit Service Worker: rund 2,6 s. Davon wartet `checkOnStart` bis zu 2 s
+  (`START_CHECK_TIMEOUT_MS`) auf `build.json` bzw. die Registrierung, bevor die erste Seite erscheint.
+- Antworten von STRATO: rund 0,2–0,3 s je Anfrage.
+
+**Ziele**
+
+- **Start wartet nicht auf die Update-Prüfung**: Die Seite erscheint sofort, die Prüfung läuft im
+  Hintergrund, das Update kommt beim nächsten Seitenwechsel (`installUpdateGuard`, wie heute).
+  Ausnahmen bleiben „Seite nicht gefunden“ (`checkBeforeNotFound`) und `client_outdated`. Alle Fälle
+  in `appUpdate.spec.ts` bleiben grün. Setzt ein Test das alte Verhalten beim Start voraus
+  (Kandidaten: „erster Besuch, Deploy noch vor der Installation“, „Strg+F5“, „Mail-Link mit alter
+  Version“, „neue Kennung, aber kein neuer Service Worker“, „neuer Service Worker installiert
+  langsam“), wird je Fall begründet, warum die neue Erwartung richtig ist, statt ihn nur anzupassen
+  (Begründung im Test und in der „✅ FERTIG“-Meldung). Eine alte Version beim Start ist zulässig, weil
+  die API nur erweitert wird (siehe CLAUDE.md "Versionierung der API für das Frontend") und
+  `client_outdated` weiterhin sofort aktualisiert. CLAUDE.md ("Updates") und KONZEPT.md "Updates der
+  App" im selben Schritt nachziehen.
+- **Angemeldete starten sofort** mit der gespeicherten Sitzung und der Offline-Kopie vom Gerät (wie
+  heute bei gestörtem Netz, `usingStoredSession`); `auth/me` und das Laden der Geräte laufen im
+  Hintergrund. Eine echte Ablehnung führt wie heute zur Anmeldung (`onStoredSessionRejected`), neue
+  Rechte wie in 1.7c. Gilt nur, wenn `permissions.version` gespeichert ist; sonst wie heute erst
+  nach `auth/me`.
+- **Parallel laden**: Die Zielseite (Programmteil der Route) lädt gleichzeitig mit `tenant` und
+  `auth/me` (Vue Router lädt Seiten sonst erst nach dem Wächter). Das Logo blockiert nicht.
+  Öffentliche Seiten (z. B. die künftige Rückgabe ohne Anmeldung, Mockup `Handy-Rueckgabe`) brauchen
+  kein `auth/me`. Zu prüfen beim Bau: ob die Weiche `/` ohne gespeicherte Sitzung gleich zur
+  Anmeldung kann und ob ein Vorladen von `api/v1/tenant` aus `index.html` ohne Inline-Skript hilft.
+- **Startbild** nach dem Mockup:
+  - steht in `index.html` (außerhalb von `#app`), Bild (SVG) und Stil als eigene Dateien des Builds,
+    ohne Ausnahme in der CSP (per Test, wie die übrigen CSP-Regeln);
+  - erst nach rund 0,4 s sichtbar, nur per CSS (Verzögerung einer Animation); ein schneller Start
+    zeigt es also nie; die App entfernt es, sobald die erste Seite steht;
+  - Ladebalken zuerst ohne Stand, danach in drei Schritten aus der App („App wird geladen“,
+    „Anmeldung wird geprüft“, „Ausrüstung wird geladen“), gesetzt als Attribut am Startbild (kein
+    `style=""`), die Breite je Schritt im Stylesheet;
+  - hell und dunkel, `prefers-reduced-motion` beachten (dann ohne Bewegung);
+  - Name und Farbe der Stadt aus dem letzten Besuch nur ohne Inline-Skript. Vorschlag: `main.ts`
+    setzt sie als Erstes aus localStorage (Farbe als CSS-Variable per CSSOM); mit Service Worker
+    läuft das vor den 0,4 s. Beim ersten Besuch bzw. ohne gespeicherten Stand „Feuerwehr“ in der
+    Standardfarbe. PHP setzt nichts ein (das Frontend liefert PHP ohne Datenbank aus).
+- **Messen**: ein Messskript (Ablauf wie oben, Handy-Breite; Zeitpunkte über `performance.mark` der
+  App, z. B. „erste Seite“ und „Suchen mit Daten“), Vorher/Nachher in der „✅ FERTIG“-Meldung.
+  Erster Besuch ohne Anmeldung per Playwright gegen `test`; angemeldet nur mit Claude in Chrome (der
+  Agent meldet sich nicht an) oder durch Holger. Ziel: Ein angemeldeter Benutzer mit Service Worker
+  sieht „Suchen“ mit Daten in unter 1 s; ein erster Besuch zeigt die Anmeldeseite deutlich schneller
+  als heute.
+
+**Tests**: `appUpdate.spec.ts` (alle Fälle, siehe oben), Sofortstart mit gespeicherter Sitzung und
+späterer Ablehnung bzw. neuen Rechten (`session.spec.ts`, `offline.spec.ts`), Startbild (erscheint
+nicht bei schnellem Start, erscheint nach 0,4 s mit `page.clock`, Schritte, dunkel, reduzierte
+Bewegung, keine CSP-Verletzung), Unit-Tests für die Reihenfolge des Starts. Browser- und
+breitenabhängig: betroffene Dateien in allen fünf Profilen, Service Worker zusätzlich unter WSL.
+
+**Risiken**: Mit gespeicherter Sitzung sieht ein inzwischen gesperrtes Konto kurz seine
+Offline-Kopie (wie heute offline; jede Anfrage bekommt 401, dann Anmeldung). Eine alte Version läuft
+bis zum nächsten Seitenwechsel (abgefangen über `client_outdated` und `X-Api-Version`).
+
 ### Schritt 1.9 „Konto wechseln“ (Konzept E14, Mockups Seite 8)
 
 Mockups `Konto-wechseln` (Admin-Konsole) und `Handy-Konto-wechseln` (Profil) in
@@ -597,10 +665,11 @@ Offen dazu: F14 (Adressen wie `geraete`, `prueffristen` und Spalten der CSV).
 | 1.5 | Super-Admin: API und Seiten „Rollen“, „Rolle bearbeiten“, Kopieren, Übernehmen, Löschen | mittel | live in `test` |
 | 1.6 | Admin: `GET roles`, Rolle zuweisen (einzeln, mehrere), Freischalten und Einladungscodes mit Rolle | mittel | live in `test` |
 | 1.7 | App auf Rechte umstellen (Menü, Wächter, Handy-Leiste, Knöpfe, Offline-Kopie mit `permissions.version`), `X-Client-Api` 2 mit `MIN` 1 (Variante B); Aktion `csv.export` für die Exporte (F2, *Benutzer* dann 403). Geteilt in 1.7a/b/c (siehe oben) | mittel | je Teil live in `test`, Handy (Holger) nach 1.7c |
+| 1.7d | „Schnellstart“: Start ohne Warten auf die Update-Prüfung, Angemeldete sofort mit Sitzung und Offline-Kopie, Zielseite parallel zu `tenant`/`auth/me`, Startbild, Messung vorher/nachher (siehe „Entscheidungen“). Erst nach 1.7c | mittel | live in `test` mit Messung, Handy (Holger) |
 | 1.8 | Live-Test aller Rollen in `test` (LIVETEST-Datei), Entscheidung über `ClientApi::MIN` = 2, Rollen für Immendingen nur nach Freigabe durch Holger | klein | – |
 | 1.9 | „Konto wechseln“ (Kontoliste auf dem Gerät, Menü und Profil, siehe „Entscheidungen“) | mittel | live in `test` (zweite Stadt nur lokal/im Test) |
 
-Reihenfolge: 1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 → 1.7 → 1.8 → 1.9. 1.5/1.6 können neue Rollen erst
+Reihenfolge: 1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 → 1.7 (a → b → c → d) → 1.8 → 1.9. 1.5/1.6 können neue Rollen erst
 anlegen, wenn 1.3 und 1.4 live sind (sonst wirkte ein Filter nicht).
 
 **Risiken**
@@ -617,6 +686,8 @@ anlegen, wenn 1.3 und 1.4 live sind (sonst wirkte ein Filter nicht).
 - Alte Apps zeigen bis zum Update Falsches (n = 2 in 1.7c löst die sofortige Prüfung aus; MIN = 2
   entscheidet 1.8).
 - CI wird länger (Matrix-Test, Rechte-Test je Route).
+- 1.7d ändert den Start der Update-Logik; sporadische Fehler dort nur unter Last suchen
+  (`npm run test:load`), nie mit längeren Wartezeiten überdecken.
 
 **Fragen** (alle entschieden am 05.11.2026, siehe „Entscheidungen“)
 
