@@ -1,23 +1,40 @@
 <script setup lang="ts">
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
-import { computed, onMounted, ref, useId } from 'vue';
+import { computed, onMounted, ref, shallowRef, useId, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { ApiError, ApiResult } from '../api/client';
-import type { AdminUser, ManagedRole } from '../api/users';
+import type { AssignableRole } from '../api/roles';
+import type { AdminUser } from '../api/users';
 import { session } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
 import InvitationCodesPanel from '../components/InvitationCodesPanel.vue';
-import { approveUser, deleteUser, rejectUser, saveUser, setUserLocked, userStore } from '../data';
+import {
+    adminLocationStore,
+    approveUser,
+    assignableRoleStore,
+    bulkAssignRole,
+    deleteUser,
+    deviceTypeStore,
+    rejectUser,
+    saveUser,
+    setUserLocked,
+    userStore,
+    type BulkRoleRun,
+} from '../data';
+import { filterText, roleFilterOptions, roleNameOf, seesText } from '../data/assignableRoles';
 import { phpTrim } from '../data/masterData';
 import {
+    bulkRoleText,
     createdText,
     displayNameProblem,
     nameHint,
     pendingText,
     pendingUsers,
-    ROLE_OPTIONS,
+    registrationText,
+    selectable,
+    selectedText,
     statusText,
     userChanges,
     userRows,
@@ -27,12 +44,14 @@ import {
 import { useUnsavedInput } from '../runtime/unsavedInput';
 
 /**
- * Benutzerverwaltung (Admin, `benutzer`; KONZEPT.md, "Bereiche des Admins", Benutzer): oben die
- * wartenden Registrierungen mit „Freischalten“ (Anzeigename und Rolle) und „Ablehnen“, darunter alle
- * Konten der Stadt, sortierbar wie im Explorer (am Handy Karten mit Sortier-Knöpfen). Der Stift
- * öffnet Anzeigename und Rolle, abseits Sperren/Entsperren und Löschen (= anonymisieren). Das eigene
- * Konto lässt sich nicht sperren, herabstufen oder löschen; alle Regeln prüft der Server. Zweiter
- * Reiter „Einladungscodes“ (`?ansicht=einladungscodes`, InvitationCodesPanel).
+ * Benutzerverwaltung (Admin, `benutzer`; KONZEPT.md, "Bereiche des Admins", Benutzer; Plan Phase 1,
+ * Schritt 1.6, Mockups „Benutzer“ und „Benutzer-Rolle“): oben die wartenden Registrierungen mit
+ * „Freischalten“ (Anzeigename und Rolle, die des Einladungscodes vorausgewählt) und „Ablehnen“,
+ * darunter alle Konten der Stadt mit Rollenfilter, sortierbar wie im Explorer (am Handy Karten mit
+ * Sortier-Knöpfen). Kästchen je Konto (nicht am eigenen) für „Rolle zuweisen …“ (F6). Der Stift
+ * öffnet Anzeigename und Rolle, abseits Sperren/Entsperren und Löschen (= anonymisieren). Welche
+ * Rollen es gibt, legt der Super-Admin fest; welche das Konto vergeben darf, sagt der Server (F5).
+ * Zweiter Reiter „Einladungscodes“ (`?ansicht=einladungscodes`, InvitationCodesPanel).
  */
 const id = useId();
 const route = useRoute();
@@ -56,10 +75,18 @@ const users = computed(() => state.value.users ?? []);
 const ownId = computed(() => session.value?.user.id ?? null);
 const pending = computed(() => pendingUsers(users.value));
 
+const roleState = computed(() => assignableRoleStore.state);
+const roles = computed(() => roleState.value.data?.roles ?? []);
+const catalog = computed(() => roleState.value.data?.catalog ?? null);
+const roleFilter = ref<number | null>(null);
+const roleOptions = computed(() => roleFilterOptions(users.value, roles.value));
+
 const query = ref('');
 const sort = ref<UserSortKey>('name');
 const dir = ref<SortDir>('asc');
-const rows = computed(() => userRows(users.value, query.value, sort.value, dir.value));
+const rows = computed(() =>
+    userRows(users.value, query.value, sort.value, dir.value, roleFilter.value),
+);
 const others = computed(() => users.value.filter((user) => user.status !== 'pending').length);
 
 const COLUMNS: readonly { key: UserSortKey; label: string }[] = [
@@ -87,6 +114,41 @@ function ariaSort(key: UserSortKey): 'ascending' | 'descending' | 'none' {
     return dir.value === 'asc' ? 'ascending' : 'descending';
 }
 
+/** Namen für „Sieht nur …“; die Listen der Konsole lädt die Seite nur, wenn eine Rolle filtert. */
+function locationName(locationId: number): string | null {
+    for (const location of adminLocationStore.state.locations ?? []) {
+        if (location.id === locationId) {
+            return location.name;
+        }
+        const child = location.children.find((sub) => sub.id === locationId);
+        if (child !== undefined) {
+            return `${location.name} / ${child.name}`;
+        }
+    }
+    return null;
+}
+
+function typeName(typeId: number): string | null {
+    return deviceTypeStore.state.types?.find((type) => type.id === typeId)?.name ?? null;
+}
+
+watch(roles, (list) => {
+    if (list.some((role) => role.locations !== null)) {
+        void adminLocationStore.refresh('open');
+    }
+    if (list.some((role) => role.deviceTypes !== null)) {
+        void deviceTypeStore.refresh('open');
+    }
+});
+
+function roleFilterText(role: AssignableRole): string | null {
+    return filterText(role, locationName, typeName);
+}
+
+function roleSees(role: AssignableRole): string {
+    return catalog.value === null ? '' : seesText(catalog.value, role);
+}
+
 const busy = ref(false);
 const success = ref<string | null>(null);
 const pageError = ref<ApiError | null>(null);
@@ -105,7 +167,7 @@ const mode = ref<Mode>('approve');
 const target = ref<AdminUser | null>(null);
 const dialogOpen = ref(false);
 const displayName = ref('');
-const role = ref<ManagedRole>('user');
+const roleId = ref<number | null>(null);
 const touched = ref(false);
 const nameError = ref<string | null>(null);
 const dialogError = ref<ApiError | null>(null);
@@ -115,21 +177,21 @@ const isOwn = computed(() => target.value !== null && target.value.id === ownId.
 const editsName = computed(
     () => mode.value === 'approve' || (target.value !== null && target.value.status === 'active'),
 );
-const initial = computed((): { displayName: string; role: ManagedRole } => ({
+const initial = computed((): { displayName: string; roleId: number | null } => ({
     displayName:
         mode.value === 'approve'
             ? (target.value?.name ?? '')
             : (target.value?.displayName ?? target.value?.name ?? ''),
-    role: target.value?.role === 'admin' ? 'admin' : 'user',
+    roleId: target.value?.roleId ?? null,
 }));
+const chosenRole = computed(() => roles.value.find((role) => role.id === roleId.value) ?? null);
+const roleChanged = computed(() => roleId.value !== initial.value.roleId);
 
 /** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
 const unsaved = computed(
     () =>
-        dialogOpen.value &&
-        (displayName.value !== initial.value.displayName || role.value !== initial.value.role),
+        dialogOpen.value && (displayName.value !== initial.value.displayName || roleChanged.value),
 );
-useUnsavedInput(() => unsaved.value);
 
 const liveProblem = computed(() =>
     editsName.value ? displayNameProblem(displayName.value) : null,
@@ -137,17 +199,24 @@ const liveProblem = computed(() =>
 const shownNameError = computed(
     () => nameError.value ?? (touched.value ? liveProblem.value : null),
 );
+/** Freischalten braucht eine Rolle (fehlt sie, sind die Rollen nicht geladen). */
+const canSubmit = computed(
+    () =>
+        (!touched.value || liveProblem.value === null) &&
+        (mode.value === 'edit' || roleId.value !== null),
+);
 
 function openDialog(user: AdminUser, kind: Mode, event: Event): void {
     startAction(event);
     mode.value = kind;
     target.value = user;
     displayName.value = initial.value.displayName;
-    role.value = initial.value.role;
+    roleId.value = initial.value.roleId;
     touched.value = false;
     nameError.value = null;
     dialogError.value = null;
     dialogOpen.value = true;
+    void assignableRoleStore.refresh('open');
 }
 
 const dialogTitle = computed(() => {
@@ -165,13 +234,22 @@ const dialogDescription = computed(() => {
     }
     const email = user.email ?? '';
     return mode.value === 'approve'
-        ? `${email} · registriert am ${createdText(user)}`
+        ? `${email} · ${registrationText(user)}`
         : `${email} · ${statusText(user)}`;
 });
 
+/** Eine Rolle ist wählbar, wenn das Konto sie vergeben darf; die bisherige bleibt sichtbar gewählt. */
+function roleDisabled(role: AssignableRole): boolean {
+    return !role.assignable && role.id !== initial.value.roleId;
+}
+
 /** Fehler, die zu keinem Feld gehören; Meldungen des Anzeigenamens (400) stehen am Feld. */
 function handleError(error: ApiError): void {
-    if (error.code === 'invalid_request' && editsName.value) {
+    if (
+        error.code === 'invalid_request' &&
+        editsName.value &&
+        !(error.message ?? '').includes('role_id')
+    ) {
         nameError.value = error.message;
     } else {
         dialogError.value = error;
@@ -190,9 +268,13 @@ async function submit(): Promise<void> {
     busy.value = true;
     let result: ApiResult<AdminUser> | null;
     if (mode.value === 'approve') {
-        result = await approveUser(user.id, { displayName: name, role: role.value });
+        if (roleId.value === null) {
+            busy.value = false;
+            return;
+        }
+        result = await approveUser(user.id, { displayName: name, roleId: roleId.value });
     } else {
-        result = await saveUser(user, userChanges(user, displayName.value, role.value));
+        result = await saveUser(user, userChanges(user, displayName.value, roleId.value));
     }
     busy.value = false;
     if (result === null) {
@@ -205,13 +287,135 @@ async function submit(): Promise<void> {
     }
     const saved = result.data;
     if (mode.value === 'approve') {
-        success.value = `${saved.label} ist freigeschaltet (${saved.roleLabel}) und erhält eine E-Mail.`;
+        success.value = `${saved.label} ist freigeschaltet (${roleNameOf(saved)}) und erhält eine E-Mail.`;
     } else if (saved.role !== user.role) {
-        success.value = `${saved.label} ist jetzt ${saved.roleLabel} und muss sich neu anmelden.`;
+        success.value = `${saved.label} hat jetzt die Rolle „${roleNameOf(saved)}“ und muss sich neu anmelden.`;
+    } else if (saved.roleId !== user.roleId) {
+        success.value = `${saved.label} hat jetzt die Rolle „${roleNameOf(saved)}“; sie gilt beim nächsten Aufruf der App.`;
     } else {
         success.value = `Änderungen an ${saved.label} gespeichert.`;
     }
     dialogOpen.value = false;
+}
+
+// Mehrfachauswahl: nur „Rolle zuweisen …“ (F6).
+const selected = shallowRef<ReadonlySet<number>>(new Set());
+const selectedUsers = computed(() => users.value.filter((user) => selected.value.has(user.id)));
+const visibleSelectable = computed(() =>
+    rows.value.filter((user) => selectable(user, ownId.value)),
+);
+const allVisibleSelected = computed(
+    () =>
+        visibleSelectable.value.length > 0 &&
+        visibleSelectable.value.every((user) => selected.value.has(user.id)),
+);
+const someVisibleSelected = computed(
+    () =>
+        !allVisibleSelected.value &&
+        visibleSelectable.value.some((user) => selected.value.has(user.id)),
+);
+
+function toggle(user: AdminUser): void {
+    const next = new Set(selected.value);
+    if (next.has(user.id)) {
+        next.delete(user.id);
+    } else {
+        next.add(user.id);
+    }
+    selected.value = next;
+}
+
+function toggleVisible(): void {
+    const next = new Set(selected.value);
+    for (const user of visibleSelectable.value) {
+        if (allVisibleSelected.value) {
+            next.delete(user.id);
+        } else {
+            next.add(user.id);
+        }
+    }
+    selected.value = next;
+}
+
+function clearSelection(): void {
+    selected.value = new Set();
+}
+
+// Konten verschwinden (gelöscht, abgelehnt): aus der Auswahl nehmen.
+watch(users, (list) => {
+    const ids = new Set(list.map((user) => user.id));
+    if ([...selected.value].some((selectedId) => !ids.has(selectedId))) {
+        selected.value = new Set([...selected.value].filter((selectedId) => ids.has(selectedId)));
+    }
+});
+
+const bulkOpen = ref(false);
+const bulkRoleId = ref<number | null>(null);
+const bulkError = ref<ApiError | null>(null);
+const bulkButton = ref<HTMLElement | null>(null);
+const bulkUnsaved = computed(() => bulkOpen.value && bulkRoleId.value !== null);
+useUnsavedInput(() => unsaved.value || bulkUnsaved.value);
+const bulkResult = shallowRef<{
+    readonly roleName: string;
+    readonly run: BulkRoleRun;
+    readonly labels: ReadonlyMap<number, string>;
+} | null>(null);
+const bulkFailures = computed(() =>
+    (bulkResult.value?.run.results ?? [])
+        .filter((result) => result.error !== null)
+        .map((result) => ({
+            id: result.id,
+            label:
+                result.user?.label ??
+                bulkResult.value?.labels.get(result.id) ??
+                `#${String(result.id)}`,
+            text: result.error?.message ?? '',
+        })),
+);
+const bulkClean = computed(
+    () =>
+        bulkResult.value !== null &&
+        bulkResult.value.run.error === null &&
+        bulkFailures.value.length === 0,
+);
+
+function openBulk(event: Event): void {
+    startAction(event);
+    bulkRoleId.value = null;
+    bulkError.value = null;
+    bulkOpen.value = true;
+    void assignableRoleStore.refresh('open');
+}
+
+async function submitBulk(): Promise<void> {
+    const role = roles.value.find((entry) => entry.id === bulkRoleId.value);
+    if (role === undefined || busy.value) {
+        return;
+    }
+    const chosen = selectedUsers.value;
+    const labels = new Map(chosen.map((user) => [user.id, user.label]));
+    busy.value = true;
+    bulkError.value = null;
+    const run = await bulkAssignRole(
+        chosen.map((user) => user.id),
+        role.id,
+    );
+    busy.value = false;
+    if (run.error !== null && run.results.length === 0) {
+        // Nichts geändert (z. B. Rolle nicht vergebbar, keine Verbindung): Fenster bleibt offen.
+        bulkError.value = run.error;
+        return;
+    }
+    bulkResult.value = { roleName: role.name, run, labels };
+    // Geänderte und unveränderte verlassen die Auswahl; Fehler und nicht gesendete bleiben.
+    const remaining = new Set(run.unsent);
+    for (const result of run.results) {
+        if (result.outcome === 'error') {
+            remaining.add(result.id);
+        }
+    }
+    selected.value = remaining;
+    bulkOpen.value = false;
 }
 
 // Rückfragen: Ablehnen, Sperren, Löschen.
@@ -303,8 +507,13 @@ function retry(): void {
     void userStore.refresh('changed');
 }
 
+function retryRoles(): void {
+    void assignableRoleStore.refresh('changed');
+}
+
 onMounted(() => {
     void userStore.refresh('open');
+    void assignableRoleStore.refresh('open');
 });
 </script>
 
@@ -361,7 +570,8 @@ onMounted(() => {
                         <div class="pending-text">
                             <strong class="user-name">{{ user.label }}</strong>
                             <span class="user-email">{{ user.email }}</span>
-                            <span class="hint">Registriert am {{ createdText(user) }}</span>
+                            <span class="hint">{{ registrationText(user) }}</span>
+                            <span class="hint">Rolle: {{ roleNameOf(user) }}</span>
                         </div>
                         <div class="pending-actions">
                             <button
@@ -404,6 +614,24 @@ onMounted(() => {
                     <span class="visually-hidden">Benutzer filtern</span>
                     <input v-model="query" type="search" placeholder="Name oder E-Mail" />
                 </label>
+                <div
+                    v-if="roleOptions.length > 2"
+                    class="role-filter"
+                    role="group"
+                    aria-label="Nach Rolle filtern"
+                >
+                    <span class="sort-label" aria-hidden="true">Rolle:</span>
+                    <button
+                        v-for="option in roleOptions"
+                        :key="option.roleId ?? 'all'"
+                        class="btn chip-button"
+                        type="button"
+                        :aria-pressed="roleFilter === option.roleId"
+                        @click="roleFilter = option.roleId"
+                    >
+                        {{ option.label }} ({{ option.count }})
+                    </button>
+                </div>
                 <div class="sort-buttons" role="group" aria-label="Sortieren">
                     <span class="sort-label" aria-hidden="true">Sortieren:</span>
                     <button
@@ -422,14 +650,80 @@ onMounted(() => {
                 </div>
             </div>
 
+            <section v-if="bulkResult !== null" class="bulk-result" data-testid="bulk-result">
+                <p
+                    class="notice"
+                    :class="bulkClean ? 'notice-success' : 'notice-info'"
+                    role="status"
+                    data-testid="bulk-summary"
+                >
+                    {{
+                        bulkRoleText(
+                            bulkResult.roleName,
+                            bulkResult.run.results,
+                            bulkResult.run.unsent.length,
+                        )
+                    }}
+                </p>
+                <ErrorNotice v-if="bulkResult.run.error !== null" :error="bulkResult.run.error" />
+                <div
+                    v-if="bulkFailures.length > 0"
+                    class="notice notice-info"
+                    data-testid="bulk-failures"
+                >
+                    <p>Nicht geändert (bleiben ausgewählt):</p>
+                    <ul class="failures">
+                        <li v-for="failure in bulkFailures" :key="failure.id">
+                            <strong>{{ failure.label }}</strong
+                            >: {{ failure.text }}
+                        </li>
+                    </ul>
+                </div>
+                <p v-if="bulkResult.run.unsent.length > 0" class="hint">
+                    Nicht gesendete Konten bleiben ausgewählt; bitte erneut versuchen.
+                </p>
+            </section>
+
+            <div v-if="selected.size > 0" class="selection-bar" data-testid="selection-bar">
+                <span class="selection-count" role="status">{{ selectedText(selected.size) }}</span>
+                <button
+                    ref="bulkButton"
+                    class="btn btn-accent"
+                    type="button"
+                    :disabled="busy"
+                    @click="openBulk"
+                >
+                    Rolle zuweisen …
+                </button>
+                <button class="link-button" type="button" @click="clearSelection">
+                    Auswahl aufheben
+                </button>
+            </div>
+
             <p v-if="state.users !== null && others > 0 && rows.length === 0" class="hint">
-                Kein Konto passt zu „{{ query.trim() }}“.
+                {{
+                    query.trim() === ''
+                        ? 'Kein Konto hat diese Rolle.'
+                        : `Kein Konto passt zu „${query.trim()}“.`
+                }}
             </p>
 
             <div v-if="rows.length > 0" class="table-card">
                 <table class="list-table" data-testid="user-table">
                     <thead>
                         <tr>
+                            <th scope="col" class="cell-select">
+                                <label class="select-box">
+                                    <input
+                                        type="checkbox"
+                                        :checked="allVisibleSelected"
+                                        :indeterminate="someVisibleSelected"
+                                        :disabled="visibleSelectable.length === 0"
+                                        aria-label="Alle angezeigten Konten auswählen"
+                                        @change="toggleVisible"
+                                    />
+                                </label>
+                            </th>
                             <th
                                 v-for="column in COLUMNS"
                                 :key="column.key"
@@ -455,6 +749,16 @@ onMounted(() => {
                             :class="{ 'row-locked': user.locked }"
                             :data-testid="`user-${String(user.id)}`"
                         >
+                            <td class="cell-select">
+                                <label v-if="selectable(user, ownId)" class="select-box">
+                                    <input
+                                        type="checkbox"
+                                        :checked="selected.has(user.id)"
+                                        :aria-label="`${user.label} auswählen`"
+                                        @change="toggle(user)"
+                                    />
+                                </label>
+                            </td>
                             <td class="col-name">
                                 <div class="cell-name">
                                     <strong class="user-name">{{ user.label }}</strong>
@@ -467,7 +771,13 @@ onMounted(() => {
                                 }}</span>
                             </td>
                             <td class="col-email">{{ user.email }}</td>
-                            <td class="col-role">{{ user.roleLabel }}</td>
+                            <td class="col-role">
+                                <span
+                                    class="role-chip"
+                                    :class="{ 'role-chip-admin': user.role === 'admin' }"
+                                    >{{ roleNameOf(user) }}</span
+                                >
+                            </td>
                             <td class="col-status">
                                 <span
                                     class="status"
@@ -517,6 +827,10 @@ onMounted(() => {
                     </tbody>
                 </table>
             </div>
+            <p v-if="state.users !== null" class="hint roles-hint">
+                Welche Rollen es gibt und was sie dürfen, legt der Super-Admin fest. Fehlt eine
+                Rolle, wenden Sie sich an ihn.
+            </p>
         </TabsContent>
         <TabsContent class="tab-panel" value="codes" :unmount-on-hide="false">
             <InvitationCodesPanel :active="tab === 'codes'" />
@@ -530,7 +844,7 @@ onMounted(() => {
         :description="dialogDescription"
         :submit-label="mode === 'approve' ? 'Freischalten' : 'Speichern'"
         :busy="busy"
-        :can-submit="!touched || liveProblem === null"
+        :can-submit="canSubmit"
         :error="dialogError"
         :return-focus="opener"
         @submit="submit"
@@ -562,13 +876,62 @@ onMounted(() => {
         </label>
         <fieldset class="roles" :disabled="mode === 'edit' && isOwn">
             <legend class="field-label">Rolle</legend>
-            <label v-for="option in ROLE_OPTIONS" :key="option.role" class="check">
-                <input v-model="role" type="radio" :name="`${id}-role`" :value="option.role" />
-                {{ option.label }}
+            <ErrorNotice v-if="roleState.error !== null" :error="roleState.error">
+                <button
+                    class="btn retry"
+                    type="button"
+                    :disabled="roleState.loading"
+                    @click="retryRoles"
+                >
+                    Erneut versuchen
+                </button>
+            </ErrorNotice>
+            <p v-else-if="roleState.data === null" class="field-hint" role="status">
+                Rollen werden geladen …
+            </p>
+            <label
+                v-for="role in roles"
+                :key="role.id"
+                class="role-option"
+                :class="{ 'role-option-disabled': roleDisabled(role) }"
+            >
+                <input
+                    v-model="roleId"
+                    type="radio"
+                    :aria-label="role.name"
+                    :aria-describedby="`${id}-role0-${String(role.id)}`"
+                    :name="`${id}-role`"
+                    :value="role.id"
+                    :disabled="roleDisabled(role)"
+                />
+                <span :id="`${id}-role0-${String(role.id)}`" class="role-text">
+                    <strong>{{ role.name }}</strong>
+                    <span v-if="role.description !== null" class="field-hint">{{
+                        role.description
+                    }}</span>
+                    <span class="field-hint">Sieht: {{ roleSees(role) }}</span>
+                    <span v-if="roleFilterText(role) !== null" class="field-hint">{{
+                        roleFilterText(role)
+                    }}</span>
+                    <span v-if="roleDisabled(role)" class="field-hint">{{
+                        role.assignBlocker
+                    }}</span>
+                </span>
             </label>
-            <p class="field-hint">
-                Benutzer buchen um und setzen den Status. Admins verwalten zusätzlich Geräte,
-                Standorte und Benutzer.
+            <p
+                v-if="chosenRole?.systemKey === 'admin' && roleChanged"
+                class="notice notice-info"
+                data-testid="admin-hint"
+            >
+                Admins haben alle Rechte, auch Benutzer und Einstellungen.
+                {{ target?.label }} kann dann selbst Rollen zuweisen.
+            </p>
+            <p v-if="mode === 'edit' && roleChanged" class="field-hint" data-testid="role-hint">
+                {{
+                    (chosenRole?.systemKey === 'admin') !== (target?.role === 'admin')
+                        ? 'Mit diesem Wechsel wird die Person auf allen Geräten abgemeldet.'
+                        : 'Die neue Rolle gilt beim nächsten Aufruf der App.'
+                }}
             </p>
         </fieldset>
         <template v-if="mode === 'edit' && target !== null && !isOwn" #extra>
@@ -587,6 +950,63 @@ onMounted(() => {
                 {{ target.label }} löschen …
             </button>
         </template>
+    </FormDialog>
+
+    <FormDialog
+        v-model:open="bulkOpen"
+        :unsaved="bulkUnsaved"
+        :title="`Rolle zuweisen: ${selectedText(selected.size)}`"
+        description="Alle ausgewählten Konten bekommen dieselbe Rolle. Wer dabei die Rolle Admin bekommt oder verliert, wird auf allen Geräten abgemeldet."
+        submit-label="Rolle zuweisen"
+        :busy="busy"
+        :can-submit="bulkRoleId !== null"
+        :error="bulkError"
+        :return-focus="bulkButton"
+        @submit="submitBulk"
+    >
+        <fieldset class="roles">
+            <legend class="field-label">Neue Rolle</legend>
+            <ErrorNotice v-if="roleState.error !== null" :error="roleState.error">
+                <button
+                    class="btn retry"
+                    type="button"
+                    :disabled="roleState.loading"
+                    @click="retryRoles"
+                >
+                    Erneut versuchen
+                </button>
+            </ErrorNotice>
+            <p v-else-if="roleState.data === null" class="field-hint" role="status">
+                Rollen werden geladen …
+            </p>
+            <label
+                v-for="role in roles"
+                :key="role.id"
+                class="role-option"
+                :class="{ 'role-option-disabled': !role.assignable }"
+            >
+                <input
+                    v-model="bulkRoleId"
+                    type="radio"
+                    :aria-label="role.name"
+                    :aria-describedby="`${id}-role1-${String(role.id)}`"
+                    :name="`${id}-bulk-role`"
+                    :value="role.id"
+                    :disabled="!role.assignable"
+                />
+                <span :id="`${id}-role1-${String(role.id)}`" class="role-text">
+                    <strong>{{ role.name }}</strong>
+                    <span v-if="role.description !== null" class="field-hint">{{
+                        role.description
+                    }}</span>
+                    <span class="field-hint">Sieht: {{ roleSees(role) }}</span>
+                    <span v-if="roleFilterText(role) !== null" class="field-hint">{{
+                        roleFilterText(role)
+                    }}</span>
+                    <span v-if="!role.assignable" class="field-hint">{{ role.assignBlocker }}</span>
+                </span>
+            </label>
+        </fieldset>
     </FormDialog>
 
     <ConfirmDialog
@@ -787,6 +1207,123 @@ onMounted(() => {
     color: var(--muted);
 }
 
+.roles-hint {
+    margin-top: 4px;
+}
+
+.role-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.chip-button[aria-pressed='true'] {
+    border-color: var(--line);
+    background: var(--selected-bg);
+}
+
+.role-chip {
+    display: inline-block;
+    padding: 2px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-hover);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+}
+
+.role-chip-admin {
+    border-color: var(--line);
+    font-weight: var(--font-weight-semibold);
+}
+
+.role-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--touch-min);
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.role-option:has(input:checked) {
+    border-color: var(--line);
+    background: var(--selected-bg);
+}
+
+.role-option input {
+    width: 20px;
+    height: 20px;
+    margin: 2px 0 0;
+    flex: none;
+    accent-color: var(--accent);
+}
+
+.role-option-disabled {
+    color: var(--muted);
+    cursor: not-allowed;
+}
+
+.role-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.selection-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--selected-bg);
+}
+
+.selection-count {
+    flex-grow: 1;
+    font-weight: var(--font-weight-bold);
+}
+
+.bulk-result {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.failures {
+    margin: 4px 0 0;
+    padding-left: 20px;
+}
+
+.list-table th.cell-select,
+.list-table td.cell-select {
+    width: 1%;
+    padding: 0 0 0 6px;
+}
+
+.select-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
+    cursor: pointer;
+}
+
+.select-box input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
 /* Am Handy sortieren Knöpfe statt Spaltenköpfe (kein <select>, siehe CLAUDE.md, CSP). */
 .sort-buttons {
     display: none;
@@ -855,8 +1392,18 @@ onMounted(() => {
         box-shadow: none;
     }
 
-    .list-table td:not(.col-actions) {
+    .list-table tbody tr {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .list-table td.cell-select {
+        grid-row: 1 / span 5;
         grid-column: 1;
+        padding: 0;
+    }
+
+    .list-table td:not(.col-actions, .cell-select) {
+        grid-column: 2;
     }
 
     .col-email,
@@ -873,7 +1420,7 @@ onMounted(() => {
 
     .col-actions {
         grid-row: 1 / span 5;
-        grid-column: 2;
+        grid-column: 3;
         width: auto;
     }
 }

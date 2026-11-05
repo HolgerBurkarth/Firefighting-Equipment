@@ -25,6 +25,7 @@ function codeJson(overrides: Record<string, unknown> = {}): Record<string, unkno
         created_at: '2026-10-31T13:05:00Z',
         revoked_at: null,
         created_by: { id: 7, label: 'Thomas Keller' },
+        role: { id: 2, name: 'Benutzer' },
         ...overrides,
     };
 }
@@ -42,7 +43,10 @@ describe('Antworten der API', () => {
             createdAt: '2026-10-31T13:05:00Z',
             revokedAt: null,
             createdBy: { id: 7, label: 'Thomas Keller' },
+            role: { id: 2, name: 'Benutzer' },
         });
+        expect(parseInvitationCode(codeJson({ role: undefined }))?.role).toBeNull();
+        expect(parseInvitationCode(codeJson({ role: { id: 2 } }))).toBeNull();
         expect(parseInvitationCode(codeJson({ label: null }))?.label).toBeNull();
     });
 
@@ -79,9 +83,14 @@ describe('Antworten der API', () => {
         });
         expect((await fetchInvitationCodes(fetch)).ok).toBe(true);
         expect(
-            (await createInvitationCode({ label: null, validDays: 30, maxUses: 50 }, fetch)).ok,
+            (
+                await createInvitationCode(
+                    { label: null, validDays: 30, maxUses: 50, roleId: null },
+                    fetch,
+                )
+            ).ok,
         ).toBe(true);
-        await createInvitationCode({ label: 'Wache', validDays: 1, maxUses: 1 }, fetch);
+        await createInvitationCode({ label: 'Wache', validDays: 1, maxUses: 1, roleId: 6 }, fetch);
         expect((await revokeInvitationCode(3, fetch)).ok).toBe(true);
         expect(
             requests.map((request) => [
@@ -92,7 +101,11 @@ describe('Antworten der API', () => {
         ).toEqual([
             ['invitation-codes', 'GET', undefined],
             ['invitation-codes', 'POST', { valid_days: 30, max_uses: 50 }],
-            ['invitation-codes', 'POST', { label: 'Wache', valid_days: 1, max_uses: 1 }],
+            [
+                'invitation-codes',
+                'POST',
+                { label: 'Wache', valid_days: 1, max_uses: 1, role_id: 6 },
+            ],
             ['invitation-codes/3/revoke', 'POST', {}],
         ]);
     });

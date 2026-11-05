@@ -7,18 +7,36 @@ import {
     type MockRequest,
     type MockResponse,
 } from './fixtures';
-import { adminOverview, userJson } from './support/admin';
+import { adminOverview, assignableRolesJson, userJson } from './support/admin';
 import { horizontalOverflow } from './support/layout';
 import { delegate } from './support/masterData';
 
 /**
  * Benutzerverwaltung (`benutzer`, KONZEPT.md, "Bereiche des Admins", Benutzer): wartende
  * Registrierungen oben mit Freischalten (Anzeigename, Rolle) und Ablehnen, Liste aller Konten mit
- * Suche und Sortierung, Bearbeiten (Anzeigename, Rolle), Sperren, Entsperren, Löschen; das eigene
- * Konto (ID 7 wie meBody) ist geschützt. Der simulierte Server merkt sich jede Änderung.
+ * Suche, Rollenfilter und Sortierung, Bearbeiten (Anzeigename, Rolle), Rolle mehrerer Konten
+ * zuweisen (Plan Phase 1, Schritt 1.6), Sperren, Entsperren, Löschen; das eigene Konto (ID 7 wie
+ * meBody) ist geschützt. Rollen wie assignableRolesJson (1 Admin, 2 Benutzer, 3 Gerätewart, 4
+ * „Live-Test Filter“, 5 nicht vergebbar). Der simulierte Server merkt sich jede Änderung.
  */
 
-const ROLE_LABELS = { user: 'Benutzer', admin: 'Admin' } as const;
+const ROLE_NAMES: Readonly<Record<number, string>> = {
+    1: 'Admin',
+    2: 'Benutzer',
+    3: 'Gerätewart',
+    4: 'Live-Test Filter',
+};
+
+/** Rolle wie UserRepository::assignRole: Kontoart folgt der Rolle Admin. */
+function withRole(user: Record<string, unknown>, roleId: number): void {
+    const admin = roleId === 1;
+    Object.assign(user, {
+        role: admin ? 'admin' : 'user',
+        role_label: admin ? 'Admin' : 'Benutzer',
+        role_id: roleId,
+        role_name: ROLE_NAMES[roleId],
+    });
+}
 
 function account(id: number, overrides: Record<string, unknown> = {}): Record<string, unknown> {
     return userJson(id, {
@@ -38,6 +56,8 @@ function initialUsers(): Record<string, unknown>[] {
             email: 'anna@example.org',
             role: 'admin',
             role_label: 'Admin',
+            role_id: 1,
+            role_name: 'Admin',
             created_at: '2026-01-05T09:00:00Z',
         }),
         account(8, {
@@ -60,6 +80,9 @@ function initialUsers(): Record<string, unknown>[] {
             name: 'Max Neu',
             email: 'max@example.org',
             created_at: '2026-10-20T09:00:00Z',
+            role_id: 3,
+            role_name: 'Gerätewart',
+            invitation_code: { id: 4, label: 'Aushang Wart' },
         }),
         userJson(22, {
             label: 'Erika Neu',
@@ -120,6 +143,38 @@ function userServer(respond: Respond = () => null) {
         })(request);
 
     const api: Record<string, (request: MockRequest) => MockResponse> = {
+        'GET api/v1/roles': () => ({ status: 200, body: assignableRolesJson() }),
+        // Wie UserBulkRoleHandler: eigenes Konto und „Live-Test Filter“ für Zoë (9) scheitern.
+        'POST api/v1/users/bulk/role': (request) => {
+            const replaced = respond(request);
+            if (replaced !== null) {
+                return replaced;
+            }
+            const body = request.body as { user_ids: number[]; role_id: number };
+            const results = body.user_ids.map((id) => {
+                const user = find(id);
+                if (user === undefined) {
+                    return {
+                        id,
+                        outcome: 'error',
+                        user: null,
+                        error: { error: 'not_found', message: 'Kein Konto.' },
+                    };
+                }
+                if (id === 7 || (id === 9 && body.role_id === 4)) {
+                    return {
+                        id,
+                        outcome: 'error',
+                        user,
+                        error: { error: 'rule_violation', message: 'Nicht erlaubt.' },
+                    };
+                }
+                const outcome = user['role_id'] === body.role_id ? 'unchanged' : 'applied';
+                withRole(user, body.role_id);
+                return { id, outcome, user, error: null };
+            });
+            return { status: 200, body: { results } };
+        },
         'GET api/v1/users': (request) => {
             const status = new URL(request.url).searchParams.get('status');
             return {
@@ -136,14 +191,12 @@ function userServer(respond: Respond = () => null) {
         const id = Number(user['id']);
         const path = `api/v1/users/${String(id)}`;
         api[`POST ${path}/approve`] = change(id, (target, body) => {
-            const role = body['role'] as 'user' | 'admin';
             Object.assign(target, {
                 status: 'active',
                 status_label: 'aktiv',
                 display_name: body['display_name'],
-                role,
-                role_label: ROLE_LABELS[role],
             });
+            withRole(target, body['role_id'] as number);
         });
         api[`POST ${path}/reject`] = remove(id);
         api[`POST ${path}/lock`] = change(id, (target) => {
@@ -153,8 +206,7 @@ function userServer(respond: Respond = () => null) {
             target['locked'] = false;
         });
         api[`POST ${path}/role`] = change(id, (target, body) => {
-            const role = body['role'] as 'user' | 'admin';
-            Object.assign(target, { role, role_label: ROLE_LABELS[role] });
+            withRole(target, body['role_id'] as number);
         });
         api[`POST ${path}/display-name`] = change(id, (target, body) => {
             target['display_name'] = body['display_name'];
@@ -206,6 +258,13 @@ test.describe('Benutzer', () => {
         // Älteste zuerst.
         await expect(pending.locator('.user-name')).toHaveText(['Erika Neu', 'Max Neu']);
         await expect(pending).toContainText('erika@example.org');
+        await expect(page.getByTestId('pending-21')).toContainText(
+            'mit dem Aushang „Aushang Wart“; die Rolle ist vorausgewählt.',
+        );
+        await expect(page.getByTestId('pending-21')).toContainText('Rolle: Gerätewart');
+        await expect(page.getByTestId('user-7').locator('.col-role')).toHaveText('Admin');
+        await expect(page.getByTestId('user-8').locator('.col-role')).toHaveText('Benutzer');
+        await expect(page.getByText('legt der Super-Admin fest')).toBeVisible();
         await expect(names(page)).toHaveText([
             'Anna Berg',
             'Thomas Keller',
@@ -248,11 +307,39 @@ test.describe('Benutzer', () => {
         ]);
     });
 
+    test('Rollenfilter mit Anzahl', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await open(page);
+        const filter = page.getByRole('group', { name: 'Nach Rolle filtern' });
+        await expect(filter.getByRole('button')).toHaveText([
+            'Alle (4)',
+            'Admin (1)',
+            'Benutzer (3)',
+        ]);
+        await expect(filter.getByRole('button', { name: 'Alle (4)' })).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await filter.getByRole('button', { name: 'Admin (1)' }).click();
+        await expect(names(page)).toHaveText(['Thomas Keller']);
+        await expect(filter.getByRole('button', { name: 'Admin (1)' })).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await filter.getByRole('button', { name: 'Alle (4)' }).click();
+        await expect(names(page)).toHaveCount(4);
+    });
+
     test('Freischalten mit Anzeigename und Rolle', async ({ page, apiRequests }) => {
         await open(page);
         await page.getByRole('button', { name: 'Max Neu freischalten' }).click();
         const dialog = page.getByRole('dialog', { name: 'Max Neu freischalten' });
         await expect(dialog).toContainText('max@example.org');
+        // Rolle des Einladungscodes vorausgewählt.
+        await expect(dialog.getByRole('radio', { name: 'Gerätewart' })).toBeChecked();
+        await expect(dialog.getByRole('radio', { name: 'Kasse' })).toBeDisabled();
+        await expect(dialog).toContainText('Sie können sie daher nicht vergeben.');
+        await expect(dialog).toContainText('Sieht: Dashboard, Suchen, Ausrüstung, Termine, Profil');
         const name = dialog.getByLabel('Anzeigename');
         await expect(name).toHaveValue('Max Neu');
         await name.fill('  ');
@@ -266,7 +353,7 @@ test.describe('Benutzer', () => {
             'Max ist freigeschaltet (Admin) und erhält eine E-Mail.',
         );
         expect(sent(apiRequests, 'POST', 'api/v1/users/21/approve')).toEqual([
-            { display_name: 'Max', role: 'admin' },
+            { display_name: 'Max', role_id: 1 },
         ]);
         await expect(page.getByTestId('pending').getByRole('heading')).toHaveText(
             '1 neue Anmeldung wartet auf Freischaltung',
@@ -327,12 +414,82 @@ test.describe('Benutzer', () => {
         expect(sent(apiRequests, 'POST', 'api/v1/users/8/role')).toEqual([]);
 
         await page.getByRole('button', { name: 'Anna B. bearbeiten' }).click();
-        await page.getByRole('dialog').getByRole('radio', { name: 'Admin' }).check();
+        await page.getByRole('dialog').getByRole('radio', { name: 'Gerätewart' }).check();
+        await expect(page.getByRole('dialog').getByTestId('role-hint')).toHaveText(
+            'Die neue Rolle gilt beim nächsten Aufruf der App.',
+        );
+        await page.getByRole('dialog').getByRole('radio', { name: 'Live-Test Filter' }).check();
+        await expect(page.getByRole('dialog')).toContainText('Sieht nur:');
+        await page.getByRole('dialog').getByRole('radio', { name: 'Gerätewart' }).check();
         await page.getByRole('dialog').getByRole('button', { name: 'Speichern' }).click();
         await expect(page.getByTestId('success-notice')).toHaveText(
-            'Anna B. ist jetzt Admin und muss sich neu anmelden.',
+            'Anna B. hat jetzt die Rolle „Gerätewart“; sie gilt beim nächsten Aufruf der App.',
         );
-        expect(sent(apiRequests, 'POST', 'api/v1/users/8/role')).toEqual([{ role: 'admin' }]);
+        await expect(page.getByTestId('user-8').locator('.col-role')).toHaveText('Gerätewart');
+
+        await page.getByRole('button', { name: 'Anna B. bearbeiten' }).click();
+        await page.getByRole('dialog').getByRole('radio', { name: 'Admin' }).check();
+        await expect(page.getByRole('dialog').getByTestId('admin-hint')).toContainText(
+            'Anna B. kann dann selbst Rollen zuweisen.',
+        );
+        await expect(page.getByRole('dialog').getByTestId('role-hint')).toHaveText(
+            'Mit diesem Wechsel wird die Person auf allen Geräten abgemeldet.',
+        );
+        await page.getByRole('dialog').getByRole('button', { name: 'Speichern' }).click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Anna B. hat jetzt die Rolle „Admin“ und muss sich neu anmelden.',
+        );
+        expect(sent(apiRequests, 'POST', 'api/v1/users/8/role')).toEqual([
+            { role_id: 3 },
+            { role_id: 1 },
+        ]);
+    });
+
+    test('Rolle mehrerer Konten zuweisen, Ergebnis je Konto', async ({ page, apiRequests }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await open(page);
+        await expect(page.getByRole('checkbox', { name: 'Thomas Keller auswählen' })).toHaveCount(
+            0,
+        );
+        await page.getByRole('checkbox', { name: 'Anna Berg auswählen' }).check();
+        await page.getByRole('checkbox', { name: 'Zoë Kraus auswählen' }).check();
+        const bar = page.getByTestId('selection-bar');
+        await expect(bar).toContainText('2 Konten ausgewählt');
+
+        await bar.getByRole('button', { name: 'Rolle zuweisen …' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Rolle zuweisen: 2 Konten ausgewählt' });
+        await expect(dialog.getByRole('button', { name: 'Rolle zuweisen' })).toBeDisabled();
+        await dialog.getByRole('radio', { name: 'Live-Test Filter' }).check();
+        await dialog.getByRole('button', { name: 'Rolle zuweisen' }).click();
+
+        await expect(page.getByTestId('bulk-summary')).toHaveText(
+            'Rolle „Live-Test Filter“: 1 Konto geändert, 1 nicht möglich.',
+        );
+        await expect(page.getByTestId('bulk-failures')).toContainText('Zoë Kraus: Nicht erlaubt.');
+        await expect(bar).toContainText('1 Konto ausgewählt');
+        await expect(page.getByRole('checkbox', { name: 'Zoë Kraus auswählen' })).toBeChecked();
+        await expect(page.getByTestId('user-8').locator('.col-role')).toHaveText(
+            'Live-Test Filter',
+        );
+
+        await bar.getByRole('button', { name: 'Auswahl aufheben' }).click();
+        await expect(bar).toBeHidden();
+        await page.getByRole('checkbox', { name: 'Alle angezeigten Konten auswählen' }).check();
+        await expect(page.getByTestId('selection-bar')).toContainText('3 Konten ausgewählt');
+        await page
+            .getByTestId('selection-bar')
+            .getByRole('button', { name: 'Rolle zuweisen …' })
+            .click();
+        await page.getByRole('dialog').getByRole('radio', { name: 'Benutzer' }).check();
+        await page.getByRole('dialog').getByRole('button', { name: 'Rolle zuweisen' }).click();
+        await expect(page.getByTestId('bulk-summary')).toHaveText(
+            'Rolle „Benutzer“: 1 Konto geändert, 2 unverändert.',
+        );
+        await expect(page.getByTestId('selection-bar')).toBeHidden();
+        expect(sent(apiRequests, 'POST', 'api/v1/users/bulk/role')).toEqual([
+            { user_ids: [8, 9], role_id: 4 },
+            { user_ids: [8, 9, 23], role_id: 2 },
+        ]);
     });
 
     test('Sperren nach Rückfrage, Entsperren direkt', async ({ page, apiRequests }) => {

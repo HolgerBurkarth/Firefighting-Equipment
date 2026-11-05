@@ -2,7 +2,13 @@
 import { computed, ref, shallowRef, useId, watch } from 'vue';
 import type { ApiError } from '../api/client';
 import type { CreatedInvitationCode, InvitationCode } from '../api/invitationCodes';
-import { createInvitationCode, invitationCodeStore, revokeInvitationCode } from '../data';
+import {
+    assignableRoleStore,
+    createInvitationCode,
+    invitationCodeStore,
+    revokeInvitationCode,
+} from '../data';
+import { codeRoles, defaultRole } from '../data/assignableRoles';
 import {
     codeTitle,
     dateText,
@@ -35,7 +41,9 @@ import QrCode from './QrCode.vue';
  * 30): Codes der Stadt mit Status und Nutzungen, „Neuer Einladungscode“ und Widerrufen. Ein neuer
  * Code erscheint genau einmal (der Server kennt danach nur den Hash): groß, mit QR-Code, Kopieren,
  * „Link teilen“ und „Aushang drucken“. Solange er zu sehen ist, zählt er als ungespeicherte Eingabe
- * (ein Update lädt die Seite dann nicht von selbst neu).
+ * (ein Update lädt die Seite dann nicht von selbst neu). Jeder Code bekommt eine Rolle nach der
+ * Freischaltung (Plan Phase 1, Schritt 1.6; nie Admin, vorgewählt Benutzer); der Aushang nennt sie
+ * nicht, der Admin kann sie beim Freischalten noch ändern.
  */
 const props = defineProps<{
     /** Reiter sichtbar: erst dann laden (die Konten brauchen die Codes nicht). */
@@ -54,6 +62,7 @@ watch(
     (active) => {
         if (active) {
             void invitationCodeStore.refresh('open');
+            void assignableRoleStore.refresh('open');
         }
     },
     { immediate: true },
@@ -78,10 +87,24 @@ const dialogError = ref<ApiError | null>(null);
 const problems = computed(() => invitationProblems(form.value));
 const shown = computed(() => (touched.value ? problems.value : {}));
 const preview = computed(() => expiryPreview(form.value, new Date()));
+const roleState = computed(() => assignableRoleStore.state);
+const roles = computed(() => codeRoles(roleState.value.data?.roles ?? []));
+const initialRoleId = computed(() => defaultRole(roles.value)?.id ?? null);
+
+// Rollen kommen nach dem Öffnen an: die Vorwahl nachziehen, solange nichts gewählt ist.
+watch(initialRoleId, (roleId) => {
+    if (dialogOpen.value && form.value.roleId === null) {
+        form.value = { ...form.value, roleId };
+    }
+});
+
+function setRole(roleId: number): void {
+    form.value = { ...form.value, roleId };
+}
 
 function openDialog(event: Event): void {
     startAction(event);
-    form.value = newInvitationForm();
+    form.value = newInvitationForm(initialRoleId.value);
     touched.value = false;
     dialogError.value = null;
     dialogOpen.value = true;
@@ -103,7 +126,8 @@ const dialogUnsaved = computed(() => {
         dialogOpen.value &&
         (form.value.label !== initial.label ||
             form.value.validDays !== initial.validDays ||
-            form.value.maxUses !== initial.maxUses)
+            form.value.maxUses !== initial.maxUses ||
+            (form.value.roleId !== null && form.value.roleId !== initialRoleId.value))
     );
 });
 useUnsavedInput(() => fresh.value !== null || dialogUnsaved.value);
@@ -255,6 +279,9 @@ function retry(): void {
                         Gültig bis {{ freshExpires }} Uhr ·
                         {{ usesText(fresh.invitationCode) }}
                     </p>
+                    <p v-if="fresh.invitationCode.role !== null" class="hint">
+                        Rolle nach der Freischaltung: {{ fresh.invitationCode.role.name }}
+                    </p>
                     <p class="fresh-link" data-testid="fresh-link">{{ link }}</p>
                     <div class="fresh-actions">
                         <button class="btn btn-accent" type="button" @click="printPoster">
@@ -320,6 +347,7 @@ function retry(): void {
                 <thead>
                     <tr>
                         <th scope="col">Bezeichnung</th>
+                        <th scope="col">Rolle nach Freischaltung</th>
                         <th scope="col">Status</th>
                         <th scope="col">Genutzt</th>
                         <th scope="col">Gültig bis</th>
@@ -338,6 +366,10 @@ function retry(): void {
                     >
                         <td class="col-label">
                             <strong>{{ codeTitle(code) }}</strong>
+                        </td>
+                        <td class="col-role">
+                            <span class="cell-label">Rolle nach Freischaltung: </span
+                            >{{ code.role?.name ?? 'Benutzer' }}
                         </td>
                         <td class="col-status">
                             <span :class="{ 'status-active': isUsable(code) }">{{
@@ -369,6 +401,18 @@ function retry(): void {
                 </tbody>
             </table>
         </div>
+
+        <section class="steps" aria-labelledby="steps-heading">
+            <h2 id="steps-heading">So läuft es ab</h2>
+            <ol>
+                <li>Die Person registriert sich mit dem Aushang und bestätigt ihre E-Mail.</li>
+                <li>
+                    Unter „Konten“ erscheint sie als wartend, mit der Rolle aus dem Code
+                    vorausgewählt.
+                </li>
+                <li>Sie prüfen den Namen, ändern bei Bedarf die Rolle und schalten frei.</li>
+            </ol>
+        </section>
     </div>
 
     <FormDialog
@@ -441,6 +485,41 @@ function retry(): void {
                 <p v-else :id="`${id}-uses-hint`" class="field-hint">1 bis {{ MAX_USES }}</p>
             </label>
         </div>
+        <fieldset class="roles">
+            <legend class="field-label">Rolle nach der Freischaltung</legend>
+            <ErrorNotice v-if="roleState.error !== null" :error="roleState.error" />
+            <p v-else-if="roleState.data === null" class="field-hint" role="status">
+                Rollen werden geladen …
+            </p>
+            <label
+                v-for="role in roles"
+                :key="role.id"
+                class="role-option"
+                :class="{ 'role-option-disabled': !role.assignable }"
+            >
+                <input
+                    type="radio"
+                    :aria-label="role.name"
+                    :aria-describedby="`${id}-role0-${String(role.id)}`"
+                    :name="`${id}-role`"
+                    :value="role.id"
+                    :checked="form.roleId === role.id"
+                    :disabled="!role.assignable"
+                    @change="setRole(role.id)"
+                />
+                <span :id="`${id}-role0-${String(role.id)}`" class="role-text">
+                    <strong>{{ role.name }}</strong>
+                    <span v-if="role.description !== null" class="field-hint">{{
+                        role.description
+                    }}</span>
+                    <span v-if="!role.assignable" class="field-hint">{{ role.assignBlocker }}</span>
+                </span>
+            </label>
+            <p class="field-hint" data-testid="no-admin-codes">
+                Die Rolle „Admin“ gibt es für Codes nicht: Wer einen Aushang fotografiert, soll nie
+                Admin werden können. Admins ernennen Sie unter „Konten“.
+            </p>
+        </fieldset>
     </FormDialog>
 
     <ConfirmDialog
@@ -640,6 +719,74 @@ function retry(): void {
     margin: 0;
     font-size: var(--font-size-sm);
     color: var(--muted);
+}
+
+.steps {
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+}
+
+.steps h2 {
+    margin: 0 0 6px;
+    font-size: var(--font-size-md);
+}
+
+.steps ol {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-secondary);
+}
+
+.roles {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.roles legend {
+    margin-bottom: 4px;
+    padding: 0;
+}
+
+.role-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: var(--touch-min);
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.role-option:has(input:checked) {
+    border-color: var(--line);
+    background: var(--selected-bg);
+}
+
+.role-option input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin: 2px 0 0;
+    accent-color: var(--accent);
+}
+
+.role-option-disabled {
+    color: var(--muted);
+    cursor: not-allowed;
+}
+
+.role-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
 /* Am Handy: Karten statt Tabelle, Knöpfe volle Breite (KONZEPT.md, "Listen"). */

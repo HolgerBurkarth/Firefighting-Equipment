@@ -1,4 +1,4 @@
-import type { AdminUser, ManagedRole } from '../api/users';
+import type { AdminUser, BulkRoleResult } from '../api/users';
 import { searchKey, searchTokens } from './deviceSearch';
 import { compareNames, nameProblem, phpTrim } from './masterData';
 
@@ -14,11 +14,6 @@ export const PERSON_NAME_MAX_LENGTH = 100;
 export function displayNameProblem(value: string): string | null {
     return nameProblem(value, PERSON_NAME_MAX_LENGTH);
 }
-
-export const ROLE_OPTIONS: readonly { readonly role: ManagedRole; readonly label: string }[] = [
-    { role: 'user', label: 'Benutzer' },
-    { role: 'admin', label: 'Admin' },
-];
 
 /** Registrierungen, die auf Freischaltung warten, älteste zuerst. */
 export function pendingUsers(users: readonly AdminUser[]): AdminUser[] {
@@ -63,8 +58,11 @@ function compare(a: AdminUser, b: AdminUser, key: UserSortKey): number {
         case 'email':
             return compareNames(a.email ?? '', b.email ?? '');
         case 'role':
-            // Admins zuerst.
-            return (a.role === 'admin' ? 0 : 1) - (b.role === 'admin' ? 0 : 1);
+            // Admins zuerst, dann nach dem Namen der Rolle.
+            return (
+                (a.role === 'admin' ? 0 : 1) - (b.role === 'admin' ? 0 : 1) ||
+                compareNames(a.roleName ?? a.roleLabel, b.roleName ?? b.roleLabel)
+            );
         case 'status':
             return statusRank(a) - statusRank(b);
         case 'created':
@@ -74,18 +72,20 @@ function compare(a: AdminUser, b: AdminUser, key: UserSortKey): number {
 
 /**
  * Liste unter den Freischaltungen: alle Konten außer `pending` (die stehen oben), gefiltert nach
- * Wörtern mit UND in Anzeigename, Name und E-Mail (Vergleichsform `searchKey`), sortiert; bei
- * Gleichstand nach Name, dann ID.
+ * Rolle (null = alle) und Wörtern mit UND in Anzeigename, Name und E-Mail (Vergleichsform
+ * `searchKey`), sortiert; bei Gleichstand nach Name, dann ID.
  */
 export function userRows(
     users: readonly AdminUser[],
     query: string,
     sort: UserSortKey,
     dir: SortDir,
+    roleId: number | null = null,
 ): AdminUser[] {
     const tokens = searchTokens(query);
     return users
         .filter((user) => user.status !== 'pending')
+        .filter((user) => roleId === null || user.roleId === roleId)
         .filter((user) => {
             const text = userSearchKey(user);
             return tokens.every((token) => text.includes(token));
@@ -109,13 +109,60 @@ export function nameHint(user: AdminUser): string | null {
 export function userChanges(
     user: AdminUser,
     displayName: string,
-    role: ManagedRole,
-): { displayName?: string; role?: ManagedRole } {
+    roleId: number | null,
+): { displayName?: string; roleId?: number } {
     const name = phpTrim(displayName);
     return {
         ...(user.status === 'active' && name !== (user.displayName ?? '') && { displayName: name }),
-        ...(role !== user.role && { role }),
+        ...(roleId !== null && roleId !== user.roleId && { roleId }),
     };
+}
+
+/** Ob das Konto ausgewählt werden kann (Mehrfachauswahl, nicht das eigene, nicht gelöscht). */
+export function selectable(user: AdminUser, ownId: number | null): boolean {
+    return user.id !== ownId && user.status !== 'deleted';
+}
+
+function accounts(count: number): string {
+    return count === 1 ? '1 Konto' : `${String(count)} Konten`;
+}
+
+/** „3 Konten ausgewählt“. */
+export function selectedText(count: number): string {
+    return `${accounts(count)} ausgewählt`;
+}
+
+/**
+ * Ergebnis von „Rolle zuweisen …“ (wie bulkResultText der Geräte): „Rolle „Gerätewart“: 3 Konten
+ * geändert, 1 unverändert, 1 nicht möglich.“; nicht gesendete zählen als nicht möglich.
+ */
+export function bulkRoleText(
+    roleName: string,
+    results: readonly BulkRoleResult[],
+    unsent: number,
+): string {
+    const count = (outcome: BulkRoleResult['outcome']): number =>
+        results.filter((result) => result.outcome === outcome).length;
+    const parts = [`${accounts(count('applied'))} geändert`];
+    if (count('unchanged') > 0) {
+        parts.push(`${String(count('unchanged'))} unverändert`);
+    }
+    const failed = count('error') + unsent;
+    if (failed > 0) {
+        parts.push(`${String(failed)} nicht möglich`);
+    }
+    return `Rolle „${roleName}“: ${parts.join(', ')}.`;
+}
+
+/**
+ * Text unter einer wartenden Registrierung: „Registriert am 01.11.2026 mit dem Aushang
+ * „Geräteträger“; die Rolle ist vorausgewählt.“ (Mockup „Benutzer“).
+ */
+export function registrationText(user: AdminUser): string {
+    const label = user.invitationCode?.label ?? null;
+    return label === null
+        ? `Registriert am ${createdText(user)}`
+        : `Registriert am ${createdText(user)} mit dem Aushang „${label}“; die Rolle ist vorausgewählt.`;
 }
 
 /** Datum der Registrierung in Ortszeit („12.10.2026“). */

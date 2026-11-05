@@ -21,13 +21,17 @@ export interface InvitationForm {
     readonly label: string;
     readonly validDays: string;
     readonly maxUses: string;
+    /** Rolle nach der Freischaltung; null = Standard-Rolle Benutzer (Rollen nicht geladen). */
+    readonly roleId: number | null;
 }
 
-export function newInvitationForm(): InvitationForm {
+/** Leeres Formular; `roleId` vorgewählt (die Standard-Rolle Benutzer, Plan Phase 1, 1.6). */
+export function newInvitationForm(roleId: number | null = null): InvitationForm {
     return {
         label: '',
         validDays: String(DEFAULT_VALID_DAYS),
         maxUses: String(DEFAULT_MAX_USES),
+        roleId,
     };
 }
 
@@ -81,7 +85,7 @@ export function invitationRequest(form: InvitationForm): NewInvitationCode | nul
         return null;
     }
     const label = phpTrim(form.label);
-    return { label: label === '' ? null : label, validDays, maxUses };
+    return { label: label === '' ? null : label, validDays, maxUses, roleId: form.roleId };
 }
 
 /** Ungefähres Ende der Gültigkeit für den Hinweis am Feld (der Server rechnet ab seiner Zeit). */

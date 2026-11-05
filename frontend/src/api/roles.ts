@@ -454,3 +454,49 @@ export function deleteRole(
         { method: 'DELETE', ...(fetchFn && { fetchFn }) },
     );
 }
+
+/** Rolle der eigenen Stadt in der Auswahl des Admins (GET roles, Plan Phase 1, Schritt 1.6). */
+export interface AssignableRole extends Role {
+    /** Darf das Konto der Sitzung die Rolle vergeben (F5)? */
+    readonly assignable: boolean;
+    /** Warum nicht (Meldung des Servers); null = darf. */
+    readonly assignBlocker: string | null;
+}
+
+export interface AssignableRoles {
+    readonly roles: readonly AssignableRole[];
+    readonly catalog: PermissionCatalog;
+}
+
+export function parseAssignableRoles(json: unknown): AssignableRoles | null {
+    if (!isRecord(json) || !Array.isArray(json['roles'])) {
+        return null;
+    }
+    const catalog = parseCatalog(json['catalog']);
+    if (catalog === null) {
+        return null;
+    }
+    const roles: AssignableRole[] = [];
+    for (const entry of json['roles']) {
+        const role = parseRole(entry);
+        if (role === null || !isRecord(entry)) {
+            return null;
+        }
+        const assignable = entry['assignable'];
+        const assignBlocker = entry['assign_blocker'];
+        if (
+            typeof assignable !== 'boolean' ||
+            (assignBlocker !== null && typeof assignBlocker !== 'string') ||
+            assignable !== (assignBlocker === null)
+        ) {
+            return null;
+        }
+        roles.push({ ...role, assignable, assignBlocker });
+    }
+    return { roles, catalog };
+}
+
+/** GET roles (Benutzer: Ansehen): Rollen der eigenen Stadt zur Auswahl, mit Katalog. */
+export function fetchAssignableRoles(fetchFn?: typeof fetch): Promise<ApiResult<AssignableRoles>> {
+    return apiRequest('roles', parseAssignableRoles, { ...(fetchFn && { fetchFn }) });
+}
