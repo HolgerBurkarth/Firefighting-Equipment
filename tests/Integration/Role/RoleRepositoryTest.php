@@ -148,7 +148,7 @@ final class RoleRepositoryTest extends DeviceSchemaTestCase
 
     public function testCreateDefaultsRunsInsideOpenTransaction(): void
     {
-        $tenantId = $this->createTenant('tuttlingen');
+        $tenantId = $this->createTenant('tuttlingen', false);
         $tenant = new TenantRepository($this->pdo())->findById($tenantId);
         self::assertInstanceOf(Tenant::class, $tenant);
 

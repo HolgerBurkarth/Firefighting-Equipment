@@ -1824,8 +1824,26 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 
 ## Rollen und Rechte (Phase 1, im Aufbau)
 - Plan und Entscheidungen: `docs/PLAN-PHASE-1-ROLLEN.md` (freigegeben 05.11.2026; Schritte 1.1–1.9).
-  Stand: Schritt 1.1 (Schema und Standard-Rollen). Die Rechte prüft weiterhin `Access` über
-  `fe_users.role`; Rollen wirken erst ab Schritt 1.3.
+  Stand: Schritt 1.1 (Schema und Standard-Rollen) und Teil 1 von 1.2 (Schreibwege setzen
+  `role_id`, Probelauf); Migrationen 0036–0038 folgen nach Freigabe. Die Rechte prüft weiterhin
+  `Access` über `fe_users.role`; Rollen wirken erst ab Schritt 1.3.
+- Regel Kontoart ↔ Rolle (nur im Code, kein CHECK möglich): `fe_users.role = 'admin'` genau dann,
+  wenn `role_id` die Rolle Admin der Stadt ist. Jeder Schreibweg von `UserRepository` setzt beides in
+  derselben Anweisung (`register`, `insertInvitedAdmin` für `createTenantWithInvitedAdmin` und
+  `inviteAdmin`, `approve`, `changeRole`; Standard-Rolle zur Kontoart über
+  `SYSTEM_ROLE_ID`/`SYSTEM_ROLE_ID_OF_TENANT`); Anonymisieren behält die Rolle. `DomainTestCase`
+  prüft die Regel vor jedem Test über alle Zeilen, die der vorige Test hinterlassen hat (Meldung nennt
+  ihn). Testhilfen: `AuthSchemaTestCase::createTenant` legt die Standard-Rollen an (ohne nur mit
+  `withDefaultRoles: false` für Schema-Tests der Rollen), `createUser` setzt ohne Angabe die
+  Standard-Rolle der Kontoart (`systemRoleId`).
+- Probelauf zu Migration 0036: `php bin/role-assignment-check.php [--config=PFAD]` (Code
+  `RoleAssignmentCheck`, `RoleAssignmentReport`, `RoleAssignmentGroup`, `src/Cli/
+  RoleAssignmentCheckCommand.php`; nur SELECT): je Stadt, Kontoart und Status die Konten, die 0036
+  zuordnet (dieselbe Bedingung wie das UPDATE, per Test), Konten, die ohne Rolle blieben, Rollen, die
+  nicht zur Kontoart passen, Super-Admins mit Rolle. Exit-Codes 0 = passt, 1 Fehler, 2 Aufruf, 3 =
+  Probleme (0037 schlüge fehl). Auf dem Server mit `php85`. Tests `RoleAssignmentCheckTest` (Stand vor
+  0036 mit `SET SESSION check_constraint_checks = 0`, Trait `LegacyRoleAccounts`),
+  `RoleAssignmentCheckScriptTest`.
 - Schema (Migrationen `0029`–`0035`, nur Erweiterungen): `fe_roles` (je Stadt, Name je Stadt
   eindeutig ohne Groß-/Kleinschreibung, `system_key` `admin`/`user`/NULL je Stadt höchstens einmal,
   `description`, `restrict_single_use` (erst ab Phase 2), `filter_locations`, `filter_device_types`,

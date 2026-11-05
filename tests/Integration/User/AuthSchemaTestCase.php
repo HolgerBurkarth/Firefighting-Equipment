@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tests\Integration\User;
 
+use FirefightingEquipment\Role\RoleRepository;
+use FirefightingEquipment\Tenant\TenantRepository;
 use FirefightingEquipment\Tests\Integration\DomainTestCase;
 
 /**
@@ -43,19 +45,47 @@ abstract class AuthSchemaTestCase extends DomainTestCase
         return (int) $this->pdo()->lastInsertId();
     }
 
-    protected function createTenant(string $slug = 'immendingen'): int
+    /**
+     * Legt eine Stadt an, wie im Betrieb mit den Standard-Rollen Admin und Benutzer (ohne Rollen nur
+     * für Tests des Schemas der Rollen).
+     */
+    protected function createTenant(string $slug = 'immendingen', bool $withDefaultRoles = true): int
     {
-        return $this->insert('fe_tenants', ['slug' => $slug, 'name' => 'Feuerwehr ' . $slug]);
+        $id = $this->insert('fe_tenants', ['slug' => $slug, 'name' => 'Feuerwehr ' . $slug]);
+        if ($withDefaultRoles) {
+            $tenant = new TenantRepository($this->pdo())->findById($id) ?? throw new \LogicException('Stadt fehlt.');
+            new RoleRepository($this->pdo())->createDefaults($tenant);
+        }
+
+        return $id;
     }
 
     /**
-     * Legt ein freigeschaltetes Konto an; $overrides ersetzt einzelne Spalten.
+     * Legt ein freigeschaltetes Konto an; $overrides ersetzt einzelne Spalten. Ohne Angabe von
+     * role_id erhält ein Konto einer Stadt die Standard-Rolle seiner Kontoart (wie UserRepository).
      *
      * @param array<string, scalar|null> $overrides
      */
     protected function createUser(?int $tenantId, array $overrides = []): int
     {
-        return $this->insert('fe_users', array_merge($this->activeUser($tenantId), $overrides));
+        $values = array_merge($this->activeUser($tenantId), $overrides);
+        if ($tenantId !== null && !array_key_exists('role_id', $values)) {
+            $values['role_id'] = $this->systemRoleId($tenantId, (string) $values['role']);
+        }
+
+        return $this->insert('fe_users', $values);
+    }
+
+    /**
+     * ID der Standard-Rolle (system_key admin bzw. user) einer Stadt, null ohne Standard-Rollen.
+     */
+    protected function systemRoleId(int $tenantId, string $systemKey): ?int
+    {
+        $stmt = $this->pdo()->prepare('SELECT id FROM fe_roles WHERE tenant_id = ? AND system_key = ?');
+        $stmt->execute([$tenantId, $systemKey]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
     }
 
     protected function createSuperadmin(): int
