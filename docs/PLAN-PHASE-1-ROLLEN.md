@@ -64,6 +64,10 @@ Weiterhin nur nach Rückfrage („❓ RÜCKFRAGE“):
 ### Schritt 1.7d „Schnellstart“ (Wunsch Holger 05.11.2026, nach 1.7c, vor 1.8)
 
 Erst umsetzen, wenn 1.7c live ist (der Sofortstart braucht die gespeicherte `permissions.version`).
+Präzisiert am 05.11.2026 (Holger): Ziele 1, 3 und 5 (Update-Prüfung im Hintergrund, paralleles
+Laden, Messung) hängen nicht an 1.7c; Ziel 2 (Start mit gespeicherter Sitzung und Offline-Kopie)
+erst nach 1.7c; Ziel 4 (Startbild) erst, wenn Holger das Mockup freigibt. Reihenfolge: 1.7b → 1.7c →
+1.7d.
 Mockup Seite 9 `Startbild.dc.html` (liegt noch nicht im Repository, vor dem Bau unter
 [`aenderungskonzept/mockups/`](aenderungskonzept/mockups/LIESMICH.md) ablegen; das Bild ist ein
 Vorschlag, Holger und Phil sehen es sich noch an).
