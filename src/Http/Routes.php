@@ -64,11 +64,17 @@ use FirefightingEquipment\Api\V1\Users\UserAction;
 use FirefightingEquipment\Api\V1\Users\UserActionHandler;
 use FirefightingEquipment\Api\V1\Users\UserListHandler;
 use FirefightingEquipment\Offline\OfflineSettings;
+use FirefightingEquipment\Permission\Action;
+use FirefightingEquipment\Permission\Area;
+use FirefightingEquipment\Permission\AreaLevel;
+use FirefightingEquipment\Permission\Requirement;
 use FirefightingEquipment\Time\Clock;
 use FirefightingEquipment\Time\SystemClock;
 
 /**
- * Alle Routen der Anwendung. Neue Endpunkte werden hier eingetragen, jeweils mit Zugriffsstufe.
+ * Alle Routen der Anwendung. Neue Endpunkte werden hier eingetragen, jeweils mit Zugriffsstufe;
+ * unter einer Stadt mit den nötigen Rechten (Requirement, Plan Phase 1, Abschnitt 2; Tabelle und
+ * Vergleich mit der bisherigen Stufe in TenantRoutePermissionsTest).
  */
 final class Routes
 {
@@ -117,12 +123,34 @@ final class Routes
         $clock ??= new SystemClock();
         $offline ??= new OfflineSettings();
 
+        $read = static fn (Area $area): Requirement => Requirement::area($area, AreaLevel::Read);
+        $write = static fn (Area $area): Requirement => Requirement::area($area, AreaLevel::Write);
+        $action = Requirement::action(...);
+        // Geräte lesen: Handy (Suchen) oder Konsole (Ausrüstungsliste). Die Exporte verlangen in
+        // Phase 1 bewusst dasselbe wie bisher (jedes Konto, das Geräte sieht; Plan, F2).
+        $seeDevices = Requirement::anyOf($read(Area::Search), $read(Area::Devices));
+        $deviceFields = Requirement::anyOf($action(Action::DeviceEdit), $action(Action::DeviceCode))
+            ->withFieldRule('scan_code', Action::DeviceCode);
+        foreach (['identifier', 'device_type_id', 'serial_number', 'manufacturer', 'model', 'procured_on', 'note'] as $field) {
+            $deviceFields = $deviceFields->withFieldRule($field, Action::DeviceEdit);
+        }
+        $reinstate = $action(Action::DeviceRetire)
+            ->withFieldRule('identifier', Action::DeviceEdit)
+            ->withFieldRule('device_type_id', Action::DeviceEdit)
+            ->withFieldRule('scan_code', Action::DeviceCode);
+        $book = Requirement::anyOf($action(Action::BookMove), $action(Action::BookStatus))
+            ->withFieldRule('location_id', Action::BookMove)
+            ->withFieldRule('status', Action::BookStatus);
+        $bulkBook = $action(Action::DevicesBulk)
+            ->withFieldRule('location_id', Action::BookMove, 'devices')
+            ->withFieldRule('status', Action::BookStatus, 'devices');
+
         return self::auth(Router::forTenant(), $neutralDuration)
             ->add('GET', 'api/v1/health', Access::Public, new HealthHandler())
             ->add('GET', 'api/v1/tenant', Access::Public, new TenantHandler())
-            ->add('POST', 'api/v1/tenant/appearance', Access::Admin, new AccentColorHandler())
-            ->add('POST', 'api/v1/tenant/logo', Access::Admin, new TenantLogoHandler(delete: false), TenantLogoHandler::MAX_BODY_BYTES)
-            ->add('DELETE', 'api/v1/tenant/logo', Access::Admin, new TenantLogoHandler(delete: true))
+            ->add('POST', 'api/v1/tenant/appearance', $write(Area::Settings), new AccentColorHandler())
+            ->add('POST', 'api/v1/tenant/logo', $write(Area::Settings), new TenantLogoHandler(delete: false), TenantLogoHandler::MAX_BODY_BYTES)
+            ->add('DELETE', 'api/v1/tenant/logo', $write(Area::Settings), new TenantLogoHandler(delete: true))
             ->add('GET', 'api/v1/tenant/logo/{size}', Access::Public, new ImageHandler(defaultIcon: false))
             ->add('GET', 'api/v1/app-icon/{size}', Access::Public, new ImageHandler(defaultIcon: true))
             ->add('GET', 'manifest.webmanifest', Access::Public, new ManifestHandler())
@@ -130,56 +158,56 @@ final class Routes
             ->add('POST', 'api/v1/auth/email/verify', Access::Public, new EmailVerifyHandler())
             ->add('POST', 'api/v1/auth/email/resend', Access::Public, self::withDuration(EmailResendHandler::class, $neutralDuration))
             ->add('POST', 'api/v1/auth/invitation/accept', Access::Public, new InvitationAcceptHandler())
-            ->add('GET', 'api/v1/auth/notifications', Access::Admin, new NotificationSettingsHandler(update: false))
-            ->add('POST', 'api/v1/auth/notifications', Access::Admin, new NotificationSettingsHandler(update: true))
-            ->add('GET', 'api/v1/invitation-codes', Access::Admin, new InvitationCodeListHandler())
-            ->add('POST', 'api/v1/invitation-codes', Access::Admin, new InvitationCodeCreateHandler())
-            ->add('POST', 'api/v1/invitation-codes/{id}/revoke', Access::Admin, new InvitationCodeRevokeHandler())
-            ->add('GET', 'api/v1/users', Access::Admin, new UserListHandler())
-            ->add('GET', 'api/v1/users/{id}', Access::Admin, new UserActionHandler(UserAction::Show))
-            ->add('DELETE', 'api/v1/users/{id}', Access::Admin, new UserActionHandler(UserAction::Delete))
-            ->add('POST', 'api/v1/users/{id}/approve', Access::Admin, new UserActionHandler(UserAction::Approve))
-            ->add('POST', 'api/v1/users/{id}/reject', Access::Admin, new UserActionHandler(UserAction::Reject))
-            ->add('POST', 'api/v1/users/{id}/lock', Access::Admin, new UserActionHandler(UserAction::Lock))
-            ->add('POST', 'api/v1/users/{id}/unlock', Access::Admin, new UserActionHandler(UserAction::Unlock))
-            ->add('POST', 'api/v1/users/{id}/role', Access::Admin, new UserActionHandler(UserAction::ChangeRole))
-            ->add('POST', 'api/v1/users/{id}/display-name', Access::Admin, new UserActionHandler(UserAction::ChangeDisplayName))
-            ->add('GET', 'api/v1/device-types', Access::Authenticated, new DeviceTypeListHandler())
-            ->add('POST', 'api/v1/device-types', Access::Admin, new DeviceTypeActionHandler(DeviceTypeAction::Create))
-            ->add('POST', 'api/v1/device-types/{id}/rename', Access::Admin, new DeviceTypeActionHandler(DeviceTypeAction::Rename))
-            ->add('POST', 'api/v1/device-types/{id}/deactivate', Access::Admin, new DeviceTypeActionHandler(DeviceTypeAction::Deactivate))
-            ->add('POST', 'api/v1/device-types/{id}/activate', Access::Admin, new DeviceTypeActionHandler(DeviceTypeAction::Activate))
-            ->add('GET', 'api/v1/locations', Access::Authenticated, new LocationListHandler())
-            ->add('POST', 'api/v1/locations', Access::Admin, new LocationActionHandler(LocationAction::Create))
-            ->add('GET', 'api/v1/locations/{id}', Access::Authenticated, new LocationActionHandler(LocationAction::Show))
-            ->add('POST', 'api/v1/locations/{id}/rename', Access::Admin, new LocationActionHandler(LocationAction::Rename))
-            ->add('POST', 'api/v1/locations/{id}/lock', Access::Admin, new LocationActionHandler(LocationAction::Lock))
-            ->add('POST', 'api/v1/locations/{id}/unlock', Access::Admin, new LocationActionHandler(LocationAction::Unlock))
-            ->add('GET', 'api/v1/devices', Access::Authenticated, new DeviceListHandler())
-            ->add('GET', 'api/v1/devices/export', Access::Authenticated, new DeviceExportHandler($clock))
-            ->add('GET', 'api/v1/device-events/export', Access::Authenticated, new DeviceHistoryExportHandler($clock))
-            ->add('GET', 'api/v1/device-events', Access::Admin, new DeviceHistoryListHandler())
-            ->add('POST', 'api/v1/devices', Access::Admin, new DeviceActionHandler(DeviceAction::Create))
-            ->add('GET', 'api/v1/devices/import/template', Access::Admin, new DeviceImportTemplateHandler(validValues: false, clock: $clock))
-            ->add('GET', 'api/v1/devices/import/values', Access::Admin, new DeviceImportTemplateHandler(validValues: true, clock: $clock))
-            ->add('POST', 'api/v1/devices/import/preview', Access::Admin, new DeviceImportHandler(apply: false, clock: $clock), DeviceImportHandler::MAX_BODY_BYTES)
-            ->add('POST', 'api/v1/devices/import', Access::Admin, new DeviceImportHandler(apply: true, clock: $clock), DeviceImportHandler::MAX_BODY_BYTES)
-            ->add('POST', 'api/v1/devices/bulk/inspection-due', Access::Admin, new DeviceBulkHandler(DeviceBulkAction::InspectionDue))
-            ->add('POST', 'api/v1/devices/bulk/state', Access::Admin, new DeviceBulkHandler(DeviceBulkAction::State))
-            ->add('GET', 'api/v1/devices/{id}', Access::Authenticated, new DeviceActionHandler(DeviceAction::Show))
-            ->add('POST', 'api/v1/devices/{id}/fields', Access::Admin, new DeviceActionHandler(DeviceAction::UpdateFields))
-            ->add('POST', 'api/v1/devices/{id}/inspection-due', Access::Admin, new DeviceActionHandler(DeviceAction::SetInspectionDue))
-            ->add('POST', 'api/v1/devices/{id}/state', Access::Authenticated, new DeviceStateHandler($clock, $offline))
-            ->add('POST', 'api/v1/devices/{id}/retire', Access::Admin, new DeviceActionHandler(DeviceAction::Retire))
-            ->add('POST', 'api/v1/devices/{id}/reinstate', Access::Admin, new DeviceActionHandler(DeviceAction::Reinstate))
-            ->add('GET', 'api/v1/devices/{id}/events', Access::Authenticated, new DeviceEventListHandler())
-            ->add('GET', 'api/v1/device-summary', Access::Authenticated, new DeviceSummaryHandler($clock))
-            ->add('GET', 'api/v1/inspection-due', Access::Authenticated, new InspectionDueHandler($clock))
+            ->add('GET', 'api/v1/auth/notifications', $action(Action::MailLog), new NotificationSettingsHandler(update: false))
+            ->add('POST', 'api/v1/auth/notifications', $action(Action::MailLog), new NotificationSettingsHandler(update: true))
+            ->add('GET', 'api/v1/invitation-codes', $read(Area::Users), new InvitationCodeListHandler())
+            ->add('POST', 'api/v1/invitation-codes', $write(Area::Users), new InvitationCodeCreateHandler())
+            ->add('POST', 'api/v1/invitation-codes/{id}/revoke', $write(Area::Users), new InvitationCodeRevokeHandler())
+            ->add('GET', 'api/v1/users', $read(Area::Users), new UserListHandler())
+            ->add('GET', 'api/v1/users/{id}', $read(Area::Users), new UserActionHandler(UserAction::Show))
+            ->add('DELETE', 'api/v1/users/{id}', $write(Area::Users), new UserActionHandler(UserAction::Delete))
+            ->add('POST', 'api/v1/users/{id}/approve', $write(Area::Users), new UserActionHandler(UserAction::Approve))
+            ->add('POST', 'api/v1/users/{id}/reject', $write(Area::Users), new UserActionHandler(UserAction::Reject))
+            ->add('POST', 'api/v1/users/{id}/lock', $write(Area::Users), new UserActionHandler(UserAction::Lock))
+            ->add('POST', 'api/v1/users/{id}/unlock', $write(Area::Users), new UserActionHandler(UserAction::Unlock))
+            ->add('POST', 'api/v1/users/{id}/role', $write(Area::Users), new UserActionHandler(UserAction::ChangeRole))
+            ->add('POST', 'api/v1/users/{id}/display-name', $write(Area::Users), new UserActionHandler(UserAction::ChangeDisplayName))
+            ->add('GET', 'api/v1/device-types', Requirement::anyOf($read(Area::DeviceTypes), $seeDevices), new DeviceTypeListHandler())
+            ->add('POST', 'api/v1/device-types', $write(Area::DeviceTypes), new DeviceTypeActionHandler(DeviceTypeAction::Create))
+            ->add('POST', 'api/v1/device-types/{id}/rename', $write(Area::DeviceTypes), new DeviceTypeActionHandler(DeviceTypeAction::Rename))
+            ->add('POST', 'api/v1/device-types/{id}/deactivate', $write(Area::DeviceTypes), new DeviceTypeActionHandler(DeviceTypeAction::Deactivate))
+            ->add('POST', 'api/v1/device-types/{id}/activate', $write(Area::DeviceTypes), new DeviceTypeActionHandler(DeviceTypeAction::Activate))
+            ->add('GET', 'api/v1/locations', Requirement::anyOf($read(Area::Locations), $seeDevices), new LocationListHandler())
+            ->add('POST', 'api/v1/locations', $write(Area::Locations), new LocationActionHandler(LocationAction::Create))
+            ->add('GET', 'api/v1/locations/{id}', Requirement::anyOf($read(Area::Locations), $seeDevices), new LocationActionHandler(LocationAction::Show))
+            ->add('POST', 'api/v1/locations/{id}/rename', $write(Area::Locations), new LocationActionHandler(LocationAction::Rename))
+            ->add('POST', 'api/v1/locations/{id}/lock', $write(Area::Locations), new LocationActionHandler(LocationAction::Lock))
+            ->add('POST', 'api/v1/locations/{id}/unlock', $write(Area::Locations), new LocationActionHandler(LocationAction::Unlock))
+            ->add('GET', 'api/v1/devices', $seeDevices, new DeviceListHandler())
+            ->add('GET', 'api/v1/devices/export', $seeDevices, new DeviceExportHandler($clock))
+            ->add('GET', 'api/v1/device-events/export', Requirement::anyOf($seeDevices, $read(Area::Log)), new DeviceHistoryExportHandler($clock))
+            ->add('GET', 'api/v1/device-events', Requirement::anyOf($read(Area::Dashboard), $read(Area::Log)), new DeviceHistoryListHandler())
+            ->add('POST', 'api/v1/devices', $action(Action::DeviceCreate), new DeviceActionHandler(DeviceAction::Create))
+            ->add('GET', 'api/v1/devices/import/template', $action(Action::CsvImport), new DeviceImportTemplateHandler(validValues: false, clock: $clock))
+            ->add('GET', 'api/v1/devices/import/values', $action(Action::CsvImport), new DeviceImportTemplateHandler(validValues: true, clock: $clock))
+            ->add('POST', 'api/v1/devices/import/preview', $action(Action::CsvImport), new DeviceImportHandler(apply: false, clock: $clock), DeviceImportHandler::MAX_BODY_BYTES)
+            ->add('POST', 'api/v1/devices/import', $action(Action::CsvImport), new DeviceImportHandler(apply: true, clock: $clock), DeviceImportHandler::MAX_BODY_BYTES)
+            ->add('POST', 'api/v1/devices/bulk/inspection-due', Requirement::allOf($action(Action::DevicesBulk), $write(Area::Due)), new DeviceBulkHandler(DeviceBulkAction::InspectionDue))
+            ->add('POST', 'api/v1/devices/bulk/state', $bulkBook, new DeviceBulkHandler(DeviceBulkAction::State))
+            ->add('GET', 'api/v1/devices/{id}', $seeDevices, new DeviceActionHandler(DeviceAction::Show))
+            ->add('POST', 'api/v1/devices/{id}/fields', $deviceFields, new DeviceActionHandler(DeviceAction::UpdateFields))
+            ->add('POST', 'api/v1/devices/{id}/inspection-due', $write(Area::Due), new DeviceActionHandler(DeviceAction::SetInspectionDue))
+            ->add('POST', 'api/v1/devices/{id}/state', $book, new DeviceStateHandler($clock, $offline))
+            ->add('POST', 'api/v1/devices/{id}/retire', $action(Action::DeviceRetire), new DeviceActionHandler(DeviceAction::Retire))
+            ->add('POST', 'api/v1/devices/{id}/reinstate', $reinstate, new DeviceActionHandler(DeviceAction::Reinstate))
+            ->add('GET', 'api/v1/devices/{id}/events', $seeDevices, new DeviceEventListHandler())
+            ->add('GET', 'api/v1/device-summary', Requirement::anyOf($read(Area::Dashboard), $read(Area::Due)), new DeviceSummaryHandler($clock))
+            ->add('GET', 'api/v1/inspection-due', $read(Area::Due), new InspectionDueHandler($clock))
             ->add('GET', 'api/v1/client-config', Access::Authenticated, new ClientConfigHandler($clock, $offline))
-            ->add('GET', 'api/v1/notices', Access::Admin, new NoticeListHandler())
-            ->add('GET', 'api/v1/notices/{id}', Access::Admin, new NoticeActionHandler(NoticeAction::Show))
-            ->add('POST', 'api/v1/notices/{id}/resolve', Access::Admin, new NoticeActionHandler(NoticeAction::Resolve))
-            ->add('POST', 'api/v1/notices/{id}/reopen', Access::Admin, new NoticeActionHandler(NoticeAction::Reopen));
+            ->add('GET', 'api/v1/notices', $read(Area::Log), new NoticeListHandler())
+            ->add('GET', 'api/v1/notices/{id}', $read(Area::Log), new NoticeActionHandler(NoticeAction::Show))
+            ->add('POST', 'api/v1/notices/{id}/resolve', $write(Area::Log), new NoticeActionHandler(NoticeAction::Resolve))
+            ->add('POST', 'api/v1/notices/{id}/reopen', $write(Area::Log), new NoticeActionHandler(NoticeAction::Reopen));
     }
 
     /** Anmeldung, Sitzungen und Passwort; unter service und unter jeder Stadt gleich. */

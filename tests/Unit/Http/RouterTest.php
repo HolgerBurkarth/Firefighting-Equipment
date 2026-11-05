@@ -12,6 +12,9 @@ use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
 use FirefightingEquipment\Http\RouteMatch;
 use FirefightingEquipment\Http\Router;
+use FirefightingEquipment\Permission\Area;
+use FirefightingEquipment\Permission\AreaLevel;
+use FirefightingEquipment\Permission\Requirement;
 use FirefightingEquipment\User\UserRole;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -22,6 +25,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(RouteMatch::class)]
 #[CoversClass(Access::class)]
 #[UsesClass(HttpException::class)]
+#[UsesClass(Requirement::class)]
 #[UsesClass(JsonResponse::class)]
 final class RouterTest extends TestCase
 {
@@ -31,7 +35,7 @@ final class RouterTest extends TestCase
         $post = self::handler();
         $router = Router::forTenant()
             ->add('GET', 'api/v1/items', Access::Public, $get)
-            ->add('POST', 'api/v1/items', Access::Admin, $post);
+            ->add('POST', 'api/v1/items', $edit = self::edit(), $post);
 
         $match = $router->match('GET', 'api/v1/items');
         self::assertSame($get, $match->handler);
@@ -40,15 +44,15 @@ final class RouterTest extends TestCase
 
         $match = $router->match('POST', 'api/v1/items');
         self::assertSame($post, $match->handler);
-        self::assertSame(Access::Admin, $match->access);
+        self::assertSame($edit, $match->access);
     }
 
     public function testBodyLimitIsDefaultOrPerRoute(): void
     {
         $router = Router::forTenant()
-            ->add('POST', 'api/v1/items', Access::Admin, self::handler())
-            ->add('POST', 'api/v1/items/import', Access::Admin, self::handler(), Request::MAX_UPLOAD_BYTES)
-            ->add('POST', 'api/v1/items/{id}/upload', Access::Admin, self::handler(), 50_000);
+            ->add('POST', 'api/v1/items', self::edit(), self::handler())
+            ->add('POST', 'api/v1/items/import', self::edit(), self::handler(), Request::MAX_UPLOAD_BYTES)
+            ->add('POST', 'api/v1/items/{id}/upload', self::edit(), self::handler(), 50_000);
 
         self::assertSame(Request::MAX_BODY_BYTES, $router->match('POST', 'api/v1/items')->maxBodyBytes);
         self::assertSame(Request::MAX_UPLOAD_BYTES, $router->match('POST', 'api/v1/items/import')->maxBodyBytes);
@@ -59,7 +63,7 @@ final class RouterTest extends TestCase
     {
         foreach ([0, Request::MAX_UPLOAD_BYTES + 1] as $limit) {
             try {
-                Router::forTenant()->add('POST', 'api/v1/items', Access::Admin, self::handler(), $limit);
+                Router::forTenant()->add('POST', 'api/v1/items', self::edit(), self::handler(), $limit);
                 self::fail('Grenze angenommen: ' . $limit);
             } catch (\LogicException $e) {
                 self::assertStringContainsString('Body-Grenze', $e->getMessage());
@@ -216,7 +220,7 @@ final class RouterTest extends TestCase
         $router = Router::forTenant()->add('GET', 'api/v1/items', Access::Public, self::handler());
 
         $this->expectException(\LogicException::class);
-        $router->add('GET', 'api/v1/items', Access::Admin, self::handler());
+        $router->add('GET', 'api/v1/items', self::edit(), self::handler());
     }
 
     public function testDuplicatePlaceholderRouteIsRejected(): void
@@ -235,10 +239,26 @@ final class RouterTest extends TestCase
         $router->add('POST', 'api/v1/items/{item}', Access::Public, self::handler());
     }
 
-    public function testAdminAccessIsNotAllowedUnderService(): void
+    public function testRequirementIsNotAllowedUnderService(): void
     {
         $this->expectException(\LogicException::class);
-        Router::forService()->add('GET', 'api/v1/items', Access::Admin, self::handler());
+        $this->expectExceptionMessage('Zugriff users:write ist in diesem Bereich nicht möglich: api/v1/items');
+        Router::forService()->add('GET', 'api/v1/items', self::edit(), self::handler());
+    }
+
+    public function testRoutesListsEveryRouteWithAccess(): void
+    {
+        $edit = self::edit();
+        $router = Router::forTenant()
+            ->add('GET', 'api/v1/items/{id}', Access::Authenticated, self::handler())
+            ->add('GET', 'api/v1/items', Access::Public, self::handler())
+            ->add('POST', 'api/v1/items', $edit, self::handler());
+
+        self::assertSame([
+            ['method' => 'GET', 'path' => 'api/v1/items', 'access' => Access::Public],
+            ['method' => 'POST', 'path' => 'api/v1/items', 'access' => $edit],
+            ['method' => 'GET', 'path' => 'api/v1/items/{id}', 'access' => Access::Authenticated],
+        ], $router->routes());
     }
 
     public function testSuperAdminAccessIsNotAllowedUnderTenant(): void
@@ -260,12 +280,14 @@ final class RouterTest extends TestCase
             self::assertTrue(Access::Public->allows($role));
             self::assertTrue(Access::Authenticated->allows($role));
         }
-        self::assertTrue(Access::Admin->allows(UserRole::Admin));
-        self::assertFalse(Access::Admin->allows(UserRole::User));
-        self::assertFalse(Access::Admin->allows(UserRole::SuperAdmin));
         self::assertTrue(Access::SuperAdmin->allows(UserRole::SuperAdmin));
         self::assertFalse(Access::SuperAdmin->allows(UserRole::Admin));
         self::assertFalse(Access::SuperAdmin->allows(UserRole::User));
+    }
+
+    private static function edit(): Requirement
+    {
+        return Requirement::area(Area::Users, AreaLevel::Write);
     }
 
     private static function handler(): RequestHandler

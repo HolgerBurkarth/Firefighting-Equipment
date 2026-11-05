@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Http;
 
+use FirefightingEquipment\Permission\Requirement;
+
 /**
  * Ordnet Methode und Pfad (relativ zu /firefighting/<kürzel>) einem Handler zu.
  *
@@ -17,11 +19,11 @@ final class Router
     private const string PLACEHOLDER_PATTERN = '/^\{([a-z][a-z_]*)\}$/D';
     private const string ID_PATTERN = '/^[1-9][0-9]{0,17}$/D';
 
-    /** @var array<string, array<string, array{RequestHandler, Access, int}>> Pfad => Methode => Route (mit Body-Grenze) */
+    /** @var array<string, array<string, array{RequestHandler, Access|Requirement, int}>> Pfad => Methode => Route (mit Body-Grenze) */
     private array $exact = [];
 
     /**
-     * @var array<string, array{segments: list<string>, methods: array<string, array{RequestHandler, Access, int}>}>
+     * @var array<string, array{segments: list<string>, methods: array<string, array{RequestHandler, Access|Requirement, int}>}>
      *      Pfad mit Platzhaltern (Namen durch {} ersetzt) => Segmente und Routen
      */
     private array $patterns = [];
@@ -30,7 +32,7 @@ final class Router
     {
     }
 
-    /** Routen unter /firefighting/service/; Access::Admin ist hier nicht erlaubt. */
+    /** Routen unter /firefighting/service/; Requirement (Rechte einer Stadt) ist hier nicht erlaubt. */
     public static function forService(): self
     {
         return new self(false);
@@ -47,7 +49,7 @@ final class Router
      * @param string $path ohne führenden Slash, z. B. "api/v1/health" oder "api/v1/auth/sessions/{id}"
      * @param int    $maxBodyBytes Höchstgröße des Bodys (1 bis Request::MAX_UPLOAD_BYTES)
      */
-    public function add(string $method, string $path, Access $access, RequestHandler $handler, int $maxBodyBytes = Request::MAX_BODY_BYTES): self
+    public function add(string $method, string $path, Access|Requirement $access, RequestHandler $handler, int $maxBodyBytes = Request::MAX_BODY_BYTES): self
     {
         if (preg_match(self::METHOD_PATTERN, $method) !== 1) {
             throw new \LogicException(sprintf('Ungültige Methode: %s', $method));
@@ -55,8 +57,12 @@ final class Router
         if (str_starts_with($path, '/') || str_ends_with($path, '/')) {
             throw new \LogicException(sprintf('Pfad ohne Slash am Anfang/Ende angeben: %s', $path));
         }
-        if ($access === ($this->forTenant ? Access::SuperAdmin : Access::Admin)) {
-            throw new \LogicException(sprintf('Zugriff %s ist in diesem Bereich nicht möglich: %s', $access->value, $path));
+        if ($this->forTenant ? $access === Access::SuperAdmin : $access instanceof Requirement) {
+            throw new \LogicException(sprintf(
+                'Zugriff %s ist in diesem Bereich nicht möglich: %s',
+                $access instanceof Requirement ? $access->describe() : $access->value,
+                $path,
+            ));
         }
 
         if ($maxBodyBytes < 1 || $maxBodyBytes > Request::MAX_UPLOAD_BYTES) {
@@ -108,6 +114,28 @@ final class Router
     }
 
     /**
+     * Alle Routen in der Reihenfolge des Anlegens (exakte zuerst), für Tests der Rechte.
+     *
+     * @return list<array{method: string, path: string, access: Access|Requirement}>
+     */
+    public function routes(): array
+    {
+        $routes = [];
+        foreach ($this->exact as $path => $methods) {
+            foreach ($methods as $method => [, $access]) {
+                $routes[] = ['method' => $method, 'path' => $path, 'access' => $access];
+            }
+        }
+        foreach ($this->patterns as $pattern) {
+            foreach ($pattern['methods'] as $method => [, $access]) {
+                $routes[] = ['method' => $method, 'path' => implode('/', $pattern['segments']), 'access' => $access];
+            }
+        }
+
+        return $routes;
+    }
+
+    /**
      * @throws HttpException 404 für unbekannte Pfade, 405 (mit Allow) für falsche Methoden
      */
     public function match(string $method, string $path): RouteMatch
@@ -131,7 +159,7 @@ final class Router
     }
 
     /**
-     * @return array{array<string, array{RequestHandler, Access, int}>, array<string, int>}|null
+     * @return array{array<string, array{RequestHandler, Access|Requirement, int}>, array<string, int>}|null
      */
     private function matchPattern(string $path): ?array
     {

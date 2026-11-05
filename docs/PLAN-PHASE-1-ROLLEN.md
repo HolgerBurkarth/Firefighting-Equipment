@@ -120,6 +120,12 @@ deleted 1; test: admin active 3, user active 2), keines bliebe ohne Rolle, keine
 1 Super-Admin ohne Rolle; 0037 läuft durch. Freigabe der Migrationen 0036–0038 durch Holger am
 05.11.2026.
 
+Schritt 1.3a (05.11.2026): Für die Standard-Rollen muss jede Route wie bisher antworten (Vorgabe
+Holger). Deshalb verlangen die Exporte (`devices/export`, `device-events/export`) vorerst nur, Geräte
+zu sehen (`search` oder `devices` Ansehen, beim Verlauf auch `log`), und `csv.export` gibt es noch
+nicht als Aktion. F2 („*Benutzer* ohne CSV-Export“) würde das Verhalten für *Benutzer* ändern (heute
+200, dann 403; die App bietet ihm den Export nirgends an) und ist daher offen, bis Holger entscheidet.
+
 Bewusst **nicht** in Phase 1:
 
 - `fe_users.role` wird weder entfernt noch umbenannt (wäre ⚠ und ist als Kontoart nützlich).
@@ -486,7 +492,7 @@ Offen dazu: F14 (Adressen wie `geraete`, `prueffristen` und Spalten der CSV).
 | --- | --- | --- | --- |
 | 1.1 | Migrationen 0029–0035 (nur Erweiterungen), `RoleRepository`, Standard-Rollen bei neuen Städten, Tests. Kein Verhalten ändert sich. | mittel | Deploy mit Migration, live prüfen |
 | 1.2 ⚠ | Migration 0036 (Konten auf Rollen), 0037 (CHECK) und 0038 (Rolle der Einladungscodes; aus 1.1 hierher, weil Migrationen lückenlos nummeriert sein müssen), Regel Kontoart ↔ Rolle in `UserRepository`. **Freigabe nötig.** | klein | Deploy mit Sicherung, live prüfen |
-| 1.3 | Katalog, `Permissions`, `Requirement`, Feldregeln, Prüfung in `Application`, `TenantRoutePermissionsTest` statt der zwei Access-Tests, `auth/me` mit `permissions`, Sitzungsdauer aus den Rechten, Migrationen 0039/0040. Für *Admin*/*Benutzer* gleiches Verhalten. | groß | CI (alle Routen) |
+| 1.3 | Katalog, `Permissions`, `Requirement`, Feldregeln, Prüfung in `Application`, `TenantRoutePermissionsTest` statt der zwei Access-Tests, `auth/me` mit `permissions`, Sitzungsdauer aus den Rechten, Migrationen 0039/0040. Für *Admin*/*Benutzer* gleiches Verhalten. Geteilt (05.11.2026): **1.3a** Rechte im Backend (Katalog bis `TenantRoutePermissionsTest`; die zwei Access-Tests bleiben zusätzlich), **1.3b** `auth/me` mit `permissions`, Sitzungsdauer aus den Rechten, Log-Mails und Einstellung über `mail.log`, Migrationen 0039/0040. Jeder Teil mit CI, Deploy und Live-Test. | groß | CI (alle Routen) |
 | 1.4 | Datenfilter in allen Abfragen und Mails, `DeviceVisibilityMatrixTest`, Reflection-Test | groß | CI |
 | 1.5 | Super-Admin: API und Seiten „Rollen“, „Rolle bearbeiten“, Kopieren, Übernehmen, Löschen | mittel | live in `test` |
 | 1.6 | Admin: `GET roles`, Rolle zuweisen (einzeln, mehrere), Freischalten und Einladungscodes mit Rolle | mittel | live in `test` |

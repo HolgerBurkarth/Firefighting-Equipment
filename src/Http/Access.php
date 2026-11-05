@@ -8,6 +8,8 @@ use FirefightingEquipment\User\UserRole;
 
 /**
  * Wer eine Route aufrufen darf. Geprüft wird zentral in Application, bevor der Handler läuft.
+ * Unter einer Stadt verlangen Routen außer den öffentlichen und den Routen jedes angemeldeten
+ * Kontos (auth/*, client-config) Rechte (Permission\Requirement).
  */
 enum Access: string
 {
@@ -15,8 +17,6 @@ enum Access: string
     case Public = 'public';
     /** Jedes angemeldete Konto (unter service nur Super-Admins). */
     case Authenticated = 'authenticated';
-    /** Admins der Stadt; nur bei Routen unter einer Stadt. */
-    case Admin = 'admin';
     /** Super-Admins; nur bei Routen unter service. */
     case SuperAdmin = 'superadmin';
 
@@ -24,7 +24,6 @@ enum Access: string
     {
         return match ($this) {
             self::Public, self::Authenticated => true,
-            self::Admin => $role === UserRole::Admin,
             self::SuperAdmin => $role === UserRole::SuperAdmin,
         };
     }
