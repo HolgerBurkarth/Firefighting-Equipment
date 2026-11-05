@@ -19,3 +19,16 @@ sich nichts; geprüft wird, dass alles wie vorher läuft.
 - ☐ Neue Stadt anlegen erhält die Rollen *Admin* und *Benutzer*: nur per Test geprüft
   (`RoleRepositoryTest`, `DefaultRolesMigrationTest`); live keine neue Stadt angelegt (Städte werden
   nie gelöscht). Sichtbar erst mit Schritt 1.5 (Reiter „Rollen“).
+
+## Schritt 1.2a – Schreibwege setzen `role_id`, Probelauf (05.11.2026, Build `2b71cb8a9709`)
+
+Ohne Migration; bestehende Konten bleiben unverändert, nur neu angelegte oder geänderte Konten
+erhalten ihre Standard-Rolle.
+
+- ☑ Deploy „Deployment erfolgreich“, „Keine offenen Migrationen.“, `build.json` = `2b71cb8a9709`,
+  `health` ok.
+- ☑ Benutzerverwaltung lädt alle Konten wie vorher, keine Fehler in der Konsole.
+- ☐ Rolle wechseln bzw. Freischalten live: nicht geprüft (ein Rollenwechsel beendet heute alle
+  Sitzungen des Kontos, auch auf Holgers Geräten); per Test `UserRoleAssignmentTest`.
+- ☐ Probelauf `php85 bin/role-assignment-check.php` auf dem Server bzw. einer Kopie: offen für Holger
+  (siehe Rückfrage zu Migration 0036).
