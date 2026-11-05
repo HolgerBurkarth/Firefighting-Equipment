@@ -63,8 +63,6 @@ installConnectivity();
 // Kennung des Builds (Support, Browser-Tests der Updates).
 document.documentElement.dataset['build'] = BUILD_ID;
 
-// Adresse beim Start samt #token=… bzw. #code=… (die Seiten entfernen das Fragment erst danach).
-const startUrl = window.location.href;
 const updater = new AppUpdater(browserUpdateEnvironment(BUILD_ID));
 const router = createAppRouter(base);
 // Antworten der API, die ein Update verlangen (409 client_outdated, neuere X-Api-Version): sofort
@@ -73,27 +71,19 @@ setOutdatedHandler((reason) => {
     void updater.reportOutdated(reason, () => window.location.href);
 });
 
-// Service Worker vor der ersten Seite registrieren: Der Start prüft, ob die Seite aus seinem Cache
-// veraltet ist, und lädt dann sofort die neue Version (KONZEPT.md, "Updates der App").
-const registered = import.meta.env.PROD
-    ? registerServiceWorker(base).then((registration) => {
-          if (registration !== null) {
-              updater.attach(registration);
-          }
-      })
-    : Promise.resolve();
-const startup = import.meta.env.PROD
-    ? updater.checkOnStart(startUrl, registered)
-    : Promise.resolve(false);
-installUpdateGuard(router, updater, startup);
+installUpdateGuard(router, updater);
 
 createApp(App, { base, updater }).provide(UPDATER_KEY, updater).use(router).mount('#app');
 
 if (import.meta.env.PROD) {
-    // Lädt der Start neu, keine Prüfungen mehr (ihre Anfragen bräche das Neuladen ab).
-    void startup.then((reloading) => {
-        if (!reloading) {
-            startUpdateChecks(router, updater);
+    // Die erste Seite wartet nicht auf die Prüfung (Plan Phase 1, Schritt 1.7d): Ist die Seite aus
+    // dem Cache des Service Workers veraltet, kommt die neue Version beim nächsten Seitenwechsel
+    // (KONZEPT.md, "Updates der App").
+    const registered = registerServiceWorker(base).then((registration) => {
+        if (registration !== null) {
+            updater.attach(registration);
         }
     });
+    void updater.checkOnStart(registered);
+    startUpdateChecks(router, updater);
 }

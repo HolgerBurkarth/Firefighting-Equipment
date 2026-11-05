@@ -1405,9 +1405,9 @@ Server (`frontend/tests/e2e/support/update-server.php`) je Test-Bereich die alte
 oder die neue Version aus. Feste Wartezeiten der App (z. B. die Suche bis rund 30 s nach einem neuen
 Service Worker) spulen die Tests mit `page.clock` vor.
 
-Jeder API-Aufruf der App trägt `X-Client-Api: 1` (Vertragsnummer der API, `resources/client-api.json`);
-das Backend wertet den Header noch nicht aus (Plan in `CLAUDE.md`, "Versionierung der API für das
-Frontend").
+Jeder API-Aufruf der App trägt `X-Client-Api: 2` (Vertragsnummer der API, `resources/client-api.json`);
+das Backend lehnt Nummern unter `ClientApi::MIN` mit 409 `client_outdated` ab, die App aktualisiert
+sich dann (`CLAUDE.md`, "Versionierung der API für das Frontend").
 
 ## GitHub Actions und Branch deploy
 

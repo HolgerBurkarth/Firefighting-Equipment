@@ -1193,21 +1193,23 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Updates (KONZEPT.md "Updates der App", `src/runtime/appUpdate.ts`): `skipWaiting: false`, die neue
   Version wartet, bis `AppUpdater` sie per `SKIP_WAITING` aktiviert und die Seite neu lädt (nie
   `skipWaiting: true`: die laufende App bräuchte sonst gelöschte Teile). Prüfen
-  (`registration.update()` und `build.json` gleichzeitig) beim Start, bei `visibilitychange`
-  (sichtbar) und stündlich, offline nie, Fehler still. Meldet `build.json` eine neue Version, der
+  (`registration.update()` und `build.json` gleichzeitig) beim Start (`checkOnStart`, im
+  Hintergrund: die erste Seite wartet nie darauf, seit Schritt 1.7d; Registrierung höchstens
+  `START_CHECK_TIMEOUT_MS` = 2 s abwarten), bei `visibilitychange` (sichtbar) und stündlich, offline
+  nie, Fehler still. Meldet `build.json` eine neue Version, der
   Browser aber keinen neuen Service Worker, fragt die App nach 0,5/1/2/4 s erneut
   (`UPDATE_RETRY_DELAYS_MS`, `findNewWorker`: EINE gemeinsame Suche für alle Aufrufer, endet bei
   `updatefound`), danach erst beim nächsten Anlass. Grund (Prüflauf unter Last): Der Browser legt
   `update()` mit einer noch laufenden Prüfung zusammen (gleichwertige Jobs im Service-Worker-
   Standard); begann diese vor dem Deploy, liest sie die alte `sw.js`. Aktualisiert wird beim nächsten Seitenwechsel auf einen anderen Pfad
-  (`installUpdateGuard`; nicht bei gleichem Pfad wie beim Entfernen von `#token=…`), beim Start
-  (`checkOnStart`, vor der ersten Seite; nur wenn ein Service Worker die Seite liefert, Kennung aus
-  `build.json` höchstens `START_CHECK_TIMEOUT_MS` = 2 s abwarten, Registrierung ebenso; neu geladen
-  wird die vollständige Startadresse samt Fragment, bei gleicher Adresse per `location.reload()`, da
-  `assign` nur zum Fragment springen würde), vor „Seite nicht gefunden“ (`checkBeforeNotFound`, über
-  `UPDATER_KEY` per `inject`; Start und „nicht gefunden“ suchen bis rund 30 s weiter,
-  `START_RETRY_DELAYS_MS` mit zusätzlich 8 und 15 s, und zeigen solange „Seite wird geladen …“
-  (`loadingPage` in `App.vue` bzw. die Seite selbst), nie kurz „nicht gefunden“; gelingt es nicht,
+  (`installUpdateGuard`; nicht bei gleichem Pfad wie beim Entfernen von `#token=…`, nie bei der
+  ersten Seite: Eine alte Version beim Start ist zulässig, weil die API nur erweitert wird, und
+  `client_outdated` aktualisiert sofort; Plan Phase 1, Schritt 1.7d; neu geladen wird die
+  vollständige Zieladresse samt Fragment, bei gleicher Adresse per `location.reload()`, da `assign`
+  nur zum Fragment springen würde), vor „Seite nicht gefunden“ (`checkBeforeNotFound`, über
+  `UPDATER_KEY` per `inject`; sucht bis rund 30 s weiter, `START_RETRY_DELAYS_MS` mit zusätzlich 8
+  und 15 s, der Name stammt aus der Zeit, als auch der Start so wartete, und zeigt solange „Seite
+  wird geladen …“ (`not-found-checking`), nie kurz „nicht gefunden“; gelingt es nicht,
   bleibt die Seite beim Laden und `App.vue` zeigt „Die neue Version konnte nicht geladen werden.“ mit
   Knopf „Neu laden“ (`reloadNeeded`, `reloadFromServer`: Service Worker abmelden, Adresse samt
   `#token`/`#code` neu laden, OHNE Schleifensperre: ein Klick ist keine Schleife); bei
@@ -1246,10 +1248,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   auf eine Installation, die z. B. die vorige Seite begann; live 31.10.2026 fast 7 s), wartet `apply`
   zuerst auf `attach` (`registrationAttached`, Frist wie die Installation). Beim Aktualisieren (`apply`) fragt die App den Service Worker (`update()`, bei Bedarf die Suche
   wie oben), wartet auf die Installation (beim Seitenwechsel höchstens `ACTIVATION_TIMEOUT_MS` = 5 s;
-  beim Start und vor „nicht gefunden“ bis zur Frist `START_LOAD_TIMEOUT_MS` = Summe von
-  `START_RETRY_DELAYS_MS` ab Beginn, für Suche und Installation zusammen, mindestens 5 s; endet die
-  Installation früher, sofort weiter; live dauerte sie länger als 5 s, der Start gab nach rund 6 s
-  auf, 31.10.2026; Browser-Test mit hängender Installation: Schaltdatei `next-held` des
+  vor „nicht gefunden“ bis zur Frist `START_LOAD_TIMEOUT_MS` = Summe von `START_RETRY_DELAYS_MS`
+  ab Ende der Prüfung, für Suche und Installation zusammen, mindestens 5 s; endet die Installation
+  früher, sofort weiter; live dauerte sie länger als 5 s, der damalige Start gab nach rund 6 s auf,
+  31.10.2026; Browser-Test mit hängender Installation: Schaltdatei `next-held` des
   Update-Testservers hält die Anfrage nach `index.html` (nur das Vorab-Laden des Service Workers
   fragt so; Workbox lädt ohne `__WB_REVISION__`, der steht nur im Cache-Schlüssel), bis der Test auf
   `next` umstellt; eine leere oder unbekannte Schaltdatei liest der Server kurz erneut, da
@@ -1365,11 +1367,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Abgedeckte Fälle: ohne/mit Eingabe, Rückfrage, erster Besuch mit Deploy vor der
   Installation (Registrierung per Init-Skript zurückgehalten), Seite per Strg+F5 geladen und vom
   neuen Service Worker übernommen (nur Chromium: `Page.reload` mit `ignoreCache` über CDP), zwei Tabs
-  (einer aktualisiert, der andere folgt; einer geschlossen), Mail-Link mit alter Version, „Seite nicht
-  gefunden“, Zurück-Knopf nach erkannter neuer Version, neue Kennung ohne neuen Service Worker (nach
-  rund 30 s „Neu laden“), Installation beim Start länger als 5 s (`next-held`; nach der Freigabe
-  lädt Workbox die übrigen Dateien nacheinander, `index.html` zuerst; der Test wartet darauf bis zur
-  Frist der App, `START_LOAD_TIMEOUT_MS` ab Beginn des Starts, nicht länger; die Uhr läuft nach
+  (einer aktualisiert, der andere folgt; einer geschlossen), Mail-Link mit alter Version (die alte
+  löst das Token ein, die neue kommt beim Seitenwechsel), „Seite nicht gefunden“, Zurück-Knopf nach
+  erkannter neuer Version, Start mit neuer Kennung ohne neuen Service Worker (Seite sofort) und
+  dasselbe vor „Seite nicht gefunden“ (nach rund 30 s „Neu laden“; `openUnknownPageWithClock`:
+  der Seitenwechsel sucht zuerst selbst, vorgespult), Installation vor „Seite nicht gefunden“ länger
+  als 5 s (`next-held`; nach der Freigabe lädt Workbox die übrigen Dateien nacheinander,
+  `index.html` zuerst; der Test wartet darauf bis zur Frist der App, `START_LOAD_TIMEOUT_MS` nach
+  der Prüfung von höchstens `START_CHECK_TIMEOUT_MS`, nicht länger; die Uhr läuft nach
   `clock.install()` weiter, Timer feuern, `runFor` springt nur vor), „Neu laden“ mit zweitem alten
   Tab (Gerätedetail mit offenem „Bearbeiten“ und Eingabe: danach steuert die neue Version die Seite,
   keiner wartet, auch nach `page.reload()`; der andere Tab lädt nicht neu, zeigt den Hinweis, behält
@@ -1387,8 +1392,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Worker laufen dabei in Echtzeit: Hängt die nächste Wartezeit an einer Antwort (z. B. `update()`),
   in kleinen Schritten vorspulen (`expect.poll` mit `runFor(1000)`, `intervals: [50]`). Begrenzt
   die App das Warten auf eine echte Antwort mit einem Timer (z. B. `START_CHECK_TIMEOUT_MS` für
-  `build.json` beim Start), erst vorspulen, wenn die Antwort sichtbar verarbeitet ist (z. B.
-  `update-loading` sichtbar); sonst läuft der Timer unter Last vor der Antwort ab. Nur gezielt
+  die Prüfung vor „Seite nicht gefunden“), erst vorspulen, wenn die Antwort sichtbar verarbeitet ist
+  (z. B. `not-found-checking` sichtbar); sonst läuft der Timer unter Last vor der Antwort ab. Nur gezielt
   in diesen Tests, nicht global.
 - Zustände, die die App asynchron setzt (CSS-Variablen wie `--accent`, localStorage,
   sessionStorage, Eigenschaften ohne Locator), in Browser-Tests nie mit einmaligem `page.evaluate`

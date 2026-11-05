@@ -832,7 +832,7 @@ describe('AppUpdater: Neuladen erst ohne laufende Anfragen', () => {
     });
 });
 
-describe('AppUpdater: Start mit veralteter Version und „Seite nicht gefunden“', () => {
+describe('AppUpdater: Start im Hintergrund und „Seite nicht gefunden“', () => {
     const START_URL = 'https://x/firefighting/test/email-bestaetigen#token=abc';
 
     function settled<T>(promise: Promise<T>): { done: boolean } {
@@ -843,49 +843,7 @@ describe('AppUpdater: Start mit veralteter Version und „Seite nicht gefunden�
         return state;
     }
 
-    it('aktuelle Version: Seite erscheint ohne „Seite wird geladen …“', async () => {
-        const s = setup();
-        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
-        expect(s.updater.loadingPage.value).toBe(false);
-    });
-
-    it('neue Version erst beim erneuten Fragen gefunden: lädt die Startadresse samt Fragment', async () => {
-        const s = setup();
-        s.served = NEW_BUILD;
-        const worker = findsNewVersionOnUpdate(s, 3);
-        activatesOnMessage(s, worker);
-        const start = s.updater.checkOnStart(START_URL);
-        await flush();
-        expect(s.updater.loadingPage.value).toBe(true);
-        await runTimers(s);
-        expect(await start).toBe(true);
-        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
-        expect(s.navigated).toEqual([START_URL]);
-    });
-
-    it('neue Version nicht zu laden: bleibt bei „Seite wird geladen …“, nach rund 30 s Knopf', async () => {
-        const s = setup();
-        s.served = NEW_BUILD;
-        const start = s.updater.checkOnStart(START_URL);
-        const state = settled(start);
-        // Fristen der Startprüfung (Registrierung, build.json), dann die Pausen bis rund 30 s.
-        expect(await runTimers(s)).toEqual([
-            START_CHECK_TIMEOUT_MS,
-            START_CHECK_TIMEOUT_MS,
-            ...START_RETRY_DELAYS_MS,
-        ]);
-        expect(START_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0)).toBeGreaterThanOrEqual(
-            30_000,
-        );
-        expect(s.registration.updates).toBe(1 + START_RETRY_DELAYS_MS.length);
-        expect(state.done).toBe(false);
-        expect(s.updater.loadingPage.value).toBe(true);
-        expect(s.updater.reloadNeeded.value).toBe(true);
-        expect(s.updater.switching.value).toBe(false);
-        expect(s.navigated).toEqual([]);
-    });
-
-    /** Fragt der Start, wird die neue Version gefunden und installiert noch (live: viele Dateien). */
+    /** Fragt die App, wird die neue Version gefunden und installiert noch (live: viele Dateien). */
     function installsSlowly(s: Setup, elapsedMs = 0): FakeWorker {
         const worker = new FakeWorker('installing');
         activatesOnMessage(s, worker);
@@ -915,67 +873,105 @@ describe('AppUpdater: Start mit veralteter Version und „Seite nicht gefunden�
         return fired;
     }
 
-    it('Installation dauert länger als ACTIVATION_TIMEOUT_MS: weiter warten, dann sofort aktivieren', async () => {
+    it('aktuelle Version: Start prüft, nichts bereit, kein Neuladen', async () => {
+        const s = setup();
+        await s.updater.checkOnStart();
+        expect(s.buildFetches).toBe(1);
+        expect(s.registration.updates).toBe(1);
+        expect(s.updater.ready.value).toBe(false);
+        expect(s.navigated).toEqual([]);
+    });
+
+    it('neue Version beim Start (Plan 1.7d): kein Neuladen, erst beim nächsten Seitenwechsel', async () => {
+        // Vorher lud der Start sofort neu (die erste Seite wartete). Jetzt erscheint die Seite der
+        // laufenden Version; das ist zulässig, weil die API nur erweitert wird (client_outdated
+        // aktualisiert weiterhin sofort).
+        const s = setup();
+        s.served = NEW_BUILD;
+        const worker = findsNewVersionOnUpdate(s, 3);
+        activatesOnMessage(s, worker);
+        const start = s.updater.checkOnStart();
+        await runTimers(s);
+        await start;
+        expect(s.updater.ready.value).toBe(true);
+        expect(s.navigated).toEqual([]);
+        expect(worker.messages).toEqual([]);
+
+        expect(await s.updater.applyNow('https://x/firefighting/test/suchen')).toBe(true);
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual(['https://x/firefighting/test/suchen']);
+    });
+
+    it('Registrierung kommt erst nach START_CHECK_TIMEOUT_MS: Start endet trotzdem, der Seitenwechsel wartet auf sie', async () => {
+        // Live 31.10.2026: register() endete nach einem Deploy erst nach fast 7 s.
+        const s = setup({ attach: false });
+        s.served = NEW_BUILD;
+        const start = settled(s.updater.checkOnStart());
+        await runShortTimers(s, START_CHECK_TIMEOUT_MS);
+        expect(start.done).toBe(true);
+        expect(s.updater.ready.value).toBe(true);
+
+        const apply = s.updater.applyNow(START_URL);
+        await flush();
+        const worker = new FakeWorker('installed');
+        activatesOnMessage(s, worker);
+        s.registration.waiting = worker;
+        s.updater.attach(s.registration);
+        expect(await apply).toBe(true);
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual([START_URL]);
+    });
+
+    it('„Seite nicht gefunden“, neue Version erst beim erneuten Fragen gefunden: lädt die Adresse samt Fragment', async () => {
+        const s = setup();
+        s.served = NEW_BUILD;
+        const worker = findsNewVersionOnUpdate(s, 3);
+        activatesOnMessage(s, worker);
+        const result = s.updater.checkBeforeNotFound(START_URL);
+        await runTimers(s);
+        expect(await result).toBe(true);
+        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
+        expect(s.navigated).toEqual([START_URL]);
+    });
+
+    it('„Seite nicht gefunden“, Installation dauert länger als ACTIVATION_TIMEOUT_MS: weiter warten, dann sofort aktivieren', async () => {
         const s = setup();
         s.served = NEW_BUILD;
         const worker = installsSlowly(s);
-        const start = s.updater.checkOnStart(START_URL);
-        const state = settled(start);
+        const result = s.updater.checkBeforeNotFound(START_URL);
+        const state = settled(result);
         // Mehr als die Frist eines Seitenwechsels vergeht, die Installation läuft noch.
         await runShortTimers(s, ACTIVATION_TIMEOUT_MS + 1000);
         expect(s.updater.reloadNeeded.value).toBe(false);
-        expect(s.updater.loadingPage.value).toBe(true);
         expect(state.done).toBe(false);
 
         s.registration.installing = null;
         s.registration.waiting = worker;
         worker.setState('installed');
-        expect(await start).toBe(true);
+        expect(await result).toBe(true);
         expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
         expect(s.navigated).toEqual([START_URL]);
     });
 
-    it('Installation endet nicht: Knopf nach rund 30 s ab Start, nicht nach der Frist eines Seitenwechsels', async () => {
+    it('„Seite nicht gefunden“, Installation endet nicht: Knopf nach rund 30 s, nicht nach der Frist eines Seitenwechsels', async () => {
         const s = setup();
         s.served = NEW_BUILD;
-        // Bis der Browser die neue Version meldet, vergehen 10 s.
         installsSlowly(s, 10_000);
-        const state = settled(s.updater.checkOnStart(START_URL));
+        const state = settled(s.updater.checkBeforeNotFound(START_URL));
         const fired = await runTimers(s);
-        expect(fired).toContain(START_LOAD_TIMEOUT_MS - 10_000);
+        expect(fired).toContain(START_LOAD_TIMEOUT_MS);
         expect(fired).not.toContain(ACTIVATION_TIMEOUT_MS);
         expect(START_LOAD_TIMEOUT_MS).toBe(START_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0));
+        expect(START_LOAD_TIMEOUT_MS).toBeGreaterThanOrEqual(30_000);
         expect(state.done).toBe(false);
         expect(s.updater.reloadNeeded.value).toBe(true);
         expect(s.navigated).toEqual([]);
     });
 
-    it('Registrierung kommt erst nach START_CHECK_TIMEOUT_MS (register wartet auf eine Installation): Start wartet darauf', async () => {
-        // Live 31.10.2026: Die vorige Seite begann nach einem Deploy die Installation; register()
-        // der neuen Seite endete erst danach (fast 7 s). Vorher gab der Start sofort auf.
+    it('„Seite nicht gefunden“, Registrierung kommt gar nicht: nach rund 30 s Knopf „Neu laden“', async () => {
         const s = setup({ attach: false });
         s.served = NEW_BUILD;
-        const start = s.updater.checkOnStart(START_URL);
-        const state = settled(start);
-        // Fristen der Startprüfung (Registrierung, build.json) laufen ab, die Registrierung fehlt.
-        await runShortTimers(s, START_CHECK_TIMEOUT_MS);
-        expect(s.updater.loadingPage.value).toBe(true);
-        expect(s.updater.reloadNeeded.value).toBe(false);
-        expect(state.done).toBe(false);
-
-        const worker = new FakeWorker('installed');
-        activatesOnMessage(s, worker);
-        s.registration.waiting = worker;
-        s.updater.attach(s.registration);
-        expect(await start).toBe(true);
-        expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
-        expect(s.navigated).toEqual([START_URL]);
-    });
-
-    it('Registrierung kommt gar nicht: nach rund 30 s Knopf „Neu laden“', async () => {
-        const s = setup({ attach: false });
-        s.served = NEW_BUILD;
-        const state = settled(s.updater.checkOnStart(START_URL));
+        const state = settled(s.updater.checkBeforeNotFound(START_URL));
         await runTimers(s);
         expect(state.done).toBe(false);
         expect(s.updater.reloadNeeded.value).toBe(true);
@@ -1011,12 +1007,13 @@ describe('AppUpdater: Start mit veralteter Version und „Seite nicht gefunden�
         expect(s.updater.reloadNeeded.value).toBe(false);
     });
 
-    it('Schleifensperre: kein Warten, Seite erscheint mit dem Hinweis wie bisher', async () => {
+    it('„Seite nicht gefunden“ mit Schleifensperre: kein Warten, Seite erscheint mit dem Hinweis wie bisher', async () => {
         const s = setup();
         s.served = NEW_BUILD;
         s.storage.setItem(RELOAD_STORAGE_KEY, String(s.now));
-        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
-        expect(s.updater.loadingPage.value).toBe(false);
+        const result = s.updater.checkBeforeNotFound(START_URL);
+        await runTimers(s);
+        expect(await result).toBe(false);
         expect(s.updater.reloadNeeded.value).toBe(false);
         expect(updateNotice(s.updater)).toBe('blocked');
     });
@@ -1040,7 +1037,6 @@ describe('AppUpdater: Seite ohne Kontrolle in der aktuellen Version', () => {
     // Live 31.10.2026: Nach „Neu laden“ kam die Seite vom Server, die neue Version wartete aber
     // weiter, solange ein anderer Tab den alten Service Worker hielt; Chrome holte beim register()
     // die alte Registrierung zurück, das nächste Neuladen lieferte wieder die alte Version.
-    const START_URL = 'https://x/firefighting/test/standorte';
 
     it('neuer Service Worker wartet schon beim Start: aktivieren, nicht neu laden', async () => {
         const worker = new FakeWorker('installed');
@@ -1050,17 +1046,16 @@ describe('AppUpdater: Seite ohne Kontrolle in der aktuellen Version', () => {
                 registration.waiting = worker;
             },
         });
-        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        await s.updater.checkOnStart();
         await flush();
         expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
         expect(s.navigated).toEqual([]);
         expect(s.updater.ready.value).toBe(false);
-        expect(s.updater.loadingPage.value).toBe(false);
     });
 
     it('neuer Service Worker wird erst nach dem Start fertig: dann aktivieren', async () => {
         const s = setup({ controller: null });
-        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        await s.updater.checkOnStart();
         const worker = installNewVersion(s);
         await flush();
         expect(worker.messages).toEqual([SKIP_WAITING_MESSAGE]);
@@ -1094,7 +1089,7 @@ describe('AppUpdater: Seite ohne Kontrolle in der aktuellen Version', () => {
             },
         });
         s.served = NEW_BUILD;
-        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        await s.updater.checkOnStart();
         await flush();
         expect(worker.messages).toEqual([]);
         expect(s.updater.ready.value).toBe(true);
@@ -1109,14 +1104,14 @@ describe('AppUpdater: Seite ohne Kontrolle in der aktuellen Version', () => {
             },
         });
         s.served = null;
-        await s.updater.checkOnStart(START_URL);
+        await s.updater.checkOnStart();
         await flush();
         expect(worker.messages).toEqual([]);
     });
 
     it('ohne wartenden Service Worker keine Abfrage beim Start (erster Besuch)', async () => {
         const s = setup({ controller: null });
-        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        await s.updater.checkOnStart();
         await flush();
         expect(s.buildFetches).toBe(0);
     });
@@ -1128,7 +1123,7 @@ describe('AppUpdater: Seite ohne Kontrolle in der aktuellen Version', () => {
                 registration.waiting = worker;
             },
         });
-        expect(await s.updater.checkOnStart(START_URL)).toBe(false);
+        await s.updater.checkOnStart();
         await flush();
         expect(worker.messages).toEqual([]);
     });
@@ -1143,21 +1138,22 @@ describe('Zeitleiste der Updates (sessionStorage)', () => {
         }[];
     }
 
-    it('Start mit veralteter Version: Einträge bis zum Neuladen, lesbar per JSON.parse', async () => {
+    it('Start und Seitenwechsel mit neuer Version: Einträge bis zum Neuladen, lesbar per JSON.parse', async () => {
         const s = setup();
         s.served = NEW_BUILD;
         const worker = findsNewVersionOnUpdate(s, 1);
         activatesOnMessage(s, worker);
-        expect(await s.updater.checkOnStart('https://x/firefighting/test/a#token=geheim')).toBe(
-            true,
-        );
+        await s.updater.checkOnStart();
+        expect(await s.updater.applyNow('https://x/firefighting/test/a#token=geheim')).toBe(true);
         const events = trace(s).map((entry) => entry.event);
         expect(events).toEqual(
             expect.arrayContaining([
                 'register',
                 'start',
+                'registered',
                 'build',
                 'update',
+                'apply',
                 'skip-waiting',
                 'controllerchange',
                 'reload',
@@ -1177,7 +1173,7 @@ describe('Zeitleiste der Updates (sessionStorage)', () => {
     it('Start ohne Verbindung: Eintrag „offline“ (sonst bliebe unklar, warum nicht geprüft wurde)', async () => {
         const s = setup();
         s.online = false;
-        expect(await s.updater.checkOnStart('https://x/firefighting/test/a')).toBe(false);
+        await s.updater.checkOnStart();
         expect(trace(s).map((entry) => entry.event)).toEqual([
             'register',
             'start',
