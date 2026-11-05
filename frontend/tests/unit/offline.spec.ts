@@ -7,7 +7,9 @@ import {
     configureStoredSession,
     ensureSession,
     logout,
+    onPermissionsChanged,
     onStoredSessionRejected,
+    recheckSession,
     resetSession,
     session,
     setSession,
@@ -185,6 +187,126 @@ describe('gespeicherte Sitzung (Offline-Modus, Entscheidung 50)', () => {
             wait: () => Promise.resolve(),
         });
         expect(result).toBeNull();
+    });
+});
+
+describe('Schnellstart mit gespeicherter Sitzung (Plan Phase 1, Schritt 1.7d)', () => {
+    const RIGHTS = permissionsJson({ search: 'read', due: 'read' }, ['book.move']);
+    const NEW_RIGHTS = permissionsJson({ search: 'read' }, ['book.move']);
+
+    /** Antwortet erst, wenn der Test `answer` aufruft (auth/me hängt bis dahin). */
+    function held(): { fetchFn: typeof fetch; answer: (status: number, body: unknown) => void } {
+        let answer: (status: number, body: unknown) => void = () => undefined;
+        const fetchFn: typeof fetch = (input, init) =>
+            new Promise((resolve) => {
+                answer = (status, body) => {
+                    resolve(respond(status, body).fetch(input, init));
+                };
+            });
+        return {
+            fetchFn,
+            answer: (status, body) => {
+                answer(status, body);
+            },
+        };
+    }
+
+    it('mit Rechten gespeichert: sofort mit ihr, ohne Hinweis; auth/me bestätigt im Hintergrund', async () => {
+        storage.setItem(KEY, JSON.stringify(meBody('user', RIGHTS)));
+        const me = held();
+        const first = await ensureSession({ fetchFn: me.fetchFn });
+        expect(first?.user.id).toBe(7);
+        expect(first?.permissions?.version).toBe(RIGHTS['version']);
+        expect(session.value?.user.id).toBe(7);
+        // Kein Offline-Hinweis: Der Server wurde noch gar nicht gefragt.
+        expect(usingStoredSession.value).toBe(false);
+        // Die Prüfung läuft noch: kein zweites auth/me (z. B. beim Zurückkehren in die App).
+        let rechecks = 0;
+        await recheckSession('visible', {
+            fetchFn: () => {
+                rechecks += 1;
+                return Promise.reject(new TypeError('Failed to fetch'));
+            },
+            now: () => Date.now() + 60_000,
+        });
+        expect(rechecks).toBe(0);
+
+        me.answer(200, meBody('user', RIGHTS));
+        await flush();
+        expect(session.value?.user.id).toBe(7);
+        expect(usingStoredSession.value).toBe(false);
+    });
+
+    it('neue Rechte in der Antwort: wie während der Sitzung (onPermissionsChanged)', async () => {
+        storage.setItem(KEY, JSON.stringify(meBody('user', RIGHTS)));
+        const changed: (string | null | undefined)[] = [];
+        const stop = onPermissionsChanged((state) => changed.push(state.permissions?.version));
+        const me = held();
+        await ensureSession({ fetchFn: me.fetchFn });
+        me.answer(200, meBody('user', NEW_RIGHTS));
+        await flush();
+        stop();
+        expect(changed).toEqual([NEW_RIGHTS['version']]);
+        expect(session.value?.permissions?.version).toBe(NEW_RIGHTS['version']);
+    });
+
+    it('der Server lehnt sie ab (401): zur Anmeldung, gespeicherte Sitzung gelöscht', async () => {
+        storage.setItem(KEY, JSON.stringify(meBody('user', RIGHTS)));
+        let rejected = 0;
+        onStoredSessionRejected(() => {
+            rejected += 1;
+        });
+        const me = held();
+        expect((await ensureSession({ fetchFn: me.fetchFn }))?.user.id).toBe(7);
+        me.answer(401, { error: 'not_authenticated', message: 'x' });
+        await flush();
+        expect(rejected).toBe(1);
+        expect(session.value).toBeNull();
+        expect(storage.getItem(KEY)).toBeNull();
+    });
+
+    it('keine Verbindung: dann gilt sie als Offline-Sitzung (Hinweis), bis der Server antwortet', async () => {
+        storage.setItem(KEY, JSON.stringify(meBody('user', RIGHTS)));
+        let release: () => void = () => undefined;
+        const waited = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const first = await ensureSession({
+            fetchFn: sequence('abort', [200, meBody('user', RIGHTS)]),
+            wait: () => waited,
+        });
+        expect(first?.user.id).toBe(7);
+        await flush();
+        expect(usingStoredSession.value).toBe(true);
+        release();
+        await flush();
+        expect(usingStoredSession.value).toBe(false);
+        expect(session.value?.user.id).toBe(7);
+    });
+
+    it('ohne gespeicherte Rechte (Sitzung aus einer App vor 1.7b): wie bisher erst nach auth/me', async () => {
+        storage.setItem(KEY, JSON.stringify(meBody('user')));
+        const me = held();
+        let resolved = false;
+        const result = ensureSession({ fetchFn: me.fetchFn }).then((state) => {
+            resolved = true;
+            return state;
+        });
+        await flush();
+        expect(resolved).toBe(false);
+        expect(session.value).toBeNull();
+        me.answer(200, meBody('user', RIGHTS));
+        expect((await result)?.permissions?.version).toBe(RIGHTS['version']);
+    });
+
+    it('Anmelden während der Prüfung: die ältere Antwort ändert nichts mehr', async () => {
+        storage.setItem(KEY, JSON.stringify(meBody('user', RIGHTS)));
+        const me = held();
+        await ensureSession({ fetchFn: me.fetchFn });
+        setSession(state('admin', 9));
+        me.answer(401, { error: 'not_authenticated', message: 'x' });
+        await flush();
+        expect(session.value?.user.id).toBe(9);
     });
 });
 

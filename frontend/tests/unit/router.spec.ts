@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent } from 'vue';
-import { createMemoryHistory, type Router } from 'vue-router';
+import { createMemoryHistory, createRouter, type Router } from 'vue-router';
 import { apiRequest } from '../../src/api/client';
 import { parseAuthState, type UserRole } from '../../src/api/auth';
 import {
@@ -17,7 +17,7 @@ import {
     setSession,
     takeLoginNotice,
 } from '../../src/auth/session';
-import { createAppRouter } from '../../src/router';
+import { createAppRouter, preloadPage } from '../../src/router';
 import { ADMIN_MENU, ADMIN_SETTINGS, SERVICE_MENU } from '../../src/router/adminMenu';
 import { parseAppBase, type AppBase } from '../../src/runtime/appBase';
 import { respond } from './support/fetch';
@@ -419,5 +419,54 @@ describe('Rechte der Rolle (Plan Phase 1, Schritt 1.7b)', () => {
         expect((await routerAt('/geraete')).currentRoute.value.name).toBe('search');
         setSession(state('admin'));
         expect((await routerAt('/geraete')).currentRoute.value.name).toBe('devices');
+    });
+});
+
+describe('preloadPage (Plan Phase 1, Schritt 1.7d)', () => {
+    it('lädt die Programmteile der Seite sofort, ohne Wächter', () => {
+        const loaded: string[] = [];
+        const router = createRouter({
+            history: createMemoryHistory('/firefighting/test/'),
+            routes: [
+                {
+                    path: '/suchen',
+                    component: () => {
+                        loaded.push('suchen');
+                        return Promise.resolve({ template: '<div />' });
+                    },
+                },
+                {
+                    path: '/profil',
+                    component: () => {
+                        loaded.push('profil');
+                        return Promise.resolve({ template: '<div />' });
+                    },
+                },
+            ],
+        });
+        // Kein Wächter läuft, keine Navigation beginnt.
+        router.beforeEach(() => {
+            throw new Error('Wächter');
+        });
+        preloadPage(router, '/suchen?q=M1#x');
+        expect(loaded).toEqual(['suchen']);
+    });
+
+    it('ein Fehler beim Laden bleibt dem Router überlassen (keine unbehandelte Ablehnung)', async () => {
+        const router = createRouter({
+            history: createMemoryHistory('/firefighting/test/'),
+            routes: [{ path: '/a', component: () => Promise.reject(new Error('chunk')) }],
+        });
+        expect(() => {
+            preloadPage(router, '/a');
+        }).not.toThrow();
+        await Promise.resolve();
+    });
+
+    it('unbekannte Adresse: nichts außer der Seite „nicht gefunden“ der App', () => {
+        const router = createAppRouter(TENANT, createMemoryHistory('/firefighting/test/'));
+        expect(() => {
+            preloadPage(router, '/gibt-es-nicht');
+        }).not.toThrow();
     });
 });

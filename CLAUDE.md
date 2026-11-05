@@ -1069,7 +1069,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `auth/me` ohne Sitzung/Cookie): jede bestätigte Sitzung wird gemerkt, `resetSession` und Abmelden
   löschen sie. Scheitert `auth/me` mit einer Störung und ist eine gespeichert, löst `ensureSession`
   sofort mit ihr auf (`usingStoredSession`), die Prüfung läuft im Hintergrund weiter; eine echte
-  Ablehnung ruft `onStoredSessionRejected` (Router: wie 401, Anmeldung mit Rückkehradresse). Lokale
+  Ablehnung ruft `onStoredSessionRejected` (Router: wie 401, Anmeldung mit Rückkehradresse).
+  Schnellstart (Plan Phase 1, Schritt 1.7d): Ist eine Sitzung MIT `permissions` gespeichert, löst
+  `ensureSession` sofort mit ihr auf, ohne auf `auth/me` zu warten (`verifying`, ohne Hinweis und
+  ohne `recheckSession`, solange die Prüfung läuft); die Antwort übernimmt `setSession` (neue Rechte
+  wie in 1.7c, ein anderes Konto ersetzt sie), eine echte Ablehnung wie oben, eine Störung macht
+  daraus die Offline-Sitzung (`usingStoredSession`, grauer Streifen). Ohne gespeicherte Rechte
+  (Sitzung aus einer App vor 1.7b) wie bisher erst nach `auth/me`. Die Kopie zeigt die Liste dabei
+  sofort (Tests `startup.spec.ts`, Unit `offline.spec.ts`). Lokale
   Kopie `src/data/offline.ts` (`installOfflineCopy` in `main.ts`, IndexedDB über
   `src/runtime/localDb.ts`: Datenbank `ff-offline`, Tabellen `snapshots` und `queue`, im Test
   `MemoryDb`): Schlüssel `<kürzel>:<konto-id>`, `OfflineSnapshot` (Format 2, `syncedAt`, Geräte,
@@ -1137,7 +1144,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Handy-Seiten (`suchen`, `prueffristen`, `profil`, `geraete/<id>` mit `<id>` wie die
   Platzhalter im Backend) für `user` und `admin` (KONZEPT.md "User am Handy – Entscheidungen").
   Der Wächter fragt `auth/me`
-  höchstens einmal je Seitenaufruf (`ensureSession`); ohne Sitzung → `anmelden?weiter=…`, falsche
+  höchstens einmal je Seitenaufruf (`ensureSession`, mit gespeicherter Sitzung samt Rechten im
+  Hintergrund, siehe Offline-Modus); die Programmteile der ersten Seite lädt `main.ts` schon vorher
+  (`preloadPage` in `src/router/index.ts`, Schritt 1.7d: gleichzeitig mit `tenant` und `auth/me`,
+  Vue Router lädt Seiten sonst erst nach den Wächtern); ohne Sitzung → `anmelden?weiter=…`, falsche
   Rolle bzw. fehlende Rechte (`canOpen`) → still zur Startseite (`landingRoute` in
   `src/auth/redirect.ts`: Super-Admin `dashboard`; sonst mit Konsole `consoleRoute` = Dashboard bzw.
   erste erlaubte Seite des Menüs ohne „Suchen“, sonst „Einstellungen“; ohne Konsole `suchen`, sonst

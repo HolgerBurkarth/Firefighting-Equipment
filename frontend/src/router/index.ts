@@ -282,6 +282,22 @@ export function guardDecision(
     return canOpen(to.meta, state) ? true : landingRoute(router, state);
 }
 
+/**
+ * Lädt die Programmteile der Seite unter `location` (relativ zum Basispfad) sofort, ohne auf die
+ * Wächter zu warten (Plan Phase 1, Schritt 1.7d „Parallel laden“): Vue Router lädt eine Seite sonst
+ * erst nach ihnen, also nach auth/me. Der Router nimmt später dieselben Module aus dem Cache des
+ * Browsers. Fehler (z. B. ein fehlender Teil nach einem Deploy) behandelt erst der Router.
+ */
+export function preloadPage(router: Router, location: string): void {
+    for (const record of router.resolve(location).matched) {
+        for (const component of Object.values(record.components ?? {})) {
+            if (typeof component === 'function') {
+                void (component as () => Promise<unknown>)().catch(() => undefined);
+            }
+        }
+    }
+}
+
 export function createAppRouter(base: AppBase, history?: RouterHistory): Router {
     const router = createRouter({
         history: history ?? createWebHistory(base.path),

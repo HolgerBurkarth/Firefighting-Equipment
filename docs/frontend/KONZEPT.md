@@ -185,6 +185,11 @@ vollständig sind.
     wegen einer Störung nicht, öffnet die App die Seite mit dieser Sitzung und fragt im Hintergrund
     weiter (2, 4, 8, dann alle 15 s, sofort bei „online“). Nur eine echte Antwort ändert sie: 401 →
     Anmeldung (Kopie und Warteschlange bleiben für dasselbe Konto), ein anderes Konto ersetzt sie.
+    Seit Plan Phase 1, Schritt 1.7d („Schnellstart“) gilt eine gespeicherte Sitzung mit Rechten auch
+    online sofort: Die App startet mit ihr und der Kopie und prüft `auth/me` im Hintergrund (ohne
+    Hinweis; erst eine Störung macht daraus den grauen Streifen). Die erste Seite lädt dabei
+    gleichzeitig mit `tenant` und `auth/me`. Für ein inzwischen gesperrtes Konto heißt das: kurz die
+    eigene Kopie, dann (401) die Anmeldung, wie offline.
 51. **Streifen „Offline“:** grau oben, solange der Browser offline meldet oder die letzte Anfrage
     keine Verbindung bekam (bis zur nächsten Antwort des Servers): „Offline – angezeigt wird der
     Stand vom 31.10., 14:02.“ Er ersetzt dann die Meldung „Keine Verbindung zum Server …“.

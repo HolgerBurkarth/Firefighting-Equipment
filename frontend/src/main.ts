@@ -11,7 +11,7 @@ import { configureStoredSession, recheckSession } from './auth/session';
 import { bookingQueue, deviceStore, installDataLayer, locationStore, otherQueues } from './data';
 import { installBookingQueue, installOfflineCopy } from './data/offline';
 import { installServiceDataLayer } from './data/service';
-import { createAppRouter } from './router';
+import { createAppRouter, preloadPage } from './router';
 import { currentAppBase } from './runtime/appBase';
 import { linkManifest } from './runtime/appearance';
 import {
@@ -65,6 +65,8 @@ document.documentElement.dataset['build'] = BUILD_ID;
 
 const updater = new AppUpdater(browserUpdateEnvironment(BUILD_ID));
 const router = createAppRouter(base);
+// Die erste Seite lädt gleichzeitig mit tenant und auth/me (Plan Phase 1, Schritt 1.7d).
+preloadPage(router, router.options.history.location);
 // Antworten der API, die ein Update verlangen (409 client_outdated, neuere X-Api-Version): sofort
 // prüfen (CLAUDE.md, "Versionierung der API für das Frontend").
 setOutdatedHandler((reason) => {
