@@ -9,15 +9,16 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * Rechte der lesenden Routen unter einer Stadt (Access::Authenticated) über die echten Routen:
- * Benutzer und Admins der eigenen Stadt 200; ohne Anmeldung, Admin einer anderen Stadt und
- * Super-Admin unter einem Stadt-Pfad 401; unter service gibt es die Routen nicht (404).
+ * Rechte der lesenden Routen unter einer Stadt über die echten Routen: Benutzer und Admins der
+ * eigenen Stadt 200 (die Exporte seit Schritt 1.7a nur Admins, Benutzer 403: kein csv.export, Plan
+ * F2); ohne Anmeldung, Admin einer anderen Stadt und Super-Admin unter einem Stadt-Pfad 401; unter
+ * service gibt es die Routen nicht (404).
  */
 #[CoversClass(Routes::class)]
 final class TenantReadRoutesAccessTest extends AuthTestCase
 {
     /**
-     * @return iterable<string, array{string}>
+     * @return iterable<string, array{0: string, 1?: bool}>
      */
     public static function readRoutes(): iterable
     {
@@ -33,15 +34,15 @@ final class TenantReadRoutesAccessTest extends AuthTestCase
         yield 'Prüffristen' => ['inspection-due'];
         yield 'Prüffristen gefiltert' => ['inspection-due?days=60&include_without_date=1&location_id={location}&include_sublocations=1&limit=10'];
         yield 'Zusammenfassung' => ['device-summary'];
-        yield 'Export Geräte' => ['devices/export'];
-        yield 'Export Geräte gefiltert' => ['devices/export?location_id={location}&include_sublocations=1&status=ready,retired&q=ma'];
-        yield 'Export Historie' => ['device-events/export'];
+        yield 'Export Geräte' => ['devices/export', false];
+        yield 'Export Geräte gefiltert' => ['devices/export?location_id={location}&include_sublocations=1&status=ready,retired&q=ma', false];
+        yield 'Export Historie' => ['device-events/export', false];
         yield 'Einstellungen für das Frontend' => ['client-config'];
-        yield 'Export Historie gefiltert' => ['device-events/export?from=2026-01-01&to=2026-12-31&device_id={device}&location_id={location}&include_sublocations=1&order=oldest'];
+        yield 'Export Historie gefiltert' => ['device-events/export?from=2026-01-01&to=2026-12-31&device_id={device}&location_id={location}&include_sublocations=1&order=oldest', false];
     }
 
     #[DataProvider('readRoutes')]
-    public function testOnlyAccountsOfOwnTenant(string $path): void
+    public function testOnlyAccountsOfOwnTenant(string $path, bool $userAllowed = true): void
     {
         $tenantId = $this->tenant('immendingen')->id;
         $this->account('immendingen', 'user@example.org');
@@ -60,7 +61,10 @@ final class TenantReadRoutesAccessTest extends AuthTestCase
         self::assertError(401, 'not_authenticated', $this->send('GET', $url, cookie: $superAdmin));
         self::assertError(404, 'not_found', $this->send('GET', self::url(null, $path), cookie: $superAdmin));
 
-        foreach (['user@example.org', 'admin@example.org'] as $email) {
+        if (!$userAllowed) {
+            self::assertError(403, 'forbidden', $this->send('GET', $url, cookie: $this->loginCookie('immendingen', 'user@example.org')));
+        }
+        foreach ($userAllowed ? ['user@example.org', 'admin@example.org'] : ['admin@example.org'] as $email) {
             $response = $this->sendAny('GET', $url, cookie: $this->loginCookie('immendingen', $email));
             $body = self::responseBody($response);
             self::assertSame(200, $response->statusCode(), $body);

@@ -204,6 +204,15 @@
                         "level": "write"
                     },
                     "with_filter": false
+                },
+                {
+                    "key": "csv.export",
+                    "label": "CSV-Export",
+                    "requires": {
+                        "area": "devices",
+                        "level": "read"
+                    },
+                    "with_filter": true
                 }
             ]
         },

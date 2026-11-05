@@ -139,8 +139,7 @@ final class Routes
         $read = static fn (Area $area): Requirement => Requirement::area($area, AreaLevel::Read);
         $write = static fn (Area $area): Requirement => Requirement::area($area, AreaLevel::Write);
         $action = Requirement::action(...);
-        // Geräte lesen: Handy (Suchen) oder Konsole (Ausrüstungsliste). Die Exporte verlangen in
-        // Phase 1 bewusst dasselbe wie bisher (jedes Konto, das Geräte sieht; Plan, F2).
+        // Geräte lesen: Handy (Suchen) oder Konsole (Ausrüstungsliste).
         $seeDevices = Requirement::anyOf($read(Area::Search), $read(Area::Devices));
         $deviceFields = Requirement::anyOf($action(Action::DeviceEdit), $action(Action::DeviceCode))
             ->withFieldRule('scan_code', Action::DeviceCode);
@@ -199,8 +198,10 @@ final class Routes
             ->add('POST', 'api/v1/locations/{id}/lock', $write(Area::Locations), new LocationActionHandler(LocationAction::Lock))
             ->add('POST', 'api/v1/locations/{id}/unlock', $write(Area::Locations), new LocationActionHandler(LocationAction::Unlock))
             ->add('GET', 'api/v1/devices', $seeDevices, new DeviceListHandler())
-            ->add('GET', 'api/v1/devices/export', $seeDevices, new DeviceExportHandler($clock))
-            ->add('GET', 'api/v1/device-events/export', Requirement::anyOf($seeDevices, $read(Area::Log)), new DeviceHistoryExportHandler($clock))
+            // CSV-Export nur mit der Aktion csv.export (Plan, F2; Rolle Benutzer: 403), der Verlauf
+            // zusätzlich mit dem Protokoll.
+            ->add('GET', 'api/v1/devices/export', $action(Action::CsvExport), new DeviceExportHandler($clock))
+            ->add('GET', 'api/v1/device-events/export', Requirement::allOf($action(Action::CsvExport), $read(Area::Log)), new DeviceHistoryExportHandler($clock))
             ->add('GET', 'api/v1/device-events', Requirement::anyOf($read(Area::Dashboard), $read(Area::Log)), new DeviceHistoryListHandler())
             ->add('POST', 'api/v1/devices', $action(Action::DeviceCreate), new DeviceActionHandler(DeviceAction::Create))
             ->add('GET', 'api/v1/devices/import/template', $action(Action::CsvImport), new DeviceImportTemplateHandler(validValues: false, clock: $clock))

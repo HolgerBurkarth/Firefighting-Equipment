@@ -7,8 +7,7 @@ namespace FirefightingEquipment\Permission;
 /**
  * Aktionen des Rechte-Katalogs (Plan Phase 1, Abschnitt 2; fe_role_actions). Jede Aktion nennt
  * den Bereich, den sie braucht; fehlt er, wirkt sie nicht. Neue Aktionen kommen mit ihrer Phase,
- * nie ohne geprüfte Route (der CSV-Export hat noch keine eigene Aktion, siehe Plan,
- * „Entscheidungen“).
+ * nie ohne geprüfte Route (CSV-Export seit Schritt 1.7a, Plan, F2).
  */
 enum Action: string
 {
@@ -20,6 +19,7 @@ enum Action: string
     case DeviceCode = 'device.code';
     case DevicesBulk = 'devices.bulk';
     case CsvImport = 'csv.import';
+    case CsvExport = 'csv.export';
     case MailLog = 'mail.log';
 
     public function label(): string
@@ -33,6 +33,7 @@ enum Action: string
             self::DeviceCode => 'Code zuordnen',
             self::DevicesBulk => 'Sammelaktionen',
             self::CsvImport => 'CSV-Import',
+            self::CsvExport => 'CSV-Export',
             self::MailLog => 'Log-Mails empfangen',
         };
     }
@@ -42,7 +43,7 @@ enum Action: string
         return match ($this) {
             self::BookMove, self::BookStatus => ActionGroup::Booking,
             self::DeviceCreate, self::DeviceEdit, self::DeviceRetire, self::DeviceCode => ActionGroup::Devices,
-            self::DevicesBulk, self::CsvImport => ActionGroup::Bulk,
+            self::DevicesBulk, self::CsvImport, self::CsvExport => ActionGroup::Bulk,
             self::MailLog => ActionGroup::Notifications,
         };
     }
@@ -58,6 +59,7 @@ enum Action: string
             self::BookMove, self::BookStatus => [Area::Search, AreaLevel::Read],
             self::DeviceCreate, self::DeviceEdit, self::DeviceRetire, self::DeviceCode,
             self::DevicesBulk, self::CsvImport => [Area::Devices, AreaLevel::Write],
+            self::CsvExport => [Area::Devices, AreaLevel::Read],
             self::MailLog => null,
         };
     }

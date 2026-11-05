@@ -154,7 +154,7 @@ final class DeviceExportTest extends ExportApiTestCase
     {
         $this->createDevice($this->tenantId, $this->typeId, $this->g1, ['identifier' => 'MA-01']);
         $this->createDevice($this->otherTenantId, $this->otherTypeId, $this->otherLocation, ['identifier' => 'MA-02']);
-        $this->account('tuttlingen', 'user@example.org');
+        $this->account('tuttlingen', 'user@example.org', ['role' => 'admin']);
 
         self::assertSame(['MA-01'], self::column($this->rows('devices/export', $this->admin), 0));
 
@@ -166,11 +166,11 @@ final class DeviceExportTest extends ExportApiTestCase
 
     public function testInvalidParametersAreJsonErrors(): void
     {
-        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?include_sublocations=1', cookie: $this->user));
-        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?status=kaputt', cookie: $this->user));
-        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?location_id=abc', cookie: $this->user));
-        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?sort=name', cookie: $this->user));
-        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?dir=up', cookie: $this->user));
+        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?include_sublocations=1', cookie: $this->admin));
+        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?status=kaputt', cookie: $this->admin));
+        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?location_id=abc', cookie: $this->admin));
+        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?sort=name', cookie: $this->admin));
+        self::assertError(400, 'invalid_request', $this->api('GET', 'devices/export?dir=up', cookie: $this->admin));
         self::assertError(405, 'method_not_allowed', $this->api('POST', 'devices/export', []));
     }
 
@@ -202,7 +202,7 @@ final class DeviceExportTest extends ExportApiTestCase
         self::assertTrue((bool) $this->pdo()->getAttribute(\Pdo\Mysql::ATTR_USE_BUFFERED_QUERY));
 
         // Nie gelesener Download: Verwerfen schließt die ungepufferte Abfrage.
-        $response = $this->sendAny('GET', self::url('immendingen', 'devices/export'), cookie: $this->user);
+        $response = $this->sendAny('GET', self::url('immendingen', 'devices/export'), cookie: $this->admin);
         self::assertSame(200, $response->statusCode());
         unset($response);
         self::assertTrue((bool) $this->pdo()->getAttribute(\Pdo\Mysql::ATTR_USE_BUFFERED_QUERY));

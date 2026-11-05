@@ -40,13 +40,14 @@ abstract class ExportApiTestCase extends DeviceApiTestCase
     }
 
     /**
-     * GET-Anfrage (Standard: als Benutzer); die Antwort wird vollständig gelesen.
+     * GET-Anfrage (Standard: als Admin; Benutzer haben seit Schritt 1.7a kein csv.export); die
+     * Antwort wird vollständig gelesen.
      *
      * @return array{Response, string}
      */
     protected function download(string $path, ?string $cookie = null, ?Application $app = null): array
     {
-        $response = $this->sendAny('GET', self::url('immendingen', $path), cookie: $cookie ?? $this->user, app: $app);
+        $response = $this->sendAny('GET', self::url('immendingen', $path), cookie: $cookie ?? $this->admin, app: $app);
 
         return [$response, self::responseBody($response)];
     }

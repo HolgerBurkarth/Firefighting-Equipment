@@ -100,7 +100,7 @@ describe('Katalog und Grenzen wie im Backend', () => {
             'settings',
         ]);
         expect(parsed.levelLabels).toEqual({ read: 'Ansehen', write: 'Ändern' });
-        expect(allActions(parsed)).toHaveLength(9);
+        expect(allActions(parsed)).toHaveLength(10);
     });
 
     it('Länge von Name und Kurzbeschreibung wie RoleDraft', () => {
