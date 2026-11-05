@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defineComponent } from 'vue';
 import { createMemoryHistory, type Router } from 'vue-router';
 import { apiRequest } from '../../src/api/client';
 import { parseAuthState, type UserRole } from '../../src/api/auth';
@@ -31,8 +32,26 @@ function state(role: UserRole) {
     return parseAuthState(meBody(role));
 }
 
+// Die Tests prüfen Wächter, Adressen und meta, nicht die Seiten (die testen eigene Dateien). Mit den
+// echten Seiten übersetzte der erste Seitenwechsel je Seite deren ganzen Baum (LoginPage samt Reka UI:
+// ohne Last rund 2,3 s, alle späteren Tests wenige ms); unter Last riss der erste Test so die 5 s
+// (rot am 04.11. und zweimal am 05.11.2026, parallel zu composer test).
+const PAGE_STUB = defineComponent({ render: () => null });
+
+function withoutPages(router: Router): Router {
+    for (const record of router.getRoutes()) {
+        const components = record.components;
+        if (components) {
+            for (const name of Object.keys(components)) {
+                components[name] = PAGE_STUB;
+            }
+        }
+    }
+    return router;
+}
+
 async function routerAt(path: string, area = TENANT): Promise<Router> {
-    const router = createAppRouter(area, createMemoryHistory());
+    const router = withoutPages(createAppRouter(area, createMemoryHistory()));
     await router.push(path);
     return router;
 }
