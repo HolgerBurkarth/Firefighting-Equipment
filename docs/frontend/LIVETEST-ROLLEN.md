@@ -212,3 +212,23 @@ Atemschutzmaske) für den Test; Testkonto #7 „Holger Test 1“ (vorher *Benutz
 - ☑ Aufgeräumt: #7 über den Stift wieder *Benutzer* („… hat jetzt die Rolle „Benutzer“ …“,
   `role_id` 4), „Live-Test Filter löschen …“ mit Rückfrage („gelöscht“); danach nur *Admin*
   (3 Konten) und *Benutzer* (2 Konten, 3 Codes). Keine Fehler in der Konsole.
+
+## Schritt 1.7a – Aktion `csv.export` für die Exporte (05.11.2026, Build `47480b85b88d`)
+
+- ☑ Deploy „Deployment erfolgreich“, `build.json` = `47480b85b88d`, `health` ok; `devices/export`
+  ohne Sitzung 401.
+- ☑ Als *Admin* in `test`: `auth/me` nennt `csv.export` unter `permissions.actions`; `GET
+  devices/export` 200 (Kopfzeile wie bisher, 69 Geräte), `GET device-events/export` 200.
+- ☑ Oberfläche als *Admin*: Geräteliste „Export (CSV)“ ergibt `geraete-test-2026-11-05.csv`,
+  Protokoll „Verlauf herunterladen (CSV)“ ergibt `historie-test-2026-08-08-bis-2026-11-05.csv`
+  (Blob im Browser abgefangen, nichts heruntergeladen).
+- ☑ `GET roles` als *Admin*: Katalog mit `csv.export` in „Mehrere Ausrüstungen“; die Standard-Rolle
+  *Benutzer* hat nur `book.move`, `book.status`.
+- ☑ Editor des Super-Admins („Neue Rolle“ für die Test-Feuerwehr, nichts gespeichert): Kästchen
+  „CSV-Export“ unter „Mehrere Ausrüstungen“, ohne Bereich grau mit „braucht „Ausrüstungsliste:
+  Ansehen““. Der Tab lief zuerst wegen der Sperre gegen Neuladeschleifen (10 Minuten je Tab) noch
+  mit Build `f4023178d8aa` und zeigte „Neue Version verfügbar.“; nach „Jetzt aktualisieren“ Build
+  `47480b85b88d`, gleiches Ergebnis (wie vorgesehen).
+- ☐ Offen für Holger: *Benutzer* (#7) erhält beim Export 403 – per Test belegt
+  (`TenantRoutePermissionsTest::testStandardRoleUserGetsForbiddenOnExports`); die App bietet *Benutzer*
+  keinen Export an. Kommt in die iPhone-Liste nach 1.7c.
