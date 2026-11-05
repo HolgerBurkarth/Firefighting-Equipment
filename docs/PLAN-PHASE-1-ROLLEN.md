@@ -106,6 +106,13 @@ Neue Tabellen mit `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode
 | 0039 | `drop_fe_users_notify_device_log_check` | Alte CHECK `chk_fe_users_notify_device_log` (nur `admin`/`superadmin`) entfernen. | nein |
 | 0040 | `add_fe_users_notify_device_log_check` | Neue CHECK: nur nicht `deleted`. Wer Log-Mails bekommt, bestimmt künftig die Aktion `mail.log` der Rolle (Code). | nein |
 
+Umgesetzt in Schritt 1.1 (05.11.2026) mit zwei Ergänzungen: `fe_roles.version` (INT, ab 1) schon
+jetzt für das gleichzeitige Bearbeiten in 1.5 (409 `version_conflict`), und CHECK
+`chk_fe_roles_admin` (die Rolle *Admin* hat nie Datenfilter oder Einschränkungen). Offen für 1.5:
+`bin/tenant.php purge-device-data` löscht Standorte; ein Datenfilter, der auf einen Standort zeigt,
+verhindert das (Fremdschlüssel, die Transaktion wird zurückgenommen). Sobald Datenfilter gesetzt
+werden können, entfernt der Befehl vorher die Zeilen in `fe_role_locations` der Stadt.
+
 Bewusst **nicht** in Phase 1:
 
 - `fe_users.role` wird weder entfernt noch umbenannt (wäre ⚠ und ist als Kontoart nützlich).
@@ -470,8 +477,8 @@ Offen dazu: F14 (Adressen wie `geraete`, `prueffristen` und Spalten der CSV).
 
 | Schritt | Inhalt | Größe | Live/CI vor dem nächsten |
 | --- | --- | --- | --- |
-| 1.1 | Migrationen 0029–0035, 0038 (nur Erweiterungen), `RoleRepository`, Standard-Rollen bei neuen Städten, Tests. Kein Verhalten ändert sich. | mittel | Deploy mit Migration, live prüfen |
-| 1.2 ⚠ | Migration 0036 (Konten auf Rollen) und 0037 (CHECK), Regel Kontoart ↔ Rolle in `UserRepository`. **Freigabe nötig.** | klein | Deploy mit Sicherung, live prüfen |
+| 1.1 | Migrationen 0029–0035 (nur Erweiterungen), `RoleRepository`, Standard-Rollen bei neuen Städten, Tests. Kein Verhalten ändert sich. | mittel | Deploy mit Migration, live prüfen |
+| 1.2 ⚠ | Migration 0036 (Konten auf Rollen), 0037 (CHECK) und 0038 (Rolle der Einladungscodes; aus 1.1 hierher, weil Migrationen lückenlos nummeriert sein müssen), Regel Kontoart ↔ Rolle in `UserRepository`. **Freigabe nötig.** | klein | Deploy mit Sicherung, live prüfen |
 | 1.3 | Katalog, `Permissions`, `Requirement`, Feldregeln, Prüfung in `Application`, `TenantRoutePermissionsTest` statt der zwei Access-Tests, `auth/me` mit `permissions`, Sitzungsdauer aus den Rechten, Migrationen 0039/0040. Für *Admin*/*Benutzer* gleiches Verhalten. | groß | CI (alle Routen) |
 | 1.4 | Datenfilter in allen Abfragen und Mails, `DeviceVisibilityMatrixTest`, Reflection-Test | groß | CI |
 | 1.5 | Super-Admin: API und Seiten „Rollen“, „Rolle bearbeiten“, Kopieren, Übernehmen, Löschen | mittel | live in `test` |

@@ -1348,7 +1348,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   "ß"/"ss" oder "é"/"e" nicht als gleich gelten (Kleinschreibung erzwingt ein CHECK); ebenso
   `fe_devices.identifier_key`, `fe_devices.scan_code`/`scan_code_key` (exakter Vergleich) sowie
   `fe_device_events.old_value`/`new_value` (siehe "Standorte und Geräte"); feste Werte (`role`, `status`, `purpose`, `action`, `kind`, `event_type`, `field`,
-  `not_applied_reason`, `outcome`, `reason`, `requested_status`, `other_status`),
+  `not_applied_reason`, `outcome`, `reason`, `requested_status`, `other_status`, `system_key`, `area`,
+  `level`),
   `password_hash`, `fe_tenants.accent_color`, `fe_tenant_logos.version` und
   `fe_device_bookings.client_ref` sind
   `ascii`/`ascii_bin`, damit `IN (...)` bzw. `LIKE` Groß- und Kleinschreibung unterscheiden.
@@ -1451,7 +1452,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   immer gemeinsam ändern.
 - Name (`TenantName`): Leerraum am Rand wird entfernt, nicht leer, höchstens 100 Zeichen,
   keine Steuerzeichen.
-- Neue Städte erhalten beim Anlegen die Start-Gerätetypen (siehe "Standorte und Geräte").
+- Neue Städte erhalten beim Anlegen die Start-Gerätetypen (siehe "Standorte und Geräte") und die
+  Standard-Rollen (siehe "Rollen und Rechte").
 - Das Kürzel ist nach dem Anlegen unveränderlich, Städte werden nie gelöscht, nur gesperrt
   (`active = 0`, Daten bleiben erhalten). Da Trigger verboten sind, sichert das der Code:
   `TenantRepository` hat bewusst keine Methode zum Ändern des Kürzels oder zum Löschen; eine
@@ -1819,6 +1821,34 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Ein Admin darf sich nicht selbst sperren, herabstufen (eigene Rolle ändern) oder löschen →
   409 `rule_violation`; ebenso Regelverstöße des Repositorys (letzter Admin, falscher Status,
   gelöschtes Konto). Unveränderte Rolle und eigener Anzeigename sind erlaubt.
+
+## Rollen und Rechte (Phase 1, im Aufbau)
+- Plan und Entscheidungen: `docs/PLAN-PHASE-1-ROLLEN.md` (freigegeben 05.11.2026; Schritte 1.1–1.9).
+  Stand: Schritt 1.1 (Schema und Standard-Rollen). Die Rechte prüft weiterhin `Access` über
+  `fe_users.role`; Rollen wirken erst ab Schritt 1.3.
+- Schema (Migrationen `0029`–`0035`, nur Erweiterungen): `fe_roles` (je Stadt, Name je Stadt
+  eindeutig ohne Groß-/Kleinschreibung, `system_key` `admin`/`user`/NULL je Stadt höchstens einmal,
+  `description`, `restrict_single_use` (erst ab Phase 2), `filter_locations`, `filter_device_types`,
+  `version` ab 1, `updated_by`; CHECK `chk_fe_roles_admin`: die Rolle Admin nie mit Filter oder
+  Einschränkung), `fe_role_areas` (`area` Format `^[a-z_]{1,30}`, `level` `read`/`write`; kein Zugriff
+  = keine Zeile), `fe_role_actions` (`action` Format `^[a-z_.]{1,40}`), `fe_role_locations` und
+  `fe_role_device_types` (Datenfilter; Ebene 1 schließt Fächer ein). Alle Untertabellen mit
+  `tenant_id` und zusammengesetztem Fremdschlüssel auf `fe_roles (id, tenant_id)` mit `ON DELETE
+  CASCADE` (nur dort; Fremdschlüssel auf `fe_users`, Standorte und Gerätetypen kaskadieren nie).
+  `fe_users.role_id` (NULL bis Schritt 1.2, Fremdschlüssel `(role_id, tenant_id)`, Super-Admins ohne
+  Rolle); `fe_users.role` bleibt als Kontoart (`admin` = hat die Rolle Admin).
+- Standard-Rollen (`src/Role/DefaultRoles`): *Admin* („Alle Rechte, nicht änderbar“, ohne Zeilen in
+  `fe_role_areas`/`fe_role_actions`: alle Rechte, auch künftige) und *Benutzer* („Wie bisher; bekommt
+  jede neue Stadt“: `search` und `due` Ansehen, `book.move`, `book.status`). Bestehende Städte per
+  Migration `0034`, neue in `TenantRepository::create` über `RoleRepository::createDefaults` (eigene
+  Transaktion oder die offene des Aufrufers). Beide Stellen immer gemeinsam ändern (per Test gleich,
+  `DefaultRolesMigrationTest`).
+- Code `src/Role/` (`Role`, `SystemRole`, `DefaultRoles`, `RoleRepository`: `listByTenant` (Admin,
+  Benutzer, dann nach Name), `find`, `findSystemRole`, `createDefaults`). Tests in
+  `tests/Integration/Role/` (`RoleSchemaTest`, `RoleRepositoryTest`, `DefaultRolesMigrationTest`).
+- `bin/tenant.php purge-device-data` löscht Standorte; ein Datenfilter auf einen Standort verhindert
+  das (Fremdschlüssel, Rücknahme). Mit Schritt 1.5 entfernt der Befehl vorher `fe_role_locations` der
+  Stadt.
 
 ## Städte verwalten und Admins einladen
 - Nur Super-Admins, nur unter `service` (`Access::SuperAdmin`; Konten einer Stadt haben dort keine

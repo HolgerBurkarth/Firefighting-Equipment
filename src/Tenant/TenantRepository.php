@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Tenant;
 
 use FirefightingEquipment\Device\DefaultDeviceTypes;
+use FirefightingEquipment\Role\RoleRepository;
 
 /**
  * Zugriff auf fe_tenants. Es gibt bewusst weder Umbenennen des Kürzels noch Löschen:
@@ -64,8 +65,9 @@ final readonly class TenantRepository
     }
 
     /**
-     * Legt eine aktive Stadt mit den Start-Gerätetypen (DefaultDeviceTypes) an. Läuft in einer eigenen
-     * Transaktion oder, falls schon eine offen ist, in dieser (UserRepository::createTenantWithInvitedAdmin).
+     * Legt eine aktive Stadt mit den Start-Gerätetypen (DefaultDeviceTypes) und den Standard-Rollen
+     * (DefaultRoles) an. Läuft in einer eigenen Transaktion oder, falls schon eine offen ist, in
+     * dieser (UserRepository::createTenantWithInvitedAdmin).
      *
      * @throws DuplicateTenantSlugException
      */
@@ -117,6 +119,7 @@ final readonly class TenantRepository
         foreach (DefaultDeviceTypes::NAMES as $typeName) {
             $insertType->execute([$tenant->id, $typeName]);
         }
+        (new RoleRepository($this->pdo))->createDefaults($tenant);
 
         return $tenant;
     }
