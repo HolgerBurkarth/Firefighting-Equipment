@@ -36,7 +36,8 @@ use FirefightingEquipment\User\UserRepository;
  * (details {role}); Rolle Admin ändern, Standard-Rolle löschen, Rolle in Gebrauch (details {accounts,
  * invitation_codes}) und F3 (details {areas, actions}) 409 rule_violation.
  *
- * Kopie (copy_of, dieselbe Stadt): Rechte und Datenfilter, Name ohne Angabe „<Name> (Kopie)“.
+ * Kopie (copy_of, dieselbe Stadt): Rechte und Datenfilter, Name ohne Angabe „<Name> (Kopie)“, ist er
+ * vergeben, „<Name> (Kopie 2)“ …, höchstens 50 Zeichen (gekürzt wird der Name der Vorlage).
  * Übernahme (source_role_id, andere Stadt): nur die Rechte (F10), Name ohne Angabe der Name der
  * Vorlage; ist er vergeben, mit „(2)“, „(3)“ …. Eine Kopie der Rolle Admin wird eine gewöhnliche Rolle
  * mit allen Rechten des Katalogs.
@@ -139,7 +140,7 @@ final readonly class RoleHandler implements RequestHandler
         $source = $roles->find($tenant, $copyOf)
             ?? throw new InvalidRoleValueException(sprintf('Die Rolle #%d gibt es in dieser Stadt nicht (Feld "copy_of").', $copyOf));
 
-        return RoleDraft::copyOf($source, $fields['name'] ?? $roles->availableName($tenant, $source->name . ' (Kopie)'));
+        return RoleDraft::copyOf($source, $fields['name'] ?? $roles->availableName($tenant, $source->name, copy: true));
     }
 
     /**
