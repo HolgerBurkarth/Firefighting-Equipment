@@ -50,6 +50,9 @@ use FirefightingEquipment\Api\V1\Notices\NoticeAction;
 use FirefightingEquipment\Api\V1\Notices\NoticeActionHandler;
 use FirefightingEquipment\Api\V1\Notices\NoticeListHandler;
 use FirefightingEquipment\Api\V1\Offline\ClientConfigHandler;
+use FirefightingEquipment\Api\V1\Roles\PermissionCatalogHandler;
+use FirefightingEquipment\Api\V1\Roles\RoleAction;
+use FirefightingEquipment\Api\V1\Roles\RoleHandler;
 use FirefightingEquipment\Api\V1\SuperAdmins\SuperAdminListHandler;
 use FirefightingEquipment\Api\V1\SuperAdmins\SuperAdminLockHandler;
 use FirefightingEquipment\Api\V1\TenantHandler;
@@ -102,6 +105,14 @@ final class Routes
             ->add('POST', 'api/v1/tenants/{id}/admins', Access::SuperAdmin, new AdminInvitationHandler(resend: false))
             ->add('GET', 'api/v1/tenants/{id}/users', Access::SuperAdmin, new TenantUserListHandler())
             ->add('POST', 'api/v1/tenants/{id}/users/{user}/resend-invitation', Access::SuperAdmin, new AdminInvitationHandler(resend: true))
+            ->add('GET', 'api/v1/tenants/{id}/roles', Access::SuperAdmin, new RoleHandler(RoleAction::List))
+            ->add('POST', 'api/v1/tenants/{id}/roles', Access::SuperAdmin, new RoleHandler(RoleAction::Create))
+            ->add('POST', 'api/v1/tenants/{id}/roles/import', Access::SuperAdmin, new RoleHandler(RoleAction::Import))
+            ->add('GET', 'api/v1/tenants/{id}/roles/{role}', Access::SuperAdmin, new RoleHandler(RoleAction::Show))
+            ->add('POST', 'api/v1/tenants/{id}/roles/{role}', Access::SuperAdmin, new RoleHandler(RoleAction::Save))
+            ->add('DELETE', 'api/v1/tenants/{id}/roles/{role}', Access::SuperAdmin, new RoleHandler(RoleAction::Delete))
+            ->add('GET', 'api/v1/tenants/{id}/role-filter-options', Access::SuperAdmin, new RoleHandler(RoleAction::FilterOptions))
+            ->add('GET', 'api/v1/permission-catalog', Access::SuperAdmin, new PermissionCatalogHandler())
             ->add('GET', 'api/v1/superadmins', Access::SuperAdmin, new SuperAdminListHandler())
             ->add('POST', 'api/v1/superadmins/{id}/lock', Access::SuperAdmin, new SuperAdminLockHandler(lock: true))
             ->add('POST', 'api/v1/superadmins/{id}/unlock', Access::SuperAdmin, new SuperAdminLockHandler(lock: false))

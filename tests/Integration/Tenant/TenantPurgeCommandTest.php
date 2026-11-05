@@ -89,6 +89,7 @@ final class TenantPurgeCommandTest extends DeviceSchemaTestCase
         self::assertMatchesRegularExpression('/^  Geräte:     3\r?$/m', $out);
         self::assertMatchesRegularExpression('/^  Ereignisse: 5\r?$/m', $out);
         self::assertMatchesRegularExpression('/^  Standorte:  3\r?$/m', $out);
+        self::assertMatchesRegularExpression('/^  Rollen mit Standortfilter: 1 \(Geräteträger\)\r?$/m', $out);
         self::assertStringContainsString('purge-device-data --slug=immendingen --execute --confirm=immendingen', $out);
         self::assertSame($before, $this->snapshot());
         self::assertSame([], $this->backups);
@@ -129,12 +130,22 @@ final class TenantPurgeCommandTest extends DeviceSchemaTestCase
         self::assertMatchesRegularExpression('/^  Standorte:  3\r?$/m', $out);
         self::assertMatchesRegularExpression('/^  Buchungen:  1\r?$/m', $out);
         self::assertMatchesRegularExpression('/^  Hinweise:   1\r?$/m', $out);
+        self::assertMatchesRegularExpression('/^  Rollen mit Standortfilter: 1 \(Geräteträger\)\r?$/m', $out);
+        self::assertStringContainsString('Standortfilter entfernt bei: Geräteträger. Diese Rollen sehen keine Ausrüstung, bis unter „Rollen“ neu ausgewählt wird.', $out);
 
-        // Erwartet: alles wie vorher außer Geräten, Ereignissen, Standorten, Quittungen und Hinweisen
-        // dieser Stadt. Damit bleiben die andere Stadt vollständig, Gerätetypen, Benutzer, Codes,
-        // Sitzungen und die Stadt selbst gleich.
+        // Erwartet: alles wie vorher außer Geräten, Ereignissen, Standorten, Quittungen, Hinweisen und
+        // Standortfiltern der Rollen dieser Stadt. Damit bleiben die andere Stadt vollständig,
+        // Gerätetypen, Benutzer, Codes, Sitzungen und die Stadt selbst gleich. Die Rolle mit
+        // Standortfilter behält filter_locations = 1 (sieht nichts) und bekommt eine neue Version.
+        $after = $this->snapshot();
         $expected = $before;
-        foreach (['fe_device_events', 'fe_devices', 'fe_locations', 'fe_device_bookings', 'fe_device_notices', 'fe_device_notice_actions'] as $table) {
+        foreach ($expected['fe_roles'] as $i => $role) {
+            if ((int) $role['tenant_id'] === $this->tenantId && $role['name'] === 'Geräteträger') {
+                self::assertSame(1, (int) $role['filter_locations']);
+                $expected['fe_roles'][$i] = [...$role, 'version' => (int) $role['version'] + 1, 'updated_at' => $after['fe_roles'][$i]['updated_at'], 'updated_by' => null];
+            }
+        }
+        foreach (['fe_device_events', 'fe_devices', 'fe_locations', 'fe_device_bookings', 'fe_device_notices', 'fe_device_notice_actions', 'fe_role_locations'] as $table) {
             $expected[$table] = array_values(array_filter(
                 $before[$table],
                 fn (array $row): bool => (int) $row['tenant_id'] !== $this->tenantId,
@@ -142,9 +153,9 @@ final class TenantPurgeCommandTest extends DeviceSchemaTestCase
             self::assertNotSame($before[$table], $expected[$table], $table);
             self::assertNotSame([], $expected[$table], $table);
         }
-        self::assertSame($expected, $this->snapshot());
+        self::assertSame($expected, $after);
         self::assertEquals(new DeviceDataCounts(0, 0, 0), $this->counts($this->tenantId));
-        self::assertEquals(new DeviceDataCounts(3, 5, 3, 1, 1), $this->counts($this->otherTenantId));
+        self::assertEquals(new DeviceDataCounts(3, 5, 3, 1, 1, ['Geräteträger']), $this->counts($this->otherTenantId));
     }
 
     public function testBackupIsCreatedBeforeDeleting(): void
@@ -326,6 +337,13 @@ final class TenantPurgeCommandTest extends DeviceSchemaTestCase
             'other_occurred_at' => '2025-12-01 08:00:00', 'other_location_id' => $vehicle, 'other_status' => 'ready', 'status' => 'resolved',
         ]);
         $this->insert('fe_device_notice_actions', ['tenant_id' => $tenantId, 'notice_id' => $notice, 'action' => 'resolve', 'user_id' => $userId]);
+
+        // Rolle mit Datenfilter auf ein Fach und den Raum (Fremdschlüssel auf fe_locations).
+        $role = $this->insert('fe_roles', ['tenant_id' => $tenantId, 'name' => 'Geräteträger', 'filter_locations' => 1]);
+        $this->insert('fe_role_areas', ['role_id' => $role, 'tenant_id' => $tenantId, 'area' => 'search', 'level' => 'read']);
+        foreach ([$compartment, $room] as $locationId) {
+            $this->insert('fe_role_locations', ['role_id' => $role, 'tenant_id' => $tenantId, 'location_id' => $locationId]);
+        }
     }
 
     private function counts(int $tenantId): DeviceDataCounts

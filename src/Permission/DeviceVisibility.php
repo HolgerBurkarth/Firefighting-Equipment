@@ -37,6 +37,12 @@ final readonly class DeviceVisibility
         return new self(null, null);
     }
 
+    /** Sieht nichts (Konto ohne Rolle, Permissions::none()). */
+    public static function none(): self
+    {
+        return new self([], []);
+    }
+
     /**
      * @param list<int>|null $locationIds   null = kein Standortfilter; Fächer schon enthalten
      * @param list<int>|null $deviceTypeIds null = kein Typfilter

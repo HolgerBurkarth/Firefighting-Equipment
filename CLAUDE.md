@@ -236,10 +236,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `pending_approval` 403, `invalid_current_password` 403, `tenant_inactive` 403, `not_found` 404,
   `tenant_not_found` 404, `method_not_allowed` 405, `rule_violation` 409 (Meldung der verletzten
   Regel), `slug_taken` 409, `email_taken` 409 (beide nur für den Super-Admin; öffentliche Abläufe
-  verraten nie, ob eine Adresse existiert), `name_taken` 409 (Name eines Gerätetyps bzw. Standorts
-  vergeben), `identifier_taken` 409 (Kennung eines Geräts vergeben), `scan_code_taken` 409
+  verraten nie, ob eine Adresse existiert), `name_taken` 409 (Name eines Gerätetyps, Standorts bzw.
+  einer Rolle vergeben), `identifier_taken` 409 (Kennung eines Geräts vergeben), `scan_code_taken` 409
   (Scan-Code eines Geräts vergeben), `version_conflict` 409
-  (Gerät inzwischen geändert, aktueller Stand in `details`), `import_outdated` 409 (CSV-Import: seit
+  (Gerät bzw. Rolle inzwischen geändert, aktueller Stand in `details`), `import_outdated` 409 (CSV-Import: seit
   der Vorschau geändert, Vorschau neu erstellen), `client_ref_conflict` 409 (Buchung: `client_ref`
   schon für eine andere Buchung verwendet), `stale_action` 409 (Offline-Buchung zu alt, ohne
   `confirmed_stale`), `client_outdated` 409 (App-Version unter `ClientApi::MIN`, `details
@@ -1846,9 +1846,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Stand: Schritte 1.1, 1.2 (Schema, Standard-Rollen, jedes Konto einer Stadt mit Rolle), 1.3a
   (Routen unter Städten prüfen Rechte der Rolle statt `fe_users.role`), 1.3b (`auth/me` mit
   `permissions`, Sitzungsdauer und Log-Mails aus den Rechten, Migrationen 0039/0040) und 1.4
-  (Datenfilter „Sieht nur …“ in allen Abfragen und Mails). Für *Admin* und *Benutzer* verhält sich
-  jede Route wie vorher (per Test), ebenso Sitzungsdauer und Empfänger der Log-Mails; neu ist nur das
-  Feld `selectable` der Standorte. Rollen mit Datenfilter legt erst der Editor in 1.5 an.
+  (Datenfilter „Sieht nur …“ in allen Abfragen und Mails), 1.5a (Verwaltung der Rollen durch den
+  Super-Admin im Backend, siehe unten). Für *Admin* und *Benutzer* verhält sich jede Route wie vorher
+  (per Test), ebenso Sitzungsdauer und Empfänger der Log-Mails; neu ist nur das Feld `selectable` der
+  Standorte. Konten bekommen eigene Rollen erst mit Schritt 1.6 (Zuweisung durch den Admin).
 - Datenfilter (Schritt 1.4, Plan Abschnitt 4 mit den Festlegungen vom 05.11.2026):
   `Permission\DeviceVisibility` (je Art `null` = alle, sonst erlaubte IDs; ein Standort der Ebene 1
   schließt seine Fächer ein, auch später angelegte; eingeschaltet ohne Auswahl = nichts; Gerät
@@ -1858,8 +1859,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `RequestContext::visibility()`. Die Repositorys `DeviceRepository`, `DeviceEventRepository`,
   `DeviceNoticeRepository`, `LocationRepository`, `DeviceTypeRepository` verlangen sie im
   Konstruktor (Pflicht, ohne Standardwert; Reflection-Test `DeviceVisibilityTest`); Handler übergeben
-  `$context->visibility()`, Kommandozeile, Seeder, CSV-Import (F3) und `DeviceLogNotifier`
-  `DeviceVisibility::all()`. Regeln: Gerät außerhalb wie fremd (404, auch `version_conflict` ohne
+  `$context->visibility()`, Kommandozeile, Seeder, CSV-Import (F3), `DeviceLogNotifier` und die
+  Auswahl für den Datenfilter des Super-Admins `DeviceVisibility::all()` (feste Liste der Stellen per
+  Test `testAllIsUsedOnlyAtKnownPlaces`; eine neue Stelle nur nach Prüfung eintragen). Ohne Rolle
+  (`Permissions::none()`) sieht ein Konto nichts (`DeviceVisibility::none()`). Regeln: Gerät außerhalb wie fremd (404, auch `version_conflict` ohne
   `details`, Wiederholung einer `client_ref`, Sammelaktion `error` `not_found` mit `device` `null`);
   Ziel-Standort bzw. Gerätetyp außerhalb wie unbekannt (400); Listen, Suche, `scan_code`, Zahlen
   (`device-summary`, `notices.open`, Gerätezahlen von Standorten und Typen), Prüffristen, Exporte,
@@ -1959,12 +1962,38 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Migration `0034`, neue in `TenantRepository::create` über `RoleRepository::createDefaults` (eigene
   Transaktion oder die offene des Aufrufers). Beide Stellen immer gemeinsam ändern (per Test gleich,
   `DefaultRolesMigrationTest`).
-- Code `src/Role/` (`Role`, `SystemRole`, `DefaultRoles`, `RoleRepository`: `listByTenant` (Admin,
-  Benutzer, dann nach Name), `find`, `findSystemRole`, `createDefaults`). Tests in
-  `tests/Integration/Role/` (`RoleSchemaTest`, `RoleRepositoryTest`, `DefaultRolesMigrationTest`).
-- `bin/tenant.php purge-device-data` löscht Standorte; ein Datenfilter auf einen Standort verhindert
-  das (Fremdschlüssel, Rücknahme). Mit Schritt 1.5 entfernt der Befehl vorher `fe_role_locations` der
-  Stadt.
+- Code `src/Role/` (`Role`, `SystemRole`, `DefaultRoles`, `RoleDraft`, `RoleUsage`, Fehler
+  `RoleException`, `InvalidRoleValueException`, `RoleNotFoundException`, `DuplicateRoleNameException`,
+  `RoleVersionConflictException`, `RoleRuleViolationException`; `RoleRepository`: `listByTenant`
+  (Admin, Benutzer, dann nach Name), `find`, `findSystemRole`, `findInAnyTenant`, `usage`,
+  `createDefaults`, `create`, `update`, `delete`, `availableName`). Tests in `tests/Integration/Role/`
+  (`RoleSchemaTest`, `RoleRepositoryTest`, `DefaultRolesMigrationTest`, `RoleApiTest`).
+- Verwaltung der Rollen durch den Super-Admin (Schritt 1.5a; Vorgaben Holger 05.11.2026; nur unter
+  `service`, `Access::SuperAdmin`, in `SuperAdminRoutesAccessTest`; Endpunkte `src/Api/V1/Roles/`:
+  `RoleHandler` mit `RoleAction`, `RoleFields`, `RoleJson`, `PermissionCatalogHandler`):
+  `GET permission-catalog` (Bereiche mit `label`, `hint`, `levels`, `levels_with_filter`; Stufen;
+  Aktionen in Gruppen `ActionGroup` mit `requires` und `with_filter`; Bezeichnungen aus `Area`,
+  `AreaLevel`, `Action`), `GET`/`POST tenants/{id}/roles` (Liste mit `usage {accounts,
+  invitation_codes}`; anlegen mit ganzem Stand `{name, description?, areas, actions, locations,
+  device_types}` bzw. Kopie `{copy_of, name?}`), `POST tenants/{id}/roles/import {source_role_id,
+  name?}` (andere Stadt, nur Rechte, F10), `GET`/`POST`/`DELETE tenants/{id}/roles/{role}` (Speichern
+  mit `version`), `GET tenants/{id}/role-filter-options` (Standorte und Typen der Stadt für „Sieht nur
+  …“). Regeln (`RoleRepository`, `RoleDraft`): *Admin* nicht änderbar und nicht löschbar, *Benutzer*
+  änderbar, nicht löschbar (409 `rule_violation`); löschen nur ohne Konten (ohne gelöschte) und ohne
+  offene Einladungscodes (Codes ohne Rolle zählen zu *Benutzer*; sonst 409 mit `details {accounts,
+  invitation_codes}`), gelöschte Konten der Rolle bekommen danach *Benutzer*, alte Codes keine Rolle;
+  veraltete `version` → 409 `version_conflict` (`details {role}`); leerer Datenfilter (`[]`) → 400;
+  F3 → 409 (`details {areas, actions}`, in beide Richtungen; Grenzen nur in
+  `Permissions::excludedWithFilter`/`excludedActionWithFilter`, auch zur Laufzeit); Standorte und
+  Ausrüstungstypen nur aus derselben Stadt (gesperrte/deaktivierte erlaubt), sonst 400; Name 1–50,
+  Kurzbeschreibung bis 200 (leer = keine), je Stadt eindeutig ohne Groß-/Kleinschreibung (409
+  `name_taken`); Aktionen ohne ihren Bereich bleiben gespeichert. Speichern ohne Unterschied erhöht
+  `version` nicht; jede Änderung erhöht sie (damit `permissions.version`), Sitzungen bleiben (F1).
+  Kopie von *Admin* = gewöhnliche Rolle mit allen Rechten des Katalogs, ohne Beschreibung.
+- `bin/tenant.php purge-device-data` entfernt vor dem Löschen der Standorte die Standortfilter
+  (`fe_role_locations`) der Rollen der Stadt (sonst verhinderte der Fremdschlüssel das Löschen); die
+  Rollen behalten `filter_locations = 1` und sehen danach nichts, bis neu ausgewählt wird (siehe
+  "Gerätedaten zurücksetzen").
 
 ## Städte verwalten und Admins einladen
 - Nur Super-Admins, nur unter `service` (`Access::SuperAdmin`; Konten einer Stadt haben dort keine
@@ -2121,10 +2150,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Mit `--execute`: nichts vorhanden → Hinweis, keine Sicherung, Exit-Code 0. Sonst zuerst Sicherung
   aller `fe_*` mit Zusatz `vor-purge-<kürzel>` (`TenantCommand::PURGE_BACKUP_SUFFIX_PREFIX`); Fehler
   (auch keine Tabellen) → Abbruch ohne Löschen, Exit-Code 1. Dann in EINER Transaktion (eine offene
-  ist ein Fehler): Standorte der Stadt `FOR UPDATE`, `DELETE` von `fe_device_notice_actions`,
+  ist ein Fehler): Standorte der Stadt und Rollen mit Standortfilter `FOR UPDATE`, `DELETE` von
+  `fe_role_locations` (die Rollen behalten `filter_locations = 1`, sehen also nichts, bis im Editor
+  neu ausgewählt wird; `version` + 1, `updated_by` NULL), `fe_device_notice_actions`,
   `fe_device_notices`, `fe_device_bookings`, `fe_device_events`, `fe_devices`, `fe_locations` Ebene 2,
   dann Ebene 1, jeweils `WHERE tenant_id = ?`. Gerätetypen, Benutzer,
-  Einladungscodes, Sitzungen und die Stadt bleiben. Ausgabe: gelöschte Anzahlen und Pfad der Sicherung.
+  Einladungscodes, Sitzungen, Rollen und die Stadt bleiben. Ausgabe: gelöschte Anzahlen, die Rollen
+  mit Standortfilter (auch im Probelauf, „Rollen mit Standortfilter: N (Namen)“) und Pfad der Sicherung.
 - Tests (`tests/Integration/Tenant/TenantPurgeCommandTest`) übergeben eine Fake-Sicherung per
   Konstruktor (`backup`) bzw. einen temporären Ordner (`backupDir`); sie vergleichen alle Zeilen
   aller Tabellen `fe_*` vorher und nachher.

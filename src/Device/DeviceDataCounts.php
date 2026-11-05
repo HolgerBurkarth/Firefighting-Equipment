@@ -6,7 +6,8 @@ namespace FirefightingEquipment\Device;
 
 /**
  * Anzahl Geräte, Ereignisse, Standorte, Buchungs-Quittungen und Hinweise einer Stadt (vorhanden
- * bzw. gelöscht; der Verlauf der Hinweise zählt nicht eigens).
+ * bzw. gelöscht; der Verlauf der Hinweise zählt nicht eigens), dazu die Rollen, deren Datenfilter
+ * „Sieht nur …“ Standorte nennt (deren Auswahl entfernt wird bzw. wurde).
  */
 final readonly class DeviceDataCounts
 {
@@ -16,6 +17,8 @@ final readonly class DeviceDataCounts
         public int $locations,
         public int $bookings = 0,
         public int $notices = 0,
+        /** @var list<string> Namen der Rollen mit Standortfilter, nach Name */
+        public array $rolesWithLocationFilter = [],
     ) {
     }
 

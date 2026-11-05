@@ -138,6 +138,18 @@ Einschalten nur mit `mail.log` (bzw. als Super-Admin). `SessionRepository::delet
 Inaktivität weiter nach Kontoart (für eigene Rollen eine Obergrenze; kürzere Sitzungen löscht
 `resume` beim Antreffen).
 
+Schritt 1.5 (05.11.2026) in zwei Teilen: **1.5a** Backend (API unter `service`, Schutzregeln,
+`purge-device-data`), **1.5b** Seiten des Super-Admins mit Live-Test. Vorgaben Holger: *Admin* nicht
+änderbar und nicht löschbar, *Benutzer* änderbar und nicht löschbar; Löschen nur ohne Konten und
+offene Einladungscodes (409 mit Anzahlen); Speichern mit `version` (409 `version_conflict`), leerer
+Filter 400, F3 409, Standorte und Typen nur aus derselben Stadt 400; jede Änderung ändert
+`permissions.version`, Sitzungen bleiben (F1). Festgelegt bei der Umsetzung: Gelöschte
+(anonymisierte) Konten zählen nicht als Personen und bekommen beim Löschen der Rolle *Benutzer*;
+nicht mehr nutzbare Codes verlieren ihre Rolle (= *Benutzer*). `purge-device-data` entfernt die
+Standortfilter der Rollen; sie behalten `filter_locations = 1` und sehen nichts, bis neu ausgewählt
+wird. Dazu aus 1.4: `Permissions::none()` sieht nichts, feste Liste der Stellen mit
+`DeviceVisibility::all()` per Test.
+
 Bewusst **nicht** in Phase 1:
 
 - `fe_users.role` wird weder entfernt noch umbenannt (wäre ⚠ und ist als Kontoart nützlich).

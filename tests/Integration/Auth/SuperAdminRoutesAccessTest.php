@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Tests\Integration\Auth;
 
 use FirefightingEquipment\Http\Routes;
+use FirefightingEquipment\Role\RoleDraft;
+use FirefightingEquipment\Role\RoleRepository;
 use FirefightingEquipment\User\EmailAddress;
 use FirefightingEquipment\User\UserRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -34,6 +36,15 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
         yield 'Admin einladen' => ['POST', 'tenants/{tenant}/admins', ['email' => 'zweiter@example.org']];
         yield 'Benutzer ansehen' => ['GET', 'tenants/{tenant}/users', null];
         yield 'Einladung erneut senden' => ['POST', 'tenants/{tenant}/users/{user}/resend-invitation', []];
+        yield 'Rechte-Katalog' => ['GET', 'permission-catalog', null];
+        yield 'Rollen auflisten' => ['GET', 'tenants/{tenant}/roles', null];
+        yield 'Rolle anlegen' => ['POST', 'tenants/{tenant}/roles', ['name' => 'Live', 'areas' => ['search' => 'read'], 'actions' => [], 'locations' => null, 'device_types' => null]];
+        yield 'Rolle kopieren' => ['POST', 'tenants/{tenant}/roles', ['copy_of' => '{role}']];
+        yield 'Rolle übernehmen' => ['POST', 'tenants/{tenant}/roles/import', ['source_role_id' => '{other-role}']];
+        yield 'Rolle anzeigen' => ['GET', 'tenants/{tenant}/roles/{role}', null];
+        yield 'Rolle speichern' => ['POST', 'tenants/{tenant}/roles/{role}', ['version' => 1, 'name' => 'Neu', 'areas' => [], 'actions' => [], 'locations' => null, 'device_types' => null]];
+        yield 'Rolle löschen' => ['DELETE', 'tenants/{tenant}/roles/{role}', []];
+        yield 'Auswahl für den Datenfilter' => ['GET', 'tenants/{tenant}/role-filter-options', null];
         yield 'Super-Admins auflisten' => ['GET', 'superadmins', null];
         yield 'Super-Admin sperren' => ['POST', 'superadmins/{superadmin}/lock', []];
         yield 'Super-Admin entsperren' => ['POST', 'superadmins/{superadmin}/unlock', []];
@@ -47,11 +58,18 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
     {
         $this->account('immendingen', 'admin@example.org', ['role' => 'admin']);
         $this->account('immendingen', 'user@example.org');
-        $this->account(null, 'chef@example.org');
+        $chef = $this->account(null, 'chef@example.org');
         $other = $this->account(null, 'zweiter@example.org');
         $tenant = $this->tenant('immendingen');
         $invited = new UserRepository($this->pdo())->inviteAdmin($tenant, EmailAddress::fromString('neu@example.org'))->user->id;
-        $path = str_replace(['{tenant}', '{user}', '{superadmin}'], [(string) $tenant->id, (string) $invited, (string) $other], $path);
+        $roles = new RoleRepository($this->pdo());
+        $role = $roles->create($tenant, RoleDraft::of('Gerätewart', null, [], [], null, null), $chef)->id;
+        $otherRole = $roles->create($this->tenant('tuttlingen'), RoleDraft::of('Träger', null, [], [], null, null), $chef)->id;
+        $placeholders = ['{tenant}' => $tenant->id, '{user}' => $invited, '{superadmin}' => $other, '{role}' => $role, '{other-role}' => $otherRole];
+        $path = strtr($path, array_map('strval', $placeholders));
+        if ($body !== null) {
+            $body = array_map(static fn (mixed $value): mixed => is_string($value) ? ($placeholders[$value] ?? $value) : $value, $body);
+        }
         $url = self::url(null, $path);
         $admin = $this->loginCookie('immendingen', 'admin@example.org');
         $user = $this->loginCookie('immendingen', 'user@example.org');
@@ -76,6 +94,8 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
         return json_encode([
             $this->pdo()->query('SELECT * FROM fe_tenants ORDER BY id')->fetchAll(),
             $this->pdo()->query('SELECT * FROM fe_users ORDER BY id')->fetchAll(),
+            $this->pdo()->query('SELECT * FROM fe_roles ORDER BY id')->fetchAll(),
+            $this->pdo()->query('SELECT * FROM fe_role_areas ORDER BY role_id, area')->fetchAll(),
             array_map(
                 static fn (array $row): array => [...$row, 'token_hash' => bin2hex($row['token_hash'])],
                 $this->pdo()->query('SELECT user_id, purpose, token_hash FROM fe_user_tokens ORDER BY id')->fetchAll(),

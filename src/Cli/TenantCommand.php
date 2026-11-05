@@ -70,6 +70,8 @@ final readonly class TenantCommand
         Probelauf (zeigt die Anzahlen). Mit --execute muss --confirm genau dem Kürzel entsprechen;
         vorher wird die Datenbank gesichert (Zusatz vor-purge-KÜRZEL, Abbruch bei Fehler).
         Gerätetypen, Benutzer, Einladungscodes, Sitzungen und die Stadt selbst bleiben.
+        Rollen mit „Sieht nur …“ auf Standorte verlieren die Auswahl und sehen danach nichts,
+        bis sie unter „Rollen“ neu ausgewählt wird; die Ausgabe nennt diese Rollen.
         Standard-Konfiguration: config/config.local.php
         Auf dem Server immer php85 statt php verwenden.
 
@@ -398,6 +400,12 @@ final readonly class TenantCommand
         $deleted = $purge->purge($tenant);
         $this->line(sprintf('Gerätedaten gelöscht: %s („%s“). Gelöscht:', $slug->value, $tenant->name->value));
         $this->printCounts($deleted);
+        if ($deleted->rolesWithLocationFilter !== []) {
+            $this->line(sprintf(
+                'Standortfilter entfernt bei: %s. Diese Rollen sehen keine Ausrüstung, bis unter „Rollen“ neu ausgewählt wird.',
+                implode(', ', $deleted->rolesWithLocationFilter),
+            ));
+        }
     }
 
     private function printCounts(DeviceDataCounts $counts): void
@@ -407,6 +415,11 @@ final readonly class TenantCommand
         $this->line(sprintf('  Standorte:  %d', $counts->locations));
         $this->line(sprintf('  Buchungen:  %d', $counts->bookings));
         $this->line(sprintf('  Hinweise:   %d', $counts->notices));
+        $this->line(sprintf(
+            '  Rollen mit Standortfilter: %d%s',
+            count($counts->rolesWithLocationFilter),
+            $counts->rolesWithLocationFilter === [] ? '' : ' (' . implode(', ', $counts->rolesWithLocationFilter) . ')',
+        ));
     }
 
     /**
