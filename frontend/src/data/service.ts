@@ -14,6 +14,17 @@ import {
     type ManagedTenant,
     type SuperAdmin,
 } from '../api/tenants';
+import {
+    deleteRole,
+    fetchPermissionCatalog,
+    postRole,
+    postRoleCopy,
+    postRoleImport,
+    postRoleSave,
+    type PermissionCatalog,
+    type Role,
+    type RoleRequest,
+} from '../api/roles';
 import { onSessionEnded } from '../auth/session';
 import { Refresher, type RefreshReason } from './refresher';
 
@@ -140,6 +151,62 @@ export async function resendInvitation(
     userId: number,
 ): Promise<ApiResult<InvitationResult>> {
     return afterTenantChange(await postResendInvitation(tenantId, userId));
+}
+
+// Rollen einer Stadt (Plan Phase 1, Schritt 1.5): keine Liste im Speicher, die Seiten laden selbst.
+
+let catalog: Promise<ApiResult<PermissionCatalog>> | null = null;
+
+/** Rechte-Katalog (ändert sich nur mit einem Deploy): einmal geladen, Fehler werden nicht gemerkt. */
+export async function permissionCatalog(): Promise<ApiResult<PermissionCatalog>> {
+    catalog ??= fetchPermissionCatalog();
+    const result = await catalog;
+    if (!result.ok) {
+        catalog = null;
+    }
+    return result;
+}
+
+export function createRole(tenantId: number, request: RoleRequest): Promise<ApiResult<Role>> {
+    return postRole(tenantId, request);
+}
+
+export function copyRole(tenantId: number, roleId: number): Promise<ApiResult<Role>> {
+    return postRoleCopy(tenantId, roleId);
+}
+
+export function importRole(
+    tenantId: number,
+    sourceRoleId: number,
+    name: string | null,
+): Promise<ApiResult<Role>> {
+    return postRoleImport(tenantId, sourceRoleId, name);
+}
+
+export function saveRole(
+    tenantId: number,
+    roleId: number,
+    version: number,
+    request: RoleRequest,
+): Promise<ApiResult<Role>> {
+    return postRoleSave(tenantId, roleId, version, request);
+}
+
+export function removeRole(tenantId: number, roleId: number): Promise<ApiResult<number>> {
+    return deleteRole(tenantId, roleId);
+}
+
+let roleNotice: string | null = null;
+
+/** Bestätigung für die nächste Seite (nach Speichern, Kopieren, Übernehmen, Löschen). */
+export function setRoleNotice(text: string): void {
+    roleNotice = text;
+}
+
+export function takeRoleNotice(): string | null {
+    const text = roleNotice;
+    roleNotice = null;
+    return text;
 }
 
 export async function setSuperAdminLocked(

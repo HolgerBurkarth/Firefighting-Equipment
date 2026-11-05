@@ -98,6 +98,20 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { roles: ['superadmin'], layout: 'admin' },
         });
         routes.push({
+            // Neue Rolle einer Stadt (Plan Phase 1, Schritt 1.5); exakter Pfad vor :role.
+            path: '/staedte/:id([1-9]\\d{0,17})/rollen/neu',
+            name: 'role-new',
+            component: () => import('../pages/RoleEditPage.vue'),
+            meta: { roles: ['superadmin'], layout: 'admin' },
+        });
+        routes.push({
+            // Rolle bearbeiten bzw. ansehen (Admin); IDs wie die Platzhalter im Backend.
+            path: '/staedte/:id([1-9]\\d{0,17})/rollen/:role([1-9]\\d{0,17})',
+            name: 'role',
+            component: () => import('../pages/RoleEditPage.vue'),
+            meta: { roles: ['superadmin'], layout: 'admin' },
+        });
+        routes.push({
             path: '/super-admins',
             name: 'super-admins',
             component: () => import('../pages/SuperAdminsPage.vue'),

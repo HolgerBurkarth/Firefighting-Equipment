@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
 import { computed, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
@@ -7,6 +8,7 @@ import type { AdminUser } from '../api/users';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
+import TenantRolesPanel from '../components/TenantRolesPanel.vue';
 import { phpTrim } from '../data/masterData';
 import {
     inviteAdmin,
@@ -30,13 +32,38 @@ import { goBack } from '../router/back';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 
 /**
- * Stadtdetail des Super-Admins (KONZEPT.md, "Super-Admin – Entscheidungen", 44): Name, Adresse
- * (nur als Text), Status und Zahlen; Umbenennen, Sperren/Entsperren mit Rückfrage, Admin einladen;
- * darunter die Konten der Stadt nur zum Ansehen, eingeladene Admins mit „Einladung erneut senden“.
+ * Stadtdetail des Super-Admins (KONZEPT.md, "Super-Admin – Entscheidungen", 44; Plan Phase 1, F7):
+ * Reiter „Übersicht“ (Name, Adresse nur als Text, Status und Zahlen; Umbenennen, Sperren/Entsperren
+ * mit Rückfrage, Admin einladen), „Admins und Benutzer“ (Konten nur zum Ansehen, eingeladene Admins
+ * mit „Einladung erneut senden“) und „Rollen“ (TenantRolesPanel). Reiter in der Adresse
+ * (`?ansicht=konten` bzw. `rollen`, gleicher Pfad).
  */
 const route = useRoute();
 const router = useRouter();
 const id = computed(() => Number(route.params['id']));
+
+type Tab = 'overview' | 'accounts' | 'roles';
+const TAB_VIEWS: Readonly<Record<Tab, string | null>> = {
+    overview: null,
+    accounts: 'konten',
+    roles: 'rollen',
+};
+const tab = computed<Tab>({
+    get: () =>
+        route.query['ansicht'] === 'konten'
+            ? 'accounts'
+            : route.query['ansicht'] === 'rollen'
+              ? 'roles'
+              : 'overview',
+    set: (value) => {
+        const view = TAB_VIEWS[value];
+        void router.replace({ query: view === null ? {} : { ansicht: view } });
+    },
+});
+
+function selectTab(value: string | number): void {
+    tab.value = value === 'accounts' || value === 'roles' ? value : 'overview';
+}
 
 const loaded = shallowRef<ManagedTenant | null>(null);
 /** Zuerst aus der Liste der Städte, dann der Stand des Servers. */
@@ -352,144 +379,174 @@ onMounted(() => {
         <ErrorNotice v-if="pageError !== null" :error="pageError" />
         <ErrorNotice v-if="loadError !== null" :error="loadError" />
 
-        <section class="card" aria-labelledby="tenant-facts" data-testid="tenant-facts">
-            <h2 id="tenant-facts" class="visually-hidden">Angaben</h2>
-            <dl class="facts">
-                <div>
-                    <dt>Adresse</dt>
-                    <dd class="address">{{ tenantAddress(tenant.slug) }}</dd>
-                </div>
-                <div>
-                    <dt>Kürzel</dt>
-                    <dd>{{ tenant.slug }} <span class="hint">(nicht änderbar)</span></dd>
-                </div>
-                <div>
-                    <dt>Admins</dt>
-                    <dd>
-                        {{ tenant.adminsActive }} aktiv<template v-if="tenant.adminsInvited > 0"
-                            >,
-                            {{
-                                countText(tenant.adminsInvited, 'eingeladen', 'eingeladen')
-                            }}</template
-                        >
-                    </dd>
-                </div>
-                <div>
-                    <dt>Benutzer</dt>
-                    <dd>{{ tenant.usersActive }} aktive Konten</dd>
-                </div>
-                <div>
-                    <dt>Angelegt</dt>
-                    <dd>{{ dayText(tenant.createdAt) }}</dd>
-                </div>
-            </dl>
-            <div class="actions">
-                <button
-                    class="btn btn-accent"
-                    type="button"
-                    :disabled="!tenant.active"
-                    @click="openInvite"
-                >
-                    Admin einladen …
-                </button>
-                <button class="btn" type="button" @click="openRename">Umbenennen …</button>
-            </div>
-            <p v-if="!tenant.active" class="hint">
-                In eine gesperrte Stadt kann niemand eingeladen werden.
-            </p>
-        </section>
-
-        <section class="card danger-zone" aria-labelledby="lock-heading">
-            <h2 id="lock-heading">{{ tenant.active ? 'Stadt sperren' : 'Stadt entsperren' }}</h2>
-            <p class="hint">
-                {{
-                    tenant.active
-                        ? 'Gesperrt kann sich niemand der Stadt anmelden; Daten bleiben erhalten. Städte werden nie gelöscht.'
-                        : 'Die Stadt ist gesperrt: niemand kann sich anmelden.'
-                }}
-            </p>
-            <button
-                class="btn"
-                :class="{ 'btn-danger': tenant.active }"
-                type="button"
-                :disabled="busy"
-                @click="askLock"
-            >
-                {{ tenant.active ? `${tenant.name} sperren …` : `${tenant.name} entsperren …` }}
-            </button>
-        </section>
-
-        <section class="users" aria-labelledby="users-heading">
-            <div class="section-head">
-                <h2 id="users-heading">Konten</h2>
-                <span v-if="users !== null" class="hint">
-                    {{ countText(users.length, 'Konto', 'Konten') }} · nur ansehen
-                </span>
-            </div>
-            <ErrorNotice v-if="usersError !== null" :error="usersError">
-                <button class="btn retry" type="button" @click="loadUsers">Erneut versuchen</button>
-            </ErrorNotice>
-            <p v-else-if="users === null" class="hint" role="status">Wird geladen …</p>
-            <p v-else-if="users.length === 0" class="hint">Noch keine Konten.</p>
-            <template v-else>
-                <label class="filter-field">
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        aria-hidden="true"
-                    >
-                        <circle cx="11" cy="11" r="7" />
-                        <path d="M20 20l-4-4" />
-                    </svg>
-                    <span class="visually-hidden">Konten filtern</span>
-                    <input v-model="query" type="search" placeholder="Name oder E-Mail" />
-                </label>
-                <p v-if="rows.length === 0" class="hint">
-                    Kein Konto passt zu „{{ query.trim() }}“.
-                </p>
-                <ul class="user-list">
-                    <li
-                        v-for="user in rows"
-                        :key="user.id"
-                        class="user"
-                        :data-testid="`account-${String(user.id)}`"
-                    >
-                        <div class="user-main">
-                            <span class="user-name">{{ user.label }}</span>
-                            <span
-                                v-if="user.email !== null && user.email !== user.label"
-                                class="hint"
-                            >
-                                {{ user.email }}
-                            </span>
+        <TabsRoot :model-value="tab" class="tabs-root" @update:model-value="selectTab">
+            <TabsList class="tabs" :aria-label="`Stadt ${tenant.name}`">
+                <TabsTrigger class="tab" value="overview">Übersicht</TabsTrigger>
+                <TabsTrigger class="tab" value="accounts">Admins und Benutzer</TabsTrigger>
+                <TabsTrigger class="tab" value="roles">Rollen</TabsTrigger>
+            </TabsList>
+            <TabsContent class="tab-panel" value="overview">
+                <section class="card" aria-labelledby="tenant-facts" data-testid="tenant-facts">
+                    <h2 id="tenant-facts" class="visually-hidden">Angaben</h2>
+                    <dl class="facts">
+                        <div>
+                            <dt>Adresse</dt>
+                            <dd class="address">{{ tenantAddress(tenant.slug) }}</dd>
                         </div>
-                        <div class="user-meta">
-                            <span>{{ user.roleLabel }}</span>
-                            <span>{{ statusText(user) }}</span>
-                            <span class="hint">seit {{ createdText(user) }}</span>
+                        <div>
+                            <dt>Kürzel</dt>
+                            <dd>{{ tenant.slug }} <span class="hint">(nicht änderbar)</span></dd>
                         </div>
+                        <div>
+                            <dt>Admins</dt>
+                            <dd>
+                                {{ tenant.adminsActive }} aktiv<template
+                                    v-if="tenant.adminsInvited > 0"
+                                    >,
+                                    {{
+                                        countText(tenant.adminsInvited, 'eingeladen', 'eingeladen')
+                                    }}</template
+                                >
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Benutzer</dt>
+                            <dd>{{ tenant.usersActive }} aktive Konten</dd>
+                        </div>
+                        <div>
+                            <dt>Angelegt</dt>
+                            <dd>{{ dayText(tenant.createdAt) }}</dd>
+                        </div>
+                    </dl>
+                    <div class="actions">
                         <button
-                            v-if="user.status === 'invited' && !user.locked && tenant.active"
-                            class="btn"
+                            class="btn btn-accent"
                             type="button"
-                            :disabled="resendingId !== null"
-                            :aria-label="`Einladung an ${user.email ?? user.label} erneut senden`"
-                            @click="resend(user)"
+                            :disabled="!tenant.active"
+                            @click="openInvite"
                         >
-                            {{
-                                resendingId === user.id
-                                    ? 'Wird gesendet …'
-                                    : 'Einladung erneut senden'
-                            }}
+                            Admin einladen …
                         </button>
-                    </li>
-                </ul>
-            </template>
-        </section>
+                        <button class="btn" type="button" @click="openRename">Umbenennen …</button>
+                    </div>
+                    <p v-if="!tenant.active" class="hint">
+                        In eine gesperrte Stadt kann niemand eingeladen werden.
+                    </p>
+                </section>
+
+                <section class="card danger-zone" aria-labelledby="lock-heading">
+                    <h2 id="lock-heading">
+                        {{ tenant.active ? 'Stadt sperren' : 'Stadt entsperren' }}
+                    </h2>
+                    <p class="hint">
+                        {{
+                            tenant.active
+                                ? 'Gesperrt kann sich niemand der Stadt anmelden; Daten bleiben erhalten. Städte werden nie gelöscht.'
+                                : 'Die Stadt ist gesperrt: niemand kann sich anmelden.'
+                        }}
+                    </p>
+                    <button
+                        class="btn"
+                        :class="{ 'btn-danger': tenant.active }"
+                        type="button"
+                        :disabled="busy"
+                        @click="askLock"
+                    >
+                        {{
+                            tenant.active
+                                ? `${tenant.name} sperren …`
+                                : `${tenant.name} entsperren …`
+                        }}
+                    </button>
+                </section>
+            </TabsContent>
+
+            <TabsContent class="tab-panel" value="accounts">
+                <section class="users" aria-labelledby="users-heading">
+                    <div class="section-head">
+                        <h2 id="users-heading">Konten</h2>
+                        <span v-if="users !== null" class="hint">
+                            {{ countText(users.length, 'Konto', 'Konten') }} · nur ansehen
+                        </span>
+                    </div>
+                    <ErrorNotice v-if="usersError !== null" :error="usersError">
+                        <button class="btn retry" type="button" @click="loadUsers">
+                            Erneut versuchen
+                        </button>
+                    </ErrorNotice>
+                    <p v-else-if="users === null" class="hint" role="status">Wird geladen …</p>
+                    <p v-else-if="users.length === 0" class="hint">Noch keine Konten.</p>
+                    <template v-else>
+                        <label class="filter-field">
+                            <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                aria-hidden="true"
+                            >
+                                <circle cx="11" cy="11" r="7" />
+                                <path d="M20 20l-4-4" />
+                            </svg>
+                            <span class="visually-hidden">Konten filtern</span>
+                            <input v-model="query" type="search" placeholder="Name oder E-Mail" />
+                        </label>
+                        <p v-if="rows.length === 0" class="hint">
+                            Kein Konto passt zu „{{ query.trim() }}“.
+                        </p>
+                        <ul class="user-list">
+                            <li
+                                v-for="user in rows"
+                                :key="user.id"
+                                class="user"
+                                :data-testid="`account-${String(user.id)}`"
+                            >
+                                <div class="user-main">
+                                    <span class="user-name">{{ user.label }}</span>
+                                    <span
+                                        v-if="user.email !== null && user.email !== user.label"
+                                        class="hint"
+                                    >
+                                        {{ user.email }}
+                                    </span>
+                                </div>
+                                <div class="user-meta">
+                                    <span>{{ user.roleLabel }}</span>
+                                    <span>{{ statusText(user) }}</span>
+                                    <span class="hint">seit {{ createdText(user) }}</span>
+                                </div>
+                                <button
+                                    v-if="
+                                        user.status === 'invited' && !user.locked && tenant.active
+                                    "
+                                    class="btn"
+                                    type="button"
+                                    :disabled="resendingId !== null"
+                                    :aria-label="`Einladung an ${user.email ?? user.label} erneut senden`"
+                                    @click="resend(user)"
+                                >
+                                    {{
+                                        resendingId === user.id
+                                            ? 'Wird gesendet …'
+                                            : 'Einladung erneut senden'
+                                    }}
+                                </button>
+                            </li>
+                        </ul>
+                    </template>
+                </section>
+            </TabsContent>
+
+            <TabsContent class="tab-panel" value="roles" :unmount-on-hide="false">
+                <TenantRolesPanel
+                    :tenant-id="tenant.id"
+                    :tenant-name="tenant.name"
+                    :active="tab === 'roles'"
+                />
+            </TabsContent>
+        </TabsRoot>
 
         <FormDialog
             v-model:open="renameOpen"

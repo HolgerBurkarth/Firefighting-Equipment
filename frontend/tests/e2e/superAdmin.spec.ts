@@ -448,6 +448,8 @@ test.describe('Stadtdetail', () => {
         // Keine Links in die Stadt (Entscheidung 47).
         await expect(facts.locator('a')).toHaveCount(0);
 
+        // Konten im Reiter „Admins und Benutzer“ (Plan Phase 1, F7).
+        await page.getByRole('tab', { name: 'Admins und Benutzer' }).click();
         await expect(page.getByTestId('account-23')).toContainText('wartet auf Freischaltung');
         await expect(page.getByTestId('account-21')).toContainText('Admin');
         await expect(page.getByRole('button', { name: /erneut senden/ })).toHaveCount(0);
@@ -518,9 +520,10 @@ test.describe('Stadtdetail', () => {
         await expect(page.getByTestId('success-notice')).toHaveText(
             'Einladung an neu@example.org gesendet (Link 24 Stunden gültig).',
         );
+        await expect(page.getByTestId('tenant-facts')).toContainText('1 eingeladen');
+        await page.getByRole('tab', { name: 'Admins und Benutzer' }).click();
         const invited = page.getByTestId('account-100');
         await expect(invited).toContainText('eingeladen');
-        await expect(page.getByTestId('tenant-facts')).toContainText('1 eingeladen');
 
         server.mailSent = false;
         await invited
@@ -554,7 +557,7 @@ test.describe('Stadtdetail', () => {
     });
 
     test('offene Einladung im Detail erneut senden', async ({ page, apiRequests }) => {
-        await page.goto('/firefighting/service/staedte/3');
+        await page.goto('/firefighting/service/staedte/3?ansicht=konten');
         await page
             .getByRole('button', { name: 'Einladung an kommandant@bad-duerrheim.de erneut senden' })
             .click();
@@ -568,7 +571,7 @@ test.describe('Stadtdetail', () => {
 
     test('Handy: kein waagerechter Überstand', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
-        await page.goto('/firefighting/service/staedte/2');
+        await page.goto('/firefighting/service/staedte/2?ansicht=konten');
         await expect(page.getByTestId('account-21')).toBeVisible();
         expect(await horizontalOverflow(page)).toBe(0);
     });

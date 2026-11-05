@@ -983,9 +983,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   verworfen; Fehler der Vorabprüfung nur als Hinweis); `createTenant` → Meldung `createdTenantText`
   (grün bzw. rot, wenn `mail_sent` false), 409 `slug_taken` am Feld. Der Name in `TenantTable` führt
   zum Stadtdetail `staedte/<id>` (`TenantDetailPage`, Route `tenant`, `<id>` wie die Platzhalter im
-  Backend; Menü „Städte“ mit `sections: ['tenant']`): zuerst aus `tenantList`, dann `GET
-  tenants/{id}` (404 „Diese Stadt gibt es nicht.“) und `GET tenants/{id}/users` (nur ansehen, Suche
-  `tenantUserRows`); „Umbenennen …“ und „Admin einladen …“ (`FormDialog`; 400 bzw. 409 `email_taken`
+  Backend; Menü „Städte“ mit `sections: ['tenant', 'role', 'role-new']`): zuerst aus `tenantList`,
+  dann `GET tenants/{id}` (404 „Diese Stadt gibt es nicht.“) und `GET tenants/{id}/users`; Reiter
+  (Reka UI `Tabs`, Plan Phase 1, F7) „Übersicht“ (Angaben, Knöpfe, Sperren), „Admins und Benutzer“
+  (`?ansicht=konten`, Konten nur ansehen, Suche `tenantUserRows`) und „Rollen“ (`?ansicht=rollen`,
+  siehe unten); „Umbenennen …“ und „Admin einladen …“ (`FormDialog`; 400 bzw. 409 `email_taken`
   am Feld; gesperrte Stadt: Knopf gesperrt), „<Name> sperren …“/„entsperren …“ mit `ConfirmDialog`;
   eingeladene, nicht gesperrte Konten mit „Einladung erneut senden“ (`invitationText`). `super-admins`
   (`SuperAdminsPage`, Route `super-admins`): Liste aus `superAdminList` (Name, E-Mail, Status mit
@@ -999,6 +1001,31 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Super-Admin auf dem Dashboard landen, simulieren dessen Abfragen damit; zustandsbehafteter Server
   `serviceServer` bzw. `superAdminServer` über `delegate`); Unit-Tests
   `tenants.spec.ts`, `router.spec.ts`.
+- Rollen einer Stadt unter `service` (Plan Phase 1, Schritt 1.5b; Mockups „Main“ und
+  „Rolle-bearbeiten“; API siehe "Rollen und Rechte", Verwaltung der Rollen): Reiter „Rollen“ im
+  Stadtdetail (`TenantRolesPanel`, geladen, sobald sichtbar): Tabelle Rolle (Name, Chip „fest“ bzw.
+  „Standard“, Kurzbeschreibung), Sieht, Darf, Sieht nur …, Personen (`roleSummary`), Aktionen (Admin
+  „Ansehen“; sonst „Bearbeiten“, „Kopieren“ (Kopie öffnet sich im Editor), „<Name> löschen …“ nur
+  ohne Nutzung, `deleteBlocker`, nach `ConfirmDialog`), „Neue Rolle“, „Rolle aus anderer Stadt
+  übernehmen …“ (`FormDialog`: Stadt, Rolle, Name freiwillig; danach der Editor), Kasten „Regeln“;
+  unter 900 px Karten. „Rolle bearbeiten“ (`RoleEditPage`, Routen `role` = `staedte/<id>/rollen/<rolle>`
+  und `role-new` = `staedte/<id>/rollen/neu`): Name, Kurzbeschreibung, „1 · Ansichten und Bereiche“
+  (Knöpfe „Kein Zugriff“/„Ansehen“/„Ändern“ mit `aria-pressed`, `levelOptions`), „2 · Aktionen“
+  (Kästchen je Gruppe, grau mit „braucht „…: …““ ohne den Bereich, `actionState`), „4 · Sieht nur
+  …“ (Standorte als Baum und Ausrüstungstypen, je „Alle“/„Nur ausgewählte“, gesperrte bzw.
+  deaktivierte markiert; „3 · Einschränkungen“ erst ab Phase 2), rechts „So sieht es die Rolle“
+  (`rolePreview`: Menü am PC, Leiste am Handy, Darf, Sieht Ausrüstung) und „Die Änderung gilt sofort
+  für N Personen …“. F3 im Editor: mit „Sieht nur …“ sind die Stufen und Aktionen grau, die es dann
+  nicht gibt (eine schon gewählte bleibt bedienbar, um sie zu entfernen), dazu `filter-conflicts`;
+  Speichern geht erst ohne Probleme (`roleFormProblems`, Meldungen wie der Server, nie strenger).
+  Admin nur ansehen. Nach Speichern, Anlegen und Löschen zurück zu den Rollen (vorige Seite bzw.
+  `?ansicht=rollen`) mit Bestätigung (`setRoleNotice`/`takeRoleNotice` in `src/data/service.ts`);
+  409 `version_conflict` zeigt den neuen Stand mit Hinweis, `name_taken` am Feld. Ungespeichert =
+  Formular anders als geladen. Logik `src/data/roles.ts`, API `src/api/roles.ts`, Katalog einmal je
+  Seitenaufruf (`permissionCatalog`). Gemeinsame Datei `tests/Fixtures/permission-catalog.json` =
+  `GET permission-catalog` (PHP `PermissionCatalogFixtureTest`; Vitest und Browser-Tests lesen sie).
+  Browser-Tests `tests/e2e/roles.spec.ts` (Attrappe `roleServer` in `tests/e2e/support/roles.ts`
+  zusammen mit `serviceServer` über `delegate`); Unit-Tests `roles.spec.ts`, `rolesApi.spec.ts`.
 - Offline-Modus (KONZEPT.md "Offline-Modus – Entscheidungen", 48–56; Schritte O1–O3 umgesetzt):
   Erreichbarkeit `src/runtime/connectivity.ts` (`isOffline` = Browser offline oder die letzte
   Anfrage bekam keine Verbindung; `apiRequest`/`apiDownload` melden `reportServerReached`;
@@ -1847,7 +1874,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (Routen unter Städten prüfen Rechte der Rolle statt `fe_users.role`), 1.3b (`auth/me` mit
   `permissions`, Sitzungsdauer und Log-Mails aus den Rechten, Migrationen 0039/0040) und 1.4
   (Datenfilter „Sieht nur …“ in allen Abfragen und Mails), 1.5a (Verwaltung der Rollen durch den
-  Super-Admin im Backend, siehe unten). Für *Admin* und *Benutzer* verhält sich jede Route wie vorher
+  Super-Admin im Backend, siehe unten) und 1.5b (Seiten „Rollen“ und „Rolle bearbeiten“, siehe
+  "Frontend"). Für *Admin* und *Benutzer* verhält sich jede Route wie vorher
   (per Test), ebenso Sitzungsdauer und Empfänger der Log-Mails; neu ist nur das Feld `selectable` der
   Standorte. Konten bekommen eigene Rollen erst mit Schritt 1.6 (Zuweisung durch den Admin).
 - Datenfilter (Schritt 1.4, Plan Abschnitt 4 mit den Festlegungen vom 05.11.2026):
