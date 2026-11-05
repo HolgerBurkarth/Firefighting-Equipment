@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Auth;
 
-use FirefightingEquipment\User\UserRole;
-
 /**
  * Zugriff auf fe_sessions. Alle Zeitvergleiche rechnet die Datenbank mit UTC_TIMESTAMP().
  */
@@ -38,13 +36,15 @@ final readonly class SessionRepository
     }
 
     /**
-     * @return array{session: Session, idleSeconds: int, expired: bool}|null
-     *         idleSeconds: Sekunden seit last_seen_at; expired: Höchstdauer erreicht
+     * @return array{session: Session, idleSeconds: int, ageSeconds: int, expired: bool}|null
+     *         idleSeconds: Sekunden seit last_seen_at; ageSeconds: seit dem Anmelden;
+     *         expired: expires_at erreicht
      */
     public function findByTokenHash(string $tokenHash): ?array
     {
         $stmt = $this->pdo->prepare(
             'SELECT ' . self::COLUMNS . ', TIMESTAMPDIFF(SECOND, last_seen_at, UTC_TIMESTAMP()) AS idle_seconds,'
+            . ' TIMESTAMPDIFF(SECOND, created_at, UTC_TIMESTAMP()) AS age_seconds,'
             . ' expires_at <= UTC_TIMESTAMP() AS expired FROM fe_sessions WHERE token_hash = ?',
         );
         $stmt->execute([$tokenHash]);
@@ -56,22 +56,25 @@ final readonly class SessionRepository
         return [
             'session' => self::hydrate($row),
             'idleSeconds' => (int) $row['idle_seconds'],
+            'ageSeconds' => (int) $row['age_seconds'],
             'expired' => (int) $row['expired'] === 1,
         ];
     }
 
     /**
-     * Gültige Sitzungen eines Kontos, zuletzt benutzte zuerst.
+     * Gültige Sitzungen eines Kontos (Grenzen der Klasse seiner aktuellen Rechte), zuletzt benutzte
+     * zuerst.
      *
      * @return list<Session>
      */
-    public function listValidByUser(int $userId, UserRole $role): array
+    public function listValidByUser(int $userId, SessionClass $class): array
     {
         $stmt = $this->pdo->prepare(
             'SELECT ' . self::COLUMNS . ' FROM fe_sessions WHERE user_id = ? AND expires_at > UTC_TIMESTAMP()'
+            . ' AND created_at > UTC_TIMESTAMP() - INTERVAL ? SECOND'
             . ' AND last_seen_at > UTC_TIMESTAMP() - INTERVAL ? SECOND ORDER BY last_seen_at DESC, id DESC',
         );
-        $stmt->execute([$userId, SessionLifetime::idleSeconds($role)]);
+        $stmt->execute([$userId, SessionLifetime::maxSeconds($class), SessionLifetime::idleSeconds($class)]);
 
         return array_map(self::hydrate(...), $stmt->fetchAll());
     }
@@ -114,7 +117,10 @@ final readonly class SessionRepository
     }
 
     /**
-     * Löscht Sitzungen nach Höchstdauer oder Inaktivität (Grenze je Rolle). Ersatz für einen Cronjob.
+     * Löscht Sitzungen nach Höchstdauer oder Inaktivität. Ersatz für einen Cronjob. Die Grenze der
+     * Inaktivität folgt der Kontoart (superadmin, admin = Rolle Admin, sonst die längste): für die
+     * Standard-Rollen genau ihre Klasse, für eigene Rollen eine Obergrenze. Sitzungen einer
+     * kürzeren Klasse löscht resume() beim Antreffen, listValidByUser() zeigt sie nicht.
      *
      * @return int Anzahl gelöschter Sitzungen
      */
@@ -126,9 +132,9 @@ final readonly class SessionRepository
             . " (CASE u.role WHEN 'superadmin' THEN ? WHEN 'admin' THEN ? ELSE ? END) SECOND",
         );
         $stmt->execute([
-            SessionLifetime::idleSeconds(UserRole::SuperAdmin),
-            SessionLifetime::idleSeconds(UserRole::Admin),
-            SessionLifetime::idleSeconds(UserRole::User),
+            SessionLifetime::idleSeconds(SessionClass::SuperAdmin),
+            SessionLifetime::idleSeconds(SessionClass::Short),
+            SessionLifetime::idleSeconds(SessionClass::Long),
         ]);
 
         return $stmt->rowCount();

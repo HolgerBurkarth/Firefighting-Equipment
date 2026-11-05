@@ -15,13 +15,16 @@ use FirefightingEquipment\Role\SystemRole;
 final readonly class Permissions
 {
     /**
-     * @param array<string, AreaLevel> $areas   Bereich (Wert von Area) → Stufe
+     * @param array<string, AreaLevel> $areas    Bereich (Wert von Area) → Stufe
      * @param list<Action>             $actions
+     * @param string|null              $revision Rolle und ihr Stand („<id>:<version>“), null ohne Rolle
      */
     private function __construct(
         private bool $all,
         private array $areas,
         private array $actions,
+        private bool $filtered = false,
+        private ?string $revision = null,
     ) {
     }
 
@@ -76,6 +79,16 @@ final readonly class Permissions
         return self::of($pairs, array_values(array_filter(array_map(Action::tryFrom(...), $actions))));
     }
 
+    /**
+     * Dieselben Rechte mit Angaben zur Rolle, aus der sie stammen (für permissions in auth/me).
+     *
+     * @param bool $filtered Rolle mit Datenfilter „Sieht nur …“ (wirkt ab Schritt 1.4)
+     */
+    public function ofRole(int $roleId, int $roleVersion, bool $filtered): self
+    {
+        return new self($this->all, $this->areas, $this->actions, $filtered, $roleId . ':' . $roleVersion);
+    }
+
     public function isAll(): bool
     {
         return $this->all;
@@ -89,6 +102,45 @@ final readonly class Permissions
     public function allows(Area $area, AreaLevel $level): bool
     {
         return $this->level($area)?->includes($level) ?? false;
+    }
+
+    public function isFiltered(): bool
+    {
+        return $this->filtered;
+    }
+
+    /** Rolle und ihr Stand („<id>:<version>“); null ohne Rolle. */
+    public function revision(): ?string
+    {
+        return $this->revision;
+    }
+
+    /**
+     * Wirksame Stufen in der Reihenfolge des Katalogs (Bereiche ohne Zugriff fehlen).
+     *
+     * @return array<string, AreaLevel> Bereich (Wert von Area) → Stufe
+     */
+    public function areas(): array
+    {
+        $levels = [];
+        foreach (Area::cases() as $area) {
+            $level = $this->level($area);
+            if ($level !== null) {
+                $levels[$area->value] = $level;
+            }
+        }
+
+        return $levels;
+    }
+
+    /**
+     * Wirksame Aktionen (can()) in der Reihenfolge des Katalogs.
+     *
+     * @return list<Action>
+     */
+    public function actions(): array
+    {
+        return array_values(array_filter(Action::cases(), $this->can(...)));
     }
 
     /** Eine Aktion wirkt nur zusammen mit dem Bereich, den sie braucht. */

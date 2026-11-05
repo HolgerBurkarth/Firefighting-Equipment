@@ -38,7 +38,7 @@ angepasst.
 | Nr. | Entscheidung |
 | --- | --- |
 | F1 | Ein Rollenwechsel beendet die Sitzungen des Kontos nur, wenn die Rolle *Admin* dazukommt oder wegfällt (also wenn sich die Kontoart `admin` ↔ `user` ändert). Jeder andere Wechsel wirkt ab der nächsten Anfrage (`Permissions` wird je Anfrage gebildet). CLAUDE.md („Rollenwechsel beendet alle Sitzungen“) wird mit Schritt 1.6 entsprechend angepasst. |
-| F2 | Wie vorgeschlagen: Die Standard-Rolle *Benutzer* bekommt kein `csv.export`. |
+| F2 | Wie vorgeschlagen: Die Standard-Rolle *Benutzer* bekommt kein `csv.export`. Präzisiert am 05.11.2026 (Holger): Die Vorgabe „jede Route wie heute“ galt für den Umbau in 1.3, nicht für diese gewollte Änderung. Umgesetzt in **Schritt 1.7**: neue Aktion `csv.export` für `GET devices/export` und `GET device-events/export`; *Admin* hat sie automatisch, *Benutzer* nicht (dann 403), eigene Rollen können sie bekommen. Vorlage und gültige Werte des Imports bleiben bei `csv.import`. Tests: `TenantRoutePermissionsTest` mit der neuen Aktion, Rolle *Benutzer* 403. `UEBERGABE-BACKEND.md` ergänzen; die „✅ FERTIG“-Meldung zu 1.7 nennt ausdrücklich, dass sich hier das Verhalten für *Benutzer* ändert. |
 | F3 | Die vier Rechte `locations` Ändern, `device_types` Ändern, `csv.import` und `users` (Ansehen und Ändern: „Benutzer verwalten“) gibt es nur für Rollen ohne Datenfilter „Sieht nur …“. Im Editor der Rollen sind sie bei Rollen mit Datenfilter ausgegraut, mit Hinweis. Der Server lehnt eine Rolle mit Datenfilter und einem dieser Rechte mit 409 `rule_violation` ab (beim Speichern der Rolle, in beide Richtungen: Filter setzen bei vorhandenem Recht ebenso). |
 | F4 | Wie vorgeschlagen: Einladungscodes behalten Bezeichnung, „Gültig (Tage)“ und „Registrierungen höchstens“; kein Nachdruck bestehender Codes, keine Teile des Codes gespeichert (die korrigierten Mockups `Einladungscodes` folgen dem). |
 | F5 | Auch andere Rollen als *Admin* dürfen Benutzer verwalten, wenn sie das Recht `users` Ändern haben (nur ohne Datenfilter, F3). Es gelten alle Schutzregeln: Nur ein Admin vergibt oder entzieht die Rolle *Admin*, und nur ein Admin sperrt oder löscht Admins (bzw. ändert deren Anzeigenamen oder Rolle). Niemand ändert sich selbst. Der letzte aktive Admin bleibt. Zusätzlich (Vorschlag Abschnitt 5): Wer eine Rolle zuweist, freischaltet oder einen Einladungscode mit Rolle anlegt, braucht alle Rechte dieser Rolle. |
@@ -123,8 +123,20 @@ deleted 1; test: admin active 3, user active 2), keines bliebe ohne Rolle, keine
 Schritt 1.3a (05.11.2026): Für die Standard-Rollen muss jede Route wie bisher antworten (Vorgabe
 Holger). Deshalb verlangen die Exporte (`devices/export`, `device-events/export`) vorerst nur, Geräte
 zu sehen (`search` oder `devices` Ansehen, beim Verlauf auch `log`), und `csv.export` gibt es noch
-nicht als Aktion. F2 („*Benutzer* ohne CSV-Export“) würde das Verhalten für *Benutzer* ändern (heute
-200, dann 403; die App bietet ihm den Export nirgends an) und ist daher offen, bis Holger entscheidet.
+nicht als Aktion. F2 („*Benutzer* ohne CSV-Export“) ändert das Verhalten für *Benutzer* (heute 200,
+dann 403; die App bietet ihm den Export nirgends an); entschieden am 05.11.2026: kommt mit Schritt 1.7
+(siehe F2 unter „Entscheidungen“).
+
+Schritt 1.3b (05.11.2026): `auth/me` mit `permissions`, Sitzungsdauer aus den Rechten
+(`SessionClass`), Log-Mails und ihre Einstellung über `mail.log`, Migrationen 0039/0040 (freigegeben
+durch Holger am 05.11.2026). Vorgaben Holger, je per Test belegt: Sitzungsdauer der Standard-Rollen
+unverändert (Admin 7 / 30 Tage, Benutzer 30 / 90 Tage); jede Zeile der alten CHECK erfüllt die neue
+(`NotifyDeviceLogCheckMigrationTest`); Log-Mails an genau dieselben Konten wie vorher (Abgleich mit
+der alten Abfrage in `UserRepositoryTest`). Zweiter Probelauf zu 0036 durch Holger vorher: 0 Konten
+zuzuordnen, 7 mit Rolle, 0 ohne Rolle, Super-Admin ohne Rolle. Ausschalten der Option geht immer,
+Einschalten nur mit `mail.log` (bzw. als Super-Admin). `SessionRepository::deleteExpired` rechnet die
+Inaktivität weiter nach Kontoart (für eigene Rollen eine Obergrenze; kürzere Sitzungen löscht
+`resume` beim Antreffen).
 
 Bewusst **nicht** in Phase 1:
 
@@ -496,7 +508,7 @@ Offen dazu: F14 (Adressen wie `geraete`, `prueffristen` und Spalten der CSV).
 | 1.4 | Datenfilter in allen Abfragen und Mails, `DeviceVisibilityMatrixTest`, Reflection-Test | groß | CI |
 | 1.5 | Super-Admin: API und Seiten „Rollen“, „Rolle bearbeiten“, Kopieren, Übernehmen, Löschen | mittel | live in `test` |
 | 1.6 | Admin: `GET roles`, Rolle zuweisen (einzeln, mehrere), Freischalten und Einladungscodes mit Rolle | mittel | live in `test` |
-| 1.7 | App auf Rechte umstellen (Menü, Wächter, Handy-Leiste, Knöpfe, Offline-Kopie mit `permissions.version`), ⚠ `X-Client-Api` 2 und `MIN` 2 nach Rückfrage | mittel | live in `test`, Handy (Holger) |
+| 1.7 | App auf Rechte umstellen (Menü, Wächter, Handy-Leiste, Knöpfe, Offline-Kopie mit `permissions.version`), ⚠ `X-Client-Api` 2 und `MIN` 2 nach Rückfrage; Aktion `csv.export` für die Exporte (F2, *Benutzer* dann 403) | mittel | live in `test`, Handy (Holger) |
 | 1.8 | Live-Test aller Rollen in `test` (LIVETEST-Datei), Rollen für Immendingen nur nach Freigabe durch Holger | klein | – |
 | 1.9 | „Konto wechseln“ (Kontoliste auf dem Gerät, Menü und Profil, siehe „Entscheidungen“) | mittel | live in `test` (zweite Stadt nur lokal/im Test) |
 

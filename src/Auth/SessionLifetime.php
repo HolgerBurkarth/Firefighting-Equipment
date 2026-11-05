@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Auth;
 
-use FirefightingEquipment\User\UserRole;
-
 /**
- * Wie lange eine Sitzung gilt: Inaktivität (seit last_seen_at) und Höchstdauer (seit dem Anmelden).
+ * Wie lange eine Sitzung gilt: Inaktivität (seit last_seen_at) und Höchstdauer (seit dem Anmelden),
+ * je Klasse (SessionClass).
  */
 final class SessionLifetime
 {
@@ -17,21 +16,21 @@ final class SessionLifetime
     /** last_seen_at wird höchstens so oft geschrieben. */
     public const int TOUCH_INTERVAL_SECONDS = 300;
 
-    public static function idleSeconds(UserRole $role): int
+    public static function idleSeconds(SessionClass $class): int
     {
-        return match ($role) {
-            UserRole::User => 30 * self::DAY,
-            UserRole::Admin => 7 * self::DAY,
-            UserRole::SuperAdmin => 1 * self::HOUR,
+        return match ($class) {
+            SessionClass::Long => 30 * self::DAY,
+            SessionClass::Short => 7 * self::DAY,
+            SessionClass::SuperAdmin => 1 * self::HOUR,
         };
     }
 
-    public static function maxSeconds(UserRole $role): int
+    public static function maxSeconds(SessionClass $class): int
     {
-        return match ($role) {
-            UserRole::User => 90 * self::DAY,
-            UserRole::Admin => 30 * self::DAY,
-            UserRole::SuperAdmin => 12 * self::HOUR,
+        return match ($class) {
+            SessionClass::Long => 90 * self::DAY,
+            SessionClass::Short => 30 * self::DAY,
+            SessionClass::SuperAdmin => 12 * self::HOUR,
         };
     }
 }

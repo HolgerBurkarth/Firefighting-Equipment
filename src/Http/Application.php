@@ -15,8 +15,6 @@ use FirefightingEquipment\Mail\ConfiguredMailer;
 use FirefightingEquipment\Mail\Mailer;
 use FirefightingEquipment\Mail\SendmailMailer;
 use FirefightingEquipment\Offline\OfflineSettings;
-use FirefightingEquipment\Permission\PermissionRepository;
-use FirefightingEquipment\Permission\Permissions;
 use FirefightingEquipment\Permission\Requirement;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\Password\PasswordHasher;
@@ -91,8 +89,9 @@ final readonly class Application
             if ($route->access !== Access::Public) {
                 $auth = $this->authenticate($request, $tenant);
                 if ($route->access instanceof Requirement) {
-                    // Nur unter einer Stadt (Router::forTenant); die Sitzung gehört zu einem Konto dieser Stadt.
-                    $permissions = $this->permissions($tenant ?? throw new \LogicException('Requirement ohne Stadt.'), $auth);
+                    // Nur unter einer Stadt (Router::forTenant); die Sitzung gehört zu einem Konto dieser
+                    // Stadt, ihre Rechte hat SessionManager::resume geladen.
+                    $permissions = $auth->permissions ?? throw new \LogicException('Requirement ohne Rechte der Sitzung.');
                     if (!$route->access->allows($permissions, $body)) {
                         throw HttpException::forbidden();
                     }
@@ -143,18 +142,6 @@ final readonly class Application
             }
 
             throw $e;
-        }
-    }
-
-    /**
-     * @throws HttpException 503 database_unavailable
-     */
-    private function permissions(Tenant $tenant, AuthSession $auth): Permissions
-    {
-        try {
-            return new PermissionRepository($this->db->get())->forUser($tenant, $auth->user->id);
-        } catch (ConnectionException | \PDOException $e) {
-            throw HttpException::databaseUnavailable($e);
         }
     }
 

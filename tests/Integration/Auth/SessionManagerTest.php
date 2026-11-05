@@ -6,11 +6,16 @@ namespace FirefightingEquipment\Tests\Integration\Auth;
 
 use FirefightingEquipment\Auth\AuthSession;
 use FirefightingEquipment\Auth\Session;
+use FirefightingEquipment\Auth\SessionClass;
 use FirefightingEquipment\Auth\SessionLifetime;
 use FirefightingEquipment\Auth\SessionManager;
 use FirefightingEquipment\Auth\SessionRepository;
 use FirefightingEquipment\Auth\SessionToken;
 use FirefightingEquipment\Auth\StartedSession;
+use FirefightingEquipment\Permission\Area;
+use FirefightingEquipment\Permission\AreaLevel;
+use FirefightingEquipment\Permission\PermissionRepository;
+use FirefightingEquipment\Permission\Permissions;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\User;
 use FirefightingEquipment\User\UserRepository;
@@ -23,6 +28,9 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[CoversClass(SessionRepository::class)]
 #[UsesClass(AuthSession::class)]
 #[UsesClass(Session::class)]
+#[UsesClass(SessionClass::class)]
+#[UsesClass(PermissionRepository::class)]
+#[UsesClass(Permissions::class)]
 #[UsesClass(SessionLifetime::class)]
 #[UsesClass(SessionToken::class)]
 #[UsesClass(StartedSession::class)]
@@ -49,7 +57,7 @@ final class SessionManagerTest extends AuthTestCase
         self::assertNotSame($started->token->cookieValue(), $row['token_hash']);
         self::assertSame('Firefox auf Windows', $row['device_label']);
         $duration = strtotime($row['expires_at'] . ' UTC') - strtotime($row['created_at'] . ' UTC');
-        self::assertSame(SessionLifetime::maxSeconds(UserRole::Admin), $duration);
+        self::assertSame(30 * 86400, $duration, 'Rolle Admin: 30 Tage');
         self::assertSame($row['created_at'], $row['last_seen_at']);
         self::assertSame($user, $started->auth->user);
     }
@@ -64,6 +72,71 @@ final class SessionManagerTest extends AuthTestCase
         self::assertNotNull($auth);
         self::assertSame($id, $auth->user->id);
         self::assertSame($started->auth->session->id, $auth->session->id);
+        self::assertFalse($auth->permissions?->isAll());
+        self::assertTrue($auth->permissions?->allows(Area::Search, AreaLevel::Read));
+    }
+
+    public function testRightsOfTheRoleComeWithTheSession(): void
+    {
+        $admin = $this->manager->start($this->user($this->account('immendingen', 'admin@example.org', ['role' => 'admin'])), 'curl');
+        $superAdmin = $this->manager->start($this->user($this->account(null, 'chef@example.org')), 'curl');
+
+        self::assertTrue($admin->auth->permissions?->isAll());
+        self::assertTrue($this->manager->resume($admin->token, $this->tenant('immendingen'))?->permissions?->isAll());
+        self::assertNull($superAdmin->auth->permissions);
+        self::assertNull($this->manager->resume($superAdmin->token, null)?->permissions);
+    }
+
+    /**
+     * Vorgabe Schritt 1.3b: Die Standard-Rollen behalten ihre Sitzungsdauer (Inaktivität /
+     * Höchstdauer), Admin 7 / 30 Tage, Benutzer 30 / 90 Tage.
+     *
+     * @return iterable<string, array{string, int, int}>
+     */
+    public static function standardRoles(): iterable
+    {
+        yield 'Admin' => ['admin', 7, 30];
+        yield 'Benutzer' => ['user', 30, 90];
+    }
+
+    #[DataProvider('standardRoles')]
+    public function testStandardRolesKeepTheirDurations(string $role, int $idleDays, int $maxDays): void
+    {
+        $tenant = $this->tenant('immendingen');
+        $started = $this->manager->start($this->user($this->account('immendingen', $role . '@example.org', ['role' => $role])), 'curl');
+        $session = $started->auth->session;
+
+        self::assertSame($maxDays * 86400, $session->expiresAt->getTimestamp() - $session->createdAt->getTimestamp());
+        $this->ageSession($session->id, $idleDays * 86400 - 60);
+        self::assertNotNull($this->manager->resume($started->token, $tenant));
+        $this->ageSession($session->id, $idleDays * 86400 + 1);
+        self::assertNull($this->manager->resume($started->token, $tenant), 'Inaktivität: ' . $idleDays . ' Tage');
+
+        $started = $this->manager->start($this->user($this->account('immendingen', $role . '2@example.org', ['role' => $role])), 'curl');
+        $this->ageSession($started->auth->session->id, $maxDays * 86400 - 60, keepLastSeen: true);
+        self::assertNotNull($this->manager->resume($started->token, $tenant));
+        $this->ageSession($started->auth->session->id, 61, keepLastSeen: true);
+        self::assertNull($this->manager->resume($started->token, $tenant), 'Höchstdauer: ' . $maxDays . ' Tage');
+    }
+
+    public function testOwnRoleGetsTheClassOfItsRightsAndAStricterRoleAppliesImmediately(): void
+    {
+        $tenant = $this->tenant('immendingen');
+        $roleId = $this->insert('fe_roles', ['tenant_id' => $tenant->id, 'name' => 'Geräteträger']);
+        $this->insert('fe_role_areas', ['role_id' => $roleId, 'tenant_id' => $tenant->id, 'area' => 'search', 'level' => 'read']);
+        $this->insert('fe_role_actions', ['role_id' => $roleId, 'tenant_id' => $tenant->id, 'action' => 'book.move']);
+        $started = $this->manager->start($this->user($this->account('immendingen', 'traeger@example.org', ['role_id' => $roleId])), 'curl');
+        $session = $started->auth->session;
+
+        self::assertSame(SessionClass::Long, $started->auth->sessionClass());
+        self::assertSame(90 * 86400, $session->expiresAt->getTimestamp() - $session->createdAt->getTimestamp());
+        $this->ageSession($session->id, 31 * 86400, keepLastSeen: true);
+        self::assertNotNull($this->manager->resume($started->token, $tenant), 'lang: nach 31 Tagen noch gültig');
+
+        // Die Rolle darf nun Stammdaten ändern: kurze Sitzungen, die Höchstdauer gilt sofort.
+        $this->insert('fe_role_areas', ['role_id' => $roleId, 'tenant_id' => $tenant->id, 'area' => 'devices', 'level' => 'write']);
+        self::assertNull($this->manager->resume($started->token, $tenant), 'kurz: nach 31 Tagen abgelaufen');
+        self::assertSame(0, $this->countRows('fe_sessions'));
     }
 
     public function testUnknownTokenIsRejected(): void
@@ -91,35 +164,37 @@ final class SessionManagerTest extends AuthTestCase
     }
 
     /**
-     * @return iterable<string, array{UserRole}>
+     * Kontoart mit Standard-Rolle und Klasse ihrer Sitzungen.
+     *
+     * @return iterable<string, array{UserRole, SessionClass}>
      */
     public static function roles(): iterable
     {
-        yield 'user' => [UserRole::User];
-        yield 'admin' => [UserRole::Admin];
-        yield 'superadmin' => [UserRole::SuperAdmin];
+        yield 'user' => [UserRole::User, SessionClass::Long];
+        yield 'admin' => [UserRole::Admin, SessionClass::Short];
+        yield 'superadmin' => [UserRole::SuperAdmin, SessionClass::SuperAdmin];
     }
 
     #[DataProvider('roles')]
-    public function testInactivityLimitPerRole(UserRole $role): void
+    public function testInactivityLimitPerRole(UserRole $role, SessionClass $class): void
     {
         [$token, $sessionId, $tenant] = $this->sessionFor($role);
 
-        $this->ageSession($sessionId, SessionLifetime::idleSeconds($role) - 60);
+        $this->ageSession($sessionId, SessionLifetime::idleSeconds($class) - 60);
         self::assertNotNull($this->manager->resume($token, $tenant), 'kurz vor der Grenze gültig');
 
         // resume hat last_seen_at erneuert; erneut über die Grenze schieben.
-        $this->ageSession($sessionId, SessionLifetime::idleSeconds($role) + 1);
+        $this->ageSession($sessionId, SessionLifetime::idleSeconds($class) + 1);
         self::assertNull($this->manager->resume($token, $tenant));
         self::assertSame(0, $this->countRows('fe_sessions'), 'abgelaufene Sitzung wird gelöscht');
     }
 
     #[DataProvider('roles')]
-    public function testMaximumDurationPerRole(UserRole $role): void
+    public function testMaximumDurationPerRole(UserRole $role, SessionClass $class): void
     {
         [$token, $sessionId, $tenant] = $this->sessionFor($role);
 
-        $this->ageSession($sessionId, SessionLifetime::maxSeconds($role) - 60, keepLastSeen: true);
+        $this->ageSession($sessionId, SessionLifetime::maxSeconds($class) - 60, keepLastSeen: true);
         self::assertNotNull($this->manager->resume($token, $tenant), 'kurz vor der Höchstdauer gültig');
 
         $this->ageSession($sessionId, 61, keepLastSeen: true);
@@ -192,7 +267,7 @@ final class SessionManagerTest extends AuthTestCase
         $this->ageSession($old, 600);
         $this->ageSession($expired, 7 * 86400);
 
-        $ids = array_map(static fn (Session $s): int => $s->id, $repository->listValidByUser($user->id, UserRole::Admin));
+        $ids = array_map(static fn (Session $s): int => $s->id, $repository->listValidByUser($user->id, SessionClass::Short));
 
         self::assertSame([$new, $old], $ids);
     }

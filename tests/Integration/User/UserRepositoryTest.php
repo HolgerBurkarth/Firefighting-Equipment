@@ -360,7 +360,7 @@ final class UserRepositoryTest extends AuthSchemaTestCase
     {
         $user = $this->createUser($this->tenant->id);
 
-        $this->assertRuleViolation('nur Admins und Super-Admins', fn () => $this->users->setDeviceLogNotification($user, true));
+        $this->assertRuleViolation('deren Rolle Log-Mails empfangen darf', fn () => $this->users->setDeviceLogNotification($user, true));
         self::assertFalse($this->users->findById($user)?->notifyDeviceLog);
     }
 
@@ -395,6 +395,68 @@ final class UserRepositoryTest extends AuthSchemaTestCase
             [$on, $superAdmin],
             array_map(static fn (User $u): int => $u->id, $this->users->listDeviceLogRecipients($this->tenant)),
         );
+    }
+
+    /**
+     * Schritt 1.3b: Empfänger über die Aktion mail.log der Rolle statt über die Kontoart. Für die
+     * Standard-Rollen dieselben Konten wie mit der Abfrage vorher, auch für Benutzer, deren Option
+     * seit Migration 0040 in der Datenbank an sein darf.
+     */
+    public function testDeviceLogRecipientsOfStandardRolesAreTheSameAsBefore(): void
+    {
+        $other = $this->tenant('tuttlingen');
+        foreach ([$this->tenant->id, $other->id, null] as $tenantId) {
+            foreach ($tenantId === null ? ['superadmin'] : ['admin', 'user'] as $role) {
+                foreach (['active', 'deleted'] as $status) {
+                    foreach ([0, 1] as $notify) {
+                        foreach ([null, self::CREATED_AT] as $lockedAt) {
+                            if ($status === 'deleted' && ($notify === 1 || $role === 'superadmin')) {
+                                continue;
+                            }
+                            $this->createUser($tenantId, ['role' => $role, 'status' => $status, 'notify_device_log' => $notify, 'locked_at' => $lockedAt]
+                                + ($status === 'deleted' ? ['email' => null, 'email_verified_at' => null, 'password_hash' => null, 'name' => null, 'display_name' => null, 'deleted_at' => self::CREATED_AT] : []));
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach ([$this->tenant, $other] as $tenant) {
+            // Abfrage vor Schritt 1.3b (Kontoart statt Rolle), unverändert übernommen.
+            $stmt = $this->pdo()->prepare(
+                "SELECT id FROM fe_users WHERE notify_device_log = 1 AND status = 'active' AND locked_at IS NULL"
+                . " AND ((tenant_id = ? AND role = 'admin') OR (tenant_key = 0 AND role = 'superadmin'))"
+                . ' ORDER BY tenant_key = 0, id',
+            );
+            $stmt->execute([$tenant->id]);
+            $before = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+
+            self::assertCount(2, $before, 'je ein aktiver, nicht gesperrter Admin und Super-Admin mit Option');
+            self::assertSame($before, array_map(static fn (User $u): int => $u->id, $this->users->listDeviceLogRecipients($tenant)));
+        }
+        self::assertSame(2, (int) $this->pdo()->query("SELECT COUNT(*) FROM fe_users WHERE role = 'user' AND status = 'active' AND notify_device_log = 1 AND locked_at IS NULL")->fetchColumn());
+    }
+
+    public function testOwnRoleWithMailLogMayEnableAndReceiveDeviceLog(): void
+    {
+        $withLog = $this->insert('fe_roles', ['tenant_id' => $this->tenant->id, 'name' => 'Gerätewart']);
+        $this->insert('fe_role_areas', ['role_id' => $withLog, 'tenant_id' => $this->tenant->id, 'area' => 'search', 'level' => 'read']);
+        $this->insert('fe_role_actions', ['role_id' => $withLog, 'tenant_id' => $this->tenant->id, 'action' => 'mail.log']);
+        $withoutLog = $this->insert('fe_roles', ['tenant_id' => $this->tenant->id, 'name' => 'Geräteträger']);
+        $this->insert('fe_role_actions', ['role_id' => $withoutLog, 'tenant_id' => $this->tenant->id, 'action' => 'book.move']);
+        $warden = $this->createUser($this->tenant->id, ['role_id' => $withLog]);
+        $carrier = $this->createUser($this->tenant->id, ['role_id' => $withoutLog]);
+
+        self::assertTrue($this->users->setDeviceLogNotification($warden, true));
+        $this->assertRuleViolation('deren Rolle Log-Mails empfangen darf', fn () => $this->users->setDeviceLogNotification($carrier, true));
+        self::assertSame([$warden], array_map(static fn (User $u): int => $u->id, $this->users->listDeviceLogRecipients($this->tenant)));
+
+        // Die Rolle verliert mail.log: keine Mails mehr, auch wenn die Option an bleibt.
+        $this->pdo()->exec('DELETE FROM fe_role_actions WHERE role_id = ' . $withLog);
+        self::assertSame([], $this->users->listDeviceLogRecipients($this->tenant));
+        self::assertTrue($this->users->findById($warden)?->notifyDeviceLog);
+        self::assertTrue($this->users->setDeviceLogNotification($warden, false), 'Ausschalten geht immer.');
+        $this->assertRuleViolation('deren Rolle Log-Mails empfangen darf', fn () => $this->users->setDeviceLogNotification($warden, true));
     }
 
     public function testTenantAdminsDoNotCountAsSuperAdmins(): void

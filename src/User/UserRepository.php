@@ -10,6 +10,8 @@ use FirefightingEquipment\Auth\UserTokenRepository;
 use FirefightingEquipment\Invitation\InvitationCodeNotUsableException;
 use FirefightingEquipment\Invitation\InvitationCodeRepository;
 use FirefightingEquipment\Invitation\InvitationCodeValue;
+use FirefightingEquipment\Permission\Action;
+use FirefightingEquipment\Permission\PermissionRepository;
 use FirefightingEquipment\Tenant\DuplicateTenantSlugException;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Tenant\TenantName;
@@ -296,7 +298,8 @@ final readonly class UserRepository
             }
             self::assertNotLastAdministrator($user, $group);
 
-            // Die Benachrichtigung „Log“ gibt es nur für Admins (CHECK chk_fe_users_notify_device_log).
+            // Wie bisher: Die Kontoart user (Rolle Benutzer, ohne mail.log) verliert die Option, damit
+            // ein späteres Hochstufen sie nicht ungefragt wieder einschaltet.
             $this->update(
                 $user->id,
                 'role = ?, role_id = ' . self::SYSTEM_ROLE_ID . ', notify_device_log = ?',
@@ -576,18 +579,20 @@ final readonly class UserRepository
     }
 
     /**
-     * Schaltet die Benachrichtigung „Log“ des Kontos ein oder aus (nur Admins und Super-Admins; auch
-     * für geschützte Konten, es ist eine Einstellung des eigenen Kontos).
+     * Schaltet die Benachrichtigung „Log“ des Kontos ein oder aus (einschalten nur Super-Admins und
+     * Konten, deren Rolle die Aktion mail.log hat, z. B. die Rolle Admin; auch für geschützte Konten,
+     * es ist eine Einstellung des eigenen Kontos).
      *
      * @return bool ob sich etwas geändert hat
      *
      * @throws UserNotFoundException
-     * @throws UserRuleViolationException Rolle user oder gelöschtes Konto
+     * @throws UserRuleViolationException Einschalten ohne mail.log der Rolle oder gelöschtes Konto
      */
     public function setDeviceLogNotification(int $id, bool $enabled): bool
     {
         return $this->transaction($id, function (User $user) use ($enabled): bool {
-            if (!$user->mayReceiveDeviceLog()) {
+            // Ausschalten geht immer (auch nachdem die Rolle mail.log verloren hat), Einschalten nur mit.
+            if ($user->isDeleted() || ($enabled && $user->role !== UserRole::SuperAdmin && !$this->roleGrantsDeviceLog($user->id))) {
                 throw UserRuleViolationException::deviceLogNotAllowed($user->id);
             }
             if ($user->notifyDeviceLog === $enabled) {
@@ -602,19 +607,32 @@ final readonly class UserRepository
 
     /**
      * Empfänger der Benachrichtigung „Log“ für Vorgänge einer Stadt: aktive, nicht gesperrte Konten
-     * mit eingeschalteter Option, und zwar die Admins dieser Stadt und alle Super-Admins (diese
+     * mit eingeschalteter Option, und zwar die Konten dieser Stadt, deren Rolle die Aktion mail.log
+     * hat (Rolle Admin immer, die Standard-Rolle Benutzer nie), und alle Super-Admins (diese
      * zuletzt), je nach ID. Konten anderer Städte nie.
      *
      * @return list<User>
      */
     public function listDeviceLogRecipients(Tenant $tenant): array
     {
+        [$grants, $params] = PermissionRepository::grantsActionSql('u', Action::MailLog);
+
         return $this->fetchAll(
-            'SELECT ' . self::COLUMNS . " FROM fe_users WHERE notify_device_log = 1 AND status = 'active' AND locked_at IS NULL"
-            . " AND ((tenant_id = ? AND role = 'admin') OR (tenant_key = 0 AND role = 'superadmin'))"
+            'SELECT ' . self::COLUMNS . " FROM fe_users u WHERE notify_device_log = 1 AND status = 'active' AND locked_at IS NULL"
+            . " AND ((tenant_id = ? AND role <> 'superadmin' AND " . $grants . ") OR (tenant_key = 0 AND role = 'superadmin'))"
             . ' ORDER BY tenant_key = 0, id',
-            [$tenant->id],
+            [$tenant->id, ...$params],
         );
+    }
+
+    /** Ob die Rolle des Kontos einer Stadt die Aktion mail.log hat. */
+    private function roleGrantsDeviceLog(int $id): bool
+    {
+        [$grants, $params] = PermissionRepository::grantsActionSql('u', Action::MailLog);
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM fe_users u WHERE u.id = ? AND ' . $grants);
+        $stmt->execute([$id, ...$params]);
+
+        return (int) $stmt->fetchColumn() === 1;
     }
 
     /**

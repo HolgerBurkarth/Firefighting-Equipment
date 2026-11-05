@@ -18,7 +18,7 @@ final readonly class SessionListHandler implements RequestHandler
     public function handle(RequestContext $context): JsonResponse
     {
         $auth = $context->auth();
-        $sessions = new SessionRepository($context->db->get())->listValidByUser($auth->user->id, $auth->user->role);
+        $sessions = new SessionRepository($context->db->get())->listValidByUser($auth->user->id, $auth->sessionClass());
 
         return new JsonResponse([
             'sessions' => array_map(

@@ -1509,14 +1509,21 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   --email>`), nie über die API (die API zeigt `protected` nur an). Keine E-Mail-Adresse eines echten
   Kontos im Code oder Repository.
 - Benachrichtigung „Log“ (`fe_users.notify_device_log`, Migration `0018`, Standard 0): CHECK
-  `chk_fe_users_notify_device_log` erlaubt 1 nur für `admin`/`superadmin` und nicht `deleted`;
-  `changeRole` auf `user` und Anonymisieren setzen sie auf 0. Siehe "Benachrichtigung „Log“".
+  `chk_fe_users_notify_device_log` (seit Migration `0040`, 0039 entfernte die alte mit Bedingung an
+  die Kontoart) erlaubt nur 0/1 und 1 nie bei `deleted`; wer sie einschalten darf und Mails bekommt,
+  entscheidet die Aktion `mail.log` der Rolle im Code (Super-Admins immer). `changeRole` auf `user`
+  und Anonymisieren setzen sie auf 0. Siehe "Benachrichtigung „Log“".
 - Passwörter: mindestens 10, höchstens 128 Zeichen, keine Komplexitätspflicht, Sperrliste
   häufiger Passwörter, kein Bestandteil von E-Mail, Name oder Stadtname. Hash mit Argon2id
   (`PASSWORD_ARGON2ID`, Standardparameter; auf STRATO in CLI und Web verfügbar).
-- Sitzungsdauer (Inaktivität / Höchstdauer): `user` 30 Tage / 90 Tage, `admin` 7 Tage / 30 Tage,
-  `superadmin` 1 Stunde / 12 Stunden. Die Inaktivitätsgrenze wird zur Laufzeit aus Rolle und
-  `last_seen_at` berechnet. Passwortänderung, Rollenwechsel, Sperren oder Löschen beenden alle
+- Sitzungsdauer (Inaktivität / Höchstdauer, seit Schritt 1.3b aus den Rechten der Rolle,
+  `SessionClass`, ohne Einstellung): kurz 7 Tage / 30 Tage (Rolle *Admin* und jede Rolle mit `users`
+  oder `settings` mindestens Ansehen, einem Bereich auf Ändern oder einer wirksamen Aktion außer
+  `book.move`, `book.status`, `mail.log`), lang 30 Tage / 90 Tage (sonst, z. B. *Benutzer*),
+  `superadmin` 1 Stunde / 12 Stunden. Die Standard-Rollen behalten damit die Dauer von `admin` bzw.
+  `user` (per Test). Beide Grenzen werden bei jeder Anfrage aus der Klasse der aktuellen Rechte,
+  `created_at` und `last_seen_at` berechnet (eine strengere Rolle gilt sofort; `expires_at` setzt die
+  Klasse beim Anmelden). Passwortänderung, Rollenwechsel, Sperren oder Löschen beenden alle
   Sitzungen des Kontos.
   - Präzisierung für das Ändern des eigenen Passworts (`POST auth/password`): Alle anderen
     Sitzungen werden beendet; die aktuelle wird durch eine neue ersetzt (neues Token, neues Cookie,
@@ -1587,9 +1594,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   - Super-Admins: `anonymize` immer abgelehnt (`superAdminNotDeletable`). Geschützte Konten:
     `lock`, `changeRole`, `changeDisplayName` abgelehnt (`protectedAccount`); `protect` nur für
     aktive, nicht gesperrte Super-Admins (`notProtectable`); `protect`/`unprotect` wiederholbar
-    (`bool`). `setDeviceLogNotification` nur für Admins und Super-Admins (`deviceLogNotAllowed`).
-    `listDeviceLogRecipients(Tenant)`: aktiv, nicht gesperrt, Option an; Admins dieser Stadt, dann
-    alle Super-Admins (nach ID).
+    (`bool`). `setDeviceLogNotification`: Einschalten nur für Super-Admins und Konten, deren Rolle
+    `mail.log` hat (`deviceLogNotAllowed`), Ausschalten immer (nicht bei gelöschten).
+    `listDeviceLogRecipients(Tenant)`: aktiv, nicht gesperrt, Option an; Konten dieser Stadt, deren
+    Rolle `mail.log` hat (`PermissionRepository::grantsActionSql`), dann alle Super-Admins (nach ID).
   - Sperren, Rollenwechsel, Passwort setzen und Anonymisieren löschen alle `fe_sessions` des
     Kontos; Anonymisieren zusätzlich alle `fe_user_tokens`. Abgelehnte Änderungen lassen alles
     unverändert (Rollback).
@@ -1618,7 +1626,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Stadt): `POST auth/login` und `POST auth/logout` (öffentlich; Logout wiederholbar, löscht das
   Cookie immer), `GET auth/me`, `GET auth/sessions`, `DELETE auth/sessions/{id}`,
   `POST auth/sessions/logout-others`, `POST auth/password` (angemeldet),
-  `GET`/`POST auth/notifications` (eigene Benachrichtigung; unter Städten `Access::Admin`, unter
+  `GET`/`POST auth/notifications` (eigene Benachrichtigung; unter Städten Aktion `mail.log`, unter
   `service` `Access::SuperAdmin`; Rechte in `NotificationSettingsTest`, da die Route in beiden
   Bereichen existiert und nicht in die Access-Tests passt),
   `POST auth/password-reset/request` und `POST auth/password-reset/confirm` (öffentlich, siehe
@@ -1628,15 +1636,20 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Token (`SessionToken`): 32 Zufallsbytes, im Cookie base64url ohne Auffüllung (43 Zeichen, nur
   kanonische Form), in `fe_sessions.token_hash` nur SHA-256. Cookie (`SessionCookie`):
   `ff_session`, `HttpOnly; Secure; SameSite=Strict`, `Path=/firefighting/<kürzel>/` bzw.
-  `/firefighting/service/`, `Max-Age` = Höchstdauer der Rolle; Löschen mit `Max-Age=0`.
-- Prüfung bei jeder Anfrage (`SessionManager::resume`): Höchstdauer (`expires_at`) und
-  Inaktivität je Rolle (`SessionLifetime`), Konto `active` und nicht gesperrt, Konto passt zum
-  Bereich (Super-Admin nur unter `service`, Stadt-Konto nur unter seiner Stadt; sonst 401, die
-  Sitzung bleibt bestehen). Alle Zeitvergleiche rechnet die Datenbank mit `UTC_TIMESTAMP()`.
+  `/firefighting/service/`, `Max-Age` = Höchstdauer der Klasse (`AuthSession::sessionClass()`);
+  Löschen mit `Max-Age=0`.
+- Prüfung bei jeder Anfrage (`SessionManager::resume`): Konto `active` und nicht gesperrt, Konto
+  passt zum Bereich (Super-Admin nur unter `service`, Stadt-Konto nur unter seiner Stadt; sonst 401,
+  die Sitzung bleibt bestehen), dann unter einer Stadt die Rechte der Rolle laden
+  (`PermissionRepository`, in `AuthSession::$permissions`, unter `service` `null`; `Application`
+  prüft damit die Routen) und Höchstdauer (`expires_at` und `created_at` + Höchstdauer der Klasse)
+  und Inaktivität der Klasse (`SessionClass`, `SessionLifetime`). Alle Zeitvergleiche rechnet die
+  Datenbank mit `UTC_TIMESTAMP()`.
   Abgelaufene Sitzungen werden beim Antreffen gelöscht. `last_seen_at` wird höchstens alle
   5 Minuten geschrieben (`SessionLifetime::TOUCH_INTERVAL_SECONDS`).
 - Aufräumen ohne Cron bei jedem Login: abgelaufene Sitzungen (`SessionRepository::deleteExpired`,
-  Inaktivität je Rolle) und `fe_auth_attempts` älter als 24 Stunden (`LoginThrottle::deleteOld`).
+  Inaktivität nach Kontoart: `admin` kurz, `user` lang als Obergrenze für eigene Rollen, deren
+  kürzere Sitzungen `resume` beim Antreffen löscht) und `fe_auth_attempts` älter als 24 Stunden (`LoginThrottle::deleteOld`).
 - Anmeldung (`Authenticator::login`): Unter einer Stadt werden nur Konten dieser Stadt gesucht,
   unter `service` nur Super-Admins. Das Passwort wird immer mit Argon2id geprüft, ohne Konto oder
   ohne Hash (`invited`, `deleted`) gegen `PasswordHasher::dummyHash()`: immer mit den Parametern
@@ -1830,26 +1843,38 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 
 ## Rollen und Rechte (Phase 1, im Aufbau)
 - Plan und Entscheidungen: `docs/PLAN-PHASE-1-ROLLEN.md` (freigegeben 05.11.2026; Schritte 1.1–1.9).
-  Stand: Schritte 1.1, 1.2 (Schema, Standard-Rollen, jedes Konto einer Stadt mit Rolle) und 1.3a
-  (Routen unter Städten prüfen Rechte der Rolle statt `fe_users.role`). Für *Admin* und *Benutzer*
-  verhält sich jede Route wie vorher (per Test). Sitzungsdauer, `auth/me` und Log-Mails richten sich
-  noch nach `fe_users.role` (Schritt 1.3b).
+  Stand: Schritte 1.1, 1.2 (Schema, Standard-Rollen, jedes Konto einer Stadt mit Rolle), 1.3a
+  (Routen unter Städten prüfen Rechte der Rolle statt `fe_users.role`) und 1.3b (`auth/me` mit
+  `permissions`, Sitzungsdauer und Log-Mails aus den Rechten, Migrationen 0039/0040). Für *Admin* und
+  *Benutzer* verhält sich jede Route wie vorher (per Test), ebenso Sitzungsdauer und Empfänger der
+  Log-Mails.
+- `GET auth/me` (auch die Antwort von `auth/login` und `auth/password`, `AuthJson::permissions`):
+  `permissions {areas: {bereich: read|write}, actions: [...], restrictions: [], filtered, version}`,
+  unter `service` `null`. Nur wirksame Rechte in der Reihenfolge des Katalogs (Aktionen nur mit ihrem
+  Bereich, `Permissions::areas()`/`actions()`), `areas` immer ein Objekt, `restrictions` bis Phase 2
+  leer, `filtered` = Rolle mit Datenfilter (`Permissions::isFiltered`, wirkt ab 1.4), `version` =
+  SHA-256 über Rolle und `fe_roles.version` (`Permissions::revision`, „<id>:<version>“) und die
+  Rechte. Die App liest das Feld ab Schritt 1.7.
 - Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank): `Area` (`dashboard`,
   `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`; `maxLevel`:
   `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`
   (`book.move`, `book.status`, `device.create`, `device.edit`, `device.retire`, `device.code`,
   `devices.bulk`, `csv.import`, `mail.log`; `requires()`: Bereich, ohne den die Aktion nicht wirkt).
   Neue Einträge nur mit ihrer Phase und einer Route, die sie prüft (CSV-Export hat in Phase 1 bewusst
-  keine Aktion: die Exporte verlangen wie bisher nur, Geräte zu sehen; F2 offen). `Permissions`
+  noch keine Aktion: die Exporte verlangen wie bisher nur, Geräte zu sehen; F2 entschieden, mit
+  Schritt 1.7 kommt `csv.export`, *Benutzer* dann 403). `Permissions`
   (`all()` für die Rolle Admin, alle Rechte auch künftige; `fromRows`: unbekannte Werte geben kein
   Recht; `allows(area, level)`, `can(action)`), `PermissionRepository::forUser(tenant, userId)` (eine
   Abfrage für Admin, sonst zwei; ohne Rolle keine Rechte), `Requirement` (Alternativen aus Rechten, die
   alle erfüllt sein müssen: `area`, `action`, `anyOf`, `allOf`; `withFieldRule(feld, aktion,
   liste?)`: steht das Feld im Body, auch mit `null`, bzw. in einem Eintrag der Liste, braucht es die
   Aktion; `describe()` Kurzform), `Need`, `FieldRule`.
-- Prüfung in `Application` nach der Sitzung, vor dem Handler: Route mit `Requirement` → Rechte laden
-  (`RequestContext::permissions()`, nur bei solchen Routen), `allows(permissions, body)`, sonst 403
-  `forbidden` (Datenbankfehler 503). Handler prüfen keine Rechte; sie lesen sie nur, um Inhalte
+- Prüfung in `Application` nach der Sitzung, vor dem Handler: Route mit `Requirement` → Rechte der
+  Sitzung (`AuthSession::$permissions`, geladen von `SessionManager::resume` bei jeder angemeldeten
+  Anfrage unter einer Stadt; im Handler `RequestContext::permissions()`, nur bei solchen Routen),
+  `allows(permissions, body)`, sonst 403 `forbidden` (Datenbankfehler 503). SQL-Bedingung für
+  Abfragen über viele Konten: `PermissionRepository::grantsActionSql(alias, aktion)` (wie `can`, per
+  Test gleich). Handler prüfen keine Rechte; sie lesen sie nur, um Inhalte
   anzupassen (bisher `GET device-summary`: `notices` nur mit `log` Ansehen). Feldregeln: `POST
   devices/{id}/state` (`location_id` → `book.move`, `status` → `book.status`), `POST devices/bulk/state`
   (dieselben je Eintrag in `devices`), `POST devices/{id}/fields` (`scan_code` → `device.code`, übrige
@@ -2589,8 +2614,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `DeviceEventRepository::findForDevice`, Vorlagen `MailTemplates::deviceLog`, `deviceBulkLog` und
   `deviceImportLog`. Aufruf in `DeviceActionHandler`, `DeviceStateHandler`, `DeviceBulkHandler` und
   `DeviceImportHandler` NACH der Rückkehr des Repositorys (also nach dem Commit). Tests: `tests/Integration/Notification/DeviceLogNotificationTest`.
-- Empfänger: `UserRepository::listDeviceLogRecipients` (Admins nur der Stadt des Vorgangs,
-  Super-Admins aller Städte; aktiv, nicht gesperrt, Option an), nie der Auslöser. Eine Mail je
+- Empfänger: `UserRepository::listDeviceLogRecipients` (Konten nur der Stadt des Vorgangs, deren
+  Rolle die Aktion `mail.log` hat, also immer die Rolle *Admin*, nie die Standard-Rolle *Benutzer*;
+  Super-Admins aller Städte; aktiv, nicht gesperrt, Option an), nie der Auslöser. Für die
+  Standard-Rollen dieselben Konten wie vor Schritt 1.3b (per Test gegen die alte Abfrage). Eine Mail je
   Empfänger und Anfrage; ein CSV-Import ergibt EINE Sammelmail (Zusammenfassung, höchstens
   `MAX_IMPORT_LINES` = 50 Zeilen mit Einzelheiten, danach „… und N weitere“; ohne neue oder geänderte
   Geräte keine Mail), ebenso eine Sammelaktion (`bulkChanged`: alle geänderten Geräte der Anfrage, je

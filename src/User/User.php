@@ -57,14 +57,6 @@ final readonly class User
     }
 
     /**
-     * Ob das Konto die Benachrichtigung „Log“ einschalten darf.
-     */
-    public function mayReceiveDeviceLog(): bool
-    {
-        return !$this->isDeleted() && ($this->role === UserRole::Admin || $this->role === UserRole::SuperAdmin);
-    }
-
-    /**
      * Bezeichnung für Listen und Historie: Anzeigename, sonst Name, sonst E-Mail;
      * anonymisierte Konten erscheinen als „Gelöschter Benutzer #ID“.
      */
