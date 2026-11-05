@@ -1,0 +1,222 @@
+{
+    "areas": [
+        {
+            "key": "dashboard",
+            "label": "Dashboard",
+            "hint": "Kacheln und letzte Aktivitäten",
+            "levels": [
+                "read"
+            ],
+            "levels_with_filter": [
+                "read"
+            ]
+        },
+        {
+            "key": "search",
+            "label": "Suchen und Ausrüstung ansehen",
+            "hint": "Handy-Seiten, Scan, Umbuchen-Ansicht",
+            "levels": [
+                "read"
+            ],
+            "levels_with_filter": [
+                "read"
+            ]
+        },
+        {
+            "key": "devices",
+            "label": "Ausrüstungsliste",
+            "hint": "Konsole: Liste, Detailseite, Verlauf",
+            "levels": [
+                "read",
+                "write"
+            ],
+            "levels_with_filter": [
+                "read",
+                "write"
+            ]
+        },
+        {
+            "key": "locations",
+            "label": "Standorte",
+            "hint": "Fahrzeuge, Fächer, Räume",
+            "levels": [
+                "read",
+                "write"
+            ],
+            "levels_with_filter": [
+                "read"
+            ]
+        },
+        {
+            "key": "device_types",
+            "label": "Ausrüstungstypen",
+            "hint": "Typen der Ausrüstung",
+            "levels": [
+                "read",
+                "write"
+            ],
+            "levels_with_filter": [
+                "read"
+            ]
+        },
+        {
+            "key": "due",
+            "label": "Termine",
+            "hint": "Fällige und überfällige Ausrüstung",
+            "levels": [
+                "read",
+                "write"
+            ],
+            "levels_with_filter": [
+                "read",
+                "write"
+            ]
+        },
+        {
+            "key": "log",
+            "label": "Protokoll und Hinweise",
+            "hint": "Hinweise erledigen, Verlauf exportieren",
+            "levels": [
+                "read",
+                "write"
+            ],
+            "levels_with_filter": [
+                "read",
+                "write"
+            ]
+        },
+        {
+            "key": "users",
+            "label": "Benutzer",
+            "hint": "Konten, Rollen zuweisen, Einladungscodes, Aushang",
+            "levels": [
+                "read",
+                "write"
+            ],
+            "levels_with_filter": []
+        },
+        {
+            "key": "settings",
+            "label": "Einstellungen der Stadt",
+            "hint": "Farbe und Logo",
+            "levels": [
+                "read",
+                "write"
+            ],
+            "levels_with_filter": [
+                "read",
+                "write"
+            ]
+        }
+    ],
+    "levels": [
+        {
+            "key": "read",
+            "label": "Ansehen"
+        },
+        {
+            "key": "write",
+            "label": "Ändern"
+        }
+    ],
+    "action_groups": [
+        {
+            "label": "Buchen",
+            "actions": [
+                {
+                    "key": "book.move",
+                    "label": "Umbuchen",
+                    "requires": {
+                        "area": "search",
+                        "level": "read"
+                    },
+                    "with_filter": true
+                },
+                {
+                    "key": "book.status",
+                    "label": "Status setzen",
+                    "requires": {
+                        "area": "search",
+                        "level": "read"
+                    },
+                    "with_filter": true
+                }
+            ]
+        },
+        {
+            "label": "Ausrüstung verwalten",
+            "actions": [
+                {
+                    "key": "device.create",
+                    "label": "Ausrüstung anlegen",
+                    "requires": {
+                        "area": "devices",
+                        "level": "write"
+                    },
+                    "with_filter": true
+                },
+                {
+                    "key": "device.edit",
+                    "label": "Stammdaten bearbeiten",
+                    "requires": {
+                        "area": "devices",
+                        "level": "write"
+                    },
+                    "with_filter": true
+                },
+                {
+                    "key": "device.retire",
+                    "label": "Aussondern und wieder aufnehmen",
+                    "requires": {
+                        "area": "devices",
+                        "level": "write"
+                    },
+                    "with_filter": true
+                },
+                {
+                    "key": "device.code",
+                    "label": "Code zuordnen",
+                    "requires": {
+                        "area": "devices",
+                        "level": "write"
+                    },
+                    "with_filter": true
+                }
+            ]
+        },
+        {
+            "label": "Mehrere Ausrüstungen",
+            "actions": [
+                {
+                    "key": "devices.bulk",
+                    "label": "Sammelaktionen",
+                    "requires": {
+                        "area": "devices",
+                        "level": "write"
+                    },
+                    "with_filter": true
+                },
+                {
+                    "key": "csv.import",
+                    "label": "CSV-Import",
+                    "requires": {
+                        "area": "devices",
+                        "level": "write"
+                    },
+                    "with_filter": false
+                }
+            ]
+        },
+        {
+            "label": "Benachrichtigungen",
+            "actions": [
+                {
+                    "key": "mail.log",
+                    "label": "Log-Mails empfangen",
+                    "requires": null,
+                    "with_filter": true
+                }
+            ]
+        }
+    ]
+}
