@@ -88,9 +88,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
      Ändert der Push nur `.md`-Dateien, läuft keine CI und es gibt nichts zu deployen.
   3. Rot: `gh run view <id> --log-failed` lesen, Ursache in der „✅ FERTIG“-Meldung erklären,
      beheben, committen, pushen. Höchstens 3 Reparaturversuche je Fehler, danach anhalten und
-     berichten („⛔ ABGEBROCHEN“). Nie einfach neu starten; einzige Ausnahme: Ein Lauf, der
-     AUSSCHLIESSLICH am bekannten Firefox-Fehler #43413 scheitert (siehe "GitHub Actions (CI)"),
-     darf einmal mit `gh run rerun <id> --failed` wiederholt werden.
+     berichten („⛔ ABGEBROCHEN“). Nie einfach neu starten; zwei Ausnahmen (siehe "GitHub Actions
+     (CI)"), je EINMAL mit `gh run rerun <id> --failed`: Ein Lauf, der AUSSCHLIESSLICH am bekannten
+     Firefox-Fehler #43413 scheitert, und (seit 05.11.2026) ein Job, der beim Einrichten des Runners
+     scheitert, bevor der erste Test bzw. die erste Prüfung läuft (z. B. Paket-Mirror, Download von
+     Browsern oder Paketen, Netzwerk des Runners), einmal je Lauf. Die „✅ FERTIG“-Meldung nennt
+     dann die Ursache mit der Zeile aus dem Protokoll. Scheitert ein Test oder eine Prüfung, gilt
+     weiter: untersuchen, nicht neu starten.
   4. Grün (auch der Job `deploy`, der den Branch `deploy` schreibt): `ssh -T strato-ff`. Danach
      prüfen: Die Ausgabe endet mit „Deployment erfolgreich“,
      `https://www.prodad.de/firefighting/test/build.json` liefert als `build` die ersten 12 Zeichen
@@ -3064,11 +3068,18 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`~/.cache/ms-playwright`, Schlüssel = Playwright-Version, gespeichert gleich nach dem
   Installieren nur von Teil 1). Bei Treffer installiert `npx playwright install-deps` nur die
   Systempakete.
-- Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Einzige Ausnahme: Ein Lauf, der
-  ausschließlich am bekannten Firefox-Fehler beim Schließen des Browser-Kontexts scheitert
-  (`_maybeDontRestoreTabs`, [microsoft/playwright#43413](https://github.com/microsoft/playwright/issues/43413),
-  Playwright 1.64 mit Firefox 157, als „not planned“ geschlossen), darf EINMAL neu gestartet werden.
-  Scheitert auch der neue Lauf, wird nicht noch einmal neu gestartet, sondern untersucht.
+- Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Zwei Ausnahmen, je mit
+  `gh run rerun <id> --failed`:
+  - Ein Lauf, der ausschließlich am bekannten Firefox-Fehler beim Schließen des Browser-Kontexts
+    scheitert (`_maybeDontRestoreTabs`, [microsoft/playwright#43413](https://github.com/microsoft/playwright/issues/43413),
+    Playwright 1.64 mit Firefox 157, als „not planned“ geschlossen), darf EINMAL neu gestartet
+    werden.
+  - Ein Job, der beim Einrichten des Runners scheitert, bevor der erste Test oder die erste Prüfung
+    läuft (z. B. Paket-Mirror bei `install-deps`, Download von Browsern oder Paketen, Netzwerk des
+    Runners), darf EINMAL je Lauf wiederholt werden (seit 05.11.2026). Die „✅ FERTIG“-Meldung nennt
+    die Ursache mit der Zeile aus dem Protokoll.
+  Scheitert auch der neue Lauf, wird nicht noch einmal neu gestartet, sondern untersucht. Scheitert
+  ein Test oder eine Prüfung, gilt immer: untersuchen, nicht neu starten.
 - Job `deploy`: nur bei Push auf `main` und nur, wenn `changes`, `frontend-checks` und
   `frontend-build` grün sind und `php` sowie alle Teile von `e2e` grün oder übersprungen (Bereich
   nicht betroffen; `!cancelled()` statt der Standardbedingung, die übersprungene als Fehler wertet);

@@ -129,6 +129,8 @@ späterer Ablehnung bzw. neuen Rechten (`session.spec.ts`, `offline.spec.ts`), S
 nicht bei schnellem Start, erscheint nach 0,4 s mit `page.clock`, Schritte, dunkel, reduzierte
 Bewegung, keine CSP-Verletzung), Unit-Tests für die Reihenfolge des Starts. Browser- und
 breitenabhängig: betroffene Dateien in allen fünf Profilen, Service Worker zusätzlich unter WSL.
+Weil `appUpdate.spec.ts` unter Windows in Firefox nicht läuft (T15), laufen die Update-Tests in
+Firefox vor „✅ FERTIG“ unter WSL, nicht erst in der CI (Holger 05.11.2026).
 
 **Risiken**: Mit gespeicherter Sitzung sieht ein inzwischen gesperrtes Konto kurz seine
 Offline-Kopie (wie heute offline; jede Anfrage bekommt 401, dann Anmeldung). Eine alte Version läuft
