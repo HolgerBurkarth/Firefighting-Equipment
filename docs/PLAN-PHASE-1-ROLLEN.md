@@ -113,6 +113,13 @@ jetzt für das gleichzeitige Bearbeiten in 1.5 (409 `version_conflict`), und CHE
 verhindert das (Fremdschlüssel, die Transaktion wird zurückgenommen). Sobald Datenfilter gesetzt
 werden können, entfernt der Befehl vorher die Zeilen in `fe_role_locations` der Stadt.
 
+Schritt 1.2 (05.11.2026) in zwei Teilen: 1.2a ohne Migration (Schreibwege setzen `role_id`,
+Probelauf `bin/role-assignment-check.php`), dann nach Freigabe 0036–0038. Probelauf auf dem Server
+durch Holger am 05.11.2026, 06:39: 7 Konten bekämen eine Rolle (immendingen: admin active 1, user
+deleted 1; test: admin active 3, user active 2), keines bliebe ohne Rolle, keine unpassende Rolle,
+1 Super-Admin ohne Rolle; 0037 läuft durch. Freigabe der Migrationen 0036–0038 durch Holger am
+05.11.2026.
+
 Bewusst **nicht** in Phase 1:
 
 - `fe_users.role` wird weder entfernt noch umbenannt (wäre ⚠ und ist als Kontoart nützlich).
