@@ -81,14 +81,15 @@ final class CacheableResponseTest extends TestCase
         yield 'CSV' => ['text/csv; charset=utf-8', self::ETAG];
         yield 'HTML ohne charset' => ['text/html', self::ETAG];
         yield 'Text' => ['text/plain; charset=utf-8', self::ETAG];
-        yield 'SVG' => ['image/svg+xml', self::ETAG];
+        // SVG nur als Datei des Builds (FrontendAssets, nur assets/, mit eigener CSP), seit Schritt 1.7d.
+        yield 'SVG mit charset' => ['image/svg+xml; charset=utf-8', self::ETAG];
         yield 'ETag ohne Anführungszeichen' => [CacheableResponse::PNG, 'abc'];
         yield 'ETag mit Zeilenumbruch' => [CacheableResponse::PNG, "\"a\nb\""];
     }
 
     public function testFrontendContentTypes(): void
     {
-        foreach (['text/html; charset=utf-8', 'text/javascript; charset=utf-8', 'text/css; charset=utf-8', 'font/woff2', 'font/woff', 'application/wasm', 'application/json; charset=utf-8'] as $type) {
+        foreach (['text/html; charset=utf-8', 'text/javascript; charset=utf-8', 'text/css; charset=utf-8', 'font/woff2', 'font/woff', 'application/wasm', 'image/svg+xml', 'application/json; charset=utf-8'] as $type) {
             $response = new CacheableResponse(new Request('GET', '/x'), $type, 'x', self::ETAG, CachePolicy::Revalidate);
             self::assertSame($type, $response->headers()['Content-Type']);
         }

@@ -1,5 +1,12 @@
 import type { Page, Route } from '@playwright/test';
-import { expect, HTTP_ERROR_CONSOLE, meBody, permissionsJson, test } from './fixtures';
+import {
+    expect,
+    HTTP_ERROR_CONSOLE,
+    meBody,
+    NETWORK_ERROR_CONSOLE,
+    permissionsJson,
+    test,
+} from './fixtures';
 import { deviceDetail, deviceJson, devicesEndpoint, LOCATIONS } from './support/devices';
 
 /**
@@ -168,5 +175,93 @@ test.describe('Schnellstart: Seite lädt parallel', () => {
         // Ohne Sitzung zur Anmeldung (die Seite erscheint erst danach).
         me.release(401, NOT_LOGGED_IN);
         await expect(page).toHaveURL(/\/firefighting\/test\/anmelden\?weiter=/);
+    });
+});
+
+test.describe('Schnellstart: Startbild', () => {
+    test.use({ allowedConsoleError: HTTP_ERROR_CONSOLE });
+
+    test('schneller Start: weg, sobald die erste Seite steht', async ({ page }) => {
+        await page.goto('/firefighting/test/anmelden');
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        await expect(page.locator('#splash')).toHaveCount(0);
+        // Marke „erste Seite“ für das Messskript.
+        expect(
+            await page.evaluate(() => performance.getEntriesByName('ff:first-page').length),
+        ).toBe(1);
+    });
+
+    test('wartet der Start auf auth/me: nach 0,4 s sichtbar mit „Anmeldung wird geprüft …“', async ({
+        page,
+    }) => {
+        const me = await holdMe(page);
+        await page.goto('/firefighting/test/suchen');
+        const splash = page.locator('#splash');
+        await expect(splash).toHaveAttribute('data-step', 'session');
+        await expect(splash.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '66');
+        await expect(splash).toContainText('Anmeldung wird geprüft …');
+        await expect(splash).toContainText('Geräteverwaltung');
+        // Nur per CSS verzögert (Animation), dann voll sichtbar.
+        await expect(splash).toHaveCSS('animation-delay', '0.4s');
+        await expect(splash).toHaveCSS('opacity', '1');
+        await expect(splash.locator('.splash-art')).toHaveCSS(
+            'background-image',
+            /assets\/splash-light-[^/]+\.svg/,
+        );
+        me.release(401, NOT_LOGGED_IN);
+        await expect(page).toHaveURL(/\/firefighting\/test\/anmelden\?weiter=/);
+        await expect(splash).toHaveCount(0);
+    });
+
+    test('dunkel und ohne Bewegung', async ({ page }) => {
+        await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+        await holdMe(page);
+        await page.goto('/firefighting/test/suchen');
+        const splash = page.locator('#splash');
+        await expect(splash).toHaveAttribute('data-step', 'session');
+        await expect(splash).toHaveCSS('background-color', 'rgb(18, 22, 28)');
+        await expect(splash.locator('.splash-art')).toHaveCSS(
+            'background-image',
+            /assets\/splash-dark-[^/]+\.svg/,
+        );
+        await expect(splash).toHaveCSS('animation-duration', '0s');
+        await expect(splash.locator('.splash-bar')).toHaveCSS('transition-duration', '0s');
+    });
+
+    test('zeigt den Namen der Stadt aus dem letzten Besuch (Farbe per Unit-Test)', async ({
+        page,
+        browser,
+    }) => {
+        await page.goto('/firefighting/test/anmelden');
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        await expect
+            .poll(() => page.evaluate(() => localStorage.getItem('ff-tenant:test')))
+            .toContain('Feuerwehr Test');
+        await holdMe(page);
+        await page.goto('/firefighting/test/suchen');
+        await expect(page.locator('#splash [data-splash-title]')).toHaveText('Feuerwehr Test');
+
+        // Erster Besuch (neuer Kontext): „Feuerwehr“.
+        const fresh = await browser.newContext();
+        const other = await fresh.newPage();
+        await other.route('**/api/v1/**', () => undefined);
+        await other.goto(new URL('/firefighting/test/suchen', page.url()).href);
+        await expect(other.locator('#splash [data-splash-title]')).toHaveText('Feuerwehr');
+        await fresh.close();
+    });
+});
+
+test.describe('Schnellstart: Startbild ohne Verbindung', () => {
+    test.use({ allowedConsoleError: NETWORK_ERROR_CONSOLE });
+
+    test('keine Verbindung beim Start: Startbild weg, Hinweis der App sichtbar', async ({
+        page,
+    }) => {
+        await page.route('**/api/v1/auth/me', (route) => route.abort('internetdisconnected'));
+        await page.goto('/firefighting/test/suchen');
+        await expect(page.getByTestId('connection-notice')).toContainText(
+            'Keine Verbindung zum Server',
+        );
+        await expect(page.locator('#splash')).toHaveCount(0);
     });
 });

@@ -278,7 +278,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   personenbezogene Daten, ohne Sitzung und nie `Set-Cookie`). `CacheableResponse` erlaubt nur die
   Content-Types `image/png`, `application/manifest+json; charset=utf-8` und für das Frontend
   `text/html; charset=utf-8`, `text/javascript; charset=utf-8`, `text/css; charset=utf-8`,
-  `font/woff2`, `font/woff`, `application/wasm` (nur `assets/`, Kamera-Scanner) und `application/json; charset=utf-8` (NUR für `build.json` des
+  `font/woff2`, `font/woff`, `application/wasm` (nur `assets/`, Kamera-Scanner), `image/svg+xml` (nur
+  `assets/`, Bilder des Startbilds, seit Schritt 1.7d; vorher bewusst abgelehnt, weil eine SVG Skript
+  enthalten kann: daher nur Dateien des Builds, nie hochgeladene, und mit eigener CSP
+  `FrontendHandler::SVG_CONTENT_SECURITY_POLICY` = `default-src 'none'`) und `application/json; charset=utf-8` (NUR für `build.json` des
   Frontends; API-Antworten nie über `CacheableResponse`) (Konstanten in `CacheableResponse`), und nur die beiden Richtlinien aus
   `CachePolicy`: `Immutable` (`public, max-age=31536000, immutable`: Logo/Symbol nur, wenn `?v=`
   gleich der aktuellen Versionskennung ist; Frontend nur `assets/…` mit Hash im Namen) und
@@ -286,7 +289,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `sw.js`/`workbox-….js`, `build.json`). Immer mit starkem `ETag` und `nosniff`; `If-None-Match` (auch `W/`,
   Liste, `*`) → 304 ohne Body. Zusätzliche Header nur aus der festen Liste
   `Content-Security-Policy`, `Referrer-Policy`, `X-Frame-Options` (ohne Steuerzeichen, sonst
-  `InvalidArgumentException`), bisher nur auf der App-Seite. Dateien des Frontends mit
+  `InvalidArgumentException`), bisher nur auf der App-Seite und `Content-Security-Policy` an SVG-Dateien
+  des Builds. Dateien des Frontends mit
   vorkomprimierter Fassung tragen zusätzlich `Vary: Accept-Encoding` (auch bei 304) und, wenn
   komprimiert gesendet, `Content-Encoding` (`br` oder `gzip`, `ContentEncoding`; nicht bei 304;
   nie ohne `Vary`), siehe "Frontend ausliefern". Fehler dieser Routen bleiben JSON mit
@@ -351,8 +355,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (sonst würde HTML als Skript geladen). Alles andere (`""`, `index.html`, `geraete/12`,
   `passwort-zuruecksetzen` …) → `index.html` mit Basispfad, `Revalidate`.
 - Erlaubte Dateien (`FrontendAssets`): nur Endungen aus `FrontendAssets::CONTENT_TYPES` (`js`, `css`,
-  `woff2`, `woff`, `wasm`; `wasm` = `application/wasm`, Lesemodul des Kamera-Scanners, nur in
-  `assets/`, also immer `Immutable`: `FrontendAssets::ASSETS_ONLY`), Name `[A-Za-z0-9][A-Za-z0-9_.-]*` (höchstens 128 Zeichen), keine Unterordner
+  `woff2`, `woff`, `wasm`, `svg`; `wasm` = `application/wasm`, Lesemodul des Kamera-Scanners, und `svg`
+  = `image/svg+xml`, Bilder des Startbilds, nur in `assets/`, also immer `Immutable`:
+  `FrontendAssets::ASSETS_ONLY`), Name `[A-Za-z0-9][A-Za-z0-9_.-]*` (höchstens 128 Zeichen), keine Unterordner
   außer `assets/`, kein `..`, keine versteckten Dateien, zusätzlich per `realpath` innerhalb von
   `frontend/dist`. Neue Endungen nur, wenn der Build sie wirklich enthält (Content-Type in
   `CacheableResponse` ergänzen). Einzige Ausnahme ohne Endung in der Liste: genau
@@ -1199,7 +1204,31 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Service Worker `sw.js` (Workbox, `generateSW`), registriert aus dem Bundle (kein Inline-Skript),
   Scope `/firefighting/<bereich>/`, Rückfall auf `index.html` außer `api/` und
   `manifest.webmanifest`. Das Manifest liefert PHP (`manifest: false` im Plugin). Vorab geladen
-  (`globPatterns`) werden `js`, `css`, `html`, `woff2` und `wasm` (Lesemodul des Scanners, offline).
+  (`globPatterns`) werden `js`, `css`, `html`, `woff2`, `wasm` (Lesemodul des Scanners, offline) und
+  `svg` (Bilder des Startbilds). Bilder bettet Vite nie als `data:` ein (`assetsInlineLimit` in
+  `vite.config.ts`; die CSP erlaubt `data:` nicht).
+- Startbild (Plan Phase 1, Schritt 1.7d „Schnellstart“, Mockup
+  `docs/aenderungskonzept/mockups/Startbild.dc.html`): in `index.html` außerhalb von `#app`
+  (`#splash`, Löschfahrzeug als `src/assets/splash-light.svg`/`splash-dark.svg` über
+  `src/styles/splash.css`, beide Dunkel-Blöcke gleich, per Test), ohne Inline-Stil und ohne Skript.
+  Erst nach rund 0,4 s sichtbar, nur per CSS (`animation-delay`, Startbild unsichtbar und ohne
+  Klicks bis dahin); ein schneller Start zeigt es nie. Ladebalken zuerst ohne Stand (`data-step` =
+  `start`), dann aus der App (`src/runtime/splash.ts`, `setSplashStep`): `app` 33 % „App wird
+  geladen …“ (sobald `main.ts` läuft), `session` 66 % „Anmeldung wird geprüft …“ (nur, wenn der Start
+  auf `auth/me` wartet; `main.ts` fragt bei geschützten Seiten `ensureSession` sofort), `data` 92 %
+  „Ausrüstung wird geladen …“ (Sitzung bekannt, die Seite lädt); Breite je Schritt im Stylesheet,
+  `aria-valuenow` am Balken. `prefers-reduced-motion`: ohne Einblenden und ohne Bewegung. Name und
+  Farbe der Stadt aus dem letzten Besuch (`showRememberedTenant` als Erstes in `main.ts`,
+  localStorage `ff-tenant:<kürzel>` = `{name, accent_color}`, gemerkt bei jeder Antwort von
+  `api/v1/tenant` in `setTenant`; Farbe als `--accent` per `applyAccent`; scheitert `tenant`, gilt
+  wieder die Standardfarbe, bei unbekannter oder gesperrter Stadt wird der Eintrag gelöscht); beim
+  ersten Besuch „Feuerwehr“ in der Standardfarbe, unter `service` „Super-Admin“. Entfernt
+  (`removeSplash`), sobald die erste Seite steht (`router.isReady()` und `nextTick`, auch nach einem
+  Fehler der ersten Navigation) oder ein Hinweis der App sichtbar sein muss (`sessionCheckError`,
+  z. B. „Keine Verbindung zum Server“). Messpunkte für das Messskript (`performance.mark`):
+  `ff:first-page` beim Entfernen, `ff:search-data` auf „Suchen“, sobald Geräte da sind (Kopie oder
+  Server). Tests `tests/e2e/startup.spec.ts`, `tests/unit/splash.spec.ts`; Messskript
+  `npm run measure:start` (`tests/e2e/support/measureStart.ts`, nur gegen die Test-Stadt, liest nur).
 - Updates (KONZEPT.md "Updates der App", `src/runtime/appUpdate.ts`): `skipWaiting: false`, die neue
   Version wartet, bis `AppUpdater` sie per `SKIP_WAITING` aktiviert und die Seite neu lädt (nie
   `skipWaiting: true`: die laufende App bräuchte sonst gelöschte Teile). Prüfen

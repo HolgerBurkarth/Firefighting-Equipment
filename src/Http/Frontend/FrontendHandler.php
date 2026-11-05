@@ -67,6 +67,13 @@ final readonly class FrontendHandler
         return $this->indexHtml($request, $path);
     }
 
+    /**
+     * Richtlinie für SVG-Bilder des Builds (Startbild): Als Bild eingebunden gilt sie nicht, direkt
+     * geöffnet verhindert sie jedes Skript und jede Anfrage (Schutz, falls je eine SVG mit Skript in den
+     * Build geriete).
+     */
+    public const string SVG_CONTENT_SECURITY_POLICY = "default-src 'none'";
+
     private function file(Request $request, string $rest, CachePolicy $policy): CacheableResponse
     {
         $file = $this->assets->file($rest, $request->header('Accept-Encoding')) ?? throw HttpException::notFound();
@@ -77,6 +84,7 @@ final readonly class FrontendHandler
             $file->body,
             $file->etag(),
             $policy,
+            $file->contentType === CacheableResponse::SVG ? ['Content-Security-Policy' => self::SVG_CONTENT_SECURITY_POLICY] : [],
             contentEncoding: $file->encoding,
             varyAcceptEncoding: $file->varies,
         );

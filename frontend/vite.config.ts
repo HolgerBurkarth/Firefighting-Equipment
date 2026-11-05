@@ -29,7 +29,8 @@ export default defineConfig({
             workbox: {
                 // Mit dem Lesemodul des Kamera-Scanners (wasm, rund 950 KB): Scannen geht auch
                 // offline (KONZEPT.md, "Offline-Modus – Entscheidungen", 56).
-                globPatterns: ['**/*.{js,css,html,woff2,wasm}'],
+                // Mit den Bildern des Startbilds (svg).
+                globPatterns: ['**/*.{js,css,html,woff2,wasm,svg}'],
                 navigateFallback: 'index.html',
                 navigateFallbackDenylist: [/\/api\//, /\/manifest\.webmanifest$/],
                 cleanupOutdatedCaches: true,
@@ -54,6 +55,9 @@ export default defineConfig({
         outDir: 'dist',
         emptyOutDir: true,
         target: ['es2022', 'safari16', 'firefox115', 'chrome111'],
+        // Bilder nie als data:-Adresse einbetten (die CSP erlaubt für img-src nur 'self' und blob:),
+        // sonst wie Vite (z. B. die Bilder des Startbilds, src/styles/splash.css).
+        assetsInlineLimit: (filePath) => (filePath.endsWith('.svg') ? false : undefined),
         // Namen wie FrontendAssets (PHP) sie ausliefert; per Browser-Test für jede Datei geprüft.
         rolldownOptions: { output: { sanitizeFileName } },
     },

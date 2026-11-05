@@ -244,6 +244,19 @@ nicht live, durch automatische Tests abgedeckt; offen B8a (Kontowechsel ohne Abm
 - Eingaben gehen nie verloren.
 - Fehlercodes höchstens klein für den Support. Bei 401 meldet die App ab.
 
+## Startbild (Plan Phase 1, Schritt 1.7d)
+
+- Mockup `docs/aenderungskonzept/mockups/Startbild.dc.html`: gezeichnetes Löschfahrzeug, Name der Stadt,
+  „Geräteverwaltung“, Ladebalken mit Text. Steht in `index.html` vor der App und erscheint erst nach
+  rund 0,4 s (nur per CSS); ein schneller Start zeigt es nie. Die App entfernt es, sobald die erste
+  Seite steht oder ein eigener Hinweis (z. B. „Keine Verbindung zum Server“) zu sehen sein muss.
+- Ladebalken: zuerst ohne Stand, dann „App wird geladen …“, „Anmeldung wird geprüft …“ (nur, wenn
+  der Start auf den Server wartet) und „Ausrüstung wird geladen …“. Hell und dunkel, ohne Bewegung bei
+  „Bewegung reduzieren“.
+- Name und Farbe der Stadt aus dem letzten Besuch (gemerkt im Browser); beim ersten Besuch
+  „Feuerwehr“ in der Standardfarbe. Bilder und Stil sind Dateien des Builds (keine Ausnahme in der
+  CSP); die Bilder liefert PHP nur aus `assets/` und mit eigener CSP (`default-src 'none'`).
+
 ## Updates der App
 Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
 - Eine neue Version (neuer Build nach einem Deploy) übernimmt nicht von selbst: Ihr Service Worker

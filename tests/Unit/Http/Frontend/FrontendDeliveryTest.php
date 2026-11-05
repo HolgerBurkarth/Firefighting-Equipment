@@ -166,6 +166,22 @@ final class FrontendDeliveryTest extends TestCase
         self::assertSame(0, $this->connectAttempts);
     }
 
+    public function testSvgOfTheBuildWithOwnContentSecurityPolicy(): void
+    {
+        // Bild des Startbilds (Plan Phase 1, Schritt 1.7d): nur aus assets/, direkt geöffnet ohne Skript.
+        $response = $this->get('/firefighting/test/assets/splash-light-abc123.svg');
+
+        self::assertSame(200, $response->statusCode());
+        $headers = $response->headers();
+        self::assertSame('image/svg+xml', $headers['Content-Type']);
+        self::assertSame('public, max-age=31536000, immutable', $headers['Cache-Control']);
+        self::assertSame('nosniff', $headers['X-Content-Type-Options']);
+        self::assertSame("default-src 'none'", $headers['Content-Security-Policy']);
+        self::assertSame(FrontendHandler::SVG_CONTENT_SECURITY_POLICY, $headers['Content-Security-Policy']);
+        self::assertSame(file_get_contents(self::DIST . '/assets/splash-light-abc123.svg'), $response->body());
+        self::assertSame(0, $this->connectAttempts);
+    }
+
     public function testNotModifiedWithMatchingEtag(): void
     {
         foreach (['/firefighting/test/', '/firefighting/test/assets/index-abc123.js'] as $uri) {
@@ -278,6 +294,7 @@ final class FrontendDeliveryTest extends TestCase
         yield 'Fassung einer nicht erlaubten Datei' => ['/firefighting/test/assets/notiz.txt'];
         yield 'WebAssembly außerhalb von assets/' => ['/firefighting/test/zxing_reader-abc123.wasm'];
         yield 'WebAssembly in Großschreibung außerhalb von assets/' => ['/firefighting/test/zxing_reader-abc123.WASM'];
+        yield 'SVG außerhalb von assets/' => ['/firefighting/test/splash-light-abc123.svg'];
         yield 'ungültiges Kürzel' => ['/firefighting/-test/'];
         yield 'Kürzel zu lang' => ['/firefighting/' . str_repeat('a', 51) . '/'];
     }
