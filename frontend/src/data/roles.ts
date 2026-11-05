@@ -271,6 +271,9 @@ const AREA_MENU_LABELS: Readonly<Record<string, string>> = {
     settings: 'Einstellungen',
 };
 
+/** Bereiche mit Handy-Seiten („Suchen“, „Termine“). */
+const HANDY_AREAS: readonly string[] = ['search', 'due'];
+
 function menuLabel(area: CatalogArea): string {
     return AREA_MENU_LABELS[area.key] ?? area.label;
 }
@@ -313,7 +316,10 @@ export function rolePreview(
     options: FilterOptions | null,
 ): RolePreview {
     const visible = catalog.areas.filter((area) => effectiveLevel(area, form) !== null);
-    const menu = visible.filter((area) => area.key !== 'search').map(menuLabel);
+    // Suchen und Termine gibt es auch als Handy-Seiten; eine Konsole (und „Dashboard“ in der Leiste,
+    // F8) erst mit einem anderen Bereich, wie heute bei der Standard-Rolle Benutzer.
+    const hasConsole = visible.some((area) => !HANDY_AREAS.includes(area.key));
+    const menu = hasConsole ? visible.filter((area) => area.key !== 'search').map(menuLabel) : [];
     const bar: string[] = [];
     if (visible.some((area) => area.key === 'search')) {
         bar.push('Suchen');
