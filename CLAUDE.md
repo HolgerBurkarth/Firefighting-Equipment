@@ -820,7 +820,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Unit-Tests `deviceForm.spec.ts`, `deviceAdminApi.spec.ts`, `router.spec.ts`.
 - Benutzerverwaltung der Admin-Konsole (`UsersPage`, `benutzer`, Route `users`, nur `admin`,
   `layout: 'admin'`, Menü „Benutzer“ mit Zähler `pendingUsers`; KONZEPT.md "Bereiche des Admins",
-  Benutzer; API siehe "Benutzerverwaltung durch den Admin", unverändert): Store `userStore`
+  Benutzer; Plan Phase 1, Schritt 1.6b, Mockups „Benutzer“ und „Benutzer-Rolle“; API siehe
+  "Benutzerverwaltung durch den Admin"): Store `userStore`
   (`UserStore`, `src/data/userStore.ts`, `GET users` ohne gelöschte, in `installDataLayer`), Ändern
   nur über `src/data/index.ts` (`approveUser`, `rejectUser`, `setUserLocked`, `saveUser`,
   `deleteUser`; API in `src/api/users.ts`): danach lädt `userStore` neu (abgewartet), `adminOverview`
@@ -829,21 +830,41 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `src/data/users.ts`. Oben (deutlich, nur mit wartenden) „N neue Anmeldungen warten auf
   Freischaltung“ (`pendingUsers`: Status `pending`, älteste zuerst) als Karten mit „Freischalten …“
   (`FormDialog`: Anzeigename vorbelegt mit dem Namen, Prüfung `displayNameProblem` wie `PersonName`;
-  Rolle als Radiogruppe `ROLE_OPTIONS`, Standard Benutzer) und „Ablehnen …“ (`ConfirmDialog`, nennt
-  die Mail). Darunter alle anderen Konten (`userRows`: Suche mit UND in Anzeigename, Name und E-Mail
+  Rolle vorgewählt die des Kontos, also die des Einladungscodes; Karte und Fenster nennen den Aushang,
+  `registrationText`) und „Ablehnen …“ (`ConfirmDialog`, nennt die Mail). Rollen (Schritt 1.6):
+  `assignableRoleStore` (`AssignableRoleStore`, `src/data/assignableRoles.ts`, `GET roles` mit
+  Katalog, in `installDataLayer`; nach jeder Änderung an Konten neu, wenn geladen). Auswahl der Rolle
+  überall als Liste von Radioknöpfen (Name als `aria-label`, darunter Kurzbeschreibung, „Sieht: …“
+  aus `roleSummary` und „Sieht nur: …“ mit Namen aus `adminLocationStore`/`deviceTypeStore`,
+  `filterText`; die Listen lädt die Seite nur, wenn eine Rolle filtert); nicht vergebbare
+  (`assignable` false) gesperrt mit `assign_blocker`, die bisherige bleibt sichtbar gewählt. Im
+  Fenster „Bearbeiten“ bei *Admin* der Hinweis „Admins haben alle Rechte …“, bei geänderter Rolle
+  „Die neue Rolle gilt beim nächsten Aufruf der App.“ bzw. beim Wechsel zu oder von *Admin* „… auf
+  allen Geräten abgemeldet.“ (F1). Über der Liste „Rolle:“ als Knöpfe mit Anzahl
+  (`roleFilterOptions`, `aria-pressed`, nur mit mehr als einer Rolle), Spalte „Rolle“ als Chip
+  (`roleNameOf`), unten „Welche Rollen es gibt … legt der Super-Admin fest …“. Mehrfachauswahl (F6):
+  Kästchen je Konto (nicht am eigenen, `selectable`) und „Alle angezeigten Konten auswählen“, Leiste
+  „N Konten ausgewählt“ mit „Rolle zuweisen …“ (`FormDialog`, nur vergebbare Rollen) und „Auswahl
+  aufheben“; `bulkAssignRole` (`src/data/index.ts`, `postBulkRole`, Blöcke zu
+  `BULK_ROLE_MAX_USERS` = 50), Ergebnis `bulkRoleText` und „Nicht geändert (bleiben ausgewählt)“
+  je Konto mit der Meldung des Servers; geänderte und unveränderte verlassen die Auswahl. Darunter alle anderen Konten (`userRows`: Suche mit UND in Anzeigename, Name und E-Mail
   per `searchKey`; Spalten Name (Anzeigename, abweichender Name darunter `nameHint`, „Sie“ am eigenen
   Konto), E-Mail, Rolle, Status (`statusText`: gesperrt vor dem Status, „E-Mail unbestätigt“),
   Registriert; Spaltenköpfe mit `aria-sort`, am Handy Karten mit Knöpfen „Sortieren“ wie bei den
   Gerätetypen). Unbestätigte Konten haben statt des Stifts „Ablehnen …“ (sie verschwinden sonst nach
   7 Tagen von selbst). Der Stift öffnet Anzeigename (nur `active`) und Rolle, gesendet nur Geändertes
-  (`userChanges`, erst Name, dann Rolle), nichts geändert → zu ohne Anfrage; abseits (Slot `extra`)
+  (`userChanges` mit `roleId`, erst Name, dann Rolle über `role_id`), nichts geändert → zu ohne Anfrage; abseits (Slot `extra`)
   „… sperren …“ (Rückfrage) bzw. „… entsperren“ und rot „… löschen …“ (Rückfrage, nennt „Gelöschter
   Benutzer #ID“). Am eigenen Konto Hinweis, Rolle gesperrt, kein Sperren und Löschen (der Server lehnt
   es ohnehin mit 409 ab). Fehler des Servers im Fenster (400 am Anzeigenamen) bzw. auf der Seite,
   Erfolg als `success-notice`. Browser-Tests `tests/e2e/users.spec.ts` (zustandsbehafteter Server je
-  Test über `delegate`); Unit-Tests `users.spec.ts`, `router.spec.ts`.
+  Test über `delegate`; `GET roles` = `assignableRolesJson` in `tests/e2e/support/admin.ts`, auch
+  in `adminOverview`); Unit-Tests `users.spec.ts`, `assignableRoles.spec.ts`, `router.spec.ts`.
 - Einladungscodes (KONZEPT.md Entscheidung 30; API siehe "Einladung, Registrierung und
-  E-Mail-Bestätigung", unverändert): zweiter Reiter der Benutzerverwaltung (Reka UI `Tabs`, Reiter
+  E-Mail-Bestätigung"; Rolle seit Schritt 1.6b: im Fenster „Rolle nach der Freischaltung“ als
+  Radioknöpfe ohne *Admin* (`codeRoles`, vorgewählt *Benutzer*, `defaultRole`; Hinweis aus dem
+  Mockup, dass es *Admin* für Codes nicht gibt), Spalte „Rolle nach Freischaltung“, der neue Code nennt
+  sie; der Aushang nennt sie nicht, darunter der Kasten „So läuft es ab“): zweiter Reiter der Benutzerverwaltung (Reka UI `Tabs`, Reiter
   „Konten“ mit Zahl der wartenden und „Einladungscodes“; in der Adresse als
   `benutzer?ansicht=einladungscodes` per `router.replace`, gleicher Pfad), Baustein
   `InvitationCodesPanel` (Inhalt bleibt beim Wechsel erhalten, `unmount-on-hide` aus; geladen erst,
@@ -1913,7 +1934,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `permissions`, Sitzungsdauer und Log-Mails aus den Rechten, Migrationen 0039/0040) und 1.4
   (Datenfilter „Sieht nur …“ in allen Abfragen und Mails), 1.5a (Verwaltung der Rollen durch den
   Super-Admin im Backend, siehe unten) und 1.5b (Seiten „Rollen“ und „Rolle bearbeiten“, siehe
-  "Frontend"), 1.6a (Rollen zuweisen im Backend, siehe "Benutzerverwaltung durch den Admin").
+  "Frontend"), 1.6a (Rollen zuweisen im Backend, siehe "Benutzerverwaltung durch den Admin") und
+  1.6b (Rollen in der Benutzerverwaltung und bei Einladungscodes, siehe "Frontend").
   Für *Admin* und *Benutzer* verhält sich jede Route wie vorher (per Test), ebenso Sitzungsdauer und
   Empfänger der Log-Mails; neu sind das Feld `selectable` der Standorte, Felder und Routen der
   Benutzerverwaltung und dass ein Rollenwechsel ohne *Admin* die Sitzungen nicht beendet (F1).

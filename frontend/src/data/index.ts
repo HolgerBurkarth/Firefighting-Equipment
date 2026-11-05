@@ -1,4 +1,4 @@
-import type { ApiResult } from '../api/client';
+import type { ApiError, ApiResult } from '../api/client';
 import { postBulkInspectionDue, postBulkState } from '../api/deviceBulk';
 import {
     postImport,
@@ -53,13 +53,16 @@ import {
     deleteUser as postDelete,
     rejectUser as postReject,
     setUserLocked as postLocked,
+    postBulkRole,
+    BULK_ROLE_MAX_USERS,
     type AdminUser,
-    type ManagedRole,
+    type BulkRoleResult,
 } from '../api/users';
 import { onSessionEnded, session, setSession } from '../auth/session';
 import { browserStorage } from '../runtime/theme';
 import { AdminDeviceList } from './adminDeviceList';
 import { AdminOverviewStore } from './adminOverview';
+import { AssignableRoleStore } from './assignableRoles';
 import { DeviceHistory } from './deviceHistory';
 import { DeviceStore } from './deviceStore';
 import { DeviceTypeStore } from './deviceTypeStore';
@@ -73,7 +76,7 @@ import { OtherQueues } from './otherQueues';
 import { currentAppBase } from '../runtime/appBase';
 import { browserLocalDb } from '../runtime/localDb';
 import { newClientRef, setBookingNotice } from './booking';
-import { runInBlocks, type BulkRun } from './deviceBulk';
+import { chunks, runInBlocks, type BulkRun } from './deviceBulk';
 import { addRecent, clearRecent, loadRecent } from './recentDevices';
 import { recentLocations } from './recentLocations';
 
@@ -92,6 +95,8 @@ export const deviceTypeStore = new DeviceTypeStore();
 export const adminDeviceList = new AdminDeviceList();
 /** Benutzerverwaltung des Admins (Konten der Stadt ohne gelöschte). */
 export const userStore = new UserStore();
+/** Rollen der Stadt zur Auswahl (Benutzerverwaltung und Einladungscodes, GET roles). */
+export const assignableRoleStore = new AssignableRoleStore();
 /** Einladungscodes der Stadt (Benutzerverwaltung, Reiter „Einladungscodes“). */
 export const invitationCodeStore = new InvitationCodeStore();
 /** Hinweise des Protokolls (Admin). */
@@ -339,14 +344,22 @@ async function afterUserChange(result: ApiResult<AdminUser>): Promise<ApiResult<
     if (adminOverview.state.overview !== null) {
         void adminOverview.refresh('changed');
     }
+    refreshRoleCounts();
     await userStore.refresh('changed');
     return result;
 }
 
-/** Registrierung freischalten mit Anzeigename und Rolle (Mail an das Konto). */
+/** Zahl der Konten je Rolle (Rollenfilter, Auswahl), nur wenn schon geladen. */
+function refreshRoleCounts(): void {
+    if (assignableRoleStore.state.data !== null) {
+        void assignableRoleStore.refresh('changed');
+    }
+}
+
+/** Registrierung freischalten mit Anzeigename und Rolle der Stadt (Mail an das Konto). */
 export async function approveUser(
     id: number,
-    request: { readonly displayName: string; readonly role: ManagedRole },
+    request: { readonly displayName: string; readonly roleId: number },
 ): Promise<ApiResult<AdminUser>> {
     return afterUserChange(await postApprove(id, request));
 }
@@ -367,7 +380,7 @@ export async function setUserLocked(id: number, locked: boolean): Promise<ApiRes
  */
 export async function saveUser(
     user: AdminUser,
-    changes: { readonly displayName?: string; readonly role?: ManagedRole },
+    changes: { readonly displayName?: string; readonly roleId?: number },
 ): Promise<ApiResult<AdminUser> | null> {
     let result: ApiResult<AdminUser> | null = null;
     if (changes.displayName !== undefined) {
@@ -376,10 +389,46 @@ export async function saveUser(
             return result;
         }
     }
-    if (changes.role !== undefined) {
-        result = await afterUserChange(await changeUserRole(user.id, changes.role));
+    if (changes.roleId !== undefined) {
+        result = await afterUserChange(await changeUserRole(user.id, changes.roleId));
     }
     return result;
+}
+
+/** Ergebnis von „Rolle zuweisen …“ für mehrere Konten. */
+export interface BulkRoleRun {
+    readonly results: readonly BulkRoleResult[];
+    /** Fehler einer ganzen Anfrage (z. B. Netzwerk, 409 vor jeder Änderung); der Rest gilt als nicht gesendet. */
+    readonly error: ApiError | null;
+    readonly unsent: readonly number[];
+}
+
+/**
+ * Rolle mehrerer Konten zuweisen (F6): Blöcke zu BULK_ROLE_MAX_USERS nacheinander, je Konto ein
+ * Ergebnis; danach lädt die Liste neu (abgewartet), auch nach einem Fehler.
+ */
+export async function bulkAssignRole(
+    userIds: readonly number[],
+    roleId: number,
+): Promise<BulkRoleRun> {
+    const results: BulkRoleResult[] = [];
+    let run: BulkRoleRun | null = null;
+    let done = 0;
+    for (const block of chunks(userIds, BULK_ROLE_MAX_USERS)) {
+        const response = await postBulkRole(block, roleId);
+        if (!response.ok) {
+            run = { results, error: response.error, unsent: userIds.slice(done) };
+            break;
+        }
+        results.push(...response.data);
+        done += block.length;
+    }
+    if (adminOverview.state.overview !== null) {
+        void adminOverview.refresh('changed');
+    }
+    refreshRoleCounts();
+    await userStore.refresh('changed');
+    return run ?? { results, error: null, unsent: [] };
 }
 
 /** Löschen = anonymisieren. */
@@ -499,6 +548,7 @@ export function installDataLayer(
         deviceTypeStore,
         adminDeviceList,
         userStore,
+        assignableRoleStore,
         invitationCodeStore,
         noticeList,
     ],

@@ -1,5 +1,6 @@
 import type { MockRequest, MockResponse } from '../fixtures';
 import { devicesEndpoint } from './devices';
+import { PERMISSION_CATALOG, roleJson, type MockRole } from './roles';
 
 /** Antwort von GET device-summary für Admins wie DeviceSummaryHandler (mit notices). */
 export function summaryJson(
@@ -46,12 +47,82 @@ export function userJson(
         display_name: null,
         role: 'user',
         role_label: 'Benutzer',
+        role_id: 2,
+        role_name: 'Benutzer',
         status: 'pending',
         status_label: 'wartet auf Freischaltung',
         locked: false,
         email_verified_at: '2026-10-29T10:00:00Z',
         created_at: '2026-10-29T09:00:00Z',
+        invitation_code: null,
         ...overrides,
+    };
+}
+
+function assignableRole(
+    role: Partial<MockRole> & Pick<MockRole, 'id' | 'name'>,
+    blocker: string | null = null,
+): Record<string, unknown> {
+    return {
+        ...roleJson({
+            description: null,
+            system_key: null,
+            areas: {},
+            actions: [],
+            locations: null,
+            device_types: null,
+            version: 1,
+            accounts: 0,
+            invitation_codes: 0,
+            ...role,
+        }),
+        assignable: blocker === null,
+        assign_blocker: blocker,
+    };
+}
+
+/**
+ * Antwort von GET roles wie AssignableRoleListHandler: Admin (1), Benutzer (2), Gerätewart (3),
+ * „Live-Test Filter“ mit Datenfilter (4, sieht nur Standort 10) und eine Rolle, die das Konto der
+ * Sitzung nicht vergeben darf (5).
+ */
+export function assignableRolesJson(): Record<string, unknown> {
+    return {
+        roles: [
+            assignableRole({
+                id: 1,
+                name: 'Admin',
+                system_key: 'admin',
+                description: 'Alle Rechte, nicht änderbar',
+            }),
+            assignableRole({
+                id: 2,
+                name: 'Benutzer',
+                system_key: 'user',
+                description: 'Wie bisher; bekommt jede neue Stadt',
+                areas: { search: 'read', due: 'read' },
+                actions: ['book.move', 'book.status'],
+            }),
+            assignableRole({
+                id: 3,
+                name: 'Gerätewart',
+                description: 'Pflegt die Ausrüstung',
+                areas: { dashboard: 'read', search: 'read', devices: 'write', due: 'write' },
+                actions: ['book.move', 'book.status', 'device.edit'],
+            }),
+            assignableRole({
+                id: 4,
+                name: 'Live-Test Filter',
+                areas: { search: 'read' },
+                actions: ['book.move'],
+                locations: [10],
+            }),
+            assignableRole(
+                { id: 5, name: 'Kasse', areas: { settings: 'write' } },
+                'Die Rolle „Kasse“ hat Rechte, die Ihre eigene Rolle nicht hat; Sie können sie daher nicht vergeben.',
+            ),
+        ],
+        catalog: PERMISSION_CATALOG,
     };
 }
 
@@ -109,6 +180,7 @@ export function adminOverview(
     return {
         'GET api/v1/device-summary': { status: 200, body: data.summary ?? summaryJson() },
         'GET api/v1/users': { status: 200, body: { users: data.pending ?? [] } },
+        'GET api/v1/roles': { status: 200, body: assignableRolesJson() },
         'GET api/v1/devices': (request) => {
             const params = new URL(request.url).searchParams;
             if (params.get('status') === null) {

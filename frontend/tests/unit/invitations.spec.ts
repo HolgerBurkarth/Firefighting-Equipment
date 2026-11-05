@@ -70,10 +70,17 @@ describe('Fenster „Neuer Einladungscode“', () => {
             label: null,
             validDays: DEFAULT_VALID_DAYS,
             maxUses: DEFAULT_MAX_USES,
+            roleId: null,
         });
         expect(
-            invitationRequest({ label: '  Dienstabend \t', validDays: ' 7 ', maxUses: '1' }),
-        ).toEqual({ label: 'Dienstabend', validDays: 7, maxUses: 1 });
+            invitationRequest({
+                label: '  Dienstabend \t',
+                validDays: ' 7 ',
+                maxUses: '1',
+                roleId: 4,
+            }),
+        ).toEqual({ label: 'Dienstabend', validDays: 7, maxUses: 1, roleId: 4 });
+        expect(newInvitationForm(2).roleId).toBe(2);
     });
 
     it.each([
@@ -97,6 +104,7 @@ describe('Fenster „Neuer Einladungscode“', () => {
             label: 'ä'.repeat(LABEL_MAX_LENGTH),
             validDays: String(MAX_VALID_DAYS),
             maxUses: String(MAX_USES),
+            roleId: null,
         };
         expect(invitationProblems(form)).toEqual({});
     });

@@ -20,6 +20,8 @@ export interface InvitationCode {
     readonly createdAt: string;
     readonly revokedAt: string | null;
     readonly createdBy: { readonly id: number; readonly label: string };
+    /** Rolle nach der Freischaltung (ohne Rolle am Code: Benutzer); null bei älteren Antworten. */
+    readonly role: { readonly id: number; readonly name: string } | null;
 }
 
 export function parseInvitationCode(json: unknown): InvitationCode | null {
@@ -35,6 +37,13 @@ export function parseInvitationCode(json: unknown): InvitationCode | null {
     const createdAt = json['created_at'];
     const revokedAt = json['revoked_at'];
     const createdBy = json['created_by'];
+    const role = json['role'] ?? null;
+    if (
+        role !== null &&
+        (!isRecord(role) || !isId(role['id']) || typeof role['name'] !== 'string')
+    ) {
+        return null;
+    }
     if (
         !isId(id) ||
         label === undefined ||
@@ -63,6 +72,7 @@ export function parseInvitationCode(json: unknown): InvitationCode | null {
         createdAt,
         revokedAt,
         createdBy: { id: createdBy['id'], label: createdBy['label'] },
+        role: role === null ? null : { id: role['id'] as number, name: role['name'] as string },
     };
 }
 
@@ -118,9 +128,11 @@ export interface NewInvitationCode {
     readonly label: string | null;
     readonly validDays: number;
     readonly maxUses: number;
+    /** Rolle nach der Freischaltung (nie Admin); null = Standard-Rolle Benutzer. */
+    readonly roleId: number | null;
 }
 
-/** POST invitation-codes {label?, valid_days, max_uses} → 201 mit dem Klartext. */
+/** POST invitation-codes {label?, valid_days, max_uses, role_id?} → 201 mit dem Klartext. */
 export function createInvitationCode(
     request: NewInvitationCode,
     fetchFn?: typeof fetch,
@@ -131,6 +143,7 @@ export function createInvitationCode(
             ...(request.label !== null && { label: request.label }),
             valid_days: request.validDays,
             max_uses: request.maxUses,
+            ...(request.roleId !== null && { role_id: request.roleId }),
         },
         ...(fetchFn && { fetchFn }),
     });

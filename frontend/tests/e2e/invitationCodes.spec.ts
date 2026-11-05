@@ -26,6 +26,7 @@ function codeJson(id: number, overrides: Record<string, unknown> = {}): Record<s
         created_at: '2026-10-31T13:05:00Z',
         revoked_at: null,
         created_by: { id: 7, label: 'Thomas Keller' },
+        role: { id: 2, name: 'Benutzer' },
         ...overrides,
     };
 }
@@ -46,9 +47,11 @@ function codeServer() {
         'GET api/v1/invitation-codes': () => ({ status: 200, body: { invitation_codes: codes } }),
         'POST api/v1/invitation-codes': (request) => {
             const body = request.body as Record<string, unknown>;
+            const roleId = (body['role_id'] as number | undefined) ?? 2;
             const code = codeJson(nextId, {
                 label: body['label'] ?? null,
                 max_uses: body['max_uses'],
+                role: { id: roleId, name: roleId === 3 ? 'Gerätewart' : 'Benutzer' },
             });
             nextId += 1;
             codes.unshift(code);
@@ -186,6 +189,14 @@ test.describe('Einladungscodes', () => {
         await dialog.getByLabel('Gültig (Tage)').fill('14');
         await dialog.getByLabel('Registrierungen höchstens').fill('20');
         await dialog.getByLabel('Bezeichnung (freiwillig)').fill('  Dienstabend November ');
+        // Rolle nach der Freischaltung: vorgewählt Benutzer, Admin gibt es nicht.
+        await expect(dialog.getByRole('radio', { name: 'Benutzer' })).toBeChecked();
+        await expect(dialog.getByRole('radio', { name: 'Admin' })).toHaveCount(0);
+        await expect(dialog.getByRole('radio', { name: 'Kasse' })).toBeDisabled();
+        await expect(dialog.getByTestId('no-admin-codes')).toContainText(
+            'Admins ernennen Sie unter „Konten“.',
+        );
+        await dialog.getByRole('radio', { name: 'Gerätewart' }).check();
         await dialog.getByRole('button', { name: 'Code erzeugen' }).click();
 
         const fresh = page.getByTestId('fresh-code');
@@ -194,6 +205,7 @@ test.describe('Einladungscodes', () => {
         );
         await expect(page.getByTestId('fresh-code-value')).toHaveText(NEW_CODE);
         await expect(fresh).toContainText('Gültig bis 30.11.2026, 14:05 Uhr');
+        await expect(fresh).toContainText('Rolle nach der Freischaltung: Gerätewart');
         const link = `${String(baseURL)}/firefighting/test/registrieren#code=${NEW_CODE}`;
         await expect(page.getByTestId('fresh-link')).toHaveText(link);
         await expect(
@@ -202,11 +214,13 @@ test.describe('Einladungscodes', () => {
         await expect(fresh.locator('path.qr-dark')).toHaveAttribute('d', /^M\d/);
         // Neu in der Liste.
         await expect(page.getByTestId('code-3')).toContainText('Dienstabend November');
+        await expect(page.getByTestId('code-3').locator('.col-role')).toContainText('Gerätewart');
+        await expect(page.getByTestId('code-2').locator('.col-role')).toContainText('Benutzer');
         expect(apiRequests.filter((r) => r.method === 'POST').map((r) => [r.path, r.body])).toEqual(
             [
                 [
                     'api/v1/invitation-codes',
-                    { label: 'Dienstabend November', valid_days: 14, max_uses: 20 },
+                    { label: 'Dienstabend November', valid_days: 14, max_uses: 20, role_id: 3 },
                 ],
             ],
         );

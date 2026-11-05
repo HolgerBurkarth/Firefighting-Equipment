@@ -161,7 +161,9 @@ zuweisen …“ mit Ergebnis je Konto (F6), Freischalten mit Rollenwahl, Einladu
 *Admin* (ohne Rolle = *Benutzer*). Festgelegt bei der Umsetzung: Wer die Rolle eines Kontos ändert,
 es sperrt, löscht oder umbenennt, braucht auch alle Rechte der bisherigen Rolle (Verallgemeinerung
 von „nur *Admin* entzieht *Admin*“); der Katalog für „Sieht: …“ kommt mit `GET roles` (kein
-`permission-catalog` unter Städten, die Route bleibt dem Super-Admin).
+`permission-catalog` unter Städten, die Route bleibt dem Super-Admin). In 1.6b: Der Aushang
+nennt die Rolle nicht (nur Liste und der neue Code; der Admin kann sie beim Freischalten ändern);
+der Hinweis im Fenster sagt nicht „das Handy lädt seine Offline-Kopie neu“, das kommt erst mit 1.7.
 
 Bewusst **nicht** in Phase 1:
 

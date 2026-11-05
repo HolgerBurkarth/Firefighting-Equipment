@@ -5,16 +5,21 @@ import {
     changeUserRole,
     deleteUser,
     parseAdminUser,
+    parseBulkRoleResponse,
     rejectUser,
     setUserLocked,
     type AdminUser,
 } from '../../src/api/users';
 import {
+    bulkRoleText,
     createdText,
     displayNameProblem,
     nameHint,
     pendingText,
     pendingUsers,
+    registrationText,
+    selectable,
+    selectedText,
     statusText,
     userChanges,
     userRows,
@@ -31,11 +36,14 @@ function json(id: number, overrides: Record<string, unknown> = {}): Record<strin
         display_name: `Person ${String(id)}`,
         role: 'user',
         role_label: 'Benutzer',
+        role_id: 2,
+        role_name: 'Benutzer',
         status: 'active',
         status_label: 'aktiv',
         locked: false,
         email_verified_at: '2026-10-01T10:00:00Z',
         created_at: '2026-10-01T09:00:00Z',
+        invitation_code: null,
         ...overrides,
     };
 }
@@ -61,13 +69,13 @@ describe('Aufrufe der Benutzerverwaltung', () => {
     it.each([
         [
             'approve',
-            () => approveUser(4, { displayName: 'Max', role: 'admin' }, fetchFn),
-            { display_name: 'Max', role: 'admin' },
+            () => approveUser(4, { displayName: 'Max', roleId: 9 }, fetchFn),
+            { display_name: 'Max', role_id: 9 },
         ],
         ['reject', () => rejectUser(4, fetchFn), {}],
         ['lock', () => setUserLocked(4, true, fetchFn), {}],
         ['unlock', () => setUserLocked(4, false, fetchFn), {}],
-        ['role', () => changeUserRole(4, 'user', fetchFn), { role: 'user' }],
+        ['role', () => changeUserRole(4, 5, fetchFn), { role_id: 5 }],
         ['display-name', () => changeUserDisplayName(4, 'Maxi', fetchFn), { display_name: 'Maxi' }],
     ] as const)('POST users/4/%s', async (action, call, body) => {
         const result = await call();
@@ -195,19 +203,82 @@ describe('Gruppen, Suche und Sortierung', () => {
 describe('Bearbeiten und Texte', () => {
     it('userChanges: nur Änderungen, Name getrimmt; Name nur bei aktiven Konten', () => {
         const active = user(1, { display_name: 'Anna' });
-        expect(userChanges(active, ' Anna ', 'user')).toEqual({});
-        expect(userChanges(active, 'Anna B.', 'admin')).toEqual({
+        expect(userChanges(active, ' Anna ', 2)).toEqual({});
+        expect(userChanges(active, 'Anna B.', 1)).toEqual({
             displayName: 'Anna B.',
-            role: 'admin',
+            roleId: 1,
         });
+        expect(userChanges(active, 'Anna', null)).toEqual({});
         const invited = user(2, {
             status: 'invited',
             display_name: null,
             name: null,
             role: 'admin',
+            role_id: 1,
         });
-        expect(userChanges(invited, 'egal', 'admin')).toEqual({});
-        expect(userChanges(invited, 'egal', 'user')).toEqual({ role: 'user' });
+        expect(userChanges(invited, 'egal', 1)).toEqual({});
+        expect(userChanges(invited, 'egal', 2)).toEqual({ roleId: 2 });
+    });
+
+    it('Rolle und Einladungscode aus der Antwort; ältere Antworten ohne die Felder', () => {
+        const coded = user(3, {
+            role_id: 7,
+            role_name: 'Gerätewart',
+            invitation_code: { id: 4, label: 'Aushang' },
+        });
+        expect([coded.roleId, coded.roleName, coded.invitationCode]).toEqual([
+            7,
+            'Gerätewart',
+            { id: 4, label: 'Aushang' },
+        ]);
+        const old = json(3);
+        delete old['role_id'];
+        delete old['role_name'];
+        delete old['invitation_code'];
+        expect(parseAdminUser(old)?.roleId).toBeNull();
+        expect(parseAdminUser(json(3, { role_id: 'x' }))).toBeNull();
+        expect(parseAdminUser(json(3, { invitation_code: { id: 4 } }))).toBeNull();
+    });
+
+    it('registrationText nennt den Aushang', () => {
+        expect(
+            registrationText(user(3, { invitation_code: { id: 4, label: 'Geräteträger' } })),
+        ).toBe(
+            'Registriert am 01.10.2026 mit dem Aushang „Geräteträger“; die Rolle ist vorausgewählt.',
+        );
+        expect(registrationText(user(3, { invitation_code: { id: 4, label: null } }))).toBe(
+            'Registriert am 01.10.2026',
+        );
+    });
+
+    it('Mehrfachauswahl: nicht das eigene Konto; Texte', () => {
+        expect(selectable(user(3), 3)).toBe(false);
+        expect(selectable(user(3), 7)).toBe(true);
+        expect(selectedText(1)).toBe('1 Konto ausgewählt');
+        expect(selectedText(3)).toBe('3 Konten ausgewählt');
+        const results = parseBulkRoleResponse({
+            results: [
+                { id: 1, outcome: 'applied', user: json(1), error: null },
+                { id: 2, outcome: 'unchanged', user: json(2), error: null },
+                {
+                    id: 3,
+                    outcome: 'error',
+                    user: null,
+                    error: { error: 'not_found', message: 'Kein Konto.' },
+                },
+            ],
+            summary: { total: 3, applied: 1, unchanged: 1, errors: 1 },
+        });
+        expect(results).not.toBeNull();
+        expect(bulkRoleText('Gerätewart', results ?? [], 2)).toBe(
+            'Rolle „Gerätewart“: 1 Konto geändert, 1 unverändert, 3 nicht möglich.',
+        );
+        expect(bulkRoleText('Benutzer', [], 0)).toBe('Rolle „Benutzer“: 0 Konten geändert.');
+        expect(
+            parseBulkRoleResponse({
+                results: [{ id: 1, outcome: 'error', user: null, error: null }],
+            }),
+        ).toBeNull();
     });
 
     it('displayNameProblem wie PersonName', () => {
