@@ -198,11 +198,17 @@ Atemschutzmaske) für den Test; Testkonto #7 „Holger Test 1“ (vorher *Benutz
 - ☑ „Termine: Ansehen“ an „Live-Test Filter“ im Editor des Super-Admins ergänzt: „Rolle „Live-Test
   Filter“ gespeichert.“, Version 2, Bereiche `search`/`due` `read`, Filter unverändert (ein erster
   Versuch von Hand war nicht gespeichert worden, Version blieb 1).
-- ☐ **Wirkung des Filters in der App mit #7** (Anmeldung als #7 nur Holger). Erwartet nach Neuladen:
-  Suchen 10 Geräte (M1–M6, M8, M9, M31, M32); Prüffristen überfällig M1, M2, in 30 Tagen fällig M8;
-  M7 (Atemschutzmaske im Lager Gerätehaus, auch per Scan-Code `ARFK-1007`) und HRT 1 (Funkgerät auf
-  HLF 20) nicht auffindbar; Standortwahl nur HLF 20 mit Fächern. Ergebnis von Holger noch nicht
-  übermittelt.
+- ☑ **Wirkung des Filters in der App mit #7** (angemeldet als #7 von Holger, nach Neuladen; alles wie
+  erwartet):
+  - ☑ Suchen: 10 Geräte (M1–M6, M8, M9, M31, M32).
+  - ☑ M7 (Atemschutzmaske im Lager Gerätehaus, auch per Scan-Code `ARFK-1007`) und HRT 1 (Funkgerät
+    auf HLF 20) nicht auffindbar.
+  - ☑ Prüffristen: überfällig M1, M2; in den nächsten 30 Tagen fällig M8.
+  - ☑ Standortwahl: nur HLF 20 mit seinen Fächern.
+  Damit ist der offene Punkt „echter Live-Test mit einer gefilterten Rolle“ aus 1.4/1.5b für Suchen,
+  Scan, Prüffristen und Standortwahl erledigt; Verlauf mit „anderer Standort“, Exporte, Log-Mails
+  eines gefilterten Empfängers sowie Buchen auf ein Ziel bzw. Gerät außerhalb (400/404) bleiben
+  per Test (`DeviceVisibilityMatrixTest`, Mail-Tests) und folgen im Durchlauf von Schritt 1.8.
 - ☑ Aufgeräumt: #7 über den Stift wieder *Benutzer* („… hat jetzt die Rolle „Benutzer“ …“,
   `role_id` 4), „Live-Test Filter löschen …“ mit Rückfrage („gelöscht“); danach nur *Admin*
   (3 Konten) und *Benutzer* (2 Konten, 3 Codes). Keine Fehler in der Konsole.
