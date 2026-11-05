@@ -35,6 +35,6 @@ final readonly class TenantUserListHandler implements RequestHandler
             throw HttpException::notFound();
         }
 
-        return new JsonResponse(['users' => array_map(UserJson::user(...), $admin->users($tenant, $status))]);
+        return new JsonResponse(['users' => array_map(UserJson::forTenant($pdo, $tenant), $admin->users($tenant, $status))]);
     }
 }

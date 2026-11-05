@@ -75,6 +75,8 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'POST api/v1/users/{id}/unlock' => ['admin', 'users:write'],
         'POST api/v1/users/{id}/role' => ['admin', 'users:write'],
         'POST api/v1/users/{id}/display-name' => ['admin', 'users:write'],
+        'POST api/v1/users/bulk/role' => ['admin', 'users:write'],
+        'GET api/v1/roles' => ['admin', 'users:read'],
         'GET api/v1/device-types' => ['authenticated', 'device_types:read | search:read | devices:read'],
         'POST api/v1/device-types' => ['admin', 'device_types:write'],
         'POST api/v1/device-types/{id}/rename' => ['admin', 'device_types:write'],

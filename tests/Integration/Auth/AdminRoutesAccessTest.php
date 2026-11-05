@@ -44,6 +44,8 @@ MA-01;defekt
         yield 'Rolle ändern' => ['POST', 'users/{user}/role', ['role' => 'admin']];
         yield 'Anzeigename ändern' => ['POST', 'users/{user}/display-name', ['display_name' => 'Max']];
         yield 'löschen' => ['DELETE', 'users/{user}', []];
+        yield 'Rolle mehrerer Konten' => ['POST', 'users/bulk/role', ['user_ids' => ['{user}'], 'role_id' => '{user-role}']];
+        yield 'Rollen zur Auswahl' => ['GET', 'roles', null];
         yield 'Gerätetyp anlegen' => ['POST', 'device-types', ['name' => 'Funkgerät']];
         yield 'Gerätetyp umbenennen' => ['POST', 'device-types/{type}/rename', ['name' => 'Handfunkgerät']];
         yield 'Gerätetyp deaktivieren' => ['POST', 'device-types/{type}/deactivate', []];
@@ -99,7 +101,7 @@ MA-01;defekt
         $importToken = new DeviceImport($this->pdo())->preview($this->tenant('immendingen'), DeviceImportFile::parse($import))->token;
         $placeholders = ['{code}' => $code, '{user}' => $user, '{type}' => $type, '{location}' => $location, '{device}' => $device, '{retired}' => $retired, '{notice}' => $notice];
         $path = strtr($path, array_map('strval', $placeholders));
-        $placeholders += ['{import_file}' => base64_encode($import), '{import_token}' => $importToken, '{logo_file}' => base64_encode(TestPng::create())];
+        $placeholders += ['{user-role}' => (int) $this->systemRoleId($this->tenant('immendingen')->id, 'user'), '{import_file}' => base64_encode($import), '{import_token}' => $importToken, '{logo_file}' => base64_encode(TestPng::create())];
         if ($method === 'DELETE' && $path === 'tenant/logo') {
             new TenantAppearanceRepository($this->pdo())->saveLogo($this->tenant('immendingen'), LogoRenderer::fromUpload(TestPng::create()), $admin);
         }

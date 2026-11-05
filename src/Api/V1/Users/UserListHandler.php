@@ -24,14 +24,15 @@ final readonly class UserListHandler implements RequestHandler
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
         $status = self::statusFilter($context);
 
-        $users = new UserRepository($context->db->get());
+        $pdo = $context->db->get();
+        $users = new UserRepository($pdo);
         $users->anonymizeStaleUnverified($tenant);
         $list = $users->listByTenant($tenant, $status);
         if ($status === null) {
             $list = array_values(array_filter($list, static fn (User $u): bool => !$u->isDeleted()));
         }
 
-        return new JsonResponse(['users' => array_map(UserJson::user(...), $list)]);
+        return new JsonResponse(['users' => array_map(UserJson::forTenant($pdo, $tenant), $list)]);
     }
 
     /**

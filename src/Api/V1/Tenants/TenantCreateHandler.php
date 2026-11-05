@@ -46,7 +46,7 @@ final readonly class TenantCreateHandler implements RequestHandler
 
         return new JsonResponse([
             'tenant' => TenantJson::tenant($admin->summary($invitation->tenant->id)),
-            'user' => UserJson::user($invitation->user),
+            'user' => UserJson::forTenant($pdo, $invitation->tenant)($invitation->user),
             'mail_sent' => $mailSent,
         ], 201);
     }
