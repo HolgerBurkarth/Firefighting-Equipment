@@ -24,6 +24,7 @@ import { changeTimeText } from '../data/changeTime';
 import { orderByLastChange } from '../data/recentDevices';
 import { isOffline } from '../runtime/connectivity';
 import { useNow } from '../runtime/now';
+import { markStartup, SEARCH_DATA_MARK } from '../runtime/splash';
 import { closeQueryView } from '../router/back';
 import {
     findByCode,
@@ -58,6 +59,16 @@ const scanError = shallowRef<ApiError | null>(null);
 const bookingNotice = shallowRef(takeBookingNotice());
 
 const list = computed(() => deviceStore.state);
+// Messpunkt „Suchen mit Geräten“ (Plan Phase 1, Schritt 1.7d; aus der Kopie oder vom Server).
+watch(
+    () => list.value.total !== null,
+    (ready) => {
+        if (ready) {
+            markStartup(SEARCH_DATA_MARK);
+        }
+    },
+    { immediate: true },
+);
 const hasQuery = computed(() => searchTokens(query.value).length > 0);
 
 // Suche auf dem Server (mehr als MAX_LOCAL_DEVICES Geräte): verzögert, ältere Antworten verworfen.

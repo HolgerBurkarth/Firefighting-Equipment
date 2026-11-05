@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { START_LOAD_TIMEOUT_MS } from '../../src/runtime/appUpdate';
+import { START_CHECK_TIMEOUT_MS, START_LOAD_TIMEOUT_MS } from '../../src/runtime/appUpdate';
 import {
     expect,
     HTTP_ERROR_CONSOLE,
@@ -161,6 +161,18 @@ async function triggerCheck(page: Page): Promise<void> {
     await page.evaluate(() => {
         document.dispatchEvent(new Event('visibilitychange'));
     });
+}
+
+/** Wartet, bis eine neue Version installiert ist und wartet. */
+async function waitForWaitingWorker(page: Page): Promise<void> {
+    await expect
+        .poll(() =>
+            page.evaluate(async () => {
+                const registration = await navigator.serviceWorker.getRegistration();
+                return registration?.waiting?.state ?? null;
+            }),
+        )
+        .toBe('installed');
 }
 
 /** Wartet, bis kein Worker mehr installiert wird oder wartet und einer die Seite kontrolliert. */
@@ -384,13 +396,50 @@ function workerState(page: Page): Promise<string> {
 /** Token wie in tests/e2e/support/update-server.php (nur dieses gilt). */
 const MAIL_TOKEN = 'Upd8-Token_aus-der-Mail_0123456789abcdefghijk';
 
+/**
+ * Seitenwechsel innerhalb der laufenden App auf eine Seite, die sie nicht kennt (wie ein Link auf eine
+ * Seite, die es erst in der neuen Version gibt): „Seite nicht gefunden“ prüft zuerst.
+ */
+async function openUnknownPage(page: Page): Promise<void> {
+    await page.evaluate(() => {
+        history.pushState({}, '', 'gibt-es-erst-spaeter#code=ABCD-EFGH-JKMN');
+        dispatchEvent(new PopStateEvent('popstate'));
+    });
+}
+
+/**
+ * Wie openUnknownPage mit installierter Uhr (page.clock): Kennt die App die neue Version schon, sucht
+ * zuerst der Seitenwechsel nach ihr (Wartezeiten der App, vorgespult), dann prüft „Seite nicht
+ * gefunden“ („Seite wird geladen …“).
+ */
+async function openUnknownPageWithClock(page: Page): Promise<void> {
+    await openUnknownPage(page);
+    const checking = page.getByTestId('not-found-checking');
+    await expect
+        .poll(
+            async () => {
+                if (await checking.isVisible()) {
+                    return true;
+                }
+                await page.clock.runFor(250);
+                return checking.isVisible();
+            },
+            { intervals: [50], timeout: 30_000 },
+        )
+        .toBe(true);
+}
+
 test.describe('Updates der App: Start mit veralteter Version', () => {
-    test('Mail-Link mit alter Version im Service Worker: neue Version lädt, Token bleibt', async ({
+    test('Mail-Link mit alter Version im Service Worker: alte Version löst ihn ein, neue beim Seitenwechsel', async ({
         page,
         context,
         browserName,
         baseURL,
     }, testInfo) => {
+        // Bis Schritt 1.7d lud der Start hier sofort die neue Version (die erste Seite wartete).
+        // Jetzt erscheint die Seite der laufenden Version sofort und löst das Token ein: richtig,
+        // weil die API nur erweitert wird (eine alte Version funktioniert weiter; lehnt der Server
+        // sie ab, kommt client_outdated). Die neue Version kommt beim nächsten Seitenwechsel.
         const area = newArea(testInfo.project.name);
         await openOldVersion(page, area);
         // Deploy, ohne dass die geöffnete App es bemerkt; dann öffnet das Mailprogramm den Link in
@@ -402,35 +451,58 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         const problems = collectProblems(mail, browserName, baseURL ?? '');
         await mail.goto(`/firefighting/${area}/email-bestaetigen#token=${MAIL_TOKEN}`);
 
-        await expect(mail.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
         await expect(mail.getByRole('heading', { level: 1 })).toHaveText(
             'E-Mail-Adresse bestätigen',
         );
-        // Das Fragment entfernt erst die neue Version.
+        await expect(mail.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
         await expect(mail).toHaveURL(`/firefighting/${area}/email-bestaetigen`);
         await mail.getByRole('button', { name: 'E-Mail-Adresse bestätigen' }).click();
         await expect(mail.getByTestId('email-verified')).toHaveText(
             'Ihre E-Mail-Adresse ist bestätigt.',
         );
+        // Inzwischen hat der Start im Hintergrund die neue Version gefunden und installiert.
+        await waitForWaitingWorker(mail);
+        await mail.getByRole('link', { name: 'Zur Anmeldung' }).click();
+        await expect(mail.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(mail).toHaveURL(`/firefighting/${area}/anmelden`);
+        await expect(mail.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
         expect(problems).toEqual([]);
         await mail.close();
     });
 
-    test('neue Kennung, aber kein neuer Service Worker: nach rund 30 s „Neu laden“', async ({
+    test('Start mit neuer Kennung, aber ohne neuen Service Worker: Seite sofort, kein Warten', async ({
+        page,
+    }, testInfo) => {
+        // Bis Schritt 1.7d wartete der Start hier bis rund 30 s und zeigte dann „Neu laden“. Jetzt
+        // erscheint die Seite sofort (das Warten bis rund 30 s gilt nur noch vor „Seite nicht
+        // gefunden“, nächster Test); das Update folgt, sobald der Browser die neue Version kennt.
+        const area = newArea(testInfo.project.name);
+        await openOldVersion(page, area);
+        writeFileSync(join(STATE, area), 'build-json');
+        await page.reload();
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        await expect(page.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
+        await expect(page.getByTestId('update-reload-needed')).toBeHidden();
+
+        // Später ist auch sw.js neu: Die nächste Prüfung findet sie, der Seitenwechsel lädt sie.
+        await deployAndCheck(page, area);
+        await expectNewVersionAfterNavigation(page, area);
+    });
+
+    test('„Seite nicht gefunden“ mit neuer Kennung, aber ohne neuen Service Worker: nach rund 30 s „Neu laden“', async ({
         page,
     }, testInfo) => {
         const area = newArea(testInfo.project.name);
         await openOldVersion(page, area);
-        // Deploy, bei dem nur build.json neu ist (sw.js bleibt alt): Der Start sucht bis rund 30 s
-        // (START_RETRY_DELAYS_MS) nach dem neuen Service Worker. Die Wartezeiten werden vorgespult;
-        // update() und Netzwerk laufen in Echtzeit, daher in kleinen Schritten.
+        // Deploy, bei dem nur build.json neu ist (sw.js bleibt alt): „Seite nicht gefunden“ sucht bis
+        // rund 30 s (START_RETRY_DELAYS_MS) nach dem neuen Service Worker. Die Wartezeiten werden
+        // vorgespult; update() und Netzwerk laufen in Echtzeit, daher in kleinen Schritten.
         writeFileSync(join(STATE, area), 'build-json');
         await page.clock.install();
         await page.reload();
-        // Erst vorspulen, wenn der Start die neue Kennung erkannt hat und sucht: Das Abwarten von
-        // build.json (START_CHECK_TIMEOUT_MS) ist ein Timer der App; vorgespult liefe er unter Last
-        // ab, bevor die echte Antwort da ist, und die alte Anmeldeseite erschiene.
-        await expect(page.getByTestId('update-loading')).toBeVisible();
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        // Erst weiter vorspulen, wenn die Prüfung sichtbar läuft (ihre Frist ist ein Timer der App).
+        await openUnknownPageWithClock(page);
         const started = await page.evaluate(() => Date.now());
         const notice = page.getByTestId('update-reload-needed');
         await expect
@@ -445,8 +517,11 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         expect(await page.evaluate(() => Date.now())).toBeGreaterThanOrEqual(started + 30_000);
         await expect(notice).toContainText('Die neue Version konnte nicht geladen werden.');
         await expect(notice.getByRole('button', { name: 'Neu laden' })).toBeVisible();
-        // Die Seite bleibt beim Laden, nie kurz die alte Anmeldeseite.
-        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeHidden();
+        // Die Seite bleibt beim Laden, nie kurz „Seite nicht gefunden“.
+        await expect(page.getByTestId('not-found-checking')).toBeVisible();
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'Seite nicht gefunden' }),
+        ).toBeHidden();
         await expect(page.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
     });
 
@@ -477,11 +552,13 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         });
         await openOldVersion(page, area);
 
-        // Deploy, bei dem der Browser den neuen Service Worker erst nach rund 30 s findet: „Neu laden“.
+        // Deploy, bei dem der Browser den neuen Service Worker erst nach rund 30 s findet: „Neu laden“
+        // vor „Seite nicht gefunden“ (bis Schritt 1.7d schon beim Start; dort wartet seitdem nichts).
         writeFileSync(join(STATE, area), 'build-json');
         await page.clock.install();
         await page.reload();
-        await expect(page.getByTestId('update-loading')).toBeVisible();
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        await openUnknownPageWithClock(page);
         const reloadNeeded = page.getByTestId('update-reload-needed');
         await expect
             .poll(
@@ -500,13 +577,14 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         await expect.poll(() => workerState(page)).toBe('controlled, waiting');
 
         await reloadNeeded.getByRole('button', { name: 'Neu laden' }).click();
+        const notFound = page.getByRole('heading', { level: 1, name: 'Seite nicht gefunden' });
         await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
-        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        await expect(notFound).toBeVisible();
         // Die neue Version übernimmt (vorher in Chromium: Seite ohne Kontrolle, neue Version wartet).
         await expect.poll(() => workerState(page)).toBe('controlled');
         await page.reload();
         await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
-        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        await expect(notFound).toBeVisible();
 
         // Der andere Tab: nicht neu geladen, Eingabe da, Hinweis statt Neuladen.
         await expect(other.getByTestId('update-notice')).toContainText(
@@ -554,24 +632,30 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         await other.close();
     });
 
-    test('neuer Service Worker installiert langsam: Start wartet und aktiviert ihn sofort danach', async ({
+    test('neuer Service Worker installiert langsam: „Seite nicht gefunden“ wartet und aktiviert ihn sofort danach', async ({
         page,
     }, testInfo) => {
         // Die Installation darf bis zur Frist der App dauern (siehe unten), dazu der Rest des Tests.
         testInfo.setTimeout(testInfo.timeout + START_LOAD_TIMEOUT_MS);
         const area = newArea(testInfo.project.name);
         await openOldVersion(page, area);
-        // Wie live (31.10.2026): Der Start erkennt die neue Version, ihr Service Worker braucht für
-        // die Installation aber länger als die Frist eines Seitenwechsels (ACTIVATION_TIMEOUT_MS).
-        // Zuerst nur build.json neu, damit der Start sucht; dann hängt die Installation, bis der
-        // Test sie freigibt (update-server.php, `next-held`).
+        // Wie live (31.10.2026, damals beim Start; seit Schritt 1.7d wartet so nur noch „Seite nicht
+        // gefunden“): Die App erkennt die neue Version, ihr Service Worker braucht für die
+        // Installation aber länger als die Frist eines Seitenwechsels (ACTIVATION_TIMEOUT_MS).
+        // Zuerst nur build.json neu, damit die App sucht; dann hängt die Installation, bis der Test
+        // sie freigibt (update-server.php, `next-held`).
         writeFileSync(join(STATE, area), 'build-json');
         await page.clock.install();
         await page.reload();
-        await expect(page.getByTestId('update-loading')).toBeVisible();
-        // Frist der App für Suche und Installation (START_LOAD_TIMEOUT_MS ab Beginn des Starts). Die
-        // Uhr läuft nach clock.install() weiter (Timer feuern), runFor springt zusätzlich vor.
-        const deadline = (await page.evaluate(() => Date.now())) + START_LOAD_TIMEOUT_MS;
+        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        await openUnknownPageWithClock(page);
+        // Frist der App für Suche und Installation (START_LOAD_TIMEOUT_MS, beginnt nach der Prüfung,
+        // die höchstens START_CHECK_TIMEOUT_MS dauert). Die Uhr läuft nach clock.install() weiter
+        // (Timer feuern), runFor springt zusätzlich vor.
+        const deadline =
+            (await page.evaluate(() => Date.now())) +
+            START_LOAD_TIMEOUT_MS +
+            START_CHECK_TIMEOUT_MS;
         writeFileSync(join(STATE, area), 'next-held');
         const installing = (): Promise<boolean> =>
             page.evaluate(async () => {
@@ -595,7 +679,7 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         }
         expect(await installing()).toBe(true);
         await expect(page.getByTestId('update-reload-needed')).toBeHidden();
-        await expect(page.getByTestId('update-loading')).toBeVisible();
+        await expect(page.getByTestId('not-found-checking')).toBeVisible();
 
         // Freigabe: Der Service Worker lädt noch alle übrigen Dateien des Builds, nacheinander
         // (Workbox, index.html ist die erste; lokal rund 1 s, in CI unter Last waren 5 s zu kurz,
@@ -608,8 +692,12 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID, {
             timeout: remaining,
         });
-        await expect(page).toHaveURL(`/firefighting/${area}/anmelden`);
-        await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
+        await expect(page).toHaveURL(
+            `/firefighting/${area}/gibt-es-erst-spaeter#code=ABCD-EFGH-JKMN`,
+        );
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'Seite nicht gefunden' }),
+        ).toBeVisible();
         await expect(page.getByTestId('update-reload-needed')).toBeHidden();
     });
 
@@ -621,10 +709,7 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         deploy(area);
         // Seitenwechsel innerhalb der alten App auf eine Seite, die sie nicht kennt (die App hat seit
         // dem Deploy noch nicht geprüft).
-        await page.evaluate(() => {
-            history.pushState({}, '', 'gibt-es-erst-spaeter#code=ABCD-EFGH-JKMN');
-            dispatchEvent(new PopStateEvent('popstate'));
-        });
+        await openUnknownPage(page);
         await expect(page.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
         await expect(page).toHaveURL(
             `/firefighting/${area}/gibt-es-erst-spaeter#code=ABCD-EFGH-JKMN`,

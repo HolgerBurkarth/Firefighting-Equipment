@@ -185,6 +185,11 @@ vollständig sind.
     wegen einer Störung nicht, öffnet die App die Seite mit dieser Sitzung und fragt im Hintergrund
     weiter (2, 4, 8, dann alle 15 s, sofort bei „online“). Nur eine echte Antwort ändert sie: 401 →
     Anmeldung (Kopie und Warteschlange bleiben für dasselbe Konto), ein anderes Konto ersetzt sie.
+    Seit Plan Phase 1, Schritt 1.7d („Schnellstart“) gilt eine gespeicherte Sitzung mit Rechten auch
+    online sofort: Die App startet mit ihr und der Kopie und prüft `auth/me` im Hintergrund (ohne
+    Hinweis; erst eine Störung macht daraus den grauen Streifen). Die erste Seite lädt dabei
+    gleichzeitig mit `tenant` und `auth/me`. Für ein inzwischen gesperrtes Konto heißt das: kurz die
+    eigene Kopie, dann (401) die Anmeldung, wie offline.
 51. **Streifen „Offline“:** grau oben, solange der Browser offline meldet oder die letzte Anfrage
     keine Verbindung bekam (bis zur nächsten Antwort des Servers): „Offline – angezeigt wird der
     Stand vom 31.10., 14:02.“ Er ersetzt dann die Meldung „Keine Verbindung zum Server …“.
@@ -239,6 +244,19 @@ nicht live, durch automatische Tests abgedeckt; offen B8a (Kontowechsel ohne Abm
 - Eingaben gehen nie verloren.
 - Fehlercodes höchstens klein für den Support. Bei 401 meldet die App ab.
 
+## Startbild (Plan Phase 1, Schritt 1.7d)
+
+- Mockup `docs/aenderungskonzept/mockups/Startbild.dc.html`: gezeichnetes Löschfahrzeug, Name der Stadt,
+  „Geräteverwaltung“, Ladebalken mit Text. Steht in `index.html` vor der App und erscheint erst nach
+  rund 0,4 s (nur per CSS); ein schneller Start zeigt es nie. Die App entfernt es, sobald die erste
+  Seite steht oder ein eigener Hinweis (z. B. „Keine Verbindung zum Server“) zu sehen sein muss.
+- Ladebalken: zuerst ohne Stand, dann „App wird geladen …“, „Anmeldung wird geprüft …“ (nur, wenn
+  der Start auf den Server wartet) und „Ausrüstung wird geladen …“. Hell und dunkel, ohne Bewegung bei
+  „Bewegung reduzieren“.
+- Name und Farbe der Stadt aus dem letzten Besuch (gemerkt im Browser); beim ersten Besuch
+  „Feuerwehr“ in der Standardfarbe. Bilder und Stil sind Dateien des Builds (keine Ausnahme in der
+  CSP); die Bilder liefert PHP nur aus `assets/` und mit eigener CSP (`default-src 'none'`).
+
 ## Updates der App
 Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
 - Eine neue Version (neuer Build nach einem Deploy) übernimmt nicht von selbst: Ihr Service Worker
@@ -254,16 +272,19 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
 - Ist eine neue Version da und kein Formular angefangen, aktualisiert die App beim nächsten
   Seitenwechsel unbemerkt: Statt in der alten Version weiterzublättern, lädt sie die Zielseite neu.
   Nicht, wenn nur die Adresszeile bereinigt wird (z. B. `#token=…` entfernt).
-- Beim Start: Kommt die Seite aus dem Service Worker (also womöglich veraltet), fragt die App vor der
-  ersten Seite die Kennung des Servers ab (höchstens 2 Sekunden, offline nicht). Ist eine neuere
-  Version da, lädt sie sofort einmal neu, mit der vollständigen Adresse samt `#token=…` bzw.
-  `#code=…`; das Fragment entfernt erst die neue Version. Grund (Live-Test): Ein Mail-Link öffnete
-  sich in einem Browser mit einer App von vor Schritt 4, die die Seite noch nicht kannte, und zeigte
-  „Seite nicht gefunden“. Eine frisch vom Server geladene Seite prüft beim Start nicht (sie ist
+- Beim Start (seit Plan Phase 1, Schritt 1.7d „Schnellstart“): Die erste Seite wartet nie auf die
+  Prüfung. Kommt die Seite aus dem Service Worker (also womöglich veraltet), prüft die App im
+  Hintergrund (offline nicht); eine neuere Version kommt beim nächsten Seitenwechsel. Eine alte
+  Version beim Start ist zulässig, weil die API nur erweitert wird; lehnt der Server sie ab
+  (`client_outdated`), aktualisiert die App sofort. Ein Mail-Link in einer alten Version löst sein
+  Token also selbst ein. Bis 1.7d lud der Start sofort einmal neu (bis zu 2 Sekunden Warten auf die
+  Kennung vor jeder ersten Seite); der damalige Grund (Live-Test: ein Mail-Link in einer App, die die
+  Seite noch nicht kannte, zeigte „Seite nicht gefunden“) bleibt über die Prüfung vor „Seite nicht
+  gefunden“ abgedeckt. Eine frisch vom Server geladene Seite prüft beim Start nicht (sie ist
   aktuell).
 - „Seite nicht gefunden“ prüft vor der Anzeige immer zuerst auf eine neue Version (vielleicht kennt
   erst sie die Seite) und lädt sie dann sofort, sofern nichts ungespeichert ist.
-- Beim Start mit veralteter Version und vor „Seite nicht gefunden“ fragt die App bis rund 30 Sekunden
+- Vor „Seite nicht gefunden“ (bis 1.7d auch beim Start mit veralteter Version) fragt die App bis rund 30 Sekunden
   nach der neuen Version (Pausen weiter 8 s, 15 s) und zeigt solange „Seite wird geladen …“, nie kurz
   „nicht gefunden“. Gelingt es nicht, erscheint „Die neue Version konnte nicht geladen werden.“ mit
   dem Knopf „Neu laden“: Die App lädt die Adresse samt `#token=…` bzw. `#code=…` direkt vom Server.
@@ -272,13 +293,13 @@ Entscheidung: Updates kommen automatisch, aber nie mitten in einer Eingabe.
   `einstellungen` (die alte Version kannte die Seite nicht) zeigte nach rund 6 s „konnte nicht
   geladen werden“, obwohl der neue Service Worker kurz danach bereitstand. Die Installation (alle
   Dateien der App vorab laden) dauerte live länger als die 5 Sekunden, die ein gewöhnlicher
-  Seitenwechsel abwartet; diese Frist galt auch beim Start. Ein Seitenwechsel wartet weiter
+  Seitenwechsel abwartet; diese Frist galt auch beim damaligen Start. Ein Seitenwechsel wartet weiter
   höchstens 5 Sekunden und bleibt sonst bei der laufenden Version. Nachgeprüft live (31.10.2026,
   Build `b3438d44f157`): ein neuer Tab direkt auf `dashboard` mit älterer Version im Service Worker
   wechselte von selbst auf die neue Version, ohne „konnte nicht geladen werden“, die Seite danach
   vom neuen Service Worker gesteuert.
-  Ebenso wartet der Start auf die Registrierung des Service Workers, wenn sie länger als 2 Sekunden
-  dauert (bis zu derselben Frist). Grund (Live-Test 31.10.2026, Nacht): Ein offener Tab hatte nach
+  Ebenso wartet das Aktualisieren auf die Registrierung des Service Workers, wenn sie länger als 2
+  Sekunden dauert (bis zu derselben Frist bzw. 5 Sekunden beim Seitenwechsel). Grund (Live-Test 31.10.2026, Nacht): Ein offener Tab hatte nach
   dem Deploy die Installation begonnen; beim Neuladen endete `register()` erst danach (fast 7 s),
   und der Start gab ohne Registrierung sofort mit „konnte nicht geladen werden“ auf.
 - Neu geladen wird nur, wenn danach sicher die neue Version kommt (der neue Service Worker hat die

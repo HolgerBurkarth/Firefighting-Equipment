@@ -61,6 +61,12 @@ export interface StoredSessionStorage {
 let storedKey: string | null = null;
 let storedStorage: StoredSessionStorage | null = null;
 const usingStored = shallowRef(false);
+/**
+ * Start mit der gespeicherten Sitzung (Plan Phase 1, Schritt 1.7d): Sie gilt sofort, auth/me prüft im
+ * Hintergrund. Anders als `usingStored` (der Server antwortet nicht) zeigt die App dabei keinen
+ * Hinweis.
+ */
+let verifying = false;
 let storedRejectedHandler: (() => void) | null = null;
 
 /**
@@ -209,11 +215,12 @@ export function setSession(state: AuthState | null): void {
 
 function applySession(state: AuthState | null, reason: 'logout' | 'ended'): void {
     // Eine laufende Prüfung im Hintergrund (gespeicherte Sitzung) ist damit erledigt.
-    if (usingStored.value) {
+    if (usingStored.value || verifying) {
         generation += 1;
         pending = null;
         checkError.value = null;
         usingStored.value = false;
+        verifying = false;
     }
     notifyIfEnded(state, reason);
     const previous = current.value;
@@ -236,6 +243,7 @@ export function resetSession(): void {
     known = false;
     pending = null;
     usingStored.value = false;
+    verifying = false;
     saveStored(null);
 }
 
@@ -284,9 +292,10 @@ async function check(
             return current.value;
         }
         if (result.ok || !isTransientError(result.error)) {
-            const rejected = usingStored.value && !result.ok;
+            const rejected = (usingStored.value || verifying) && !result.ok;
             checkError.value = null;
             usingStored.value = false;
+            verifying = false;
             setSession(result.ok ? result.data : null);
             if (rejected) {
                 storedRejectedHandler?.();
@@ -294,8 +303,12 @@ async function check(
             return current.value;
         }
         checkError.value = result.error;
-        // Offline: mit der gespeicherten Sitzung weiterarbeiten, im Hintergrund weiter fragen.
-        if (!usingStored.value && current.value === null) {
+        // Offline: mit der gespeicherten Sitzung weiterarbeiten, im Hintergrund weiter fragen. Lief
+        // sie schon (Start mit gespeicherter Sitzung), gilt sie jetzt als offline (Hinweis).
+        if (verifying) {
+            verifying = false;
+            usingStored.value = true;
+        } else if (!usingStored.value && current.value === null) {
             const stored = loadStored();
             if (stored !== null) {
                 current.value = stored;
@@ -317,12 +330,31 @@ async function check(
  * der Fehler in `sessionCheckError`. Nur eine echte Antwort führt zur Anmeldung. Gibt es eine
  * gespeicherte Sitzung (configureStoredSession), gilt sie bei einer Störung sofort; die Prüfung läuft
  * im Hintergrund weiter (`usingStoredSession`).
+ *
+ * Schnellstart (Plan Phase 1, Schritt 1.7d): Ist eine Sitzung MIT Rechten gespeichert
+ * (`permissions.version`, seit 1.7b), gilt sie sofort, ohne auf auth/me zu warten; die Prüfung läuft
+ * im Hintergrund. Antwortet der Server, übernimmt setSession seinen Stand (neue
+ * Rechte wie in 1.7c, ein anderes Konto ersetzt sie); eine echte Ablehnung führt wie offline zur
+ * Anmeldung (`onStoredSessionRejected`); eine Störung macht daraus die Offline-Sitzung.
  */
 export function ensureSession(options: EnsureSessionOptions = {}): Promise<AuthState | null> {
     if (known) {
         return Promise.resolve(current.value);
     }
     if (pending === null) {
+        const stored = loadStored();
+        if (stored?.permissions != null) {
+            current.value = stored;
+            known = true;
+            verifying = true;
+            const own = check(options, () => undefined).finally(() => {
+                if (pending === own) {
+                    pending = null;
+                }
+            });
+            pending = own;
+            return Promise.resolve(stored);
+        }
         let resolveFirst: (state: AuthState | null) => void = () => undefined;
         const first = new Promise<AuthState | null>((resolve) => {
             resolveFirst = resolve;
@@ -354,7 +386,7 @@ export interface RecheckOptions {
  * wird, tut sie nichts.
  */
 export function recheckSession(reason: RecheckReason, options: RecheckOptions = {}): Promise<void> {
-    if (!known || current.value === null || usingStored.value) {
+    if (!known || current.value === null || usingStored.value || verifying) {
         return Promise.resolve();
     }
     if (recheck !== null) {

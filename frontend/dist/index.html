@@ -10,18 +10,42 @@
         <!-- Manifest nur unter Städten: setzt src/runtime/appearance.ts (linkManifest). -->
         <link rel="icon" type="image/png" href="api/v1/app-icon/192"  />
         <link rel="apple-touch-icon" href="api/v1/app-icon/180"  />
-      <script type="module" crossorigin src="./assets/index-C5qf9tJI.js"></script>
+        <!-- Startbild: Stil (im CSS des Builds) und Bilder als Dateien, keine Ausnahme in der CSP. -->
+      <script type="module" crossorigin src="./assets/index-DwX57BLQ.js"></script>
       <link rel="modulepreload" crossorigin href="./assets/plugin-vue_export-helper-CStXJJQD.js">
       <link rel="modulepreload" crossorigin href="./assets/runtime-dom.esm-bundler-BElt4B7R.js">
       <link rel="modulepreload" crossorigin href="./assets/Primitive-qgHgBT_u.js">
       <link rel="modulepreload" crossorigin href="./assets/Teleport-DntfhRx5.js">
       <link rel="modulepreload" crossorigin href="./assets/useApi-CUWMwLLw-BYLoHXfD.js">
       <link rel="modulepreload" crossorigin href="./assets/ErrorNotice-CMLFBnbj.js">
-      <link rel="modulepreload" crossorigin href="./assets/session-Dq_15Xw3.js">
+      <link rel="modulepreload" crossorigin href="./assets/session-BIKTBGxj.js">
       <link rel="modulepreload" crossorigin href="./assets/masterData-hFrBxd6p.js">
-      <link rel="stylesheet" crossorigin href="./assets/index-BPofyhjd.css">
+      <link rel="stylesheet" crossorigin href="./assets/index-2lmMPc5R.css">
     </head>
     <body>
+        <!--
+            Startbild (Plan Phase 1, Schritt 1.7d): erst nach rund 0,4 s sichtbar (splash.css), die
+            App entfernt es, sobald die erste Seite steht (src/runtime/splash.ts).
+        -->
+        <div id="splash" class="splash" data-step="start">
+            <div class="splash-art" role="img" aria-label="Gezeichnetes Löschfahrzeug"></div>
+            <div class="splash-text">
+                <span class="splash-title" data-splash-title>Feuerwehr</span>
+                <span class="splash-subtitle">Geräteverwaltung</span>
+            </div>
+            <div
+                class="splash-track"
+                role="progressbar"
+                aria-label="App wird geladen"
+                aria-valuemin="0"
+                aria-valuemax="100"
+            >
+                <div class="splash-bar"></div>
+            </div>
+            <span class="splash-label" aria-live="polite" data-splash-label
+                >App wird geladen …</span
+            >
+        </div>
         <div id="app"></div>
     </body>
 </html>

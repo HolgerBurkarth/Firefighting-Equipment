@@ -34,14 +34,6 @@ onMounted(() => {
         <div class="admin-column">
             <AppNotices :updater="updater" />
             <main class="app-main app-main-admin">
-                <p
-                    v-if="updater.loadingPage.value"
-                    class="hint"
-                    role="status"
-                    data-testid="update-loading"
-                >
-                    Seite wird geladen …
-                </p>
                 <RouterView />
             </main>
         </div>
@@ -75,15 +67,6 @@ onMounted(() => {
         <AppNotices :updater="updater" />
 
         <main class="app-main" :class="`app-main-${layout}`">
-            <!-- Start mit veralteter Version: Die erste Seite wartet auf die neue. -->
-            <p
-                v-if="updater.loadingPage.value"
-                class="hint"
-                role="status"
-                data-testid="update-loading"
-            >
-                Seite wird geladen …
-            </p>
             <RouterView />
         </main>
         <UserTabBar v-if="layout === 'user'" />
@@ -123,11 +106,6 @@ onMounted(() => {
 .app-header-subtitle {
     font-size: var(--font-size-sm);
     opacity: 0.85;
-}
-
-.hint {
-    margin: 0;
-    color: var(--muted);
 }
 
 .app-main {

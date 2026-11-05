@@ -22,7 +22,7 @@ export const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 export const RELOAD_COOLDOWN_MS = 10 * 60 * 1000;
 /**
  * So lange wartet ein Seitenwechsel auf die Installation der neuen Version (danach weiter mit der
- * laufenden). Beim Start und vor „Seite nicht gefunden“ gilt START_LOAD_TIMEOUT_MS.
+ * laufenden). Vor „Seite nicht gefunden“ gilt START_LOAD_TIMEOUT_MS.
  */
 export const ACTIVATION_TIMEOUT_MS = 5000;
 /**
@@ -31,8 +31,8 @@ export const ACTIVATION_TIMEOUT_MS = 5000;
  */
 export const TAKEOVER_TIMEOUT_MS = 2000;
 /**
- * Höchstens so lange wartet der Start (und „Seite nicht gefunden“) auf die Build-Kennung des Servers;
- * danach geht es ohne Ergebnis weiter (langsame Verbindung).
+ * Höchstens so lange wartet der Start im Hintergrund auf die Registrierung und „Seite nicht gefunden“
+ * auf die Prüfung; danach geht es ohne Ergebnis weiter (langsame Verbindung).
  */
 export const START_CHECK_TIMEOUT_MS = 2000;
 /**
@@ -44,15 +44,16 @@ export const START_CHECK_TIMEOUT_MS = 2000;
  */
 export const UPDATE_RETRY_DELAYS_MS: readonly number[] = [500, 1000, 2000, 4000];
 /**
- * Beim Start mit veralteter Version und vor „Seite nicht gefunden“ weiter bis rund 30 s; so lange
- * bleibt „Seite wird geladen …“ stehen, danach der Hinweis mit dem Knopf „Neu laden“.
+ * Vor „Seite nicht gefunden“ weiter bis rund 30 s (der Name stammt aus der Zeit, als auch der Start
+ * so wartete, bis Schritt 1.7d); so lange bleibt „Seite wird geladen …“ stehen, danach der Hinweis
+ * mit dem Knopf „Neu laden“.
  */
 export const START_RETRY_DELAYS_MS: readonly number[] = [...UPDATE_RETRY_DELAYS_MS, 8000, 15000];
 /**
- * Start und „Seite nicht gefunden“: Frist ab Beginn für Suche UND Installation des neuen Service
- * Workers (= Summe der Pausen, rund 30 s). Live dauert die Installation (alle Dateien vorab laden)
- * länger als ACTIVATION_TIMEOUT_MS; mit dieser Frist gab der Start nach rund 6 s auf, obwohl der neue
- * Service Worker kurz danach bereitstand (31.10.2026).
+ * „Seite nicht gefunden“: Frist ab Beginn für Suche UND Installation des neuen Service Workers
+ * (= Summe der Pausen, rund 30 s). Live dauert die Installation (alle Dateien vorab laden) länger
+ * als ACTIVATION_TIMEOUT_MS; mit dieser Frist gab der damalige Start nach rund 6 s auf, obwohl der
+ * neue Service Worker kurz danach bereitstand (31.10.2026).
  */
 export const START_LOAD_TIMEOUT_MS = START_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0);
 /**
@@ -117,9 +118,10 @@ export class AppUpdater {
     readonly autoBlocked = shallowRef(false);
     /** Die neue Version wird gerade aktiviert (Hinweis „Neue Version wird geladen …“). */
     readonly switching = shallowRef(false);
-    /** Start mit veralteter Version: Die erste Seite wartet auf die neue („Seite wird geladen …“). */
-    readonly loadingPage = shallowRef(false);
-    /** Die neue Version ließ sich beim Start nicht laden: Hinweis mit Knopf „Neu laden“. */
+    /**
+     * Die neue Version ließ sich vor „Seite nicht gefunden“ nicht laden: Hinweis mit Knopf
+     * „Neu laden“.
+     */
     readonly reloadNeeded = shallowRef(false);
     /**
      * Der Server lehnt diese Version ab (409 `client_outdated`): Hinweis „Diese Version ist veraltet
@@ -331,40 +333,30 @@ export class AppUpdater {
     }
 
     /**
-     * Beim Start, bevor eine Seite angezeigt wird: Kommt die Seite aus dem Service Worker (also
-     * womöglich veraltet) und liefert der Server eine andere Version, sofort einmal neu laden, und
-     * zwar mit der vollständigen Adresse samt #token bzw. #code (noch hat keine Seite das Fragment
-     * entfernt). Schleifensperre wie beim Seitenwechsel. true = die App lädt neu.
+     * Beim Start, im Hintergrund (Plan Phase 1, Schritt 1.7d „Schnellstart“): Die erste Seite wartet
+     * nicht darauf. Kommt die Seite aus dem Service Worker (also womöglich veraltet), prüfen wie
+     * sonst (`check`); eine neue Version kommt beim nächsten Seitenwechsel (installUpdateGuard).
+     * Eine alte Version beim Start ist zulässig, weil die API nur erweitert wird; lehnt der Server sie
+     * ab (`client_outdated`), aktualisiert reportOutdated sofort. Kommt die Seite vom Server und
+     * wartet ein neuer Service Worker, siehe checkUncontrolled.
      */
-    async checkOnStart(
-        url: string,
-        registered: Promise<unknown> = Promise.resolve(),
-    ): Promise<boolean> {
+    async checkOnStart(registered: Promise<unknown> = Promise.resolve()): Promise<void> {
         this.trace.record('start', `build=${this.env.buildId}`);
-        // Registrierung abwarten (für das Aktivieren der neuen Version), aber nie unbegrenzt.
+        // Registrierung abwarten (update() braucht sie), aber nie unbegrenzt.
         await this.withTimeout(registered);
         this.trace.record('registered', this.workerSummary(this.registration));
         if (!this.env.isOnline()) {
             this.trace.record('offline');
-            return false;
+            return;
         }
         if (this.env.container.controller === null) {
             // Die Seite kommt vom Server; wartet ein neuer Service Worker, im Hintergrund prüfen.
             if (this.registration?.waiting) {
-                void this.checkUncontrolled();
+                await this.checkUncontrolled();
             }
-            return false;
+            return;
         }
-        const served = await this.withTimeout(this.track(this.env.fetchBuildId()));
-        this.trace.record('build', served ?? 'unknown');
-        if (served === null || served === this.env.buildId) {
-            return false;
-        }
-        this.ready.value = true;
-        this.loadingPage.value = true;
-        const reloading = await this.loadNewVersion(url);
-        this.loadingPage.value = false;
-        return reloading;
+        await this.check();
     }
 
     /**
@@ -427,7 +419,7 @@ export class AppUpdater {
     }
 
     /**
-     * Start und „Seite nicht gefunden“: neue Version laden, dabei bis rund 30 s nach dem neuen
+     * Vor „Seite nicht gefunden“: neue Version laden, dabei bis rund 30 s nach dem neuen
      * Service Worker fragen (START_RETRY_DELAYS_MS). true = die App lädt neu; false = keine neue
      * Version (oder Schleifensperre), die Seite erscheint. Gelingt es trotz neuer Version nicht,
      * bleibt die Seite beim Laden (das Promise endet nie, nie kurz „nicht gefunden“) und
@@ -479,8 +471,8 @@ export class AppUpdater {
     }
 
     /**
-     * Beim Seitenwechsel (auch mit angefangenem Formular, die Seite wird ohnehin verlassen), beim
-     * Start und vor „Seite nicht gefunden“: neue Version laden, sofern eine da ist und die
+     * Beim Seitenwechsel (auch mit angefangenem Formular, die Seite wird ohnehin verlassen) und vor
+     * „Seite nicht gefunden“: neue Version laden, sofern eine da ist und die
      * Schleifensperre nicht greift. true = die App lädt neu (Navigation abbrechen); false = weiter
      * mit der laufenden Version (auch wenn die neue gerade nicht aktiviert werden konnte).
      * `installDeadline` (wie env.now): bis dahin auf die Installation warten, sonst
@@ -782,17 +774,14 @@ export function updateNotice(updater: AppUpdater): 'outdated' | 'unsaved' | 'blo
 
 /**
  * Beim Seitenwechsel auf eine andere Seite (anderer Pfad, nicht beim Entfernen eines Fragments wie
- * #token=…) die neue Version laden statt in der alten App weiterzublättern. Beim Start entscheidet
- * `startup` (AppUpdater.checkOnStart): true = die App lädt neu, die erste Seite erscheint nicht.
+ * #token=…) die neue Version laden statt in der alten App weiterzublättern. Die erste Seite wartet
+ * nie darauf (Plan Phase 1, Schritt 1.7d; die Prüfung beim Start läuft im Hintergrund,
+ * AppUpdater.checkOnStart).
  */
-export function installUpdateGuard(
-    router: Router,
-    updater: AppUpdater,
-    startup: Promise<boolean> = Promise.resolve(false),
-): void {
+export function installUpdateGuard(router: Router, updater: AppUpdater): void {
     router.beforeEach(async (to, from) => {
         if (from === START_LOCATION) {
-            return !(await startup);
+            return true;
         }
         if (to.path === from.path) {
             return true;
@@ -817,11 +806,10 @@ export function isChunkLoadError(error: unknown): boolean {
 }
 
 /**
- * Prüfung beim Start, wenn die App wieder sichtbar wird, und stündlich. Seiten, deren Teile nach
- * einem Deploy fehlen (alte App ohne Service Worker), werden einmal neu geladen.
+ * Prüfung, wenn die App wieder sichtbar wird, und stündlich (beim Start prüft checkOnStart). Seiten,
+ * deren Teile nach einem Deploy fehlen (alte App ohne Service Worker), werden einmal neu geladen.
  */
 export function startUpdateChecks(router: Router, updater: AppUpdater): void {
-    void updater.check();
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
             void updater.check();

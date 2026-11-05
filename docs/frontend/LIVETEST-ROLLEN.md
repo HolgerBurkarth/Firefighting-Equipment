@@ -255,3 +255,76 @@ Atemschutzmaske) für den Test; Testkonto #7 „Holger Test 1“ (vorher *Benutz
 - ☐ Offen für Holger: eine eigene Rolle live ansehen (z. B. „Live-Test Filter“ an #7: nur Handy-Seiten,
   Standortwahl ohne „Ganzes Fahrzeug“ bei nur sichtbaren Fächern); der Agent meldet sich nicht als #7
   an. Per Browser-Test belegt (`tests/e2e/permissions.spec.ts`). Kommt in die iPhone-Liste nach 1.7c.
+
+## Schritt 1.7c – Rechte ändern sich während der Sitzung (05.11.2026, Build `08c676252d25`)
+
+CI: Der erste Lauf brach in zwei Teilen der Browser-Tests beim Einrichten des Runners ab (Schritt
+„Systempakete der Browser“, letzte Zeile `Get:54 http://azure.archive.ubuntu.com/ubuntu
+noble/universe amd64 libflite1 amd64 2.2-6build3 [13.6 MB]`, dann „The operation was canceled.“);
+nach einmaliger Wiederholung mit `--failed` grün.
+
+- ☑ Deploy „Deployment erfolgreich“, `build.json` = `08c676252d25`, `health` ok, API-Antworten mit
+  `X-Api-Version: 2`.
+- ☑ Update: Der offene Tab lud beim Öffnen automatisch die neue Version (Zeitleiste `reload
+  automatic` → `start build=08c676252d25`), vom Service Worker gesteuert.
+- ☑ Als *Admin*: jede API-Anfrage sendet `X-Client-Api: 2` (`devices`, `locations`, `client-config`,
+  `auth/me`, Dashboard-Abfragen); `build.json` ohne.
+- ☑ Offline-Kopie in IndexedDB im Format 2 mit `permissions` = `permissions.version` der
+  gespeicherten Sitzung (69 Geräte).
+- ☑ Zurückkehren in die App (`visibilitychange`, sichtbar): nach mehr als 30 s genau ein `auth/me`
+  und das Auffrischen der geladenen Daten; ein zweites innerhalb von 30 s fragt `auth/me` nicht.
+  Rechte gleich, also nichts gelöscht, Seite bleibt. Keine Fehler in der Konsole.
+- ☐ Neue Rechte bei offener App, Warteschlange mit 403: braucht ein zweites Konto ohne *Admin*
+  (die Rolle *Admin* ist fest) → iPhone-Liste unten. Per Test belegt (`permissionsChange.spec.ts`,
+  `bookingQueue.spec.ts`, Browser `permissions.spec.ts`).
+
+## iPhone-Liste für Holger mit Konto #7 (nach Schritt 1.7c)
+
+Fasst die offenen Punkte von 1.3a, 1.4, 1.7a, 1.7b und 1.7c zusammen. iPhone: Test-Stadt als App
+(Homescreen), angemeldet als #7 „Holger Test 1“. PC: angemeldet als Admin der Test-Stadt und als
+Super-Admin. Kein Rollenwechsel in dieser Liste betrifft *Admin*, #7 bleibt also immer angemeldet.
+
+**Vorbereitung (PC, Super-Admin):** Stadtdetail „Test-Feuerwehr“ → Reiter „Rollen“ → „Neue Rolle“
+„Live-Test 1.7“: Suchen Ansehen, Termine Ansehen, Aktionen „Umbuchen“ und „Status setzen“; „Sieht nur“
+Standorte = nur die Fächer von HLF 20 (nicht HLF 20 selbst), Ausrüstungstypen alle. Speichern.
+
+**A – #7 als *Benutzer* (Ausgang, 1.3a, 1.7a)**
+- ☐ A1 App öffnen: keine Fehlermeldung, Leiste Suchen, Prüffristen, Profil (kein Dashboard).
+- ☐ A2 Nirgends ein Export (CSV) zu sehen (1.7a: der Server antwortet *Benutzer* mit 403).
+- ☐ A3 Ein Gerät umbuchen und den Status ändern (Standort und Status vorher notieren); die
+  Bestätigung erscheint, „Zuletzt benutzt“ zeigt es oben.
+
+**B – Neue Rechte bei offener App (1.7b, 1.7c)**
+- ☐ B1 iPhone: App auf „Suchen“ offen lassen.
+- ☐ B2 PC (Admin): „Benutzer“ → Stift an #7 → Rolle „Live-Test 1.7“. Im Fenster steht „Die neue
+  Rolle gilt beim nächsten Aufruf der App. Handys laden dabei ihre Offline-Kopie neu.“ Speichern.
+- ☐ B3 iPhone: App in den Hintergrund (Homescreen), mindestens 30 s warten, wieder öffnen. Ohne
+  Neuladen und ohne Anmelden zeigt „Suchen“ nur noch Geräte in den Fächern von HLF 20; „Zuletzt
+  benutzt“ nur noch sichtbare.
+- ☐ B4 Ein Gerät öffnen → „Anderen Standort suchen …“: nur HLF 20 mit seinen Fächern, ohne „Ganzes
+  Fahrzeug, ohne Fach“ (1.7b, `selectable`).
+- ☐ B5 Prüffristen: nur Geräte aus den Fächern von HLF 20.
+- ☐ B6 Flugmodus an: grauer Streifen „Offline – angezeigt wird der Stand vom …“ mit einer Zeit NACH
+  B3 (die Offline-Kopie wurde neu gespeichert), weiterhin nur die gefilterten Geräte. Flugmodus aus.
+
+**C – Warteschlange, wenn ein Recht wegfällt (1.7c)**
+- ☐ C1 iPhone: Flugmodus an, ein sichtbares Gerät umbuchen („Gespeichert – wird gesendet, sobald
+  eine Verbindung besteht …“). App noch nicht wieder online bringen.
+- ☐ C2 PC (Super-Admin): Rolle „Live-Test 1.7“ bearbeiten, Aktion „Umbuchen“ entfernen, speichern.
+- ☐ C3 iPhone: Flugmodus aus, App in den Vordergrund. Auf „Suchen“ steht die Buchung als nicht
+  gesendet mit „Dafür fehlen Ihnen inzwischen die Rechte.“ und „Verwerfen“; „Verwerfen“ antippen.
+  Beim Öffnen eines Geräts nur noch der Status, kein Standort.
+
+**D – Seite fällt weg (1.7c)**
+- ☐ D1 iPhone: „Suchen“ offen lassen. PC (Super-Admin): an „Live-Test 1.7“ Suchen auf „Kein Zugriff“,
+  speichern. iPhone: nach mindestens 30 s im Hintergrund wieder öffnen → still auf „Prüffristen“,
+  in der Leiste kein „Suchen“ mehr.
+
+**E – Aufräumen**
+- ☐ E1 PC (Admin): #7 wieder *Benutzer*. iPhone nach 30 s im Hintergrund: wieder alle Geräte, Leiste
+  Suchen, Prüffristen, Profil.
+- ☐ E2 PC (Super-Admin): „Live-Test 1.7 löschen …“ (geht erst, wenn kein Konto sie mehr hat).
+- ☐ E3 Das in A3 umgebuchte Gerät auf Standort und Status von vorher zurücksetzen.
+
+Nicht in dieser Liste (folgt mit 1.8 bzw. per Test): Verlauf mit „anderer Standort“, Log-Mails eines
+gefilterten Empfängers, Buchen auf ein Ziel bzw. Gerät außerhalb (400/404).

@@ -88,9 +88,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
      Ändert der Push nur `.md`-Dateien, läuft keine CI und es gibt nichts zu deployen.
   3. Rot: `gh run view <id> --log-failed` lesen, Ursache in der „✅ FERTIG“-Meldung erklären,
      beheben, committen, pushen. Höchstens 3 Reparaturversuche je Fehler, danach anhalten und
-     berichten („⛔ ABGEBROCHEN“). Nie einfach neu starten; einzige Ausnahme: Ein Lauf, der
-     AUSSCHLIESSLICH am bekannten Firefox-Fehler #43413 scheitert (siehe "GitHub Actions (CI)"),
-     darf einmal mit `gh run rerun <id> --failed` wiederholt werden.
+     berichten („⛔ ABGEBROCHEN“). Nie einfach neu starten; zwei Ausnahmen (siehe "GitHub Actions
+     (CI)"), je EINMAL mit `gh run rerun <id> --failed`: Ein Lauf, der AUSSCHLIESSLICH am bekannten
+     Firefox-Fehler #43413 scheitert, und (seit 05.11.2026) ein Job, der beim Einrichten des Runners
+     scheitert, bevor der erste Test bzw. die erste Prüfung läuft (z. B. Paket-Mirror, Download von
+     Browsern oder Paketen, Netzwerk des Runners), einmal je Lauf. Die „✅ FERTIG“-Meldung nennt
+     dann die Ursache mit der Zeile aus dem Protokoll. Scheitert ein Test oder eine Prüfung, gilt
+     weiter: untersuchen, nicht neu starten.
   4. Grün (auch der Job `deploy`, der den Branch `deploy` schreibt): `ssh -T strato-ff`. Danach
      prüfen: Die Ausgabe endet mit „Deployment erfolgreich“,
      `https://www.prodad.de/firefighting/test/build.json` liefert als `build` die ersten 12 Zeichen
@@ -274,7 +278,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   personenbezogene Daten, ohne Sitzung und nie `Set-Cookie`). `CacheableResponse` erlaubt nur die
   Content-Types `image/png`, `application/manifest+json; charset=utf-8` und für das Frontend
   `text/html; charset=utf-8`, `text/javascript; charset=utf-8`, `text/css; charset=utf-8`,
-  `font/woff2`, `font/woff`, `application/wasm` (nur `assets/`, Kamera-Scanner) und `application/json; charset=utf-8` (NUR für `build.json` des
+  `font/woff2`, `font/woff`, `application/wasm` (nur `assets/`, Kamera-Scanner), `image/svg+xml` (nur
+  `assets/`, Bilder des Startbilds, seit Schritt 1.7d; vorher bewusst abgelehnt, weil eine SVG Skript
+  enthalten kann: daher nur Dateien des Builds, nie hochgeladene, und mit eigener CSP
+  `FrontendHandler::SVG_CONTENT_SECURITY_POLICY` = `default-src 'none'`) und `application/json; charset=utf-8` (NUR für `build.json` des
   Frontends; API-Antworten nie über `CacheableResponse`) (Konstanten in `CacheableResponse`), und nur die beiden Richtlinien aus
   `CachePolicy`: `Immutable` (`public, max-age=31536000, immutable`: Logo/Symbol nur, wenn `?v=`
   gleich der aktuellen Versionskennung ist; Frontend nur `assets/…` mit Hash im Namen) und
@@ -282,7 +289,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `sw.js`/`workbox-….js`, `build.json`). Immer mit starkem `ETag` und `nosniff`; `If-None-Match` (auch `W/`,
   Liste, `*`) → 304 ohne Body. Zusätzliche Header nur aus der festen Liste
   `Content-Security-Policy`, `Referrer-Policy`, `X-Frame-Options` (ohne Steuerzeichen, sonst
-  `InvalidArgumentException`), bisher nur auf der App-Seite. Dateien des Frontends mit
+  `InvalidArgumentException`), bisher nur auf der App-Seite und `Content-Security-Policy` an SVG-Dateien
+  des Builds. Dateien des Frontends mit
   vorkomprimierter Fassung tragen zusätzlich `Vary: Accept-Encoding` (auch bei 304) und, wenn
   komprimiert gesendet, `Content-Encoding` (`br` oder `gzip`, `ContentEncoding`; nicht bei 304;
   nie ohne `Vary`), siehe "Frontend ausliefern". Fehler dieser Routen bleiben JSON mit
@@ -347,8 +355,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (sonst würde HTML als Skript geladen). Alles andere (`""`, `index.html`, `geraete/12`,
   `passwort-zuruecksetzen` …) → `index.html` mit Basispfad, `Revalidate`.
 - Erlaubte Dateien (`FrontendAssets`): nur Endungen aus `FrontendAssets::CONTENT_TYPES` (`js`, `css`,
-  `woff2`, `woff`, `wasm`; `wasm` = `application/wasm`, Lesemodul des Kamera-Scanners, nur in
-  `assets/`, also immer `Immutable`: `FrontendAssets::ASSETS_ONLY`), Name `[A-Za-z0-9][A-Za-z0-9_.-]*` (höchstens 128 Zeichen), keine Unterordner
+  `woff2`, `woff`, `wasm`, `svg`; `wasm` = `application/wasm`, Lesemodul des Kamera-Scanners, und `svg`
+  = `image/svg+xml`, Bilder des Startbilds, nur in `assets/`, also immer `Immutable`:
+  `FrontendAssets::ASSETS_ONLY`), Name `[A-Za-z0-9][A-Za-z0-9_.-]*` (höchstens 128 Zeichen), keine Unterordner
   außer `assets/`, kein `..`, keine versteckten Dateien, zusätzlich per `realpath` innerhalb von
   `frontend/dist`. Neue Endungen nur, wenn der Build sie wirklich enthält (Content-Type in
   `CacheableResponse` ergänzen). Einzige Ausnahme ohne Endung in der Liste: genau
@@ -1065,7 +1074,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `auth/me` ohne Sitzung/Cookie): jede bestätigte Sitzung wird gemerkt, `resetSession` und Abmelden
   löschen sie. Scheitert `auth/me` mit einer Störung und ist eine gespeichert, löst `ensureSession`
   sofort mit ihr auf (`usingStoredSession`), die Prüfung läuft im Hintergrund weiter; eine echte
-  Ablehnung ruft `onStoredSessionRejected` (Router: wie 401, Anmeldung mit Rückkehradresse). Lokale
+  Ablehnung ruft `onStoredSessionRejected` (Router: wie 401, Anmeldung mit Rückkehradresse).
+  Schnellstart (Plan Phase 1, Schritt 1.7d): Ist eine Sitzung MIT `permissions` gespeichert, löst
+  `ensureSession` sofort mit ihr auf, ohne auf `auth/me` zu warten (`verifying`, ohne Hinweis und
+  ohne `recheckSession`, solange die Prüfung läuft); die Antwort übernimmt `setSession` (neue Rechte
+  wie in 1.7c, ein anderes Konto ersetzt sie), eine echte Ablehnung wie oben, eine Störung macht
+  daraus die Offline-Sitzung (`usingStoredSession`, grauer Streifen). Ohne gespeicherte Rechte
+  (Sitzung aus einer App vor 1.7b) wie bisher erst nach `auth/me`. Die Kopie zeigt die Liste dabei
+  sofort (Tests `startup.spec.ts`, Unit `offline.spec.ts`). Lokale
   Kopie `src/data/offline.ts` (`installOfflineCopy` in `main.ts`, IndexedDB über
   `src/runtime/localDb.ts`: Datenbank `ff-offline`, Tabellen `snapshots` und `queue`, im Test
   `MemoryDb`): Schlüssel `<kürzel>:<konto-id>`, `OfflineSnapshot` (Format 2, `syncedAt`, Geräte,
@@ -1133,7 +1149,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Handy-Seiten (`suchen`, `prueffristen`, `profil`, `geraete/<id>` mit `<id>` wie die
   Platzhalter im Backend) für `user` und `admin` (KONZEPT.md "User am Handy – Entscheidungen").
   Der Wächter fragt `auth/me`
-  höchstens einmal je Seitenaufruf (`ensureSession`); ohne Sitzung → `anmelden?weiter=…`, falsche
+  höchstens einmal je Seitenaufruf (`ensureSession`, mit gespeicherter Sitzung samt Rechten im
+  Hintergrund, siehe Offline-Modus); die Programmteile der ersten Seite lädt `main.ts` schon vorher
+  (`preloadPage` in `src/router/index.ts`, Schritt 1.7d: gleichzeitig mit `tenant` und `auth/me`,
+  Vue Router lädt Seiten sonst erst nach den Wächtern); ohne Sitzung → `anmelden?weiter=…`, falsche
   Rolle bzw. fehlende Rechte (`canOpen`) → still zur Startseite (`landingRoute` in
   `src/auth/redirect.ts`: Super-Admin `dashboard`; sonst mit Konsole `consoleRoute` = Dashboard bzw.
   erste erlaubte Seite des Menüs ohne „Suchen“, sonst „Einstellungen“; ohne Konsole `suchen`, sonst
@@ -1185,25 +1204,51 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Service Worker `sw.js` (Workbox, `generateSW`), registriert aus dem Bundle (kein Inline-Skript),
   Scope `/firefighting/<bereich>/`, Rückfall auf `index.html` außer `api/` und
   `manifest.webmanifest`. Das Manifest liefert PHP (`manifest: false` im Plugin). Vorab geladen
-  (`globPatterns`) werden `js`, `css`, `html`, `woff2` und `wasm` (Lesemodul des Scanners, offline).
+  (`globPatterns`) werden `js`, `css`, `html`, `woff2`, `wasm` (Lesemodul des Scanners, offline) und
+  `svg` (Bilder des Startbilds). Bilder bettet Vite nie als `data:` ein (`assetsInlineLimit` in
+  `vite.config.ts`; die CSP erlaubt `data:` nicht).
+- Startbild (Plan Phase 1, Schritt 1.7d „Schnellstart“, Mockup
+  `docs/aenderungskonzept/mockups/Startbild.dc.html`): in `index.html` außerhalb von `#app`
+  (`#splash`, Löschfahrzeug als `src/assets/splash-light.svg`/`splash-dark.svg` über
+  `src/styles/splash.css`, beide Dunkel-Blöcke gleich, per Test), ohne Inline-Stil und ohne Skript.
+  Erst nach rund 0,4 s sichtbar, nur per CSS (`animation-delay`, Startbild unsichtbar und ohne
+  Klicks bis dahin); ein schneller Start zeigt es nie. Ladebalken zuerst ohne Stand (`data-step` =
+  `start`), dann aus der App (`src/runtime/splash.ts`, `setSplashStep`): `app` 33 % „App wird
+  geladen …“ (sobald `main.ts` läuft), `session` 66 % „Anmeldung wird geprüft …“ (nur, wenn der Start
+  auf `auth/me` wartet; `main.ts` fragt bei geschützten Seiten `ensureSession` sofort), `data` 92 %
+  „Ausrüstung wird geladen …“ (Sitzung bekannt, die Seite lädt); Breite je Schritt im Stylesheet,
+  `aria-valuenow` am Balken. `prefers-reduced-motion`: ohne Einblenden und ohne Bewegung. Name und
+  Farbe der Stadt aus dem letzten Besuch (`showRememberedTenant` als Erstes in `main.ts`,
+  localStorage `ff-tenant:<kürzel>` = `{name, accent_color}`, gemerkt bei jeder Antwort von
+  `api/v1/tenant` in `setTenant`; Farbe als `--accent` per `applyAccent`; scheitert `tenant`, gilt
+  wieder die Standardfarbe, bei unbekannter oder gesperrter Stadt wird der Eintrag gelöscht); beim
+  ersten Besuch „Feuerwehr“ in der Standardfarbe, unter `service` „Super-Admin“. Entfernt
+  (`removeSplash`), sobald die erste Seite steht (`router.isReady()` und `nextTick`, auch nach einem
+  Fehler der ersten Navigation) oder ein Hinweis der App sichtbar sein muss (`sessionCheckError`,
+  z. B. „Keine Verbindung zum Server“). Messpunkte für das Messskript (`performance.mark`):
+  `ff:first-page` beim Entfernen, `ff:search-data` auf „Suchen“, sobald Geräte da sind (Kopie oder
+  Server). Tests `tests/e2e/startup.spec.ts`, `tests/unit/splash.spec.ts`; Messskript
+  `npm run measure:start` (`tests/e2e/support/measureStart.ts`, nur gegen die Test-Stadt, liest nur).
 - Updates (KONZEPT.md "Updates der App", `src/runtime/appUpdate.ts`): `skipWaiting: false`, die neue
   Version wartet, bis `AppUpdater` sie per `SKIP_WAITING` aktiviert und die Seite neu lädt (nie
   `skipWaiting: true`: die laufende App bräuchte sonst gelöschte Teile). Prüfen
-  (`registration.update()` und `build.json` gleichzeitig) beim Start, bei `visibilitychange`
-  (sichtbar) und stündlich, offline nie, Fehler still. Meldet `build.json` eine neue Version, der
+  (`registration.update()` und `build.json` gleichzeitig) beim Start (`checkOnStart`, im
+  Hintergrund: die erste Seite wartet nie darauf, seit Schritt 1.7d; Registrierung höchstens
+  `START_CHECK_TIMEOUT_MS` = 2 s abwarten), bei `visibilitychange` (sichtbar) und stündlich, offline
+  nie, Fehler still. Meldet `build.json` eine neue Version, der
   Browser aber keinen neuen Service Worker, fragt die App nach 0,5/1/2/4 s erneut
   (`UPDATE_RETRY_DELAYS_MS`, `findNewWorker`: EINE gemeinsame Suche für alle Aufrufer, endet bei
   `updatefound`), danach erst beim nächsten Anlass. Grund (Prüflauf unter Last): Der Browser legt
   `update()` mit einer noch laufenden Prüfung zusammen (gleichwertige Jobs im Service-Worker-
   Standard); begann diese vor dem Deploy, liest sie die alte `sw.js`. Aktualisiert wird beim nächsten Seitenwechsel auf einen anderen Pfad
-  (`installUpdateGuard`; nicht bei gleichem Pfad wie beim Entfernen von `#token=…`), beim Start
-  (`checkOnStart`, vor der ersten Seite; nur wenn ein Service Worker die Seite liefert, Kennung aus
-  `build.json` höchstens `START_CHECK_TIMEOUT_MS` = 2 s abwarten, Registrierung ebenso; neu geladen
-  wird die vollständige Startadresse samt Fragment, bei gleicher Adresse per `location.reload()`, da
-  `assign` nur zum Fragment springen würde), vor „Seite nicht gefunden“ (`checkBeforeNotFound`, über
-  `UPDATER_KEY` per `inject`; Start und „nicht gefunden“ suchen bis rund 30 s weiter,
-  `START_RETRY_DELAYS_MS` mit zusätzlich 8 und 15 s, und zeigen solange „Seite wird geladen …“
-  (`loadingPage` in `App.vue` bzw. die Seite selbst), nie kurz „nicht gefunden“; gelingt es nicht,
+  (`installUpdateGuard`; nicht bei gleichem Pfad wie beim Entfernen von `#token=…`, nie bei der
+  ersten Seite: Eine alte Version beim Start ist zulässig, weil die API nur erweitert wird, und
+  `client_outdated` aktualisiert sofort; Plan Phase 1, Schritt 1.7d; neu geladen wird die
+  vollständige Zieladresse samt Fragment, bei gleicher Adresse per `location.reload()`, da `assign`
+  nur zum Fragment springen würde), vor „Seite nicht gefunden“ (`checkBeforeNotFound`, über
+  `UPDATER_KEY` per `inject`; sucht bis rund 30 s weiter, `START_RETRY_DELAYS_MS` mit zusätzlich 8
+  und 15 s, der Name stammt aus der Zeit, als auch der Start so wartete, und zeigt solange „Seite
+  wird geladen …“ (`not-found-checking`), nie kurz „nicht gefunden“; gelingt es nicht,
   bleibt die Seite beim Laden und `App.vue` zeigt „Die neue Version konnte nicht geladen werden.“ mit
   Knopf „Neu laden“ (`reloadNeeded`, `reloadFromServer`: Service Worker abmelden, Adresse samt
   `#token`/`#code` neu laden, OHNE Schleifensperre: ein Klick ist keine Schleife); bei
@@ -1242,10 +1287,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   auf eine Installation, die z. B. die vorige Seite begann; live 31.10.2026 fast 7 s), wartet `apply`
   zuerst auf `attach` (`registrationAttached`, Frist wie die Installation). Beim Aktualisieren (`apply`) fragt die App den Service Worker (`update()`, bei Bedarf die Suche
   wie oben), wartet auf die Installation (beim Seitenwechsel höchstens `ACTIVATION_TIMEOUT_MS` = 5 s;
-  beim Start und vor „nicht gefunden“ bis zur Frist `START_LOAD_TIMEOUT_MS` = Summe von
-  `START_RETRY_DELAYS_MS` ab Beginn, für Suche und Installation zusammen, mindestens 5 s; endet die
-  Installation früher, sofort weiter; live dauerte sie länger als 5 s, der Start gab nach rund 6 s
-  auf, 31.10.2026; Browser-Test mit hängender Installation: Schaltdatei `next-held` des
+  vor „nicht gefunden“ bis zur Frist `START_LOAD_TIMEOUT_MS` = Summe von `START_RETRY_DELAYS_MS`
+  ab Ende der Prüfung, für Suche und Installation zusammen, mindestens 5 s; endet die Installation
+  früher, sofort weiter; live dauerte sie länger als 5 s, der damalige Start gab nach rund 6 s auf,
+  31.10.2026; Browser-Test mit hängender Installation: Schaltdatei `next-held` des
   Update-Testservers hält die Anfrage nach `index.html` (nur das Vorab-Laden des Service Workers
   fragt so; Workbox lädt ohne `__WB_REVISION__`, der steht nur im Cache-Schlüssel), bis der Test auf
   `next` umstellt; eine leere oder unbekannte Schaltdatei liest der Server kurz erneut, da
@@ -1361,11 +1406,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Abgedeckte Fälle: ohne/mit Eingabe, Rückfrage, erster Besuch mit Deploy vor der
   Installation (Registrierung per Init-Skript zurückgehalten), Seite per Strg+F5 geladen und vom
   neuen Service Worker übernommen (nur Chromium: `Page.reload` mit `ignoreCache` über CDP), zwei Tabs
-  (einer aktualisiert, der andere folgt; einer geschlossen), Mail-Link mit alter Version, „Seite nicht
-  gefunden“, Zurück-Knopf nach erkannter neuer Version, neue Kennung ohne neuen Service Worker (nach
-  rund 30 s „Neu laden“), Installation beim Start länger als 5 s (`next-held`; nach der Freigabe
-  lädt Workbox die übrigen Dateien nacheinander, `index.html` zuerst; der Test wartet darauf bis zur
-  Frist der App, `START_LOAD_TIMEOUT_MS` ab Beginn des Starts, nicht länger; die Uhr läuft nach
+  (einer aktualisiert, der andere folgt; einer geschlossen), Mail-Link mit alter Version (die alte
+  löst das Token ein, die neue kommt beim Seitenwechsel), „Seite nicht gefunden“, Zurück-Knopf nach
+  erkannter neuer Version, Start mit neuer Kennung ohne neuen Service Worker (Seite sofort) und
+  dasselbe vor „Seite nicht gefunden“ (nach rund 30 s „Neu laden“; `openUnknownPageWithClock`:
+  der Seitenwechsel sucht zuerst selbst, vorgespult), Installation vor „Seite nicht gefunden“ länger
+  als 5 s (`next-held`; nach der Freigabe lädt Workbox die übrigen Dateien nacheinander,
+  `index.html` zuerst; der Test wartet darauf bis zur Frist der App, `START_LOAD_TIMEOUT_MS` nach
+  der Prüfung von höchstens `START_CHECK_TIMEOUT_MS`, nicht länger; die Uhr läuft nach
   `clock.install()` weiter, Timer feuern, `runFor` springt nur vor), „Neu laden“ mit zweitem alten
   Tab (Gerätedetail mit offenem „Bearbeiten“ und Eingabe: danach steuert die neue Version die Seite,
   keiner wartet, auch nach `page.reload()`; der andere Tab lädt nicht neu, zeigt den Hinweis, behält
@@ -1383,8 +1431,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Worker laufen dabei in Echtzeit: Hängt die nächste Wartezeit an einer Antwort (z. B. `update()`),
   in kleinen Schritten vorspulen (`expect.poll` mit `runFor(1000)`, `intervals: [50]`). Begrenzt
   die App das Warten auf eine echte Antwort mit einem Timer (z. B. `START_CHECK_TIMEOUT_MS` für
-  `build.json` beim Start), erst vorspulen, wenn die Antwort sichtbar verarbeitet ist (z. B.
-  `update-loading` sichtbar); sonst läuft der Timer unter Last vor der Antwort ab. Nur gezielt
+  die Prüfung vor „Seite nicht gefunden“), erst vorspulen, wenn die Antwort sichtbar verarbeitet ist
+  (z. B. `not-found-checking` sichtbar); sonst läuft der Timer unter Last vor der Antwort ab. Nur gezielt
   in diesen Tests, nicht global.
 - Zustände, die die App asynchron setzt (CSS-Variablen wie `--accent`, localStorage,
   sessionStorage, Eigenschaften ohne Locator), in Browser-Tests nie mit einmaligem `page.evaluate`
@@ -3064,11 +3112,18 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`~/.cache/ms-playwright`, Schlüssel = Playwright-Version, gespeichert gleich nach dem
   Installieren nur von Teil 1). Bei Treffer installiert `npx playwright install-deps` nur die
   Systempakete.
-- Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Einzige Ausnahme: Ein Lauf, der
-  ausschließlich am bekannten Firefox-Fehler beim Schließen des Browser-Kontexts scheitert
-  (`_maybeDontRestoreTabs`, [microsoft/playwright#43413](https://github.com/microsoft/playwright/issues/43413),
-  Playwright 1.64 mit Firefox 157, als „not planned“ geschlossen), darf EINMAL neu gestartet werden.
-  Scheitert auch der neue Lauf, wird nicht noch einmal neu gestartet, sondern untersucht.
+- Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Zwei Ausnahmen, je mit
+  `gh run rerun <id> --failed`:
+  - Ein Lauf, der ausschließlich am bekannten Firefox-Fehler beim Schließen des Browser-Kontexts
+    scheitert (`_maybeDontRestoreTabs`, [microsoft/playwright#43413](https://github.com/microsoft/playwright/issues/43413),
+    Playwright 1.64 mit Firefox 157, als „not planned“ geschlossen), darf EINMAL neu gestartet
+    werden.
+  - Ein Job, der beim Einrichten des Runners scheitert, bevor der erste Test oder die erste Prüfung
+    läuft (z. B. Paket-Mirror bei `install-deps`, Download von Browsern oder Paketen, Netzwerk des
+    Runners), darf EINMAL je Lauf wiederholt werden (seit 05.11.2026). Die „✅ FERTIG“-Meldung nennt
+    die Ursache mit der Zeile aus dem Protokoll.
+  Scheitert auch der neue Lauf, wird nicht noch einmal neu gestartet, sondern untersucht. Scheitert
+  ein Test oder eine Prüfung, gilt immer: untersuchen, nicht neu starten.
 - Job `deploy`: nur bei Push auf `main` und nur, wenn `changes`, `frontend-checks` und
   `frontend-build` grün sind und `php` sowie alle Teile von `e2e` grün oder übersprungen (Bereich
   nicht betroffen; `!cancelled()` statt der Standardbedingung, die übersprungene als Fehler wertet);

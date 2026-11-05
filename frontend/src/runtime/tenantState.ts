@@ -3,7 +3,10 @@ import { deleteLogo, postAccentColor, postLogo } from '../api/appearance';
 import type { ApiError, ApiResult } from '../api/client';
 import { fetchTenant, type TenantInfo } from '../api/tenant';
 import type { AppBase } from './appBase';
+import { applyAccent } from './accent';
 import { applyTenantAppearance } from './appearance';
+import { rememberTenant } from './splash';
+import { browserStorage } from './theme';
 
 export interface TenantState {
     /** true, bis GET api/v1/tenant beantwortet ist (unter service nie). */
@@ -34,9 +37,14 @@ export async function loadTenant(
     }
     const result = await fetchTenant(fetchFn);
     if (result.ok) {
-        applyTenantAppearance(doc, result.data);
-        state.value = { loading: false, tenant: result.data, error: null };
+        setTenant(result.data, doc);
     } else {
+        // Die Farbe aus dem letzten Besuch (Startbild) gilt nicht mehr; ist die Stadt unbekannt
+        // oder gesperrt, auch der gemerkte Stand nicht.
+        applyAccent(doc.documentElement, null);
+        if (isTenantUnavailable(result.error)) {
+            rememberTenant(browserStorage(), base.area, null);
+        }
         state.value = { loading: false, tenant: null, error: result.error };
     }
 }
@@ -44,6 +52,11 @@ export async function loadTenant(
 /** Übernimmt einen neuen Stand der Stadt (Antwort einer Änderung) samt Erscheinungsbild. */
 export function setTenant(tenant: TenantInfo, doc: Document = document): void {
     applyTenantAppearance(doc, tenant);
+    // Für das Startbild des nächsten Starts (src/runtime/splash.ts).
+    rememberTenant(browserStorage(), tenant.slug, {
+        name: tenant.name,
+        accentColor: tenant.accentColor,
+    });
     state.value = { loading: false, tenant, error: null };
 }
 

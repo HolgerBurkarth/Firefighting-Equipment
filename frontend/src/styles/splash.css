@@ -1,0 +1,135 @@
+/*
+ * Startbild (Plan Phase 1, Schritt 1.7d „Schnellstart“, Mockup docs/aenderungskonzept/mockups/
+ * Startbild.dc.html). Steht in index.html außerhalb von #app und ist erst nach rund 0,4 s sichtbar
+ * (Verzögerung der Animation, kein Skript): Ein schneller Start zeigt es nie, die App entfernt es,
+ * sobald die erste Seite steht (src/runtime/splash.ts). Den Stand des Ladebalkens setzt die App als
+ * Attribut data-step (kein style=""), die Breite je Schritt steht hier. Farben aus tokens.css.
+ */
+.splash {
+    --splash-track: #e1e5ea;
+    --splash-art: url('../assets/splash-light.svg');
+
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--text);
+    opacity: 0;
+    pointer-events: none;
+    animation: splash-show 0.2s ease-out 0.4s forwards;
+}
+
+/* Dunkel: beide Blöcke gleich (wie in tokens.css, per Test). */
+:root[data-theme='dark'] .splash {
+    --splash-track: #2b3542;
+    --splash-art: url('../assets/splash-dark.svg');
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .splash {
+        --splash-track: #2b3542;
+        --splash-art: url('../assets/splash-dark.svg');
+    }
+}
+
+@keyframes splash-show {
+    to {
+        opacity: 1;
+    }
+}
+
+.splash-art {
+    width: 260px;
+    max-width: 100%;
+    height: 190px;
+    background: var(--splash-art) center / contain no-repeat;
+}
+
+.splash-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+}
+
+.splash-title {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.splash-subtitle,
+.splash-label {
+    font-size: 15px;
+    color: var(--muted);
+}
+
+.splash-track {
+    position: relative;
+    width: 220px;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--splash-track);
+}
+
+.splash-bar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    border-radius: 999px;
+    background: var(--accent);
+    transition: width 0.5s ease;
+}
+
+/* Vor dem Start der App: Balken ohne Stand. */
+.splash[data-step='start'] .splash-bar {
+    width: 40%;
+    animation: splash-slide 1.4s ease-in-out infinite;
+}
+
+.splash[data-step='app'] .splash-bar {
+    width: 33%;
+}
+
+.splash[data-step='session'] .splash-bar {
+    width: 66%;
+}
+
+.splash[data-step='data'] .splash-bar {
+    width: 92%;
+}
+
+@keyframes splash-slide {
+    from {
+        left: -40%;
+    }
+
+    to {
+        left: 100%;
+    }
+}
+
+/* Ohne Bewegung: erscheint ohne Einblenden, Balken steht. */
+@media (prefers-reduced-motion: reduce) {
+    .splash {
+        animation-duration: 0s;
+    }
+
+    .splash[data-step='start'] .splash-bar {
+        left: 30%;
+        animation: none;
+    }
+
+    .splash-bar {
+        transition: none;
+    }
+}
