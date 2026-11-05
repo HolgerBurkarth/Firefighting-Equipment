@@ -12,6 +12,11 @@ use FirefightingEquipment\Invitation\InvitationCodeRepository;
 use FirefightingEquipment\Invitation\InvitationCodeValue;
 use FirefightingEquipment\Permission\Action;
 use FirefightingEquipment\Permission\PermissionRepository;
+use FirefightingEquipment\Permission\Permissions;
+use FirefightingEquipment\Role\Role;
+use FirefightingEquipment\Role\RoleNotFoundException;
+use FirefightingEquipment\Role\RoleRepository;
+use FirefightingEquipment\Role\SystemRole;
 use FirefightingEquipment\Tenant\DuplicateTenantSlugException;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Tenant\TenantName;
@@ -24,8 +29,10 @@ use FirefightingEquipment\Tenant\TenantSlug;
  * Ändernde Methoden laufen jeweils in einer eigenen Transaktion und sperren zuerst alle Konten
  * derselben Stadt bzw. alle Super-Admins (SELECT … FOR UPDATE). So sehen gleichzeitige Änderungen
  * immer den aktuellen Stand, und die Regeln „letzter Admin“ und „letzter Super-Admin“ lassen sich
- * nicht durch zwei parallele Aufrufe umgehen. Sperren, Rollenwechsel, Passwort setzen und
- * Anonymisieren beenden alle Sitzungen des Kontos.
+ * nicht durch zwei parallele Aufrufe umgehen. Sperren, Passwort setzen und Anonymisieren beenden
+ * alle Sitzungen des Kontos, ein Rollenwechsel nur, wenn die Rolle Admin dazukommt oder wegfällt (F1).
+ * Einige Methoden nehmen eine Prüfung des Aufrufers ($authorize, UserAdministration), die im
+ * gesperrten Stand läuft.
  *
  * Geschützte Konten (protected, nur Super-Admins) lehnen Änderungen durch andere ab; erlaubt bleiben
  * Passwort ändern bzw. zurücksetzen und die eigene Benachrichtigung. Super-Admins werden nie
@@ -37,19 +44,17 @@ final readonly class UserRepository
     public const int UNVERIFIED_RETENTION_DAYS = 7;
 
     private const int ER_DUP_ENTRY = 1062;
+    private const int ER_NO_REFERENCED_ROW = 1452;
 
     /**
-     * Rolle zur Kontoart (fe_users.role admin/user → Standard-Rolle mit diesem system_key), damit
-     * role und role_id in derselben Anweisung zusammenpassen (Plan Phase 1, Abschnitt 1). Erster
-     * Parameter: die Kontoart. Variante für UPDATE (Stadt aus der Zeile) und für INSERT (Stadt als
-     * Parameter davor).
+     * Rolle zur Kontoart (fe_users.role admin/user → Standard-Rolle mit diesem system_key) beim
+     * Anlegen, damit role und role_id in derselben Anweisung zusammenpassen (Plan Phase 1,
+     * Abschnitt 1). Parameter: Stadt, Kontoart. Beim Zuweisen setzt updateRole() beides.
      */
-    private const string SYSTEM_ROLE_ID =
-        '(SELECT r.id FROM fe_roles r WHERE r.tenant_id = fe_users.tenant_id AND r.system_key = ?)';
     private const string SYSTEM_ROLE_ID_OF_TENANT = 'SELECT r.id FROM fe_roles r WHERE r.tenant_id = ? AND r.system_key = ?';
 
     private const string COLUMNS = 'id, tenant_id, role, status, email, name, display_name, email_verified_at,'
-        . ' locked_at, deleted_at, created_at, updated_at, protected, notify_device_log';
+        . ' locked_at, deleted_at, created_at, updated_at, protected, notify_device_log, role_id, invitation_code_id';
 
     public function __construct(private \PDO $pdo)
     {
@@ -240,9 +245,10 @@ final readonly class UserRepository
      * @throws UserNotFoundException
      * @throws UserRuleViolationException letzter Admin bzw. Super-Admin, gelöschtes oder geschütztes Konto
      */
-    public function lock(int $id): bool
+    public function lock(int $id, ?\Closure $authorize = null): bool
     {
-        return $this->transaction($id, function (User $user, array $group): bool {
+        return $this->transaction($id, function (User $user, array $group) use ($authorize): bool {
+            self::authorize($user, $authorize);
             self::assertNotDeleted($user);
             self::assertNotProtected($user);
             if ($user->isLocked()) {
@@ -263,9 +269,10 @@ final readonly class UserRepository
      * @throws UserNotFoundException
      * @throws UserRuleViolationException gelöschtes Konto
      */
-    public function unlock(int $id): bool
+    public function unlock(int $id, ?\Closure $authorize = null): bool
     {
-        return $this->transaction($id, function (User $user): bool {
+        return $this->transaction($id, function (User $user) use ($authorize): bool {
+            self::authorize($user, $authorize);
             self::assertNotDeleted($user);
             if (!$user->isLocked()) {
                 return false;
@@ -278,61 +285,128 @@ final readonly class UserRepository
     }
 
     /**
-     * Wechselt zwischen admin und user. Die Rolle Super-Admin wird weder vergeben noch entzogen.
+     * Wechselt zwischen den Standard-Rollen Admin und Benutzer (Kontoart admin bzw. user), sonst wie
+     * assignRole(). Die Rolle Super-Admin wird weder vergeben noch entzogen.
+     *
+     * @param (\Closure(User, Role): void)|null $authorize wie bei assignRole()
      *
      * @return bool ob sich etwas geändert hat (false: hatte die Rolle bereits)
      *
      * @throws UserNotFoundException
      * @throws UserRuleViolationException
      */
-    public function changeRole(int $id, UserRole $role): bool
+    public function changeRole(int $id, UserRole $role, ?\Closure $authorize = null): bool
     {
-        return $this->transaction($id, function (User $user, array $group) use ($role): bool {
+        return $this->assign($id, fn (User $user): Role => $this->systemRoleFor($user, $role), $authorize);
+    }
+
+    /**
+     * Weist einem Konto eine Rolle seiner Stadt zu (Plan Phase 1, Schritt 1.6). Die Kontoart folgt
+     * der Rolle (admin genau mit der Rolle Admin). Sitzungen enden nur, wenn sich dabei die Kontoart
+     * ändert (F1); sonst gilt die neue Rolle ab der nächsten Anfrage. Hat die neue Rolle kein
+     * mail.log, wird die Benachrichtigung „Log“ ausgeschaltet (ein späterer Wechsel schaltet sie
+     * nicht ungefragt wieder ein).
+     *
+     * @param (\Closure(User, Role): void)|null $authorize prüft im gesperrten Stand (Konto und neue
+     *                                                   Rolle, z. B. F5) und wirft bei einem Verstoß
+     *
+     * @return bool ob sich etwas geändert hat (false: hatte die Rolle bereits)
+     *
+     * @throws UserNotFoundException
+     * @throws RoleNotFoundException      Rolle nicht aus der Stadt des Kontos
+     * @throws UserRuleViolationException
+     */
+    public function assignRole(int $id, int $roleId, ?\Closure $authorize = null): bool
+    {
+        return $this->assign($id, fn (User $user): Role => $this->roleOf($user, $roleId), $authorize);
+    }
+
+    /**
+     * @param \Closure(User): Role               $resolve
+     * @param (\Closure(User, Role): void)|null $authorize
+     *
+     * @throws UserNotFoundException
+     * @throws RoleNotFoundException
+     * @throws UserRuleViolationException
+     */
+    private function assign(int $id, \Closure $resolve, ?\Closure $authorize): bool
+    {
+        return $this->transaction($id, function (User $user, array $group) use ($resolve, $authorize): bool {
             self::assertNotDeleted($user);
             self::assertNotProtected($user);
-            if ($role === UserRole::SuperAdmin || $user->role === UserRole::SuperAdmin) {
+            if ($user->role === UserRole::SuperAdmin) {
                 throw UserRuleViolationException::superAdminRole();
             }
-            if ($user->role === $role) {
+            $role = $resolve($user);
+            if ($authorize !== null) {
+                $authorize($user, $role);
+            }
+            if ($user->roleId === $role->id) {
                 return false;
             }
-            self::assertNotLastAdministrator($user, $group);
+            $kind = self::kindOf($role);
+            if ($kind !== $user->role) {
+                self::assertNotLastAdministrator($user, $group);
+            }
 
-            // Wie bisher: Die Kontoart user (Rolle Benutzer, ohne mail.log) verliert die Option, damit
-            // ein späteres Hochstufen sie nicht ungefragt wieder einschaltet.
-            $this->update(
-                $user->id,
-                'role = ?, role_id = ' . self::SYSTEM_ROLE_ID . ', notify_device_log = ?',
-                [$role->value, $role->value, $role === UserRole::User ? '0' : ($user->notifyDeviceLog ? '1' : '0')],
-            );
-            $this->endSessions($user->id);
+            $notify = $user->notifyDeviceLog && Permissions::fromRole($role)->can(Action::MailLog);
+            $this->updateRole($user->id, $role, 'notify_device_log = ?', [$notify ? '1' : '0']);
+            if ($kind !== $user->role) {
+                $this->endSessions($user->id);
+            }
 
             return true;
         });
     }
 
     /**
-     * Freischalten durch einen Admin: nur aus pending (E-Mail bestätigt), setzt Anzeigename und Rolle
-     * (admin oder user) und den Status active.
+     * Freischalten durch einen Admin: nur aus pending (E-Mail bestätigt), setzt Anzeigename und eine
+     * der Standard-Rollen Admin bzw. Benutzer und den Status active.
+     *
+     * @param (\Closure(User, Role): void)|null $authorize wie bei assignRole()
      *
      * @throws UserNotFoundException
      * @throws UserRuleViolationException nicht pending, Rolle Super-Admin
      */
-    public function approve(int $id, PersonName $displayName, UserRole $role): User
+    public function approve(int $id, PersonName $displayName, UserRole $role, ?\Closure $authorize = null): User
     {
-        $this->transaction($id, function (User $user) use ($displayName, $role): void {
-            if ($role === UserRole::SuperAdmin) {
+        return $this->approveAs($id, $displayName, fn (User $user): Role => $this->systemRoleFor($user, $role), $authorize);
+    }
+
+    /**
+     * Wie approve(), mit einer Rolle der Stadt (z. B. der des Einladungscodes, Plan Phase 1,
+     * Schritt 1.6).
+     *
+     * @param (\Closure(User, Role): void)|null $authorize wie bei assignRole()
+     *
+     * @throws UserNotFoundException
+     * @throws RoleNotFoundException
+     * @throws UserRuleViolationException
+     */
+    public function approveWithRole(int $id, PersonName $displayName, int $roleId, ?\Closure $authorize = null): User
+    {
+        return $this->approveAs($id, $displayName, fn (User $user): Role => $this->roleOf($user, $roleId), $authorize);
+    }
+
+    /**
+     * @param \Closure(User): Role               $resolve
+     * @param (\Closure(User, Role): void)|null $authorize
+     */
+    private function approveAs(int $id, PersonName $displayName, \Closure $resolve, ?\Closure $authorize): User
+    {
+        $this->transaction($id, function (User $user) use ($displayName, $resolve, $authorize): void {
+            if ($user->role === UserRole::SuperAdmin) {
                 throw UserRuleViolationException::superAdminRole();
+            }
+            $role = $resolve($user);
+            if ($authorize !== null) {
+                $authorize($user, $role);
             }
             if ($user->status !== UserStatus::Pending) {
                 throw UserRuleViolationException::notPending($user->id);
             }
 
-            $this->update(
-                $user->id,
-                "status = 'active', display_name = ?, role = ?, role_id = " . self::SYSTEM_ROLE_ID,
-                [$displayName->value, $role->value, $role->value],
-            );
+            $this->updateRole($user->id, $role, "status = 'active', display_name = ?", [$displayName->value]);
         });
 
         return $this->findById($id) ?? throw UserNotFoundException::forId($id);
@@ -365,9 +439,10 @@ final readonly class UserRepository
      * @throws UserNotFoundException
      * @throws UserRuleViolationException gelöschtes Konto
      */
-    public function changeDisplayName(int $id, PersonName $displayName): bool
+    public function changeDisplayName(int $id, PersonName $displayName, ?\Closure $authorize = null): bool
     {
-        return $this->transaction($id, function (User $user) use ($displayName): bool {
+        return $this->transaction($id, function (User $user) use ($displayName, $authorize): bool {
+            self::authorize($user, $authorize);
             self::assertNotDeleted($user);
             self::assertNotProtected($user);
             if ($user->displayName?->value === $displayName->value) {
@@ -445,9 +520,10 @@ final readonly class UserRepository
      * @throws UserNotFoundException
      * @throws UserRuleViolationException letzter Admin, Super-Admin (nie löschbar)
      */
-    public function anonymize(int $id): bool
+    public function anonymize(int $id, ?\Closure $authorize = null): bool
     {
-        return $this->transaction($id, function (User $user, array $group): bool {
+        return $this->transaction($id, function (User $user, array $group) use ($authorize): bool {
+            self::authorize($user, $authorize);
             if ($user->role === UserRole::SuperAdmin) {
                 throw UserRuleViolationException::superAdminNotDeletable();
             }
@@ -465,8 +541,9 @@ final readonly class UserRepository
     /**
      * Registrierung mit Einladungscode, in einer Transaktion: Stadt sperren, Code sperren und prüfen,
      * dann entweder (E-Mail schon vergeben) nichts ändern oder eine Nutzung zählen und das Konto
-     * anlegen (Status unverified, Rolle user). Gleichzeitige Registrierungen können einen Code so
-     * nicht über max_uses hinaus nutzen. Die Passwortregeln prüft der Aufrufer.
+     * anlegen (Status unverified, Kontoart user, Rolle des Codes bzw. ohne Rolle am Code Benutzer).
+     * Gleichzeitige Registrierungen können einen Code so nicht über max_uses hinaus nutzen. Die
+     * Passwortregeln prüft der Aufrufer.
      *
      * @throws InvitationCodeNotUsableException Code unbekannt, aus einer anderen Stadt, abgelaufen,
      *                                          aufgebraucht oder widerrufen (auch wenn die E-Mail
@@ -489,11 +566,13 @@ final readonly class UserRepository
             }
 
             $codes->countUse($codeId);
+            // Rolle des Codes (nie Admin, InvitationCodeRepository::create), ohne Rolle Benutzer.
             $this->pdo->prepare(
                 'INSERT INTO fe_users (tenant_id, role, role_id, status, email, password_hash, name, invitation_code_id,'
-                . " created_at, updated_at) VALUES (?, 'user', (" . self::SYSTEM_ROLE_ID_OF_TENANT . "), 'unverified', ?, ?, ?, ?,"
+                . " created_at, updated_at) VALUES (?, 'user', COALESCE((SELECT c.role_id FROM fe_invitation_codes c"
+                . ' WHERE c.id = ? AND c.tenant_id = ?), (' . self::SYSTEM_ROLE_ID_OF_TENANT . ")), 'unverified', ?, ?, ?, ?,"
                 . ' UTC_TIMESTAMP(), UTC_TIMESTAMP())',
-            )->execute([$tenant->id, $tenant->id, UserRole::User->value, $email->value, $passwordHash, $name->value, $codeId]);
+            )->execute([$tenant->id, $codeId, $tenant->id, $tenant->id, UserRole::User->value, $email->value, $passwordHash, $name->value, $codeId]);
             $id = (int) $this->pdo->lastInsertId();
 
             return new Registration($this->findById($id) ?? throw new \LogicException('Angelegtes Konto nicht gefunden.'), true);
@@ -802,6 +881,70 @@ final readonly class UserRepository
     }
 
     /**
+     * Prüfung des Aufrufers im gesperrten Stand (UserAdministration, F5); wirft bei einem Verstoß.
+     *
+     * @param (\Closure(User): void)|null $authorize
+     */
+    private static function authorize(User $user, ?\Closure $authorize): void
+    {
+        if ($authorize !== null) {
+            $authorize($user);
+        }
+    }
+
+    private static function kindOf(Role $role): UserRole
+    {
+        return $role->systemRole === SystemRole::Admin ? UserRole::Admin : UserRole::User;
+    }
+
+    /**
+     * @throws UserRuleViolationException Rolle Super-Admin
+     */
+    private function systemRoleFor(User $user, UserRole $kind): Role
+    {
+        $systemRole = match ($kind) {
+            UserRole::Admin => SystemRole::Admin,
+            UserRole::User => SystemRole::User,
+            UserRole::SuperAdmin => throw UserRuleViolationException::superAdminRole(),
+        };
+
+        return new RoleRepository($this->pdo)->findSystemRoleOfTenant(self::tenantIdOf($user), $systemRole)
+            ?? throw new \LogicException(sprintf('Standard-Rolle %s fehlt.', $systemRole->value));
+    }
+
+    /**
+     * @throws RoleNotFoundException
+     */
+    private function roleOf(User $user, int $roleId): Role
+    {
+        return new RoleRepository($this->pdo)->findOfTenant(self::tenantIdOf($user), $roleId)
+            ?? throw RoleNotFoundException::forId($roleId);
+    }
+
+    private static function tenantIdOf(User $user): int
+    {
+        return $user->tenantId ?? throw UserRuleViolationException::superAdminRole();
+    }
+
+    /**
+     * Setzt Rolle und Kontoart in derselben Anweisung (Regel Kontoart ↔ Rolle) und weitere Spalten.
+     * Wurde die Rolle inzwischen gelöscht, scheitert der Fremdschlüssel: wie unbekannt.
+     *
+     * @param string            $assignments SQL aus diesem Code, nie aus Eingaben
+     * @param list<string|null> $params
+     *
+     * @throws RoleNotFoundException
+     */
+    private function updateRole(int $id, Role $role, string $assignments, array $params): void
+    {
+        try {
+            $this->update($id, $assignments . ', role = ?, role_id = ?', [...$params, self::kindOf($role)->value, (string) $role->id]);
+        } catch (\PDOException $e) {
+            throw ($e->errorInfo[1] ?? null) === self::ER_NO_REFERENCED_ROW ? RoleNotFoundException::forId($role->id) : $e;
+        }
+    }
+
+    /**
      * @throws UserRuleViolationException
      */
     private static function assertNotProtected(User $user): void
@@ -935,6 +1078,8 @@ final readonly class UserRepository
             self::utc((string) $row['updated_at']),
             (int) $row['protected'] === 1,
             (int) $row['notify_device_log'] === 1,
+            $row['role_id'] === null ? null : (int) $row['role_id'],
+            $row['invitation_code_id'] === null ? null : (int) $row['invitation_code_id'],
         );
     }
 

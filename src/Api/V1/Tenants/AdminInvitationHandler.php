@@ -57,7 +57,7 @@ final readonly class AdminInvitationHandler implements RequestHandler
         $mailSent = AdminInvitationMail::send($context->notifier(), $context->urls, $invitation);
 
         return new JsonResponse(
-            ['user' => UserJson::user($invitation->user), 'mail_sent' => $mailSent],
+            ['user' => UserJson::forTenant($pdo, $invitation->tenant)($invitation->user), 'mail_sent' => $mailSent],
             $this->resend ? 200 : 201,
         );
     }

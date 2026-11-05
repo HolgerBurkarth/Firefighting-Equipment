@@ -67,11 +67,14 @@ final class UserAdministrationTest extends AuthTestCase
             'display_name' => 'Erika',
             'role' => 'user',
             'role_label' => 'Benutzer',
+            'role_id' => $this->systemRoleId($this->tenant('immendingen')->id, 'user'),
+            'role_name' => 'Benutzer',
             'status' => 'active',
             'status_label' => 'aktiv',
             'locked' => true,
             'email_verified_at' => '2026-01-01T12:00:00Z',
             'created_at' => $locked['created_at'],
+            'invitation_code' => null,
         ], $locked);
     }
 
@@ -169,7 +172,9 @@ final class UserAdministrationTest extends AuthTestCase
     {
         yield 'Super-Admin' => [['display_name' => 'Max', 'role' => 'superadmin'], 'Das Feld "role" muss "user" oder "admin" sein.'];
         yield 'Rolle groß' => [['display_name' => 'Max', 'role' => 'Admin'], 'Das Feld "role" muss "user" oder "admin" sein.'];
-        yield 'ohne Rolle' => [['display_name' => 'Max'], 'Das Feld "role" fehlt oder ist kein Text.'];
+        yield 'ohne Rolle' => [['display_name' => 'Max'], 'Das Feld "role_id" fehlt.'];
+        yield 'beide Felder' => [['display_name' => 'Max', 'role' => 'user', 'role_id' => 1], 'Bitte nur "role_id" angeben (nicht zusätzlich "role").'];
+        yield 'Rolle als Text' => [['display_name' => 'Max', 'role_id' => '1'], 'Das Feld "role_id" muss eine ganze Zahl von 1 bis 9223372036854775807 sein.'];
         yield 'leerer Anzeigename' => [['display_name' => ' ', 'role' => 'user'], 'Der Name darf nicht leer sein.'];
         yield 'ohne Anzeigename' => [['role' => 'user'], 'Das Feld "display_name" fehlt oder ist kein Text.'];
     }
@@ -292,7 +297,7 @@ final class UserAdministrationTest extends AuthTestCase
     public static function selfActions(): iterable
     {
         yield 'sich selbst sperren' => ['POST', 'lock', [], 'Sie können Ihr eigenes Konto nicht sperren.'];
-        yield 'sich selbst herabstufen' => ['POST', 'role', ['role' => 'user'], 'Sie können Ihrem eigenen Konto die Admin-Rolle nicht entziehen.'];
+        yield 'sich selbst herabstufen' => ['POST', 'role', ['role' => 'user'], 'Sie können Ihre eigene Rolle nicht ändern.'];
         yield 'sich selbst löschen' => ['DELETE', '', [], 'Sie können Ihr eigenes Konto nicht löschen.'];
     }
 

@@ -63,8 +63,10 @@ use FirefightingEquipment\Api\V1\Tenants\TenantCreateHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantListHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantSlugAvailabilityHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantUserListHandler;
+use FirefightingEquipment\Api\V1\Users\AssignableRoleListHandler;
 use FirefightingEquipment\Api\V1\Users\UserAction;
 use FirefightingEquipment\Api\V1\Users\UserActionHandler;
+use FirefightingEquipment\Api\V1\Users\UserBulkRoleHandler;
 use FirefightingEquipment\Api\V1\Users\UserListHandler;
 use FirefightingEquipment\Offline\OfflineSettings;
 use FirefightingEquipment\Permission\Action;
@@ -175,6 +177,8 @@ final class Routes
             ->add('POST', 'api/v1/invitation-codes', $write(Area::Users), new InvitationCodeCreateHandler())
             ->add('POST', 'api/v1/invitation-codes/{id}/revoke', $write(Area::Users), new InvitationCodeRevokeHandler())
             ->add('GET', 'api/v1/users', $read(Area::Users), new UserListHandler())
+            ->add('POST', 'api/v1/users/bulk/role', $write(Area::Users), new UserBulkRoleHandler())
+            ->add('GET', 'api/v1/roles', $read(Area::Users), new AssignableRoleListHandler())
             ->add('GET', 'api/v1/users/{id}', $read(Area::Users), new UserActionHandler(UserAction::Show))
             ->add('DELETE', 'api/v1/users/{id}', $write(Area::Users), new UserActionHandler(UserAction::Delete))
             ->add('POST', 'api/v1/users/{id}/approve', $write(Area::Users), new UserActionHandler(UserAction::Approve))

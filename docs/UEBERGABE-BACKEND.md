@@ -8,6 +8,42 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-05 – „Rollen: Rollen zuweisen, Freischalten und Einladungscodes mit Rolle im Backend (Phase 1, Schritt 1.6a)“
+
+Plan Phase 1, Abschnitt 5 „Zuweisung durch den Admin“ und „Einladungscodes mit Rolle“, Vorgaben Holger
+(05.11.2026: Schutzregeln F5, F1, F6). Nur Erweiterungen; alte Apps senden weiter `role` und lesen
+`role`.
+
+- `GET roles` (neu, `users` Ansehen) → `{roles, catalog}`: je Rolle der Stadt die Felder wie beim
+  Super-Admin (`RoleJson::role` mit `usage`) und `assignable`, `assign_blocker` (Meldung, warum das
+  Konto der Sitzung sie nicht vergeben darf, sonst `null`); `catalog` wie `GET permission-catalog`.
+- `POST users/{id}/role {role_id}` und `POST users/{id}/approve {display_name, role_id}`: `role_id` =
+  Rolle der Stadt (unbekannt/fremd 400 „Die Rolle #N gibt es nicht. (Feld "role_id")“); `role`
+  (`user`/`admin`) bleibt erlaubt, beides zusammen 400, keines 400 „Das Feld "role_id" fehlt.“
+  (bisher „Das Feld "role" fehlt …“).
+- `POST users/bulk/role {user_ids, role_id}` (neu, `users` Ändern): 1–50 Konten, je Konto eigene
+  Transaktion, Antwort `{results: [{id, outcome, user, error}], summary {total, applied, unchanged,
+  errors}}` wie die Sammelaktionen der Geräte.
+- `UserJson` (alle Antworten mit Konten, auch beim Super-Admin): neu `role_id`, `role_name`,
+  `invitation_code {id, label}`.
+- `POST invitation-codes`: neu optional `role_id` (Rolle nach der Freischaltung; *Admin* 400 mit dem
+  Text aus dem Mockup, nicht vergebbar 409); `GET invitation-codes` und die Antwort: neu `role {id,
+  name}` (ohne Rolle am Code *Benutzer*). `POST auth/register` gibt dem Konto die Rolle des Codes.
+- Verhalten: Ein Rollenwechsel beendet die Sitzungen nur, wenn *Admin* dazukommt oder wegfällt (F1;
+  bisher immer, damals gab es nur diese beiden). Ohne `mail.log` in der neuen Rolle geht die
+  Benachrichtigung „Log“ aus. Eigene Rolle ändern: neue Meldung „Sie können Ihre eigene Rolle nicht
+  ändern.“ (bisher „… die Admin-Rolle nicht entziehen.“).
+- Schutzregeln F5 (409 `rule_violation`): *Admin* vergeben/entziehen und Konten mit *Admin* ändern,
+  sperren, entsperren, löschen nur *Admin*; Rolle zuweisen, freischalten, Code mit Rolle nur mit allen
+  Rechten der Rolle (Datenfilter innerhalb des eigenen); Konto ändern nur mit allen Rechten seiner
+  bisherigen Rolle. Für *Admin* ändert sich nichts.
+
+Tests: `UserRoleAssignmentApiTest` (neu), `PermissionsTest` (`covers`, `includes`),
+`UserAdministrationTest`, `UserAdministrationRepositoryTest`, `InvitationCodeEndpointsTest`,
+`TenantRoutePermissionsTest` und `AdminRoutesAccessTest` (neue Routen). `CLAUDE.md` "Benutzerverwaltung
+durch den Admin", "Einladung, Registrierung und E-Mail-Bestätigung", "Benutzerverwaltung im Code",
+"Benutzer und Anmeldung" (Sitzungsdauer).
+
 ## 2026-11-05 – „Rollen: Name der Kopie „(Kopie 2)“, höchstens 50 Zeichen“
 
 `POST tenants/{id}/roles {copy_of}` ohne `name` (nur unter `service`): Die Kopie heißt „<Name> (Kopie)“,

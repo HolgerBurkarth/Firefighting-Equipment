@@ -30,6 +30,7 @@ final class InvitationJson
             'expires_at' => AuthJson::time($code->expiresAt),
             'created_at' => AuthJson::time($code->createdAt),
             'revoked_at' => $code->revokedAt === null ? null : AuthJson::time($code->revokedAt),
+            'role' => $code->roleId === null ? null : ['id' => $code->roleId, 'name' => $code->roleName],
             'created_by' => [
                 'id' => $code->createdBy,
                 'label' => $creator?->label() ?? sprintf('#%d', $code->createdBy),

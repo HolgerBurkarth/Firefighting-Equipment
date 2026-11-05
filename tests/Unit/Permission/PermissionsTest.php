@@ -7,6 +7,7 @@ namespace FirefightingEquipment\Tests\Unit\Permission;
 use FirefightingEquipment\Permission\Action;
 use FirefightingEquipment\Permission\Area;
 use FirefightingEquipment\Permission\AreaLevel;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Permission\FieldRule;
 use FirefightingEquipment\Permission\Need;
 use FirefightingEquipment\Permission\Permissions;
@@ -26,6 +27,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(AreaLevel::class)]
 #[CoversClass(Action::class)]
 #[UsesClass(Role::class)]
+#[UsesClass(DeviceVisibility::class)]
 final class PermissionsTest extends TestCase
 {
     public function testCatalogValuesFitDatabaseFormat(): void
@@ -153,6 +155,61 @@ final class PermissionsTest extends TestCase
     {
         $this->expectException(\LogicException::class);
         Need::area(Area::Dashboard, AreaLevel::Write);
+    }
+
+    /** F5 (Schritt 1.6): wer eine Rolle zuweist, braucht alle ihre wirksamen Rechte. */
+    public function testCoversComparesEffectiveRights(): void
+    {
+        $manager = Permissions::of([[Area::Users, AreaLevel::Write], [Area::Search, AreaLevel::Read], [Area::Due, AreaLevel::Read]], [Action::BookMove, Action::BookStatus]);
+        $user = Permissions::fromRows(DefaultRoles::USER_AREAS, DefaultRoles::USER_ACTIONS);
+
+        self::assertTrue(Permissions::all()->covers($manager));
+        self::assertTrue($manager->covers($user));
+        self::assertTrue($manager->covers($manager));
+        self::assertFalse($user->covers($manager), 'users fehlt');
+        self::assertFalse($manager->covers(Permissions::all()), 'nur Admin gibt Admin');
+        self::assertFalse($manager->covers(Permissions::of([[Area::Due, AreaLevel::Write]], [])), 'Stufe');
+        self::assertFalse($manager->covers(Permissions::of([[Area::Search, AreaLevel::Read]], [Action::MailLog])), 'Aktion');
+        self::assertTrue($manager->covers(Permissions::of([], [Action::DeviceEdit])), 'Aktion ohne ihren Bereich wirkt nicht');
+
+        $allCatalog = Permissions::of(
+            array_map(static fn (Area $area): array => [$area, $area->maxLevel()], Area::cases()),
+            Action::cases(),
+        );
+        self::assertFalse($allCatalog->covers(Permissions::all()), 'jedes Recht des Katalogs ist noch nicht Admin');
+        self::assertTrue($allCatalog->covers($manager));
+    }
+
+    public function testCoversNeedsFilterWithinOwn(): void
+    {
+        $plain = Permissions::of([[Area::Search, AreaLevel::Read]], []);
+        $hlf = $plain->ofRole(2, 1, DeviceVisibility::restricted([10, 11], null));
+        $hlfOnly = $plain->ofRole(3, 1, DeviceVisibility::restricted([10], null));
+        $lager = $plain->ofRole(4, 1, DeviceVisibility::restricted([20], null));
+        $type = $plain->ofRole(5, 1, DeviceVisibility::restricted(null, [7]));
+
+        self::assertTrue($plain->covers($hlf));
+        self::assertTrue($hlf->covers($hlfOnly));
+        self::assertFalse($hlfOnly->covers($hlf));
+        self::assertFalse($hlf->covers($lager));
+        self::assertFalse($hlf->covers($plain), 'ohne Filter sieht mehr');
+        self::assertFalse($type->covers($hlf), 'Typfilter ohne Standortfilter');
+        self::assertTrue(DeviceVisibility::restricted([10, 11], [7])->includes(DeviceVisibility::restricted([11], [7])));
+        self::assertFalse(DeviceVisibility::restricted([10, 11], [7])->includes(DeviceVisibility::restricted([11], null)));
+        self::assertTrue(DeviceVisibility::all()->includes(DeviceVisibility::none()));
+    }
+
+    public function testFromRoleWithFilterCarriesFilterOfRole(): void
+    {
+        $now = new \DateTimeImmutable('2026-11-05 12:00:00', new \DateTimeZone('UTC'));
+        $role = new Role(9, 1, null, 'HLF', null, false, true, false, ['users' => 'write', 'search' => 'read'], [], [10], [], 3, $now, $now);
+
+        $permissions = Permissions::fromRoleWithFilter($role);
+
+        self::assertTrue($permissions->isFiltered());
+        self::assertFalse($permissions->allows(Area::Users, AreaLevel::Read), 'F3');
+        self::assertSame('9:3', $permissions->revision());
+        self::assertTrue(Permissions::fromRoleWithFilter(self::role(SystemRole::Admin, [], []))->isAll());
     }
 
     /**

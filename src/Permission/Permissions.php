@@ -67,6 +67,41 @@ final readonly class Permissions
     }
 
     /**
+     * Wie fromRole(), mit dem Datenfilter der Rolle (Standorte der Ebene 1 ohne ihre Fächer; genügt
+     * für covers() und F3, nicht für Abfragen).
+     */
+    public static function fromRoleWithFilter(Role $role): self
+    {
+        return self::fromRole($role)->ofRole($role->id, $role->version, DeviceVisibility::restricted(
+            $role->filterLocations ? $role->locationIds : null,
+            $role->filterDeviceTypes ? $role->deviceTypeIds : null,
+        ));
+    }
+
+    /**
+     * Ob diese Rechte alle von $other enthalten (Plan Phase 1, Abschnitt 5, F5: wer eine Rolle
+     * zuweist, braucht alle ihre Rechte, ihr Datenfilter liegt in seinem). Verglichen werden die
+     * wirksamen Rechte (F3, Aktionen nur mit ihrem Bereich). Alle Rechte (Rolle Admin) enthält nur
+     * die Rolle Admin, auch wenn eine andere Rolle heute jedes Recht des Katalogs hat.
+     */
+    public function covers(self $other): bool
+    {
+        if ($this->all) {
+            return true;
+        }
+        if ($other->all || !$this->visibility->includes($other->visibility)) {
+            return false;
+        }
+        foreach ($other->areas() as $area => $level) {
+            if (!$this->allows(Area::from($area), $level)) {
+                return false;
+            }
+        }
+
+        return array_all($other->actions(), $this->can(...));
+    }
+
+    /**
      * Aus den Zeilen von fe_role_areas/fe_role_actions; unbekannte Werte geben kein Recht.
      *
      * @param array<string, string> $areas   Bereich → Stufe

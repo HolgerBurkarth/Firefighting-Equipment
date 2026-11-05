@@ -1551,8 +1551,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `superadmin` 1 Stunde / 12 Stunden. Die Standard-Rollen behalten damit die Dauer von `admin` bzw.
   `user` (per Test). Beide Grenzen werden bei jeder Anfrage aus der Klasse der aktuellen Rechte,
   `created_at` und `last_seen_at` berechnet (eine strengere Rolle gilt sofort; `expires_at` setzt die
-  Klasse beim Anmelden). Passwortänderung, Rollenwechsel, Sperren oder Löschen beenden alle
-  Sitzungen des Kontos.
+  Klasse beim Anmelden). Passwortänderung, Sperren oder Löschen beenden alle Sitzungen des Kontos,
+  ein Rollenwechsel nur, wenn die Rolle *Admin* dazukommt oder wegfällt (Kontoart `admin` ↔ `user`,
+  F1, seit Schritt 1.6); jeder andere Wechsel wirkt ab der nächsten Anfrage.
   - Präzisierung für das Ändern des eigenen Passworts (`POST auth/password`): Alle anderen
     Sitzungen werden beendet; die aktuelle wird durch eine neue ersetzt (neues Token, neues Cookie,
     gleiche Gerätebezeichnung). Angemeldet bleibt also nur das Gerät, auf dem geändert wurde. Ein
@@ -1617,7 +1618,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   andere Städte unberührt). Danach Regeln prüfen, dann schreiben.
   - Der letzte aktive (`status = active`), nicht gesperrte Admin einer Stadt bzw. Super-Admin wird
     nicht gesperrt, herabgestuft oder anonymisiert (`UserRuleViolationException`).
-  - Die Rolle `superadmin` wird per `changeRole` weder vergeben noch entzogen. `setPassword` nicht
+  - Die Rolle `superadmin` wird per `changeRole`/`assignRole` weder vergeben noch entzogen. `setPassword` nicht
     für `invited` (eigener Ablauf). Gelöschte Konten werden nicht mehr geändert.
   - Super-Admins: `anonymize` immer abgelehnt (`superAdminNotDeletable`). Geschützte Konten:
     `lock`, `changeRole`, `changeDisplayName` abgelehnt (`protectedAccount`); `protect` nur für
@@ -1626,8 +1627,16 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     `mail.log` hat (`deviceLogNotAllowed`), Ausschalten immer (nicht bei gelöschten).
     `listDeviceLogRecipients(Tenant)`: aktiv, nicht gesperrt, Option an; Konten dieser Stadt, deren
     Rolle `mail.log` hat (`PermissionRepository::grantsActionSql`), dann alle Super-Admins (nach ID).
-  - Sperren, Rollenwechsel, Passwort setzen und Anonymisieren löschen alle `fe_sessions` des
-    Kontos; Anonymisieren zusätzlich alle `fe_user_tokens`. Abgelehnte Änderungen lassen alles
+  - Sperren, Passwort setzen und Anonymisieren löschen alle `fe_sessions` des Kontos, ein
+    Rollenwechsel nur beim Wechsel der Kontoart (F1); Anonymisieren zusätzlich alle `fe_user_tokens`.
+  - Rolle zuweisen (Schritt 1.6): `assignRole(id, roleId, authorize?)` (Rolle der Stadt des Kontos,
+    sonst `RoleNotFoundException`; Kontoart folgt der Rolle, `updateRole` setzt `role` und `role_id`
+    in derselben Anweisung; ohne `mail.log` in der neuen Rolle `notify_device_log = 0`; letzter Admin
+    nur beim Wechsel weg von *Admin*), `changeRole(id, UserRole)` = Standard-Rolle der Kontoart,
+    `approveWithRole(id, name, roleId, authorize?)` neben `approve(id, name, UserRole)`. `lock`,
+    `unlock`, `changeDisplayName`, `anonymize` nehmen ebenfalls `authorize` (Prüfung des Aufrufers
+    im gesperrten Stand, `UserAdministration`). Registrierung: Rolle des Codes, ohne Rolle am Code
+    *Benutzer* (Kontoart `user`). Abgelehnte Änderungen lassen alles
     unverändert (Rollback).
   - Keine Methode zum `DELETE` von Benutzern hinzufügen.
   - Ausnahme ohne Sperre der Stadt: `rehashPassword` (nur nach erfolgreicher Anmeldung) schreibt
@@ -1818,9 +1827,12 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `InvitationCodeStatus`, `InvitationCodeRepository`), Endpunkte in `src/Api/V1/Invitation/` und
   `src/Api/V1/Auth/` (`RegisterHandler`, `EmailVerifyHandler`, `EmailResendHandler`), Bremse
   `RegistrationThrottle`.
-- Einladungscodes (Admin): `POST invitation-codes {label?, valid_days 1–90, max_uses 1–500}` → 201
-  mit `code` (Klartext `XXXX-XXXX-XXXX`, nur in dieser Antwort; leere Bezeichnung = keine),
-  `GET invitation-codes` (neueste zuerst, nie Klartext oder Hash), `POST invitation-codes/{id}/revoke
+- Einladungscodes (Admin): `POST invitation-codes {label?, valid_days 1–90, max_uses 1–500,
+  role_id?}` → 201 mit `code` (Klartext `XXXX-XXXX-XXXX`, nur in dieser Antwort; leere Bezeichnung =
+  keine; `role_id` seit Schritt 1.6 = Rolle nach der Freischaltung, ohne = *Benutzer* (gespeichert
+  NULL), *Admin* oder unbekannt → 400 (`InvitationCodeCreateHandler::ADMIN_ROLE_MESSAGE`), Rolle über
+  den eigenen Rechten → 409), `GET invitation-codes` (neueste zuerst, nie Klartext oder Hash; je Code
+  `role {id, name}`, ohne Rolle am Code *Benutzer*), `POST invitation-codes/{id}/revoke
   {}` (wiederholbar; fremd/unbekannt 404). Status wird berechnet (Zeitvergleich in der Datenbank),
   Vorrang: `revoked`, `exhausted`, `expired`, `active`. Codes bleiben gültig, wenn ihr Ersteller
   gesperrt oder gelöscht wird.
@@ -1829,7 +1841,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `PasswordPolicy` mit E-Mail, Name und Stadt (422, wird nicht gezählt), dann
   `UserRepository::register` in einer Transaktion: Stadt sperren, Code `FOR UPDATE` erneut prüfen,
   bei schon vergebener E-Mail nichts ändern (keine Nutzung), sonst `use_count + 1` und Konto
-  `unverified`/`user` anlegen. Neues Konto: Link `verify_email` (24 h), Mail
+  `unverified`/`user` mit der Rolle des Codes (ohne Rolle *Benutzer*) anlegen. Neues Konto: Link `verify_email` (24 h), Mail
   `<base_url>/firefighting/<kürzel>/email-bestaetigen#token=…`. Vorhandene E-Mail: Hinweis-Mail an
   den Besitzer. Beides gleiche Antwort (202, Argon2id in beiden Fällen, je eine Mail, Mindestdauer
   1,5 s, Überschreitung als `registration_slow` im Protokoll).
@@ -1853,21 +1865,46 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Freischaltung) enthalten den Hinweis, `feuerwehr-app@prodad.de` zu den Kontakten hinzuzufügen.
 
 ## Benutzerverwaltung durch den Admin
-- Nur Admins, nur Konten der eigenen Stadt (`Access::Admin`; Admin einer anderen Stadt und
-  Super-Admin unter einem Stadt-Pfad: 401, `user`: 403). Code: `UserAdministration` (Stadt-Bezug:
-  fremde/unbekannte IDs → `UserNotFoundException` → 404; Selbstschutz) über `UserRepository` (alle
-  Regeln dort gelten weiter), Endpunkte `src/Api/V1/Users/` (`UserListHandler`,
-  `UserActionHandler` mit `UserAction`, `UserJson`).
+- Lesen `users` Ansehen, Ändern `users` Ändern (bisher nur *Admin*; F3: nie mit Datenfilter), nur
+  Konten der eigenen Stadt (Konto einer anderen Stadt und Super-Admin unter einem Stadt-Pfad: 401,
+  ohne Recht 403). Code: `UserAdministration` (Stadt-Bezug: fremde/unbekannte IDs →
+  `UserNotFoundException` → 404; Selbstschutz; Schutzregeln F5, siehe unten) über `UserRepository`
+  (alle Regeln dort gelten weiter), Endpunkte `src/Api/V1/Users/` (`UserListHandler`,
+  `UserActionHandler` mit `UserAction`, `UserBulkRoleHandler`, `AssignableRoleListHandler`,
+  `UserJson`).
 - `GET users[?status=…]` (ohne Filter alle außer `deleted`; unbekannter Status 400),
-  `GET users/{id}`, `POST users/{id}/approve {display_name, role}` (nur `pending` → `active`, Rolle
-  `user`/`admin`; Mail "Ihr Konto wurde freigeschaltet"), `POST users/{id}/reject {}` (nur
-  `unverified`/`pending`; anonymisiert, danach Mail "Ihre Registrierung wurde nicht freigegeben" an
-  die vorher gespeicherte Adresse), `POST users/{id}/lock`/`unlock {}`, `POST users/{id}/role
-  {role}`, `POST users/{id}/display-name {display_name}`, `DELETE users/{id} {}` (anonymisieren).
-  Antwort immer `{"user": …}` mit dem Stand danach.
-- Ein Admin darf sich nicht selbst sperren, herabstufen (eigene Rolle ändern) oder löschen →
-  409 `rule_violation`; ebenso Regelverstöße des Repositorys (letzter Admin, falscher Status,
-  gelöschtes Konto). Unveränderte Rolle und eigener Anzeigename sind erlaubt.
+  `GET users/{id}`, `POST users/{id}/approve {display_name, role_id}` (nur `pending` → `active`; Mail
+  "Ihr Konto wurde freigeschaltet"), `POST users/{id}/reject {}` (nur `unverified`/`pending`;
+  anonymisiert, danach Mail "Ihre Registrierung wurde nicht freigegeben" an die vorher gespeicherte
+  Adresse), `POST users/{id}/lock`/`unlock {}`, `POST users/{id}/role {role_id}`, `POST
+  users/{id}/display-name {display_name}`, `DELETE users/{id} {}` (anonymisieren). Antwort immer
+  `{"user": …}` mit dem Stand danach. Rolle bei `approve` und `role`: `role_id` (Rolle der Stadt,
+  unbekannt oder fremd 400) oder für alte Apps wie bisher `role` (`user`/`admin` = Standard-Rolle;
+  bleibt mindestens einen Deploy), nicht beides (400), keines → 400 „Das Feld "role_id" fehlt.“.
+- `UserJson` (auch Super-Admin, `UserJson::forTenant` lädt Namen der Rollen und Bezeichnungen der
+  Codes einmal): zusätzlich `role_id`, `role_name` (Rolle der Stadt; `role` bleibt die Kontoart) und
+  `invitation_code {id, label}` (Code der Registrierung, sonst `null`).
+- `GET roles` (`users` Ansehen, Schritt 1.6): `{roles, catalog}`; je Rolle die Felder von
+  `RoleJson::role` (mit `usage`) und `assignable`/`assign_blocker` (darf das Konto der Sitzung sie
+  vergeben, sonst die Meldung), `catalog` = `GET permission-catalog` des Super-Admins.
+- `POST users/bulk/role {user_ids, role_id}` (`users` Ändern, F6): 1 bis
+  `UserBulkRoleHandler::MAX_USERS` (50) Konten, ohne doppelte, unbekannte Felder 400; Rolle
+  unbekannt 400 bzw. nicht vergebbar 409, beides vor jeder Änderung. Je Konto eine eigene
+  Transaktion wie `POST users/{id}/role`; Antwort immer 200 `{results: [{id, outcome
+  (applied|unchanged|error), user, error}], summary {total, applied, unchanged, errors}}` wie die
+  Sammelaktionen der Geräte (`user` = Stand danach bzw. aktueller, `null` bei fremder/unbekannter
+  ID; `error` = `{error, message}`).
+- Niemand sperrt oder löscht sich selbst oder ändert die eigene Rolle → 409 `rule_violation`;
+  ebenso Regelverstöße des Repositorys (letzter Admin, falscher Status, gelöschtes Konto).
+  Unveränderte Rolle und eigener Anzeigename sind erlaubt.
+- Schutzregeln F5 (Plan Phase 1, Schritt 1.6; je 409 `rule_violation`, geprüft im gesperrten Stand,
+  per Test mit einer Rolle „Personal“ mit `users` Ändern ohne *Admin*): Die Rolle *Admin* vergibt
+  oder entzieht nur *Admin*; Konten mit *Admin* sperrt, entsperrt, löscht oder benennt nur *Admin*
+  um. Wer eine Rolle zuweist, freischaltet oder einen Code mit Rolle anlegt, braucht alle ihre
+  wirksamen Rechte und ihr Datenfilter liegt in seinem (`Permissions::covers`,
+  `Permissions::fromRoleWithFilter`, `DeviceVisibility::includes`; *Admin* deckt alles, sonst deckt
+  nichts *Admin*). Wer eine Rolle ändert, sperrt, löscht oder umbenennt, braucht auch alle Rechte
+  der bisherigen Rolle des Kontos (sonst ließe sich jemandem mit mehr Rechten die Rolle nehmen).
 
 ## Rollen und Rechte (Phase 1, im Aufbau)
 - Plan und Entscheidungen: `docs/PLAN-PHASE-1-ROLLEN.md` (freigegeben 05.11.2026; Schritte 1.1–1.9).
@@ -1876,9 +1913,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `permissions`, Sitzungsdauer und Log-Mails aus den Rechten, Migrationen 0039/0040) und 1.4
   (Datenfilter „Sieht nur …“ in allen Abfragen und Mails), 1.5a (Verwaltung der Rollen durch den
   Super-Admin im Backend, siehe unten) und 1.5b (Seiten „Rollen“ und „Rolle bearbeiten“, siehe
-  "Frontend"). Für *Admin* und *Benutzer* verhält sich jede Route wie vorher
-  (per Test), ebenso Sitzungsdauer und Empfänger der Log-Mails; neu ist nur das Feld `selectable` der
-  Standorte. Konten bekommen eigene Rollen erst mit Schritt 1.6 (Zuweisung durch den Admin).
+  "Frontend"), 1.6a (Rollen zuweisen im Backend, siehe "Benutzerverwaltung durch den Admin").
+  Für *Admin* und *Benutzer* verhält sich jede Route wie vorher (per Test), ebenso Sitzungsdauer und
+  Empfänger der Log-Mails; neu sind das Feld `selectable` der Standorte, Felder und Routen der
+  Benutzerverwaltung und dass ein Rollenwechsel ohne *Admin* die Sitzungen nicht beendet (F1).
 - Datenfilter (Schritt 1.4, Plan Abschnitt 4 mit den Festlegungen vom 05.11.2026):
   `Permission\DeviceVisibility` (je Art `null` = alle, sonst erlaubte IDs; ein Standort der Ebene 1
   schließt seine Fächer ein, auch später angelegte; eingeschaltet ohne Auswahl = nichts; Gerät

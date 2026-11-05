@@ -125,7 +125,7 @@ final class InvitationCodeEndpointsTest extends AuthTestCase
         self::assertSame(['id' => $other, 'label' => sprintf('Gelöschter Benutzer #%d', $other)], $codes[2]['created_by']);
         foreach ($codes as $code) {
             self::assertSame(
-                ['id', 'label', 'status', 'status_label', 'use_count', 'max_uses', 'expires_at', 'created_at', 'revoked_at', 'created_by'],
+                ['id', 'label', 'status', 'status_label', 'use_count', 'max_uses', 'expires_at', 'created_at', 'revoked_at', 'role', 'created_by'],
                 array_keys($code),
                 'nie Klartext oder Hash',
             );

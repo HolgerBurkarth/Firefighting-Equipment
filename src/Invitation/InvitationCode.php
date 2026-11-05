@@ -25,6 +25,9 @@ final readonly class InvitationCode
         public \DateTimeImmutable $createdAt,
         /** Berechnet beim Laden (Zeitvergleich in der Datenbank) */
         public InvitationCodeStatus $status,
+        /** Rolle nach der Freischaltung: gespeicherte Rolle, ohne sie die Standard-Rolle Benutzer */
+        public ?int $roleId = null,
+        public ?string $roleName = null,
     ) {
     }
 }

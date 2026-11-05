@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tests\Integration\User;
 
+use FirefightingEquipment\Permission\Permissions;
+use FirefightingEquipment\Role\RoleRepository;
 use FirefightingEquipment\Tests\Integration\Auth\AuthTestCase;
 use FirefightingEquipment\User\PersonName;
 use FirefightingEquipment\User\User;
@@ -92,7 +94,7 @@ final class UserAdministrationRepositoryTest extends AuthTestCase
     {
         $actor = $this->admin('immendingen', 'admin@example.org');
         $foreign = $this->account('tuttlingen', 'user@example.org');
-        $admin = new UserAdministration($this->users, $this->tenant('immendingen'), $actor);
+        $admin = $this->administration($actor);
 
         $this->expectException(UserNotFoundException::class);
         $admin->lock($foreign);
@@ -107,12 +109,17 @@ final class UserAdministrationRepositoryTest extends AuthTestCase
         $actor = $this->admin('immendingen', 'admin@example.org');
         $other = $this->account('immendingen', 'admin2@example.org', ['role' => 'admin']);
         $this->users->lock($actor->id);
-        $admin = new UserAdministration($this->users, $this->tenant('immendingen'), $actor);
+        $admin = $this->administration($actor);
 
         $this->assertViolation(fn () => $admin->lock($other));
-        $this->assertViolation(fn () => $admin->changeRole($other, UserRole::User));
+        $this->assertViolation(fn () => $admin->assignRole($other, (int) $this->systemRoleId($this->tenant('immendingen')->id, 'user')));
         $this->assertViolation(fn () => $admin->delete($other));
         self::assertTrue($this->users->findById($other)?->isActiveAdministrator());
+    }
+
+    private function administration(User $actor): UserAdministration
+    {
+        return new UserAdministration($this->users, new RoleRepository($this->pdo()), $this->tenant('immendingen'), $actor, Permissions::all());
     }
 
     private function admin(string $slug, string $email): User

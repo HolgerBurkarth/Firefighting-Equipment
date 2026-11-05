@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Invitation;
 
+use FirefightingEquipment\Role\RoleNotFoundException;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -18,9 +19,13 @@ final readonly class InvitationCodeRepository
     public const int MAX_USES = 500;
 
     private const int ER_DUP_ENTRY = 1062;
+    private const int ER_NO_REFERENCED_ROW = 1452;
     private const int MAX_INSERT_ATTEMPTS = 3;
-    private const string COLUMNS = 'id, tenant_id, label, max_uses, use_count, expires_at, revoked_at, created_by,'
-        . ' created_at, expires_at <= UTC_TIMESTAMP() AS expired';
+    private const string COLUMNS = 'c.id, c.tenant_id, c.label, c.max_uses, c.use_count, c.expires_at, c.revoked_at,'
+        . ' c.created_by, c.created_at, c.expires_at <= UTC_TIMESTAMP() AS expired, r.id AS role_id, r.name AS role_name';
+    /** Code mit seiner Rolle; ohne Rolle am Code die Standard-Rolle Benutzer (Plan Phase 1, Schritt 1.6). */
+    private const string FROM = "fe_invitation_codes c LEFT JOIN fe_roles r ON r.tenant_id = c.tenant_id"
+        . " AND (r.id = c.role_id OR (c.role_id IS NULL AND r.system_key = 'user'))";
     /** Bedingung für einen nutzbaren Code (Zeitvergleich in der Datenbank; auch RoleRepository). */
     public const string USABLE = 'revoked_at IS NULL AND use_count < max_uses AND expires_at > UTC_TIMESTAMP()';
 
@@ -31,13 +36,16 @@ final readonly class InvitationCodeRepository
     /**
      * Legt einen Code an. Der Klartext steht nur im Ergebnis und wird nirgends gespeichert.
      *
-     * @param int $createdBy Admin derselben Stadt (prüft auch der Fremdschlüssel)
+     * @param int      $createdBy Konto derselben Stadt (prüft auch der Fremdschlüssel)
+     * @param int|null $roleId    Rolle nach der Freischaltung (derselben Stadt, nie Admin; prüft der
+     *                            Aufrufer), null = Standard-Rolle Benutzer
      *
      * @return array{InvitationCode, InvitationCodeValue}
      *
      * @throws InvalidInvitationValueException Gültigkeit oder Nutzungen außerhalb der Grenzen
+     * @throws RoleNotFoundException           Rolle inzwischen gelöscht (Fremdschlüssel)
      */
-    public function create(Tenant $tenant, int $createdBy, ?InvitationCodeLabel $label, int $validDays, int $maxUses): array
+    public function create(Tenant $tenant, int $createdBy, ?InvitationCodeLabel $label, int $validDays, int $maxUses, ?int $roleId = null): array
     {
         if ($validDays < 1 || $validDays > self::MAX_VALID_DAYS) {
             throw new InvalidInvitationValueException(sprintf('Die Gültigkeit muss 1 bis %d Tage betragen.', self::MAX_VALID_DAYS));
@@ -53,10 +61,13 @@ final readonly class InvitationCodeRepository
                 // Beide UTC_TIMESTAMP() einer Anweisung liefern denselben Wert (CHECK: höchstens 90 Tage).
                 $this->pdo->prepare(
                     'INSERT INTO fe_invitation_codes (tenant_id, code_hash, label, max_uses, use_count, expires_at,'
-                    . ' created_by, created_at) VALUES (?, ?, ?, ?, 0, UTC_TIMESTAMP() + INTERVAL ? DAY, ?, UTC_TIMESTAMP())',
-                )->execute([$tenant->id, $value->hash(), $label?->value, $maxUses, $validDays, $createdBy]);
+                    . ' created_by, created_at, role_id) VALUES (?, ?, ?, ?, 0, UTC_TIMESTAMP() + INTERVAL ? DAY, ?, UTC_TIMESTAMP(), ?)',
+                )->execute([$tenant->id, $value->hash(), $label?->value, $maxUses, $validDays, $createdBy, $roleId]);
                 break;
             } catch (\PDOException $e) {
+                if ($roleId !== null && ($e->errorInfo[1] ?? null) === self::ER_NO_REFERENCED_ROW) {
+                    throw RoleNotFoundException::forId($roleId);
+                }
                 if (($e->errorInfo[1] ?? null) !== self::ER_DUP_ENTRY || $attempt >= self::MAX_INSERT_ATTEMPTS) {
                     throw $e;
                 }
@@ -74,7 +85,7 @@ final readonly class InvitationCodeRepository
      */
     public function listByTenant(Tenant $tenant): array
     {
-        $stmt = $this->pdo->prepare('SELECT ' . self::COLUMNS . ' FROM fe_invitation_codes WHERE tenant_id = ? ORDER BY id DESC');
+        $stmt = $this->pdo->prepare('SELECT ' . self::COLUMNS . ' FROM ' . self::FROM . ' WHERE c.tenant_id = ? ORDER BY c.id DESC');
         $stmt->execute([$tenant->id]);
 
         return array_map(self::hydrate(...), $stmt->fetchAll());
@@ -82,7 +93,7 @@ final readonly class InvitationCodeRepository
 
     public function findByTenantAndId(Tenant $tenant, int $id): ?InvitationCode
     {
-        $stmt = $this->pdo->prepare('SELECT ' . self::COLUMNS . ' FROM fe_invitation_codes WHERE id = ? AND tenant_id = ?');
+        $stmt = $this->pdo->prepare('SELECT ' . self::COLUMNS . ' FROM ' . self::FROM . ' WHERE c.id = ? AND c.tenant_id = ?');
         $stmt->execute([$id, $tenant->id]);
         $row = $stmt->fetch();
 
@@ -163,6 +174,8 @@ final readonly class InvitationCodeRepository
             (int) $row['created_by'],
             self::utc((string) $row['created_at']),
             InvitationCodeStatus::of($row['revoked_at'] !== null, $useCount, $maxUses, (bool) $row['expired']),
+            $row['role_id'] === null ? null : (int) $row['role_id'],
+            $row['role_name'] === null ? null : (string) $row['role_name'],
         );
     }
 

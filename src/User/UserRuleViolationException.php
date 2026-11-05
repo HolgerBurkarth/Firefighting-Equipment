@@ -86,9 +86,32 @@ final class UserRuleViolationException extends UserException
         return new self('Sie können Ihr eigenes Konto nicht sperren.');
     }
 
-    public static function selfDemote(): self
+    public static function selfRole(): self
     {
-        return new self('Sie können Ihrem eigenen Konto die Admin-Rolle nicht entziehen.');
+        return new self('Sie können Ihre eigene Rolle nicht ändern.');
+    }
+
+    public static function adminRoleOnlyByAdmins(): self
+    {
+        return new self('Die Rolle „Admin“ vergeben und entziehen nur Admins.');
+    }
+
+    public static function adminOnlyByAdmins(): self
+    {
+        return new self('Konten mit der Rolle „Admin“ ändern, sperren und löschen nur Admins.');
+    }
+
+    public static function roleBeyondOwnRights(string $role): self
+    {
+        return new self(sprintf('Die Rolle „%s“ hat Rechte, die Ihre eigene Rolle nicht hat; Sie können sie daher nicht vergeben.', $role));
+    }
+
+    public static function accountBeyondOwnRights(string $role): self
+    {
+        return new self(sprintf(
+            'Das Konto hat die Rolle „%s“ mit Rechten, die Ihre eigene Rolle nicht hat; Sie können es daher nicht ändern.',
+            $role,
+        ));
     }
 
     public static function selfDelete(): self

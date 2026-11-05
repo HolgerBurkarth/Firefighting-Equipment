@@ -10,22 +10,29 @@ use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
 use FirefightingEquipment\Mail\MailMessage;
 use FirefightingEquipment\Mail\MailTemplates;
+use FirefightingEquipment\Role\RoleNotFoundException;
+use FirefightingEquipment\Role\RoleRepository;
+use FirefightingEquipment\Role\SystemRole;
+use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\InvalidUserValueException;
 use FirefightingEquipment\User\PersonName;
 use FirefightingEquipment\User\UserAdministration;
 use FirefightingEquipment\User\UserNotFoundException;
 use FirefightingEquipment\User\UserRepository;
-use FirefightingEquipment\User\UserRole;
 use FirefightingEquipment\User\UserRuleViolationException;
 
 /**
- * Benutzerverwaltung (Admin) auf ein Konto der eigenen Stadt, siehe UserAction. Antwort immer
- * {"user": …} mit dem Stand danach (gelöschte bzw. abgelehnte Konten anonymisiert).
+ * Benutzerverwaltung auf ein Konto der eigenen Stadt, siehe UserAction. Antwort immer {"user": …}
+ * mit dem Stand danach (gelöschte bzw. abgelehnte Konten anonymisiert).
  *
- * Fremde oder unbekannte IDs: 404 not_found. Verstöße gegen Regeln (letzter Admin, sich selbst
- * sperren, herabstufen oder löschen, falscher Status): 409 rule_violation. Ungültige Felder: 400.
- * Freischalten schickt „Ihr Konto wurde freigeschaltet“, Ablehnen „Ihre Registrierung wurde nicht
- * freigegeben“ (an die Adresse, die vor dem Anonymisieren gespeichert war).
+ * Rolle (approve, role): role_id (Rolle der Stadt, Plan Phase 1, Schritt 1.6) oder wie bisher role
+ * (user/admin = Standard-Rolle Benutzer bzw. Admin; bleibt für alte Apps), nicht beides.
+ *
+ * Fremde oder unbekannte IDs: 404 not_found. Unbekannte Rolle (role_id): 400. Verstöße gegen Regeln
+ * (letzter Admin, sich selbst sperren, löschen oder die eigene Rolle ändern, falscher Status,
+ * Schutzregeln F5 in UserAdministration): 409 rule_violation. Ungültige Felder: 400. Freischalten
+ * schickt „Ihr Konto wurde freigeschaltet“, Ablehnen „Ihre Registrierung wurde nicht freigegeben“
+ * (an die Adresse, die vor dem Anonymisieren gespeichert war).
  */
 final readonly class UserActionHandler implements RequestHandler
 {
@@ -38,21 +45,25 @@ final readonly class UserActionHandler implements RequestHandler
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
         $id = $context->param('id');
 
-        $admin = new UserAdministration(new UserRepository($context->db->get()), $tenant, $context->auth()->user);
+        $pdo = $context->db->get();
+        $roles = new RoleRepository($pdo);
+        $admin = self::administration($context, $tenant);
         try {
             // Felder werden als Argumente gelesen, also vor der Suche des Kontos (400 vor 404).
             $user = match ($this->action) {
                 UserAction::Show => $admin->find($id),
-                UserAction::Approve => $admin->approve($id, self::displayName($context), self::role($context)),
+                UserAction::Approve => $admin->approve($id, self::displayName($context), self::roleId($context, $roles, $tenant)),
                 UserAction::Reject => $admin->reject($id),
                 UserAction::Lock => $admin->lock($id),
                 UserAction::Unlock => $admin->unlock($id),
-                UserAction::ChangeRole => $admin->changeRole($id, self::role($context)),
+                UserAction::ChangeRole => $admin->assignRole($id, self::roleId($context, $roles, $tenant))[0],
                 UserAction::ChangeDisplayName => $admin->changeDisplayName($id, self::displayName($context)),
                 UserAction::Delete => $admin->delete($id),
             };
         } catch (UserNotFoundException) {
             throw HttpException::notFound();
+        } catch (RoleNotFoundException $e) {
+            throw HttpException::invalidRequest($e->getMessage() . ' (Feld "role_id")');
         } catch (UserRuleViolationException $e) {
             throw HttpException::ruleViolation($e->getMessage());
         }
@@ -72,19 +83,42 @@ final readonly class UserActionHandler implements RequestHandler
             $user = $admin->find($id);
         }
 
-        return new JsonResponse(['user' => UserJson::user($user)]);
+        return new JsonResponse(['user' => UserJson::forTenant($pdo, $tenant)($user)]);
+    }
+
+    /** Verwaltung mit Konto und Rechten der Sitzung (auch für die Sammelaktion). */
+    public static function administration(RequestContext $context, Tenant $tenant): UserAdministration
+    {
+        $pdo = $context->db->get();
+
+        return new UserAdministration(new UserRepository($pdo), new RoleRepository($pdo), $tenant, $context->auth()->user, $context->permissions());
     }
 
     /**
+     * Rolle aus role_id (Rolle der Stadt, ob sie existiert, prüft UserRepository) oder role
+     * (Standard-Rolle Benutzer bzw. Admin, für alte Apps).
+     *
      * @throws HttpException 400 invalid_request
      */
-    private static function role(RequestContext $context): UserRole
+    private static function roleId(RequestContext $context, RoleRepository $roles, Tenant $tenant): int
     {
-        return match ($context->stringField('role')) {
-            UserRole::Admin->value => UserRole::Admin,
-            UserRole::User->value => UserRole::User,
+        $hasRoleId = $context->hasField('role_id');
+        if ($hasRoleId && $context->hasField('role')) {
+            throw HttpException::invalidRequest('Bitte nur "role_id" angeben (nicht zusätzlich "role").');
+        }
+        if (!$hasRoleId && !$context->hasField('role')) {
+            throw HttpException::invalidRequest('Das Feld "role_id" fehlt.');
+        }
+        if ($hasRoleId) {
+            return $context->intField('role_id', 1, PHP_INT_MAX);
+        }
+        $systemRole = match ($context->stringField('role')) {
+            'admin' => SystemRole::Admin,
+            'user' => SystemRole::User,
             default => throw HttpException::invalidRequest('Das Feld "role" muss "user" oder "admin" sein.'),
         };
+
+        return ($roles->findSystemRole($tenant, $systemRole) ?? throw new \LogicException('Standard-Rolle fehlt.'))->id;
     }
 
     /**

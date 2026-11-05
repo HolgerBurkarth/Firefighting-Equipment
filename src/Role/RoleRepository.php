@@ -73,12 +73,23 @@ final readonly class RoleRepository
 
     public function find(Tenant $tenant, int $id): ?Role
     {
-        return $this->fetch($tenant->id, ' AND id = ?', [$id])[0] ?? null;
+        return $this->findOfTenant($tenant->id, $id);
+    }
+
+    /** Wie find(), mit der ID der Stadt (z. B. die Stadt eines Kontos, UserRepository). */
+    public function findOfTenant(int $tenantId, int $id): ?Role
+    {
+        return $this->fetch($tenantId, ' AND id = ?', [$id])[0] ?? null;
     }
 
     public function findSystemRole(Tenant $tenant, SystemRole $systemRole): ?Role
     {
-        return $this->fetch($tenant->id, ' AND system_key = ?', [$systemRole->value])[0] ?? null;
+        return $this->findSystemRoleOfTenant($tenant->id, $systemRole);
+    }
+
+    public function findSystemRoleOfTenant(int $tenantId, SystemRole $systemRole): ?Role
+    {
+        return $this->fetch($tenantId, ' AND system_key = ?', [$systemRole->value])[0] ?? null;
     }
 
     /**

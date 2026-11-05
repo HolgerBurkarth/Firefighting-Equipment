@@ -98,6 +98,23 @@ final readonly class DeviceVisibility
     }
 
     /**
+     * Ob $other nichts zeigt, was dieser Filter nicht zeigt (Rolle zuweisen, Plan Phase 1,
+     * Abschnitt 5). Je Art: ohne eigenen Filter immer, sonst muss $other ebenso filtern und nur
+     * erlaubte IDs nennen. $other darf Standorte der Ebene 1 ohne ihre Fächer nennen: Ein gewählter
+     * Standort der Ebene 1 ist hier enthalten, ein nur über ein Fach erlaubter nicht.
+     */
+    public function includes(self $other): bool
+    {
+        foreach ([[$this->locationIds, $other->locationIds], [$this->deviceTypeIds, $other->deviceTypeIds]] as [$own, $theirs]) {
+            if ($own !== null && ($theirs === null || array_diff($theirs, $own) !== [])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Bedingung auf die Spalten eines Geräts (z. B. d.device_type_id, d.location_id), mit führendem
      * AND; ohne Filter leer. Leere Auswahl: nie wahr.
      *

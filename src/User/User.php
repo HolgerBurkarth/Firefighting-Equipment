@@ -33,6 +33,10 @@ final readonly class User
         public bool $protected = false,
         /** Benachrichtigung „Log“ bei Vorgängen der Geräte-Historie (nur Admins und Super-Admins) */
         public bool $notifyDeviceLog = false,
+        /** Rolle der Stadt (fe_roles); null nur bei Super-Admins */
+        public ?int $roleId = null,
+        /** Einladungscode der Registrierung; null ohne (z. B. eingeladene Admins) */
+        public ?int $invitationCodeId = null,
     ) {
     }
 

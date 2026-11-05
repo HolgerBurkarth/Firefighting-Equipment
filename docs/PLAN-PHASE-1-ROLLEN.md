@@ -148,7 +148,20 @@ Filter 400, F3 409, Standorte und Typen nur aus derselben Stadt 400; jede Änder
 nicht mehr nutzbare Codes verlieren ihre Rolle (= *Benutzer*). `purge-device-data` entfernt die
 Standortfilter der Rollen; sie behalten `filter_locations = 1` und sehen nichts, bis neu ausgewählt
 wird. Dazu aus 1.4: `Permissions::none()` sieht nichts, feste Liste der Stellen mit
-`DeviceVisibility::all()` per Test.
+`DeviceVisibility::all()` per Test. Abnahme 1.5 durch Holger am 05.11.2026 mit den Festlegungen:
+gelöschte Konten bekommen *Benutzer*, nicht nutzbare Codes verlieren die Rolle; Kopie „<Name>
+(Kopie)“, „(Kopie 2)“ …, höchstens 50 Zeichen (gekürzt wird der Name der Vorlage), bei *Admin* mit
+den heutigen Rechten; Übernehmen nur aus einer anderen Stadt.
+
+Schritt 1.6 (05.11.2026) in zwei Teilen: **1.6a** Backend, **1.6b** Seiten der Benutzerverwaltung
+mit Live-Test. Vorgaben Holger: Schutzregeln F5 (nur *Admin* vergibt oder entzieht *Admin*, niemand
+ändert die eigene Rolle, der letzte aktive Admin bleibt, wer eine Rolle zuweist, braucht alle ihre
+Rechte), F1 (Sitzungen enden nur beim Wechsel zu oder von *Admin*), Mehrfachauswahl nur „Rolle
+zuweisen …“ mit Ergebnis je Konto (F6), Freischalten mit Rollenwahl, Einladungscodes mit Rolle ohne
+*Admin* (ohne Rolle = *Benutzer*). Festgelegt bei der Umsetzung: Wer die Rolle eines Kontos ändert,
+es sperrt, löscht oder umbenennt, braucht auch alle Rechte der bisherigen Rolle (Verallgemeinerung
+von „nur *Admin* entzieht *Admin*“); der Katalog für „Sieht: …“ kommt mit `GET roles` (kein
+`permission-catalog` unter Städten, die Route bleibt dem Super-Admin).
 
 Bewusst **nicht** in Phase 1:
 
