@@ -43,7 +43,7 @@ final readonly class DeviceListHandler implements RequestHandler
         $limit = $context->queryInt('limit', 1, self::MAX_LIMIT) ?? self::DEFAULT_LIMIT;
         $offset = $context->queryInt('offset', 0, self::MAX_OFFSET) ?? 0;
 
-        $page = new DeviceRepository($context->db->get())->list($tenant, $filter, $sort, $direction, $limit, $offset);
+        $page = new DeviceRepository($context->db->get(), $context->visibility())->list($tenant, $filter, $sort, $direction, $limit, $offset);
 
         return new JsonResponse([
             'devices' => array_map(DeviceJson::listItem(...), $page->devices),

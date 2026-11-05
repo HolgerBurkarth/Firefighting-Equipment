@@ -41,7 +41,7 @@ final readonly class NoticeActionHandler implements RequestHandler
                 DeviceFields::rejectUnknown($context, []);
             }
 
-            $notices = new DeviceNoticeRepository($context->db->get());
+            $notices = new DeviceNoticeRepository($context->db->get(), $context->visibility());
             $notice = match ($this->action) {
                 NoticeAction::Show => $notices->find($tenant, $id) ?? throw NoticeNotFoundException::forId($id),
                 NoticeAction::Resolve => $notices->change($tenant, $id, $context->auth()->user->id, NoticeChange::Resolve, $note),

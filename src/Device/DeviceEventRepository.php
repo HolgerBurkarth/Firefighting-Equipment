@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Device;
 
 use FirefightingEquipment\Database\UnbufferedQuery;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -15,6 +16,11 @@ use FirefightingEquipment\Tenant\Tenant;
  * Standorte erscheinen mit ihrem aktuellen Namen und Pfad (die Historie speichert nur IDs), der
  * Benutzer mit seinem Anzeigenamen (anonymisiert: „Gelöschter Benutzer #ID“, nie die E-Mail), die
  * Buchungs-Kennung (client_ref) aus der Quittung (fe_device_bookings), falls vorhanden.
+ *
+ * Datenfilter (DeviceVisibility, Pflicht im Konstruktor): Die Historie der Stadt (Letzte
+ * Aktivitäten, Export) enthält nur Einträge von Geräten, die JETZT sichtbar sind (Typ und aktueller
+ * Standort); Standorte außerhalb erscheinen überall als „anderer Standort“. Ob ein einzelnes Gerät
+ * sichtbar ist, prüft bei listForDevice() der Aufrufer (DeviceRepository::find).
  */
 final readonly class DeviceEventRepository
 {
@@ -44,7 +50,7 @@ final readonly class DeviceEventRepository
     private const string HISTORY_FROM = self::DEVICE_JOINS
         . ' WHERE e.tenant_id = ? AND e.created_at >= ? AND e.created_at < ?';
 
-    public function __construct(private \PDO $pdo)
+    public function __construct(private \PDO $pdo, private DeviceVisibility $visibility)
     {
     }
 
@@ -66,7 +72,7 @@ final readonly class DeviceEventRepository
         $stmt = $this->pdo->prepare(sprintf('%s%s ORDER BY e.id DESC LIMIT %d OFFSET %d', self::SELECT, self::FROM, $limit, $offset));
         $stmt->execute([$tenant->id, $deviceId]);
 
-        return new DeviceEventPage(array_map(self::hydrate(...), $stmt->fetchAll()), $total);
+        return new DeviceEventPage(array_map($this->event(...), $stmt->fetchAll()), $total);
     }
 
     /**
@@ -91,7 +97,7 @@ final readonly class DeviceEventRepository
         ));
         $stmt->execute([$tenant->id, $deviceId, ...$ids]);
 
-        return array_map(self::hydrate(...), $stmt->fetchAll());
+        return array_map($this->event(...), $stmt->fetchAll());
     }
 
     /**
@@ -99,7 +105,7 @@ final readonly class DeviceEventRepository
      */
     public function countHistory(Tenant $tenant, DeviceHistoryFilter $filter): int
     {
-        [$where, $params] = self::historyWhere($tenant, $filter);
+        [$where, $params] = $this->historyWhere($tenant, $filter);
         $stmt = $this->pdo->prepare('SELECT COUNT(*)' . self::HISTORY_FROM . $where);
         $stmt->execute($params);
 
@@ -115,7 +121,7 @@ final readonly class DeviceEventRepository
      */
     public function exportHistory(Tenant $tenant, DeviceHistoryFilter $filter): \Generator
     {
-        [$where, $params] = self::historyWhere($tenant, $filter);
+        [$where, $params] = $this->historyWhere($tenant, $filter);
         $direction = $filter->newestFirst ? 'DESC' : 'ASC';
 
         return UnbufferedQuery::rows(
@@ -130,7 +136,7 @@ final readonly class DeviceEventRepository
                 $direction,
             ),
             $params,
-            self::historyEntry(...),
+            $this->historyEntry(...),
         );
     }
 
@@ -145,31 +151,36 @@ final readonly class DeviceEventRepository
             throw new \InvalidArgumentException('limit muss positiv, offset nicht negativ sein.');
         }
 
-        $count = $this->pdo->prepare('SELECT COUNT(*) FROM fe_device_events e WHERE e.tenant_id = ?');
-        $count->execute([$tenant->id]);
+        [$visible, $visibleParams] = $this->visibility->sql('d');
+        $count = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM fe_device_events e JOIN fe_devices d ON d.id = e.device_id AND d.tenant_id = e.tenant_id'
+            . ' WHERE e.tenant_id = ?' . $visible,
+        );
+        $count->execute([$tenant->id, ...$visibleParams]);
         $total = (int) $count->fetchColumn();
 
         // limit und offset sind geprüfte Ganzzahlen.
         $stmt = $this->pdo->prepare(sprintf(
-            '%s%s%s WHERE e.tenant_id = ? ORDER BY e.created_at DESC, e.id DESC LIMIT %d OFFSET %d',
+            '%s%s%s WHERE e.tenant_id = ?%s ORDER BY e.created_at DESC, e.id DESC LIMIT %d OFFSET %d',
             self::SELECT,
             self::DEVICE_COLUMNS,
             self::DEVICE_JOINS,
+            $visible,
             $limit,
             $offset,
         ));
-        $stmt->execute([$tenant->id]);
+        $stmt->execute([$tenant->id, ...$visibleParams]);
 
-        return new DeviceHistoryPage(array_map(self::historyEntry(...), $stmt->fetchAll()), $total);
+        return new DeviceHistoryPage(array_map($this->historyEntry(...), $stmt->fetchAll()), $total);
     }
 
     /**
      * @param array<string, mixed> $row Zeile mit SELECT und DEVICE_COLUMNS
      */
-    private static function historyEntry(array $row): DeviceHistoryEntry
+    private function historyEntry(array $row): DeviceHistoryEntry
     {
         return new DeviceHistoryEntry(
-            self::hydrate($row),
+            $this->event($row),
             (int) $row['device_id'],
             (string) $row['device_identifier'],
             (int) $row['type_id'],
@@ -181,10 +192,10 @@ final readonly class DeviceEventRepository
      * @return array{string, list<int|string>} weitere Bedingungen (SQL aus diesem Code) und alle
      *                                         Parameter von HISTORY_FROM an
      */
-    private static function historyWhere(Tenant $tenant, DeviceHistoryFilter $filter): array
+    private function historyWhere(Tenant $tenant, DeviceHistoryFilter $filter): array
     {
-        $where = '';
-        $params = [$tenant->id, $filter->fromUtc, $filter->untilUtc];
+        [$where, $visibleParams] = $this->visibility->sql('d');
+        $params = [$tenant->id, $filter->fromUtc, $filter->untilUtc, ...$visibleParams];
         if ($filter->deviceId !== null) {
             $where .= ' AND e.device_id = ?';
             $params[] = $filter->deviceId;
@@ -204,6 +215,16 @@ final readonly class DeviceEventRepository
         }
 
         return [$where, $params];
+    }
+
+    /**
+     * Eintrag mit maskierten Standorten außerhalb des Datenfilters.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function event(array $row): DeviceEvent
+    {
+        return self::hydrate($row)->maskedFor($this->visibility);
     }
 
     /**

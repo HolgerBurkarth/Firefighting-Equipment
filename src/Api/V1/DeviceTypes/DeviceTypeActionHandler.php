@@ -26,7 +26,7 @@ final readonly class DeviceTypeActionHandler implements RequestHandler
     public function handle(RequestContext $context): JsonResponse
     {
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
-        $types = new DeviceTypeRepository($context->db->get());
+        $types = new DeviceTypeRepository($context->db->get(), $context->visibility());
 
         try {
             // Felder vor der Suche des Typs lesen (400 vor 404).

@@ -35,7 +35,7 @@ final readonly class DeviceExportHandler implements RequestHandler
         return new CsvResponse(
             sprintf('geraete-%s-%s.csv', $tenant->slug->value, LocalDate::today($this->clock)),
             DeviceCsv::DEVICE_HEADER,
-            new DeviceRepository($context->db->get())->export($tenant, $filter, $sort, $direction),
+            new DeviceRepository($context->db->get(), $context->visibility())->export($tenant, $filter, $sort, $direction),
             DeviceCsv::device(...),
             $context->errors,
         );

@@ -20,7 +20,7 @@ final readonly class Location
         /** null = Ebene 1 */
         public ?int $parentId,
         public bool $active,
-        /** nicht ausgesonderte Geräte direkt an diesem Standort */
+        /** nicht ausgesonderte (und sichtbare) Geräte direkt an diesem Standort */
         public int $deviceCount,
         /** wie $deviceCount, bei Ebene 1 einschließlich aller Unterstandorte (auch nicht aufgeführter) */
         public int $deviceCountTotal,
@@ -29,6 +29,8 @@ final readonly class Location
         public \DateTimeImmutable $createdAt,
         /** UTC */
         public \DateTimeImmutable $updatedAt,
+        /** false: Standort der Ebene 1 außerhalb des Datenfilters, von dem nur Fächer sichtbar sind */
+        public bool $selectable = true,
     ) {
     }
 
@@ -53,6 +55,30 @@ final readonly class Location
             array_values(array_filter($this->children, static fn (Location $c): bool => $c->active)),
             $this->createdAt,
             $this->updatedAt,
+            $this->selectable,
+        );
+    }
+
+    /**
+     * Derselbe Standort mit anderen Unterstandorten (Datenfilter; $deviceCountTotal bleibt, er zählt
+     * schon nur sichtbare Geräte).
+     *
+     * @param list<Location> $children
+     */
+    public function withChildren(array $children, bool $selectable): self
+    {
+        return new self(
+            $this->id,
+            $this->name,
+            $this->kind,
+            $this->parentId,
+            $this->active,
+            $this->deviceCount,
+            $this->deviceCountTotal,
+            $children,
+            $this->createdAt,
+            $this->updatedAt,
+            $selectable,
         );
     }
 }

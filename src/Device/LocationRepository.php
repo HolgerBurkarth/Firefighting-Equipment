@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Device;
 
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -20,12 +21,18 @@ use FirefightingEquipment\Tenant\Tenant;
  *   active. MariaDB 10.11 kennt kein FOR SHARE.
  * - lock() sperrt den Standort mit FOR UPDATE und zählt erst danach; wer ihn als Ziel benutzt,
  *   wartet also bzw. ist schon fertig und wird mitgezählt.
+ *
+ * Datenfilter (DeviceVisibility, Pflicht im Konstruktor): Gerätezahlen zählen nur sichtbare Geräte;
+ * mit Standortfilter enthalten Baum und find() nur sichtbare Standorte, ein Standort der Ebene 1, von
+ * dem nur Fächer sichtbar sind, erscheint mit diesen als nicht wählbar (selectable false). Ändern
+ * (anlegen, umbenennen, sperren) erreichen nur Rollen ohne Datenfilter (F3); lock() zählt immer alle
+ * Geräte.
  */
 final readonly class LocationRepository
 {
     private const int ER_DUP_ENTRY = 1062;
 
-    public function __construct(private \PDO $pdo)
+    public function __construct(private \PDO $pdo, private DeviceVisibility $visibility)
     {
     }
 
@@ -39,14 +46,18 @@ final readonly class LocationRepository
      */
     public function tree(Tenant $tenant, bool $includeInactive): array
     {
-        $tree = $this->build($this->fetchRows($tenant, '', []));
+        $tree = $this->visible($this->build($this->fetchRows($tenant, '', [])));
         if ($includeInactive) {
             return $tree;
         }
 
-        $active = array_filter($tree, static fn (Location $l): bool => $l->active);
+        $active = array_map(
+            static fn (Location $l): Location => $l->withActiveChildrenOnly(),
+            array_filter($tree, static fn (Location $l): bool => $l->active),
+        );
 
-        return array_values(array_map(static fn (Location $l): Location => $l->withActiveChildrenOnly(), $active));
+        // Nicht wählbar und ohne aktive sichtbare Fächer: nichts zu zeigen.
+        return array_values(array_filter($active, static fn (Location $l): bool => $l->selectable || $l->children !== []));
     }
 
     /**
@@ -55,7 +66,7 @@ final readonly class LocationRepository
     public function find(Tenant $tenant, int $id): ?Location
     {
         $rows = $this->fetchRows($tenant, ' AND (l.id = ? OR l.parent_id = ?)', [$id, $id]);
-        foreach ($this->build($rows) as $location) {
+        foreach ($this->visible($this->build($rows)) as $location) {
             if ($location->id === $id) {
                 return $location;
             }
@@ -64,7 +75,7 @@ final readonly class LocationRepository
         // Unterstandort: build() liefert nur Ebene 1, die hier fehlt.
         foreach ($rows as $row) {
             if ((int) $row['id'] === $id) {
-                return self::hydrate($row, []);
+                return $this->visibility->allowsLocation($id) ? self::hydrate($row, []) : null;
             }
         }
 
@@ -285,18 +296,46 @@ final readonly class LocationRepository
      */
     private function fetchRows(Tenant $tenant, string $where, array $params): array
     {
+        // Gezählt werden nur sichtbare Geräte.
+        [$visible, $visibleParams] = $this->visibility->sql('d');
         $stmt = $this->pdo->prepare(
             'SELECT l.id, l.name, l.kind, l.parent_id, l.active, l.created_at, l.updated_at, COALESCE(c.devices, 0) AS devices'
             . ' FROM fe_locations l LEFT JOIN ('
-            . "SELECT location_id, COUNT(*) AS devices FROM fe_devices WHERE tenant_id = ? AND status <> 'retired'"
-            . ' GROUP BY location_id'
+            . "SELECT d.location_id, COUNT(*) AS devices FROM fe_devices d WHERE d.tenant_id = ? AND d.status <> 'retired'" . $visible
+            . ' GROUP BY d.location_id'
             . ') c ON c.location_id = l.id'
             . ' WHERE l.tenant_id = ?' . $where
             . ' ORDER BY l.name, l.id',
         );
-        $stmt->execute([$tenant->id, $tenant->id, ...$params]);
+        $stmt->execute([$tenant->id, ...$visibleParams, $tenant->id, ...$params]);
 
         return $stmt->fetchAll();
+    }
+
+    /**
+     * Nur sichtbare Standorte (ohne Standortfilter alle): Fächer im Filter; Ebene 1 im Filter, sonst
+     * nur mit sichtbaren Fächern und dann nicht wählbar.
+     *
+     * @param list<Location> $tree
+     *
+     * @return list<Location>
+     */
+    private function visible(array $tree): array
+    {
+        if (!$this->visibility->filtersLocations()) {
+            return $tree;
+        }
+
+        $visible = [];
+        foreach ($tree as $location) {
+            $children = array_values(array_filter($location->children, fn (Location $c): bool => $this->visibility->allowsLocation($c->id)));
+            $selectable = $this->visibility->allowsLocation($location->id);
+            if ($selectable || $children !== []) {
+                $visible[] = $location->withChildren($children, $selectable);
+            }
+        }
+
+        return $visible;
     }
 
     /**

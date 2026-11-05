@@ -32,13 +32,26 @@ function isCount(value: unknown): value is number {
     return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
+/**
+ * Gerätezahl direkt am Standort; ein Standort, von dem die Rolle nur Fächer sieht (Datenfilter,
+ * `selectable` false), kommt ohne Zahl (null) und zählt hier mit 0. Wählbar macht ihn die App erst
+ * ab Schritt 1.7 von den Rechten abhängig. Ungültig: null.
+ */
+function directCount(json: Record<string, unknown>): number | null {
+    const count = json['device_count'];
+    if (count === null && json['selectable'] === false) {
+        return 0;
+    }
+    return isCount(count) ? count : null;
+}
+
 function parseSubLocation(json: unknown, parent: number): SubLocation | null {
     if (!isRecord(json)) {
         return null;
     }
     const { id, name, kind, level, active } = json;
     const parentId = json['parent_id'];
-    const deviceCount = json['device_count'];
+    const deviceCount = directCount(json);
     if (
         !isId(id) ||
         typeof name !== 'string' ||
@@ -60,7 +73,7 @@ export function parseLocation(json: unknown): Location | null {
     const { id, name, kind, level, active } = json;
     const kindLabel = json['kind_label'];
     const parentId = json['parent_id'];
-    const deviceCount = json['device_count'];
+    const deviceCount = directCount(json);
     const deviceCountTotal = json['device_count_total'];
     if (
         !isId(id) ||

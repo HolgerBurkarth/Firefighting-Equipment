@@ -21,7 +21,7 @@ final readonly class LocationListHandler implements RequestHandler
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
         $includeInactive = $context->queryFlag('include_inactive');
 
-        $tree = new LocationRepository($context->db->get())->tree($tenant, $includeInactive);
+        $tree = new LocationRepository($context->db->get(), $context->visibility())->tree($tenant, $includeInactive);
 
         return new JsonResponse(['locations' => array_map(LocationJson::location(...), $tree)]);
     }

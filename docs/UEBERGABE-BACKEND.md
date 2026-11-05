@@ -8,6 +8,41 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-05 – „Rechte: Datenfilter „Sieht nur …“ in allen Abfragen und Mails (Phase 1, Schritt 1.4)“
+
+Für *Admin* und *Benutzer* (ohne Datenfilter) bleibt alles gleich, außer dem neuen Feld
+`selectable` der Standorte. Rollen mit Datenfilter gibt es erst mit dem Editor (Schritt 1.5); bis
+dahin nur in Tests (Plan Phase 1, Abschnitt 4 mit den Festlegungen vom 05.11.2026):
+
+- `DeviceVisibility` (Standorte, Ebene 1 mit ihren Fächern, und Gerätetypen; UND; eingeschaltet
+  ohne Auswahl = nichts) aus der Rolle, in allen Repositorys der Geräte, des Verlaufs, der Hinweise,
+  Standorte und Gerätetypen (Pflicht im Konstruktor).
+- Gerät außerhalb → 404 wie fremd (Einzelansicht, Verlauf, jede Änderung, `version_conflict` ohne
+  `details`, Wiederholung einer gespeicherten `client_ref`, in Sammelaktionen `error` `not_found` mit
+  `device: null`); Ziel-Standort oder Gerätetyp außerhalb → 400 wie unbekannt.
+- `GET devices` (auch `q`, `scan_code`), `devices/export`, `inspection-due`, `device-summary` (auch
+  `notices.open`), `device-events`, `device-events/export` (Grenze zählt nur Sichtbare), `notices`:
+  nur sichtbare Geräte (Verlauf der Stadt und Hinweise nach dem jetzigen Stand des Geräts).
+- Standorte außerhalb erscheinen als `{"id": null, "name": "anderer Standort", "path": null}` in
+  `devices/{id}/events`, `device-events`, Hinweisen (`booking.location`, `other.location`), im
+  CSV des Verlaufs und in Mails als Text „anderer Standort“.
+- `GET locations`, `GET locations/{id}`: neues Feld `selectable` (immer true ohne Standortfilter);
+  mit Standortfilter nur sichtbare Standorte, ein Standort der Ebene 1, von dem nur Fächer sichtbar
+  sind, mit `selectable: false` und `device_count: null`. `device_count`/`device_count_total` und
+  `GET device-types` zählen nur sichtbare Geräte; mit Typfilter nur sichtbare Typen.
+- F3 zur Laufzeit: Mit Datenfilter wirken `users`, `locations`/`device_types` Ändern und
+  `csv.import` nicht (403), auch wenn die Rolle sie hätte; `auth/me` zeigt das so.
+- `permissions.version` in `auth/me` enthält jetzt auch die IDs des Filters.
+- Mails „Log“ und Hinweis-Mails je Empfänger mit dessen Filter (vorher oder nachher sichtbar;
+  Sammelmail/Import nur seine Zeilen, sonst keine Mail).
+- Tests: `DeviceVisibilityMatrixTest` (Admin, nur Standort, nur Typ, beide; leerer Filter, Fach,
+  neues Fach, Wiederholung, Versionskonflikt, F3), `DeviceVisibilityTest` (Unit, Reflection der
+  Repositorys), `DeviceLogNotificationTest`, `DeviceNoticeNotificationTest`, `LocationEndpointsTest`;
+  Frontend `bookingQueue.spec.ts` (404 → `failed`), Parser in `deviceHistory.spec.ts`,
+  `notices.spec.ts`, `locationsApi.spec.ts`.
+- Dokumentiert in `CLAUDE.md`, "Rollen und Rechte" (Datenfilter), "Gerätetypen und Standorte (API)",
+  "Benachrichtigung „Log“".
+
 ## 2026-11-05 – „Rechte: auth/me mit permissions, Sitzungsdauer und Log-Mails aus der Rolle (Phase 1, Schritt 1.3b)“
 
 Für die Standard-Rollen *Admin* und *Benutzer* bleibt das Verhalten gleich (per Test); neu ist ein

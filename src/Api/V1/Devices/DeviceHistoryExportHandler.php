@@ -75,7 +75,7 @@ final readonly class DeviceHistoryExportHandler implements RequestHandler
             throw DeviceErrors::http($e);
         }
 
-        $events = new DeviceEventRepository($context->db->get());
+        $events = new DeviceEventRepository($context->db->get(), $context->visibility());
         $count = $events->countHistory($tenant, $filter);
         if ($count > $this->maxRows) {
             throw HttpException::ruleViolation(

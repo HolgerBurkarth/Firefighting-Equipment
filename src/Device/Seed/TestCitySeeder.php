@@ -16,6 +16,7 @@ use FirefightingEquipment\Device\LocationName;
 use FirefightingEquipment\Device\LocationRepository;
 use FirefightingEquipment\Device\NewDevice;
 use FirefightingEquipment\Device\ScanCode;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -47,7 +48,7 @@ final readonly class TestCitySeeder
         $typeIds = $this->typeIds($tenant);
         $locationIds = $this->createLocations($tenant);
 
-        $repository = new DeviceRepository($this->pdo);
+        $repository = new DeviceRepository($this->pdo, DeviceVisibility::all());
         $created = [];
         foreach ($devices as $device) {
             $typeId = $typeIds[$device->deviceType]
@@ -97,7 +98,7 @@ final readonly class TestCitySeeder
     private function typeIds(Tenant $tenant): array
     {
         $ids = [];
-        foreach (new DeviceTypeRepository($this->pdo)->listByTenant($tenant, false) as $type) {
+        foreach (new DeviceTypeRepository($this->pdo, DeviceVisibility::all())->listByTenant($tenant, false) as $type) {
             $ids[$type->name->value] = $type->id;
         }
 
@@ -111,7 +112,7 @@ final readonly class TestCitySeeder
      */
     private function createLocations(Tenant $tenant): array
     {
-        $locations = new LocationRepository($this->pdo);
+        $locations = new LocationRepository($this->pdo, DeviceVisibility::all());
         $ids = [];
         foreach (TestCityData::LOCATIONS as $name => [$kind, $children]) {
             $parent = $locations->create($tenant, LocationName::fromString($name), $kind, null);

@@ -8,6 +8,7 @@ use FirefightingEquipment\Mail\MailMessage;
 use FirefightingEquipment\Mail\MailTemplates;
 use FirefightingEquipment\Notification\DeviceLogNotifier;
 use FirefightingEquipment\Tests\Integration\Device\DeviceApiTestCase;
+use FirefightingEquipment\Tests\Integration\Device\FilteredRoles;
 use FirefightingEquipment\Tests\Integration\Device\OfflineBookings;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -20,6 +21,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(MailTemplates::class)]
 final class DeviceNoticeNotificationTest extends DeviceApiTestCase
 {
+    use FilteredRoles;
     use OfflineBookings;
 
     protected function setUp(): void
@@ -69,6 +71,32 @@ final class DeviceNoticeNotificationTest extends DeviceApiTestCase
             self::assertLessThanOrEqual(76, mb_strlen($line), $line);
         }
         self::assertSame([], $this->log);
+    }
+
+    /**
+     * Empfänger mit Datenfilter (nur HLF 20): Hinweis nur zu einem Gerät, das er jetzt sieht;
+     * gewünschter Standort außerhalb als „anderer Standort“.
+     */
+    public function testFilteredRecipientGetsNoticesOnlyOfVisibleDevicesWithMaskedLocations(): void
+    {
+        $this->filteredAccount('wache@example.org', ['filter_locations' => 1], [$this->hlf], [], account: ['notify_device_log' => 1]);
+        $visible = $this->createViaApi('MA-01')['id'];
+        $hidden = $this->createViaApi('MA-02', ['location_id' => $this->room])['id'];
+        foreach ([$visible, $hidden] as $id) {
+            $this->api('POST', "devices/{$id}/state", ['version' => 1, 'status' => 'defective'], $this->admin);
+            $this->setStateChangedAt($id, '-1 hour');
+        }
+
+        $this->mailer->sent = [];
+        $this->offline($visible, ['version' => 1, 'location_id' => $this->room, 'occurred_at' => $this->at('-1 day')]);
+        self::assertSame(['admin@example.org', 'log-admin@example.org', 'wache@example.org', 'chef@example.org'], $this->recipients());
+        self::assertStringContainsString('Gewünscht: Standort anderer Standort', $this->mailer->sent[2]->text);
+        self::assertStringNotContainsString('Lager', $this->mailer->sent[2]->text);
+        self::assertStringContainsString('Gewünscht: Standort Lager', $this->mailer->sent[0]->text);
+
+        $this->mailer->sent = [];
+        $this->offline($hidden, ['version' => 1, 'location_id' => $this->g1, 'occurred_at' => $this->at('-1 day')]);
+        self::assertSame(['admin@example.org', 'log-admin@example.org', 'chef@example.org'], $this->recipients());
     }
 
     public function testSubjectsOfAllKindsAndNoMailToTheActor(): void

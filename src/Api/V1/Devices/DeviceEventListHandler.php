@@ -27,10 +27,10 @@ final readonly class DeviceEventListHandler implements RequestHandler
 
         $pdo = $context->db->get();
         $id = $context->param('id');
-        if (new DeviceRepository($pdo)->find($tenant, $id) === null) {
+        if (new DeviceRepository($pdo, $context->visibility())->find($tenant, $id) === null) {
             throw HttpException::notFound();
         }
-        $page = new DeviceEventRepository($pdo)->listForDevice($tenant, $id, $limit, $offset);
+        $page = new DeviceEventRepository($pdo, $context->visibility())->listForDevice($tenant, $id, $limit, $offset);
 
         return new JsonResponse([
             'events' => array_map(DeviceEventJson::event(...), $page->events),

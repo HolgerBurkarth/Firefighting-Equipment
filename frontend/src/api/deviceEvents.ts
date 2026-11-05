@@ -1,11 +1,32 @@
 import { apiDownload, apiRequest, isRecord, type ApiResult, type DownloadedFile } from './client';
 import { isId, isUtcTime, nullableString } from './devices';
 
-/** Standort in der Historie (aktueller Name und Pfad, DeviceEventJson::location). */
+/**
+ * Standort in der Historie (aktueller Name und Pfad, DeviceEventJson::location). Außerhalb des
+ * Datenfilters der Rolle „anderer Standort“: `id` null, `path` gleich dem Namen.
+ */
 export interface EventLocation {
-    readonly id: number;
+    readonly id: number | null;
     readonly name: string;
     readonly path: string;
+}
+
+/**
+ * Standort aus Verlauf oder Hinweis; der Server liefert einen Standort außerhalb des Datenfilters als
+ * `{id: null, name: "anderer Standort", path: null}`. Ungültig: null.
+ */
+export function parseEventLocation(json: unknown): EventLocation | null {
+    if (!isRecord(json) || typeof json['name'] !== 'string') {
+        return null;
+    }
+    const { id, name, path } = json;
+    if (id === null && path === null) {
+        return { id: null, name, path: name };
+    }
+    if (!isId(id) || typeof path !== 'string') {
+        return null;
+    }
+    return { id, name, path };
 }
 
 /** Eintrag von GET devices/{id}/events (DeviceEventJson::event). */
@@ -50,15 +71,7 @@ function parseLocation(json: unknown): EventLocation | null | undefined {
     if (json === null) {
         return null;
     }
-    if (
-        !isRecord(json) ||
-        !isId(json['id']) ||
-        typeof json['name'] !== 'string' ||
-        typeof json['path'] !== 'string'
-    ) {
-        return undefined;
-    }
-    return { id: json['id'], name: json['name'], path: json['path'] };
+    return parseEventLocation(json) ?? undefined;
 }
 
 function parseLocationChange(json: unknown): DeviceEventEntry['location'] | undefined {

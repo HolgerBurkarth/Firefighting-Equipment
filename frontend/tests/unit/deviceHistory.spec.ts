@@ -74,6 +74,29 @@ describe('parseDeviceDetail', () => {
 });
 
 describe('parseDeviceEvent', () => {
+    it('Datenfilter: Standort außerhalb als „anderer Standort“ (Zeilen zeigen den Namen)', () => {
+        const masked = event(4, {
+            location: {
+                from: { id: null, name: 'anderer Standort', path: null },
+                to: { id: 20, name: 'LF 10', path: 'LF 10' },
+            },
+        });
+        expect(masked.location?.from).toEqual({
+            id: null,
+            name: 'anderer Standort',
+            path: 'anderer Standort',
+        });
+        expect(eventLines(masked)).toContainEqual({
+            label: 'Standort',
+            value: 'anderer Standort → LF 10',
+        });
+        expect(
+            parseDeviceEvent(
+                eventJson(5, { location: { from: { id: 11, name: 'G1', path: null }, to: null } }),
+            ),
+        ).toBeNull();
+    });
+
     it('liest alle Angaben', () => {
         expect(event(3, { comment: 'gereinigt' })).toEqual({
             id: 3,

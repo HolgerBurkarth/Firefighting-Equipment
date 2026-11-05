@@ -8,6 +8,7 @@ use FirefightingEquipment\Api\V1\Devices\DeviceActionHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceFields;
 use FirefightingEquipment\Device\DeviceEventWriter;
 use FirefightingEquipment\Device\DeviceRepository;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -75,7 +76,7 @@ final class DeviceInspectionDueTest extends DeviceApiTestCase
     public function testRepositoryRefusesOpenTransaction(): void
     {
         $id = $this->createDevice($this->tenantId, $this->typeId, $this->g1);
-        $repository = new DeviceRepository($this->pdo());
+        $repository = new DeviceRepository($this->pdo(), DeviceVisibility::all());
 
         $this->pdo()->beginTransaction();
         try {

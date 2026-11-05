@@ -8,6 +8,7 @@ use FirefightingEquipment\Device\Device;
 use FirefightingEquipment\Device\DeviceDate;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\NewDevice;
+use FirefightingEquipment\Permission\DeviceVisibility;
 
 /**
  * Geplantes Ergebnis einer Zeile: für die Vorschau (Ergebnis, Änderungen, Meldungen, Warnungen) und
@@ -100,6 +101,54 @@ final readonly class ImportRowPlan
             $due,
             $locationId,
             $status,
+        );
+    }
+
+    /**
+     * Die Zeile für ein Konto mit Datenfilter (Sammelmail „Log“): neue Geräte nur mit sichtbarem Typ
+     * und Standort, bestehende, wenn sie vorher oder nachher sichtbar sind; ein Standort außerhalb
+     * erscheint als „anderer Standort“. Fehler und übersprungene Zeilen (ohne Gerät) nie; null =
+     * nicht sichtbar.
+     */
+    public function visibleFor(DeviceVisibility $visibility): ?self
+    {
+        if ($visibility->isAll()) {
+            return $this;
+        }
+        if ($this->newDevice !== null) {
+            return $visibility->allows($this->newDevice->deviceTypeId, $this->newDevice->locationId) ? $this : null;
+        }
+        if ($this->device === null || $this->result === ImportResult::Error) {
+            return null;
+        }
+        $typeAfter = $this->fieldChanges['device_type'][2] ?? $this->device->deviceTypeId;
+        $locationAfter = $this->locationId ?? $this->device->locationId;
+        if (!$visibility->allowsDevice($this->device) && !$visibility->allows((int) $typeAfter, $locationAfter)) {
+            return null;
+        }
+        $mask = static fn (?string $path, int $id): ?string => $path === null || $visibility->allowsLocation($id) ? $path : DeviceVisibility::OTHER_LOCATION;
+        $changes = array_map(
+            fn (ImportChange $c): ImportChange => $c->column === ImportColumn::Location
+                ? new ImportChange($c->column, $mask($c->old, $this->device->locationId), $mask($c->new, $locationAfter))
+                : $c,
+            $this->changes,
+        );
+
+        return new self(
+            $this->line,
+            $this->identifier,
+            $this->result,
+            $this->device,
+            $changes,
+            $this->messages,
+            $this->warnings,
+            $this->key,
+            $this->newDevice,
+            $this->fieldChanges,
+            $this->dueChanged,
+            $this->due,
+            $this->locationId,
+            $this->status,
         );
     }
 

@@ -58,7 +58,7 @@ final readonly class InspectionDueHandler implements RequestHandler
         $limit = $context->queryInt('limit', 1, self::MAX_LIMIT) ?? self::DEFAULT_LIMIT;
 
         $window = InspectionWindow::from($this->clock, $days);
-        $devices = new DeviceRepository($context->db->get());
+        $devices = new DeviceRepository($context->db->get(), $context->visibility());
         $sections = [InspectionSection::Overdue, InspectionSection::DueSoon, ...($withoutDate ? [InspectionSection::WithoutDate] : [])];
 
         $json = ['today' => $window->today, 'days' => $window->days, 'until' => $window->until];

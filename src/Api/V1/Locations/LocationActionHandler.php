@@ -36,7 +36,7 @@ final readonly class LocationActionHandler implements RequestHandler
     public function handle(RequestContext $context): JsonResponse
     {
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
-        $locations = new LocationRepository($context->db->get());
+        $locations = new LocationRepository($context->db->get(), $context->visibility());
 
         try {
             // Felder vor der Suche des Standorts lesen (400 vor 404).

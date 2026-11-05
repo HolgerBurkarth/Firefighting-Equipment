@@ -25,7 +25,7 @@ final readonly class DeviceHistoryListHandler implements RequestHandler
         $limit = $context->queryInt('limit', 1, DeviceListHandler::MAX_LIMIT) ?? DeviceListHandler::DEFAULT_LIMIT;
         $offset = $context->queryInt('offset', 0, DeviceListHandler::MAX_OFFSET) ?? 0;
 
-        $page = new DeviceEventRepository($context->db->get())->listForTenant($tenant, $limit, $offset);
+        $page = new DeviceEventRepository($context->db->get(), $context->visibility())->listForTenant($tenant, $limit, $offset);
 
         return new JsonResponse([
             'events' => array_map(self::entry(...), $page->entries),

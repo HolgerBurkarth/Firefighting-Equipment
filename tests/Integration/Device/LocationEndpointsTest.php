@@ -11,6 +11,7 @@ use FirefightingEquipment\Api\V1\Locations\LocationListHandler;
 use FirefightingEquipment\Device\Location;
 use FirefightingEquipment\Device\LocationRepository;
 use FirefightingEquipment\Http\JsonResponse;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tests\Integration\Auth\AuthTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -71,7 +72,7 @@ final class LocationEndpointsTest extends AuthTestCase
         self::assertSame(['Geräteraum', 'HLF 20'], array_column($tree, 'name'));
         $vehicle = $tree[1];
         self::assertSame(
-            ['id', 'name', 'kind', 'kind_label', 'level', 'parent_id', 'active', 'device_count', 'device_count_total', 'children', 'created_at', 'updated_at'],
+            ['id', 'name', 'kind', 'kind_label', 'level', 'parent_id', 'active', 'selectable', 'device_count', 'device_count_total', 'children', 'created_at', 'updated_at'],
             array_keys($vehicle),
         );
         self::assertSame([$hlf, 'vehicle', 'Fahrzeug', 1, null, true, 1, 4], [
@@ -81,7 +82,7 @@ final class LocationEndpointsTest extends AuthTestCase
         self::assertSame([$fach1, $fach2], array_column($vehicle['children'], 'id'));
         $child = $vehicle['children'][0];
         self::assertSame(
-            ['id', 'name', 'kind', 'kind_label', 'level', 'parent_id', 'active', 'device_count', 'created_at', 'updated_at'],
+            ['id', 'name', 'kind', 'kind_label', 'level', 'parent_id', 'active', 'selectable', 'device_count', 'created_at', 'updated_at'],
             array_keys($child),
         );
         self::assertSame([2, $hlf, 'vehicle', 2], [$child['level'], $child['parent_id'], $child['kind'], $child['device_count']]);
@@ -341,7 +342,7 @@ final class LocationEndpointsTest extends AuthTestCase
     public function testRepositoryRefusesOpenTransaction(): void
     {
         $id = $this->createLocation($this->tenantId);
-        $repository = new LocationRepository($this->pdo());
+        $repository = new LocationRepository($this->pdo(), DeviceVisibility::all());
 
         $this->pdo()->beginTransaction();
         try {

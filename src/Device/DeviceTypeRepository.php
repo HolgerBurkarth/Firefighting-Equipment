@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Device;
 
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -11,12 +12,15 @@ use FirefightingEquipment\Tenant\Tenant;
  * deaktiviert; es gibt bewusst keine Methode zum Löschen. Ob ein Name schon vergeben ist,
  * entscheidet der UNIQUE-Index (utf8mb4_unicode_ci: ohne Groß- und Kleinschreibung, ß = ss), so
  * auch bei gleichzeitigen Aufrufen.
+ *
+ * Datenfilter (DeviceVisibility, Pflicht im Konstruktor): mit Typfilter nur sichtbare Typen;
+ * Gerätezahlen nur sichtbarer Geräte. Ändern erreichen nur Rollen ohne Datenfilter (F3).
  */
 final readonly class DeviceTypeRepository
 {
     private const int ER_DUP_ENTRY = 1062;
 
-    public function __construct(private \PDO $pdo)
+    public function __construct(private \PDO $pdo, private DeviceVisibility $visibility)
     {
     }
 
@@ -96,16 +100,18 @@ final readonly class DeviceTypeRepository
      */
     private function fetch(Tenant $tenant, string $where, array $params): array
     {
+        [$visible, $visibleParams] = $this->visibility->sql('d');
+        [$types, $typeParams] = $this->visibility->deviceTypeSql('t.id');
         $stmt = $this->pdo->prepare(
             'SELECT t.id, t.name, t.active, t.created_at, t.updated_at, COALESCE(c.devices, 0) AS devices'
             . ' FROM fe_device_types t LEFT JOIN ('
-            . "SELECT device_type_id, COUNT(*) AS devices FROM fe_devices WHERE tenant_id = ? AND status <> 'retired'"
-            . ' GROUP BY device_type_id'
+            . "SELECT d.device_type_id, COUNT(*) AS devices FROM fe_devices d WHERE d.tenant_id = ? AND d.status <> 'retired'" . $visible
+            . ' GROUP BY d.device_type_id'
             . ') c ON c.device_type_id = t.id'
-            . ' WHERE t.tenant_id = ?' . $where
+            . ' WHERE t.tenant_id = ?' . $types . $where
             . ' ORDER BY t.name, t.id',
         );
-        $stmt->execute([$tenant->id, $tenant->id, ...$params]);
+        $stmt->execute([$tenant->id, ...$visibleParams, $tenant->id, ...$typeParams, ...$params]);
 
         return array_map(
             static fn (array $row): DeviceType => new DeviceType(

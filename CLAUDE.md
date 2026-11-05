@@ -1844,17 +1844,51 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 ## Rollen und Rechte (Phase 1, im Aufbau)
 - Plan und Entscheidungen: `docs/PLAN-PHASE-1-ROLLEN.md` (freigegeben 05.11.2026; Schritte 1.1–1.9).
   Stand: Schritte 1.1, 1.2 (Schema, Standard-Rollen, jedes Konto einer Stadt mit Rolle), 1.3a
-  (Routen unter Städten prüfen Rechte der Rolle statt `fe_users.role`) und 1.3b (`auth/me` mit
-  `permissions`, Sitzungsdauer und Log-Mails aus den Rechten, Migrationen 0039/0040). Für *Admin* und
-  *Benutzer* verhält sich jede Route wie vorher (per Test), ebenso Sitzungsdauer und Empfänger der
-  Log-Mails.
+  (Routen unter Städten prüfen Rechte der Rolle statt `fe_users.role`), 1.3b (`auth/me` mit
+  `permissions`, Sitzungsdauer und Log-Mails aus den Rechten, Migrationen 0039/0040) und 1.4
+  (Datenfilter „Sieht nur …“ in allen Abfragen und Mails). Für *Admin* und *Benutzer* verhält sich
+  jede Route wie vorher (per Test), ebenso Sitzungsdauer und Empfänger der Log-Mails; neu ist nur das
+  Feld `selectable` der Standorte. Rollen mit Datenfilter legt erst der Editor in 1.5 an.
+- Datenfilter (Schritt 1.4, Plan Abschnitt 4 mit den Festlegungen vom 05.11.2026):
+  `Permission\DeviceVisibility` (je Art `null` = alle, sonst erlaubte IDs; ein Standort der Ebene 1
+  schließt seine Fächer ein, auch später angelegte; eingeschaltet ohne Auswahl = nichts; Gerät
+  sichtbar = Typ UND Standort sichtbar; `sql(alias)`, `locationSql`, `deviceTypeSql`, `allows…`),
+  gebildet von `PermissionRepository` aus `fe_roles.filter_*`, `fe_role_locations`,
+  `fe_role_device_types`, getragen von `Permissions::visibility()`, im Handler
+  `RequestContext::visibility()`. Die Repositorys `DeviceRepository`, `DeviceEventRepository`,
+  `DeviceNoticeRepository`, `LocationRepository`, `DeviceTypeRepository` verlangen sie im
+  Konstruktor (Pflicht, ohne Standardwert; Reflection-Test `DeviceVisibilityTest`); Handler übergeben
+  `$context->visibility()`, Kommandozeile, Seeder, CSV-Import (F3) und `DeviceLogNotifier`
+  `DeviceVisibility::all()`. Regeln: Gerät außerhalb wie fremd (404, auch `version_conflict` ohne
+  `details`, Wiederholung einer `client_ref`, Sammelaktion `error` `not_found` mit `device` `null`);
+  Ziel-Standort bzw. Gerätetyp außerhalb wie unbekannt (400); Listen, Suche, `scan_code`, Zahlen
+  (`device-summary`, `notices.open`, Gerätezahlen von Standorten und Typen), Prüffristen, Exporte,
+  Letzte Aktivitäten und Hinweise nur sichtbare Geräte (Verlauf der Stadt nach dem JETZIGEN Stand
+  des Geräts); Standorte außerhalb in Verlauf, Hinweisen, CSV und Mails als „anderer Standort“
+  (`DeviceVisibility::OTHER_LOCATION`, `DeviceEventLocation::maskedFor`, JSON `{id: null, name:
+  "anderer Standort", path: null}`, `DeviceEvent`/`DeviceNotice::maskedFor`). Standortbaum: mit
+  Standortfilter nur sichtbare; ein Standort der Ebene 1, von dem nur Fächer sichtbar sind, mit
+  `selectable` false und `device_count` `null` (als Ziel 400). F3 zur Laufzeit: Mit Datenfilter
+  gibt `Permissions` `users` nicht, `locations`/`device_types` höchstens Ansehen und `csv.import`
+  nicht. Mails: je Empfänger dessen Filter (Super-Admins alle), Gerät vorher (gesperrter Stand,
+  `DeviceEventRecorder::before`) oder nachher sichtbar, Sammelmail und Import nur seine Zeilen
+  (`DeviceImportPlan::visibleFor`, sonst keine Mail; sieht er bei einer Sammelaktion nur ein Gerät,
+  die Mail zum Gerät), Hinweis nur zu sichtbarem Gerät. Frontend: `parseEventLocation`
+  (`src/api/deviceEvents.ts`, auch in Hinweisen) liest den maskierten Standort (`id` null, `path` =
+  Name), `parseLocation` zählt `device_count` `null` bei `selectable` false als 0; die Warteschlange
+  setzt eine Buchung mit 404 auf `failed`. Tests `DeviceVisibilityMatrixTest` (Admin und drei
+  Rollen: nur Standort, nur Typ, beide; leerer Filter, nur ein Fach, neues Fach, Wiederholung,
+  Versionskonflikt, F3), `DeviceVisibilityTest`, Mails in `DeviceLogNotificationTest`/
+  `DeviceNoticeNotificationTest` (Trait `FilteredRoles`), Frontend `bookingQueue.spec.ts`,
+  `deviceHistory.spec.ts`, `notices.spec.ts`, `locationsApi.spec.ts`.
 - `GET auth/me` (auch die Antwort von `auth/login` und `auth/password`, `AuthJson::permissions`):
   `permissions {areas: {bereich: read|write}, actions: [...], restrictions: [], filtered, version}`,
   unter `service` `null`. Nur wirksame Rechte in der Reihenfolge des Katalogs (Aktionen nur mit ihrem
   Bereich, `Permissions::areas()`/`actions()`), `areas` immer ein Objekt, `restrictions` bis Phase 2
-  leer, `filtered` = Rolle mit Datenfilter (`Permissions::isFiltered`, wirkt ab 1.4), `version` =
-  SHA-256 über Rolle und `fe_roles.version` (`Permissions::revision`, „<id>:<version>“) und die
-  Rechte. Die App liest das Feld ab Schritt 1.7.
+  leer, `filtered` = Rolle mit Datenfilter (`Permissions::isFiltered`), `version` = SHA-256 über
+  Rolle und `fe_roles.version` (`Permissions::revision`, „<id>:<version>“), die Rechte und die IDs
+  des Datenfilters (`DeviceVisibility::toArray`, ändert sich auch mit einem neuen Fach). Die App
+  liest das Feld ab Schritt 1.7.
 - Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank): `Area` (`dashboard`,
   `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`; `maxLevel`:
   `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`
@@ -2141,9 +2175,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Unterstandorte), `GET locations/{id}` (Ebene 1 mit allen Unterstandorten, auch gesperrten),
   `POST locations {name, kind?, parent_id?}` → 201, `POST locations/{id}/rename {name}`,
   `POST locations/{id}/lock` bzw. `unlock {}` (wiederholbar). Antwort `{"location": …}` mit `id`,
-  `name`, `kind`, `kind_label`, `level`, `parent_id`, `active`, `device_count` (nicht ausgesonderte
-  Geräte direkt am Standort), nur bei Ebene 1 zusätzlich `device_count_total` (einschließlich aller
-  Unterstandorte, auch nicht aufgeführter) und `children`.
+  `name`, `kind`, `kind_label`, `level`, `parent_id`, `active`, `selectable` (seit Schritt 1.4;
+  false nur mit Datenfilter, siehe "Rollen und Rechte"), `device_count` (nicht ausgesonderte, für
+  das Konto sichtbare Geräte direkt am Standort; `null` bei `selectable` false), nur bei Ebene 1
+  zusätzlich `device_count_total` (einschließlich aller Unterstandorte, auch nicht aufgeführter) und
+  `children`. Mit Datenfilter nur sichtbare Standorte bzw. Gerätetypen und Zahlen sichtbarer Geräte.
 - Anlegen: Ebene 1 braucht `kind` (`vehicle`, `room`, `external`, sonst 400). Mit `parent_id`
   (echte JSON-Ganzzahl): unbekannter oder fremder übergeordneter Standort → 400 (Feld im Body, nicht
   im Pfad); übergeordneter ist selbst Unterstandort → 409 (zwei Ebenen); gesperrt → 409; `kind`
@@ -2617,7 +2653,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Empfänger: `UserRepository::listDeviceLogRecipients` (Konten nur der Stadt des Vorgangs, deren
   Rolle die Aktion `mail.log` hat, also immer die Rolle *Admin*, nie die Standard-Rolle *Benutzer*;
   Super-Admins aller Städte; aktiv, nicht gesperrt, Option an), nie der Auslöser. Für die
-  Standard-Rollen dieselben Konten wie vor Schritt 1.3b (per Test gegen die alte Abfrage). Eine Mail je
+  Standard-Rollen dieselben Konten wie vor Schritt 1.3b (per Test gegen die alte Abfrage). Mit
+  Datenfilter des Empfängers nur sichtbare Geräte und „anderer Standort“ (siehe "Rollen und Rechte",
+  Datenfilter). Eine Mail je
   Empfänger und Anfrage; ein CSV-Import ergibt EINE Sammelmail (Zusammenfassung, höchstens
   `MAX_IMPORT_LINES` = 50 Zeilen mit Einzelheiten, danach „… und N weitere“; ohne neue oder geänderte
   Geräte keine Mail), ebenso eine Sammelaktion (`bulkChanged`: alle geänderten Geräte der Anfrage, je

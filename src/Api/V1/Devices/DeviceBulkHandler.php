@@ -57,8 +57,8 @@ final readonly class DeviceBulkHandler implements RequestHandler
         $user = $context->auth()->user;
         $pdo = $context->db->get();
         $recorder = new DeviceEventRecorder();
-        $devices = new DeviceRepository($pdo, $recorder);
-        $booker = new DeviceBooker($tenant, $devices, new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo));
+        $devices = new DeviceRepository($pdo, $context->visibility(), $recorder);
+        $booker = new DeviceBooker($tenant, $devices, new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo, $context->visibility()));
 
         $entries = $this->entries($context);
         try {
@@ -88,7 +88,7 @@ final readonly class DeviceBulkHandler implements RequestHandler
             }
 
             if (!$replayed && $recorder->ids() !== []) {
-                $changed[] = [$device, $recorder->ids()];
+                $changed[] = [$device, $recorder->ids(), $recorder->before()];
             }
             $results[] = self::result($id, $outcome->value, $replayed, $device, null);
             ++$counts[$outcome === BookingOutcome::Applied ? 'applied' : 'unchanged'];

@@ -16,6 +16,7 @@ use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\DeviceStateChange;
 use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
@@ -194,7 +195,7 @@ final class DeviceBookingClientRefTest extends DeviceApiTestCase
         $change = new DeviceStateChange($this->room, null);
 
         try {
-            new DeviceRepository($this->pdo())->book(
+            new DeviceRepository($this->pdo(), DeviceVisibility::all())->book(
                 $this->tenant('immendingen'),
                 $this->adminId,
                 $id,
@@ -221,9 +222,9 @@ final class DeviceBookingClientRefTest extends DeviceApiTestCase
         $hash = BookingRequest::hash($id, 1, $change, null, null);
         $booker = new DeviceBooker(
             $this->tenant('immendingen'),
-            new DeviceRepository($this->pdo()),
+            new DeviceRepository($this->pdo(), DeviceVisibility::all()),
             new DeviceBookingRepository($this->pdo()),
-            new DeviceNoticeRepository($this->pdo()),
+            new DeviceNoticeRepository($this->pdo(), DeviceVisibility::all()),
         );
 
         // Wie eine gleichzeitige Anfrage: Die Quittung entsteht erst nach der Prüfung mit previous().

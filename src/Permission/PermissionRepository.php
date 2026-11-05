@@ -9,7 +9,8 @@ use FirefightingEquipment\Tenant\Tenant;
 
 /**
  * Rechte eines Kontos aus seiner Rolle, einmal je Anfrage (SessionManager). Rolle Admin: eine
- * Abfrage, sonst zwei. Ohne Rolle (darf es seit Migration 0037 nicht geben) keine Rechte.
+ * Abfrage, sonst zwei, je eingeschaltetem Datenfilter eine weitere. Ohne Rolle (darf es seit
+ * Migration 0037 nicht geben) keine Rechte.
  */
 final readonly class PermissionRepository
 {
@@ -37,9 +38,9 @@ final readonly class PermissionRepository
             return Permissions::none();
         }
         $roleId = (int) $role['id'];
-        $filtered = (int) $role['filter_locations'] === 1 || (int) $role['filter_device_types'] === 1;
         if ($role['system_key'] === SystemRole::Admin->value) {
-            return Permissions::all()->ofRole($roleId, (int) $role['version'], $filtered);
+            // CHECK chk_fe_roles_admin: die Rolle Admin nie mit Datenfilter.
+            return Permissions::all()->ofRole($roleId, (int) $role['version'], DeviceVisibility::all());
         }
 
         $rows = $this->pdo->prepare(
@@ -58,7 +59,40 @@ final readonly class PermissionRepository
             }
         }
 
-        return Permissions::fromRows($areas, $actions)->ofRole($roleId, (int) $role['version'], $filtered);
+        return Permissions::fromRows($areas, $actions)->ofRole($roleId, (int) $role['version'], $this->visibility(
+            $tenantId,
+            $roleId,
+            (int) $role['filter_locations'] === 1,
+            (int) $role['filter_device_types'] === 1,
+        ));
+    }
+
+    /**
+     * Datenfilter der Rolle: Standorte (ein Standort der Ebene 1 schließt seine Fächer ein, auch
+     * später angelegte) und Gerätetypen; eingeschaltet ohne Auswahl = nichts.
+     */
+    private function visibility(int $tenantId, int $roleId, bool $filterLocations, bool $filterDeviceTypes): DeviceVisibility
+    {
+        if (!$filterLocations && !$filterDeviceTypes) {
+            return DeviceVisibility::all();
+        }
+        $locations = null;
+        if ($filterLocations) {
+            $stmt = $this->pdo->prepare(
+                'SELECT DISTINCT l.id FROM fe_role_locations rl JOIN fe_locations l ON l.tenant_id = rl.tenant_id'
+                . ' AND (l.id = rl.location_id OR l.parent_id = rl.location_id) WHERE rl.role_id = ? AND rl.tenant_id = ?',
+            );
+            $stmt->execute([$roleId, $tenantId]);
+            $locations = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+        }
+        $types = null;
+        if ($filterDeviceTypes) {
+            $stmt = $this->pdo->prepare('SELECT device_type_id FROM fe_role_device_types WHERE role_id = ? AND tenant_id = ?');
+            $stmt->execute([$roleId, $tenantId]);
+            $types = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+        }
+
+        return DeviceVisibility::restricted($locations, $types);
     }
 
     /**

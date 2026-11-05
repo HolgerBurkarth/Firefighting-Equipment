@@ -9,6 +9,7 @@ use FirefightingEquipment\Database\LazyConnection;
 use FirefightingEquipment\Mail\Mailer;
 use FirefightingEquipment\Mail\Notifier;
 use FirefightingEquipment\Mail\SendmailMailer;
+use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Permission\Permissions;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\User\Password\PasswordHasher;
@@ -67,6 +68,15 @@ final readonly class RequestContext
     public function permissions(): Permissions
     {
         return $this->permissions ?? throw new \LogicException('Route ohne Requirement: keine Rechte geladen.');
+    }
+
+    /**
+     * Welche Geräte, Standorte und Gerätetypen das Konto einer Route mit Requirement sieht (Datenfilter
+     * der Rolle); für die Repositorys, die sie im Konstruktor verlangen.
+     */
+    public function visibility(): DeviceVisibility
+    {
+        return $this->permissions()->visibility();
     }
 
     /**

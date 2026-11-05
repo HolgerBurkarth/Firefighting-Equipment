@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Device\Import;
 
+use FirefightingEquipment\Permission\DeviceVisibility;
+
 /**
  * Ergebnis der Prüfung einer Import-Datei gegen die Datenbank.
  *
@@ -31,6 +33,22 @@ final readonly class DeviceImportPlan
             [$fileHash, array_map(static fn (ImportRowPlan $row): array => $row->fingerprint(), $rows)],
             JSON_THROW_ON_ERROR,
         ));
+    }
+
+    /**
+     * Nur die Zeilen, die das Konto sieht (ImportRowPlan::visibleFor), für die Sammelmail „Log“;
+     * Kennzeichen und unbekannte Werte entfallen.
+     */
+    public function visibleFor(DeviceVisibility $visibility): self
+    {
+        if ($visibility->isAll()) {
+            return $this;
+        }
+
+        return new self('', array_values(array_filter(array_map(
+            static fn (ImportRowPlan $row): ?ImportRowPlan => $row->visibleFor($visibility),
+            $this->rows,
+        ))), [], []);
     }
 
     public function count(ImportResult $result): int
