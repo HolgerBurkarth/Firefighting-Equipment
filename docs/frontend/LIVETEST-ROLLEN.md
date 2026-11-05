@@ -97,3 +97,28 @@ ohne Rolle. Deploy mit Sicherung `ff-db-20261105-065636Z-vor-migration-e047623.s
   `search`/`due` `read`, `book.move`, `book.status`; Sitzung 90 Tage (Cookie `Max-Age` 7776000).
 - ☐ Log-Mails tatsächlich empfangen (Holger, Postfach): erwartet unverändert für Admins mit
   eingeschalteter Option; per Test `UserRepositoryTest` gegen die alte Abfrage.
+
+## Schritt 1.4 – Datenfilter in allen Abfragen und Mails (05.11.2026, Build `3e778842474e`)
+
+Ohne Migration. Erwartet: für *Admin* und *Benutzer* (ohne Datenfilter) keine sichtbare Änderung,
+neu nur das Feld `selectable` der Standorte (immer true).
+
+- ☑ Deploy „Deployment erfolgreich“, „Keine offenen Migrationen.“, `build.json` = `3e778842474e`,
+  `health` ok.
+- ☑ Als *Admin*: `auth/me` mit `filtered` false; `devices` 69 Geräte (wie vorher), `locations`
+  9 Standorte, alle `selectable` true, Summe `device_count_total` 69; `device-types` mit Zahlen
+  (Atemschutzmaske 25, Funkgerät 20, Atemschutzgerät 15, Live-Testtyp 2 5, Wärmebildkamera 4);
+  `device-summary` 69 Geräte, 2 offene Hinweise; `inspection-due` 11 überfällig; `device-events`
+  147 Einträge; `notices` 3; beide Exporte 200; M90 mit Verlauf (15 Einträge). Nirgends „anderer
+  Standort“.
+- ☑ Schreiben: M90 Status „in Wartung“ und zurück auf „einsatzbereit“ (je 200 `applied`, Stand
+  danach wie vorher).
+- ☑ Geräte, Standorte, Gerätetypen, Protokoll, Prüffristen und Gerätedetail laden, keine Fehler in
+  der Konsole.
+- ☐ Als *Benutzer*: Anmeldung mit Passwort (Holger). Erwartet wie bisher.
+- ☐ **Für Schritt 1.5 offen: echter Live-Test mit einer gefilterten Rolle** in der Test-Stadt, sobald
+  der Editor Rollen mit „Sieht nur …“ anlegen kann: Liste, Suche, Scan, Gerätedetail und Verlauf
+  („anderer Standort“), Dashboard-Zahlen, Prüffristen, Protokoll und Hinweise, Exporte, Standortwahl
+  (Standort der Ebene 1 nur mit Fächern nicht wählbar), Buchen auf Ziel außerhalb (400), Gerät
+  außerhalb (404), Log-Mails eines gefilterten Empfängers, leerer Filter lässt sich nicht speichern.
+  Bis dahin per Test (`DeviceVisibilityMatrixTest`, Mail-Tests).
