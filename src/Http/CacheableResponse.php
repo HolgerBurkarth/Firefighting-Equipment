@@ -23,15 +23,10 @@ final readonly class CacheableResponse implements Response
     public const string WOFF = 'font/woff';
     /** Nur das Lesemodul des Kamera-Scanners (frontend/src/scanner/, FrontendAssets). */
     public const string WASM = 'application/wasm';
-    /**
-     * Nur Bilder des Startbilds aus dem Build (frontend/src/assets/, FrontendAssets; nie hochgeladene
-     * Dateien, eine SVG könnte Skript enthalten).
-     */
-    public const string SVG = 'image/svg+xml';
     /** Nur build.json des Frontends (FrontendAssets::BUILD_INFO_FILE). */
     public const string JSON = 'application/json; charset=utf-8';
 
-    private const array CONTENT_TYPES = [self::PNG, self::MANIFEST, self::HTML, self::JAVASCRIPT, self::CSS, self::WOFF2, self::WOFF, self::WASM, self::SVG, self::JSON];
+    private const array CONTENT_TYPES = [self::PNG, self::MANIFEST, self::HTML, self::JAVASCRIPT, self::CSS, self::WOFF2, self::WOFF, self::WASM, self::JSON];
 
     /** Zusätzliche Header, nur für die App-Seite (FrontendHandler). */
     private const array SECURITY_HEADERS = ['Content-Security-Policy', 'Referrer-Policy', 'X-Frame-Options'];

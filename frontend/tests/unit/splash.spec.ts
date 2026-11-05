@@ -73,8 +73,29 @@ describe('Startbild in index.html (Plan Phase 1, Schritt 1.7d)', () => {
         // Hell, dunkel (data-theme) und dunkel (System).
         expect(blocks).toHaveLength(3);
         expect(blocks[1]).toBe(blocks[2]);
-        expect(blocks[1]).toContain('splash-dark.svg');
+        expect(blocks[1]).toContain('--splash-art-disc: #1e2631;');
         expect(SPLASH_CSS).toContain('prefers-reduced-motion: reduce');
+    });
+
+    it('Bild als SVG im HTML: Farben nur über Klassen aus splash.css, keine Verweise', () => {
+        const art = document.querySelector('#splash svg.splash-art');
+        expect(art?.getAttribute('role')).toBe('img');
+        expect(art?.getAttribute('aria-label')).toBe('Gezeichnetes Löschfahrzeug');
+        const shapes = [...(art?.children ?? [])];
+        expect(shapes.length).toBeGreaterThan(20);
+        for (const shape of shapes) {
+            expect(['circle', 'rect', 'path']).toContain(shape.tagName.toLowerCase());
+            expect(
+                shape
+                    .getAttributeNames()
+                    .filter((name) => /^(fill|stroke|style|href|xlink|on)/.test(name)),
+            ).toEqual([]);
+            const name = shape.getAttribute('class') ?? '';
+            expect(name).toMatch(/^splash-art-[a-z]+$/);
+            expect(SPLASH_CSS).toContain(`.${name} {\n    fill: `);
+        }
+        // Keine Bilddatei mehr (vorher assets/splash-*.svg): das Bild kommt mit der ersten Antwort.
+        expect(SPLASH_CSS).not.toContain('url(');
     });
 });
 

@@ -28,11 +28,10 @@ final readonly class FrontendAssets
         'woff2' => CacheableResponse::WOFF2,
         'woff' => CacheableResponse::WOFF,
         'wasm' => CacheableResponse::WASM,
-        'svg' => CacheableResponse::SVG,
     ];
 
     /** Endungen, die nur in assets/ ausgeliefert werden (nie direkt im Build-Ordner). */
-    public const array ASSETS_ONLY = ['wasm', 'svg'];
+    public const array ASSETS_ONLY = ['wasm'];
 
     /**
      * Kennung der ausgelieferten Version ({"build": "…"}), nur direkt im Build-Ordner; wie

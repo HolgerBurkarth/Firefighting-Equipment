@@ -3,11 +3,14 @@
  * Startbild.dc.html). Steht in index.html außerhalb von #app und ist erst nach rund 0,4 s sichtbar
  * (Verzögerung der Animation, kein Skript): Ein schneller Start zeigt es nie, die App entfernt es,
  * sobald die erste Seite steht (src/runtime/splash.ts). Den Stand des Ladebalkens setzt die App als
- * Attribut data-step (kein style=""), die Breite je Schritt steht hier. Farben aus tokens.css.
+ * Attribut data-step (kein style=""), die Breite je Schritt steht hier. Farben aus tokens.css, die des
+ * Bildes (SVG in index.html, ohne eigene Stilangaben) über die Klassen splash-art-… unten.
  */
 .splash {
     --splash-track: #e1e5ea;
-    --splash-art: url('../assets/splash-light.svg');
+    --splash-art-disc: #fff;
+    --splash-art-ground: #dde2e8;
+    --splash-art-window: #cfe3fa;
 
     position: fixed;
     inset: 0;
@@ -28,13 +31,17 @@
 /* Dunkel: beide Blöcke gleich (wie in tokens.css, per Test). */
 :root[data-theme='dark'] .splash {
     --splash-track: #2b3542;
-    --splash-art: url('../assets/splash-dark.svg');
+    --splash-art-disc: #1e2631;
+    --splash-art-ground: #2b3542;
+    --splash-art-window: #8fb6e8;
 }
 
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme='light']) .splash {
         --splash-track: #2b3542;
-        --splash-art: url('../assets/splash-dark.svg');
+        --splash-art-disc: #1e2631;
+        --splash-art-ground: #2b3542;
+        --splash-art-window: #8fb6e8;
     }
 }
 
@@ -45,10 +52,51 @@
 }
 
 .splash-art {
+    display: block;
     width: 260px;
     max-width: 100%;
-    height: 190px;
-    background: var(--splash-art) center / contain no-repeat;
+    height: auto;
+}
+
+/* Farben des Löschfahrzeugs (Mockup); nur Scheibe, Boden und Fenster ändern sich im Dunkeln. */
+.splash-art-disc {
+    fill: var(--splash-art-disc);
+}
+
+.splash-art-ground {
+    fill: var(--splash-art-ground);
+}
+
+.splash-art-window {
+    fill: var(--splash-art-window);
+}
+
+.splash-art-body {
+    fill: #b71c1c;
+}
+
+.splash-art-shutter {
+    fill: #8e1515;
+}
+
+.splash-art-stripe {
+    fill: #f2f4f7;
+}
+
+.splash-art-ladder {
+    fill: #c9d1da;
+}
+
+.splash-art-beacon {
+    fill: #2f6fd6;
+}
+
+.splash-art-tire {
+    fill: #1b2430;
+}
+
+.splash-art-lamp {
+    fill: #f2b233;
 }
 
 .splash-text {
