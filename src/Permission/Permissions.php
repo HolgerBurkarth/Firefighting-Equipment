@@ -18,35 +18,34 @@ use FirefightingEquipment\Role\SystemRole;
  */
 final readonly class Permissions
 {
-    private DeviceVisibility $visibility;
-
     /**
-     * @param array<string, AreaLevel> $areas      Bereich (Wert von Area) → Stufe
+     * @param array<string, AreaLevel> $areas    Bereich (Wert von Area) → Stufe
      * @param list<Action>             $actions
-     * @param DeviceVisibility|null    $visibility null = alle
-     * @param string|null              $revision   Rolle und ihr Stand („<id>:<version>“), null ohne Rolle
+     * @param string|null              $revision Rolle und ihr Stand („<id>:<version>“), null ohne Rolle
      */
     private function __construct(
         private bool $all,
         private array $areas,
         private array $actions,
-        ?DeviceVisibility $visibility = null,
+        private DeviceVisibility $visibility,
         private ?string $revision = null,
     ) {
-        $this->visibility = $visibility ?? DeviceVisibility::all();
     }
 
     public static function all(): self
     {
-        return new self(true, [], []);
+        return new self(true, [], [], DeviceVisibility::all());
     }
 
+    /** Keine Rechte und keine Sichtbarkeit (Konto ohne Rolle). */
     public static function none(): self
     {
-        return new self(false, [], []);
+        return new self(false, [], [], DeviceVisibility::none());
     }
 
     /**
+     * Rechte ohne Datenfilter; den Filter der Rolle setzt ofRole().
+     *
      * @param list<array{Area, AreaLevel}> $areas
      * @param list<Action>                $actions
      */
@@ -57,7 +56,7 @@ final readonly class Permissions
             $byArea[$area->value] = $level;
         }
 
-        return new self(false, $byArea, array_values(array_unique($actions, SORT_REGULAR)));
+        return new self(false, $byArea, array_values(array_unique($actions, SORT_REGULAR)), DeviceVisibility::all());
     }
 
     public static function fromRole(Role $role): self
@@ -111,16 +110,32 @@ final readonly class Permissions
             return $area->maxLevel();
         }
         $level = $this->areas[$area->value] ?? null;
-        if ($level === null || $this->visibility->isAll()) {
+        $excluded = self::excludedWithFilter($area);
+        if ($level === null || $this->visibility->isAll() || $excluded === null || !$level->includes($excluded)) {
             return $level;
         }
 
         // F3: mit Datenfilter keine Verwaltung.
+        return $excluded === AreaLevel::Write ? AreaLevel::Read : null;
+    }
+
+    /**
+     * F3 (Plan Phase 1): kleinste Stufe eines Bereichs, die es mit Datenfilter nicht gibt; null =
+     * keine Grenze. Gilt hier zur Laufzeit und beim Speichern einer Rolle (RoleRules).
+     */
+    public static function excludedWithFilter(Area $area): ?AreaLevel
+    {
         return match ($area) {
-            Area::Users => null,
-            Area::Locations, Area::DeviceTypes => AreaLevel::Read,
-            default => $level,
+            Area::Users => AreaLevel::Read,
+            Area::Locations, Area::DeviceTypes => AreaLevel::Write,
+            default => null,
         };
+    }
+
+    /** F3: Aktionen, die es mit Datenfilter nicht gibt. */
+    public static function excludedActionWithFilter(Action $action): bool
+    {
+        return $action === Action::CsvImport;
     }
 
     public function allows(Area $area, AreaLevel $level): bool
@@ -179,7 +194,7 @@ final readonly class Permissions
         if ($this->all) {
             return true;
         }
-        if (!in_array($action, $this->actions, true) || ($action === Action::CsvImport && $this->isFiltered())) {
+        if (!in_array($action, $this->actions, true) || (self::excludedActionWithFilter($action) && $this->isFiltered())) {
             return false;
         }
         $required = $action->requires();

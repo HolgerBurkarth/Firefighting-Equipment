@@ -21,8 +21,8 @@ final readonly class InvitationCodeRepository
     private const int MAX_INSERT_ATTEMPTS = 3;
     private const string COLUMNS = 'id, tenant_id, label, max_uses, use_count, expires_at, revoked_at, created_by,'
         . ' created_at, expires_at <= UTC_TIMESTAMP() AS expired';
-    /** Bedingung für einen nutzbaren Code (Zeitvergleich in der Datenbank). */
-    private const string USABLE = 'revoked_at IS NULL AND use_count < max_uses AND expires_at > UTC_TIMESTAMP()';
+    /** Bedingung für einen nutzbaren Code (Zeitvergleich in der Datenbank; auch RoleRepository). */
+    public const string USABLE = 'revoked_at IS NULL AND use_count < max_uses AND expires_at > UTC_TIMESTAMP()';
 
     public function __construct(private \PDO $pdo)
     {

@@ -8,6 +8,45 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-05 – „Rollen: Verwaltung durch den Super-Admin im Backend (Phase 1, Schritt 1.5a)“
+
+Neue Routen nur unter `service` (alle `Access::SuperAdmin`, in `SuperAdminRoutesAccessTest`); unter
+Städten ändert sich nichts. Vorgaben Holger (05.11.2026) und Plan Phase 1, Abschnitt 5:
+
+- `GET permission-catalog`: `{areas: [{key, label, hint, levels, levels_with_filter}], levels:
+  [{key, label}], action_groups: [{label, actions: [{key, label, requires {area, level}|null,
+  with_filter}]}]}` (F3: `levels_with_filter` bzw. `with_filter` = was es mit „Sieht nur …“ gibt).
+- `GET tenants/{id}/roles` → `{roles}` (Admin, Benutzer, dann nach Name); je Rolle `{id, name,
+  description, system_key, all_rights, editable, deletable, areas {bereich: read|write}, actions,
+  locations (null = alle), device_types (null = alle), version, created_at, updated_at, usage
+  {accounts, invitation_codes}}`. *Admin* mit allen Rechten des Katalogs (`all_rights`). `usage`:
+  Konten ohne gelöschte, offene Einladungscodes (ohne Rolle zählen sie zu *Benutzer*).
+- `POST tenants/{id}/roles {name, description?, areas, actions, locations, device_types}` → 201
+  `{role}`; Kopie `{copy_of, name?}` (dieselbe Stadt, Rechte und Datenfilter, Name ohne Angabe „<Name>
+  (Kopie)“, sonst „… (2)“; Kopie von *Admin* = gewöhnliche Rolle mit allen Rechten des Katalogs).
+  `POST tenants/{id}/roles/import {source_role_id, name?}` → 201 (andere Stadt, nur Rechte, F10).
+- `GET`/`POST`/`DELETE tenants/{id}/roles/{role}`: Speichern mit `version` und ganzem Stand (ohne
+  Unterschied keine neue Version), Löschen `{}` → `{deleted_role_id}`.
+- `GET tenants/{id}/role-filter-options` → `{locations: [{id, name, kind, kind_label, active,
+  children}], device_types: [{id, name, active}]}` (auch gesperrte/deaktivierte, ohne Gerätezahlen).
+- Fehler: ungültiger Wert, unbekannter Bereich, Stufe oder Aktion, leerer Filter („Bitte mindestens
+  einen Standort wählen oder „Alle Standorte“.“), Standort oder Typ einer anderen Stadt, unbekannte
+  Vorlage → 400; Name vergeben (ohne Groß-/Kleinschreibung) → 409 `name_taken`; veraltete `version` →
+  409 `version_conflict` mit `details {role}`; *Admin* ändern oder löschen, *Benutzer* löschen, Rolle
+  mit Konten oder offenen Codes löschen (`details {accounts, invitation_codes}`), F3 (Datenfilter mit
+  `users`, `locations`/`device_types` Ändern oder `csv.import`, `details {areas, actions}`, in beide
+  Richtungen) → 409 `rule_violation`.
+- Löschen: Gelöschte (anonymisierte) Konten der Rolle bekommen die Rolle *Benutzer*, nicht mehr
+  nutzbare Codes keine Rolle (= *Benutzer*); dann wird die Rolle gelöscht.
+- Jede Änderung erhöht `fe_roles.version` und damit `permissions.version` in `auth/me`; Sitzungen
+  bleiben (F1), die Rechte gelten ab der nächsten Anfrage.
+- Ergänzungen zu 1.4: `Permissions::none()` sieht nichts (`DeviceVisibility::none()`); feste Liste
+  der Stellen mit `DeviceVisibility::all()` per Test.
+- `bin/tenant.php purge-device-data` entfernt vorher die Standortfilter der Rollen der Stadt; die
+  Rollen behalten den Filter (sehen nichts), ihre `version` steigt, die Ausgabe nennt sie.
+- Tests: `RoleApiTest`, `SuperAdminRoutesAccessTest`, `TenantPurgeCommandTest`, `DeviceVisibilityTest`.
+- Dokumentiert in `CLAUDE.md`, "Rollen und Rechte" (Verwaltung der Rollen), "Gerätedaten zurücksetzen".
+
 ## 2026-11-05 – „Rechte: Datenfilter „Sieht nur …“ in allen Abfragen und Mails (Phase 1, Schritt 1.4)“
 
 Für *Admin* und *Benutzer* (ohne Datenfilter) bleibt alles gleich, außer dem neuen Feld

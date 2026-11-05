@@ -37,6 +37,16 @@ enum Action: string
         };
     }
 
+    public function group(): ActionGroup
+    {
+        return match ($this) {
+            self::BookMove, self::BookStatus => ActionGroup::Booking,
+            self::DeviceCreate, self::DeviceEdit, self::DeviceRetire, self::DeviceCode => ActionGroup::Devices,
+            self::DevicesBulk, self::CsvImport => ActionGroup::Bulk,
+            self::MailLog => ActionGroup::Notifications,
+        };
+    }
+
     /**
      * Bereich und Stufe, ohne die die Aktion nicht wirkt; null = keiner.
      *

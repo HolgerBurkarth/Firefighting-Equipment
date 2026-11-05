@@ -13,6 +13,11 @@ use FirefightingEquipment\Tenant\Tenant;
  * Bewusste Ausnahme von "Geräte werden nie gelöscht" und "Historie nur INSERT": nur für Städte ohne
  * echte Daten (z. B. Testdaten vor der Erstbefüllung). Deshalb eine eigene Klasse statt einer Methode
  * in einem Repository. Gerätetypen, Benutzer, Einladungscodes, Sitzungen und die Stadt bleiben.
+ *
+ * Rollen mit Datenfilter auf Standorte (fe_role_locations, Fremdschlüssel auf fe_locations) verlieren
+ * ihre Auswahl: Die Zeilen werden vorher gelöscht, die Rollen behalten filter_locations = 1 und sehen
+ * danach nichts, bis im Editor der Rollen neu ausgewählt wird; ihre version steigt (permissions.version
+ * der Konten ändert sich, gleichzeitiges Bearbeiten erkennt den neuen Stand).
  */
 final readonly class TenantDeviceDataPurge
 {
@@ -33,15 +38,15 @@ final readonly class TenantDeviceDataPurge
         /** @var array{0: int|string, 1: int|string, 2: int|string, 3: int|string, 4: int|string} $row */
         $row = $stmt->fetch(\PDO::FETCH_NUM);
 
-        return new DeviceDataCounts((int) $row[0], (int) $row[1], (int) $row[2], (int) $row[3], (int) $row[4]);
+        return new DeviceDataCounts((int) $row[0], (int) $row[1], (int) $row[2], (int) $row[3], (int) $row[4], array_values($this->filteredRoles($tenant, '')));
     }
 
     /**
-     * Löscht in EINER eigenen Transaktion (eine bereits offene ist ein Fehler): Verlauf der Hinweise,
-     * Hinweise, Quittungen, Ereignisse, Geräte, Unterstandorte, Standorte der Ebene 1 (Reihenfolge der
-     * Fremdschlüssel). Die Standorte werden
-     * zuerst gesperrt, damit niemand währenddessen ein Gerät dorthin legt; scheitert etwas, wird
-     * alles zurückgenommen.
+     * Löscht in EINER eigenen Transaktion (eine bereits offene ist ein Fehler): Standortfilter der
+     * Rollen, Verlauf der Hinweise, Hinweise, Quittungen, Ereignisse, Geräte, Unterstandorte, Standorte
+     * der Ebene 1 (Reihenfolge der Fremdschlüssel). Die Standorte und die betroffenen Rollen werden
+     * zuerst gesperrt, damit niemand währenddessen ein Gerät dorthin legt oder einen Filter setzt;
+     * scheitert etwas, wird alles zurückgenommen.
      *
      * @return DeviceDataCounts gelöschte Zeilen
      */
@@ -56,6 +61,15 @@ final readonly class TenantDeviceDataPurge
             $lock = $this->pdo->prepare('SELECT id FROM fe_locations WHERE tenant_id = ? ORDER BY id FOR UPDATE');
             $lock->execute([$tenant->id]);
             $lock->fetchAll();
+            $roles = $this->filteredRoles($tenant, ' FOR UPDATE');
+
+            if ($roles !== []) {
+                $this->delete('DELETE FROM fe_role_locations WHERE tenant_id = ?', $tenant);
+                $this->pdo->prepare(
+                    'UPDATE fe_roles SET version = version + 1, updated_at = UTC_TIMESTAMP(), updated_by = NULL'
+                    . ' WHERE tenant_id = ? AND id IN (' . implode(', ', array_fill(0, count($roles), '?')) . ')',
+                )->execute([$tenant->id, ...array_keys($roles)]);
+            }
 
             $this->delete('DELETE FROM fe_device_notice_actions WHERE tenant_id = ?', $tenant);
             $notices = $this->delete('DELETE FROM fe_device_notices WHERE tenant_id = ?', $tenant);
@@ -73,7 +87,25 @@ final readonly class TenantDeviceDataPurge
             throw $e;
         }
 
-        return new DeviceDataCounts($devices, $events, $locations, $bookings, $notices);
+        return new DeviceDataCounts($devices, $events, $locations, $bookings, $notices, array_values($roles));
+    }
+
+    /**
+     * Rollen der Stadt mit Standortfilter.
+     *
+     * @param string $lock '' oder ' FOR UPDATE'
+     *
+     * @return array<int, string> ID → Name, nach Name
+     */
+    private function filteredRoles(Tenant $tenant, string $lock): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT r.id, r.name FROM fe_roles r WHERE r.tenant_id = ? AND EXISTS (SELECT 1 FROM fe_role_locations rl'
+            . ' WHERE rl.role_id = r.id AND rl.tenant_id = r.tenant_id) ORDER BY r.name, r.id' . $lock,
+        );
+        $stmt->execute([$tenant->id]);
+
+        return array_map('strval', $stmt->fetchAll(\PDO::FETCH_KEY_PAIR));
     }
 
     private function delete(string $sql, Tenant $tenant): int

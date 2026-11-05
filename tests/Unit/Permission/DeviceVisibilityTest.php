@@ -73,6 +73,89 @@ final class DeviceVisibilityTest extends TestCase
         self::assertSame([' AND 0 = 1', []], DeviceVisibility::restricted(null, [])->deviceTypeSql('t.id'));
     }
 
+    public function testNoneSeesNothing(): void
+    {
+        $none = DeviceVisibility::none();
+
+        self::assertFalse($none->isAll());
+        self::assertFalse($none->allows(1, 2));
+        self::assertSame([' AND 0 = 1 AND 0 = 1', []], $none->sql('d'));
+        self::assertSame(['locations' => [], 'device_types' => []], $none->toArray());
+    }
+
+    /** Ohne Rolle keine Rechte und auch keine Sichtbarkeit (nicht „alle“). */
+    public function testPermissionsWithoutRoleSeeNothing(): void
+    {
+        $none = Permissions::none();
+
+        self::assertSame(DeviceVisibility::none()->toArray(), $none->visibility()->toArray());
+        self::assertSame([], $none->areas());
+        self::assertSame([], $none->actions());
+    }
+
+    /**
+     * Wo der Code ausdrücklich alle Geräte sieht (DeviceVisibility::all()): feste Liste mit Grund.
+     * Eine neue Stelle lässt den Test scheitern; sie kommt nur nach Prüfung dazu, dass dort kein
+     * Konto mit Datenfilter Daten sieht (Plan Phase 1, Abschnitt 4).
+     */
+    public function testAllIsUsedOnlyAtKnownPlaces(): void
+    {
+        self::assertSame([
+            // Super-Admin: Standorte und Typen als Auswahl für „Sieht nur …“ (ohne Geräte).
+            'src/Api/V1/Roles/RoleHandler.php' => 2,
+            // CSV-Import: nur Rollen ohne Datenfilter (F3).
+            'src/Device/Import/DeviceImportPlanner.php' => 3,
+            // Testdaten der Test-Stadt (Kommandozeile).
+            'src/Device/Seed/TestCitySeeder.php' => 3,
+            // Mails „Log“ und Hinweise: liest alles, maskiert je Empfänger.
+            'src/Notification/DeviceLogNotifier.php' => 3,
+            // Rolle Admin und Rollen ohne Datenfilter.
+            'src/Permission/PermissionRepository.php' => 2,
+            // Permissions::all() (Admin) und of() (Filter danach per ofRole()).
+            'src/Permission/Permissions.php' => 2,
+        ], self::usesOfAll());
+    }
+
+    /**
+     * Aufrufe von DeviceVisibility::all() im PHP-Code der Anwendung (ohne Kommentare).
+     *
+     * @return array<string, int> Pfad relativ zum Projekt → Anzahl, nach Pfad sortiert
+     */
+    private static function usesOfAll(): array
+    {
+        $root = dirname(__DIR__, 3);
+        $uses = [];
+        foreach (['src', 'bin', 'public', 'scripts'] as $dir) {
+            $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/' . $dir, \FilesystemIterator::SKIP_DOTS));
+            foreach ($files as $file) {
+                if (!$file instanceof \SplFileInfo || $file->getExtension() !== 'php') {
+                    continue;
+                }
+                $code = file_get_contents($file->getPathname());
+                self::assertIsString($code);
+                $tokens = array_values(array_filter(
+                    \PhpToken::tokenize($code),
+                    static fn (\PhpToken $t): bool => !$t->is([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT]),
+                ));
+                $count = 0;
+                foreach ($tokens as $i => $token) {
+                    $class = ltrim($token->text, '\\');
+                    if (($class === 'DeviceVisibility' || str_ends_with($class, '\\DeviceVisibility'))
+                        && ($tokens[$i + 1] ?? null)?->is(T_DOUBLE_COLON)
+                        && strtolower($tokens[$i + 2]->text ?? '') === 'all') {
+                        ++$count;
+                    }
+                }
+                if ($count > 0) {
+                    $uses[str_replace('\\', '/', substr($file->getPathname(), strlen($root) + 1))] = $count;
+                }
+            }
+        }
+        ksort($uses);
+
+        return $uses;
+    }
+
     public function testRejectsUnsafeAliases(): void
     {
         $this->expectException(\InvalidArgumentException::class);

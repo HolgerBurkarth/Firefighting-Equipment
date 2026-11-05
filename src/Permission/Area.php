@@ -36,6 +36,22 @@ enum Area: string
         };
     }
 
+    /** Erklärung im Editor der Rollen (Mockup „Rolle bearbeiten“, nur was es in dieser Phase gibt). */
+    public function hint(): string
+    {
+        return match ($this) {
+            self::Dashboard => 'Kacheln und letzte Aktivitäten',
+            self::Search => 'Handy-Seiten, Scan, Umbuchen-Ansicht',
+            self::Devices => 'Konsole: Liste, Detailseite, Verlauf',
+            self::Locations => 'Fahrzeuge, Fächer, Räume',
+            self::DeviceTypes => 'Typen der Ausrüstung',
+            self::Due => 'Fällige und überfällige Ausrüstung',
+            self::Log => 'Hinweise erledigen, Verlauf exportieren',
+            self::Users => 'Konten, Rollen zuweisen, Einladungscodes, Aushang',
+            self::Settings => 'Farbe und Logo',
+        };
+    }
+
     /** Bereiche ohne Stufe „Ändern“ (Mockup „Rolle bearbeiten“). */
     public function maxLevel(): AreaLevel
     {
