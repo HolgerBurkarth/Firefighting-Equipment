@@ -54,3 +54,23 @@ ohne, 0037 läuft durch. Deploy mit Sicherung `ff-db-20261105-054801Z-vor-migrat
   7 mit Rolle (Holger).
 - ☐ Registrieren mit Code, Freischalten, Rolle wechseln live: Holger (neue Konten erhalten ihre Rolle;
   per Test `UserRoleAssignmentTest`, der CHECK `chk_fe_users_role_id` lehnt jedes Konto ohne Rolle ab).
+
+## Schritt 1.3a – Rechte im Backend (05.11.2026, Build `4ac60bad2b5e`)
+
+Routen unter Städten prüfen die Rechte der Rolle statt `fe_users.role`. Erwartet: für *Admin* und
+*Benutzer* keine sichtbare Änderung.
+
+- ☑ Deploy „Deployment erfolgreich“, „Keine offenen Migrationen.“, `build.json` = `4ac60bad2b5e`,
+  `health` ok.
+- ☑ Als *Admin* (bestehende Sitzung): alle lesenden Routen 200 (`auth/me`, `auth/sessions`,
+  `client-config`, `auth/notifications`, `invitation-codes`, `users`, `device-types`, `locations`,
+  `devices`, `devices/{id}`, `devices/{id}/events`, beide Exporte, `device-events`, Vorlage und gültige
+  Werte des Imports, `device-summary` mit `notices`, `inspection-due`, `notices`).
+- ☑ Als *Admin*: Dashboard (mit „Offene Hinweise 2“), Prüffristen, Protokoll und Geräteliste laden,
+  keine Fehler in der Konsole.
+- ☑ Als *Admin* mit Feldregeln: M90 Status „in Wartung“ und zurück auf „einsatzbereit“ (`POST
+  devices/{id}/state`, beide 200 `applied`), Modell von M90 geändert und auf den alten Wert
+  zurückgesetzt (`POST devices/{id}/fields`, 200).
+- ☐ Als *Benutzer*: braucht eine Anmeldung mit Passwort (Holger). Erwartet wie bisher: Suchen,
+  Umbuchen, Status, Prüffristen gehen; Konsole bzw. Admin-Routen 403 (per Test
+  `TenantRoutePermissionsTest` für jede Route).
