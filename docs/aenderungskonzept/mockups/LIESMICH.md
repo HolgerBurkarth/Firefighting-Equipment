@@ -1,6 +1,6 @@
 # Mockups zum Änderungskonzept 2026-11
 
-Abzug der UI-Mockups aus dem Claude-Projekt (Design „Mockups Änderungskonzept“), Stand 04.11.2026.
+Abzug der UI-Mockups aus dem Claude-Projekt (Design „Mockups Änderungskonzept“), Stand 05.11.2026.
 Konzept: [`../../AENDERUNGSKONZEPT-2026-11.md`](../../AENDERUNGSKONZEPT-2026-11.md).
 
 ## Wie lesen
@@ -32,3 +32,7 @@ Konzept: [`../../AENDERUNGSKONZEPT-2026-11.md`](../../AENDERUNGSKONZEPT-2026-11.
 | 6 · Mindestbestand und Tausch | `Mindestbestand.dc.html` | Standort mit Sollbestand, außer Betrieb | 6 |
 | 6 · Mindestbestand und Tausch | `Handy-Tausch.dc.html` | Geräteträger · Tausch am Handy | 6 |
 | 7 · Mail-Benachrichtigungen | `Benachrichtigungen.dc.html` | Profil · Mails und Erinnerungen an Termine | 7 |
+| 8 · Konto wechseln | `Konto-wechseln.dc.html` | Admin · Konto wechseln (PC, Menü unten) | 12 (E14) |
+| 8 · Konto wechseln | `Handy-Konto-wechseln.dc.html` | Handy · Konto wechseln im Profil | 12 (E14) |
+
+Geändert am 05.11.2026: `Einladungscodes.dc.html` zeigt bei bestehenden Codes die Bezeichnung statt Codeteilen und keinen Nachdruck (Plan Phase 1, F4); das Formular hat wieder Bezeichnung, Gültig (Tage) und Registrierungen höchstens.
