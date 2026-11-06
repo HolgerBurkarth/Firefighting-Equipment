@@ -174,6 +174,11 @@ export async function accountEntries(
     return result;
 }
 
+/** Anmeldeseite: nur die Konten anderer Städte (die aktuelle Stadt erscheint dort nicht). */
+export function otherAccountEntries(entries: readonly AccountEntry[]): AccountEntry[] {
+    return entries.filter((entry) => entry.state !== 'current');
+}
+
 /** Hinweise unter einem Eintrag (abgelaufene Anmeldung, nicht gesendete Buchungen). */
 export function accountHints(entry: AccountEntry): string[] {
     const hints: string[] = [];

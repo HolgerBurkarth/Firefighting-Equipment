@@ -7,6 +7,7 @@ import { login, resendVerification } from '../api/auth';
 import { formatCountdown } from '../auth/errorMessages';
 import { afterLogin } from '../auth/redirect';
 import { setSession, takeLoginNotice, type LoginNotice } from '../auth/session';
+import AccountSwitcher from '../components/AccountSwitcher.vue';
 import BrandCard from '../components/BrandCard.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import MailHint from '../components/MailHint.vue';
@@ -201,6 +202,10 @@ async function onResend(): Promise<void> {
                 Passwort vergessen?
             </RouterLink>
         </form>
+
+        <!-- Andere Städte dieses Geräts (Runde 2, Aufgabe 1): nach dem Abmelden oder einer
+             abgelaufenen Anmeldung zurück in eine Stadt, in der das Gerät angemeldet ist. -->
+        <AccountSwitcher v-if="!base.isService" variant="login" />
     </div>
 </template>
 
