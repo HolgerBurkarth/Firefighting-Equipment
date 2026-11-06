@@ -642,3 +642,29 @@ Konto wechseln (iPhone; zweite Stadt Immendingen, dort nur ansehen):
 - 3, 4, 7, 9, 10: übersprungen (per Test belegt).
 - Bestätigt: App-Name „Ausrüstungsverwaltung“/„FF-Ausrüstung“, Absendername „Feuerwehr
   Ausrüstungsverwaltung“, „Detailseite“.
+
+## Runde 2 – Anmeldeseite mit den anderen Konten (06.11.2026, Build `e5e0f74dd43d`)
+
+Commit `4863eae` (Anmeldeseite), dazu `7309ece` (Ergebnisse Runde 1) und `e5e0f74` (T15). CI grün
+(9:36 min), Deploy „Deployment erfolgreich“, `build.json` = `e5e0f74dd43d`, `health` ok. Agent nur in
+`test`, nichts gespeichert, nicht angemeldet oder abgemeldet.
+
+- ☑ Anmeldeseite `test` mit nur `test` in `ff-accounts`: kein Abschnitt.
+- ☑ Mit einem vorübergehend eingetragenen Eintrag (Kürzel `gibt-es-nicht`, „FF Livetest“, ohne
+  Sitzung): unter dem Formular „Auf diesem Gerät auch angemeldet:“ mit „FF Livetest · Livetest ·
+  Benutzer · neu anmelden“ und Hinweis; `test` selbst erscheint nicht. Chrome hatte die Anmeldedaten
+  eingesetzt: Antippen fragt „Konto wechseln? … Trotzdem wechseln?“, danach Anmeldeseite von
+  `gibt-es-nicht` (Formular ausgeblendet, `tenant_not_found`) mit „Test-Feuerwehr · Holger Burkarth ·
+  Admin · wechseln“; Antippen öffnet `test` angemeldet (Dashboard) ohne Passwort. `ff-accounts` danach
+  wieder wie vorher (nur `test`).
+- Hinweis: Hat Chrome die Anmeldedaten eingesetzt, wartet ein Update (gilt als Eingabe); erst
+  „Jetzt aktualisieren“ lud die neue Version. Gewollt (Regel für alle Formulare).
+- ☐ Offen für Holger: zwei echte Städte am iPhone (siehe Liste unten).
+
+### Liste für Holger (Runde 2)
+
+1. iPhone, in `test` und Immendingen angemeldet: In Immendingen abmelden. Erwartet: Anmeldeseite von
+   Immendingen mit „Auf diesem Gerät auch angemeldet:“ und „Test-Feuerwehr · <Name> · Admin ·
+   wechseln“; Antippen öffnet `test` angemeldet ohne Passwort. Immendingen erscheint dort nicht.
+2. Danach in `test` die Anmeldeseite öffnen (z. B. nach dem Abmelden in `test`): ohne andere Städte in
+   der Liste kein Abschnitt.
