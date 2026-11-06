@@ -470,7 +470,10 @@ Umbuchen-Seite führt für Admins ein Link „Gerätedetail (Admin)“ hierher.
 ### Listen
 - Suchfeld oben rechts, filtert schon beim Tippen nach Teiltext; daneben „Neu“.
 - Spaltenköpfe sortieren wie im Windows-Explorer (Klick auf-, zweiter Klick absteigend, Pfeil).
-- Stift-Symbol zum Bearbeiten in jeder Zeile; Klick auf die Zeile öffnet die Details.
+- Stift-Symbol zum Bearbeiten in jeder Zeile; Klick auf die Zeile öffnet die Details. Ist der Name
+  ein Link, tut ein Klick irgendwo in der Zeile bzw. Karte dasselbe (außer auf Knöpfen, Links,
+  Kästchen und beim Markieren von Text; per Tastatur der Link des Namens), in allen Listen gleich
+  (Holger 06.11.2026 nach T9; CLAUDE.md "Frontend", Regel für alle Listen).
 - Am Handy werden Zeilen zu Karten, Sortierung über Knöpfe oben (wie die Spaltenköpfe).
   Auswahllisten (Gerätetyp, Standort, Rolle …) mit Select bzw. Combobox von Reka UI, kein natives
   `<select>` (siehe CLAUDE.md, CSP; TODO-SPAETER.md T8).

@@ -20,6 +20,7 @@ import AppSelect from './AppSelect.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ErrorNotice from './ErrorNotice.vue';
 import FormDialog from './FormDialog.vue';
+import { vRowLink } from './rowLink';
 
 /**
  * Reiter „Rollen“ im Stadtdetail des Super-Admins (Plan Phase 1, Schritt 1.5; Mockup „Main“):
@@ -268,6 +269,7 @@ watch(
                     <tr
                         v-for="{ role, summary } in rows"
                         :key="role.id"
+                        v-row-link
                         :data-testid="`role-${String(role.id)}`"
                     >
                         <td>
@@ -296,6 +298,7 @@ watch(
                             <RouterLink
                                 class="btn"
                                 :class="{ 'btn-quiet': !role.editable }"
+                                data-row-link
                                 :to="{ name: 'role', params: { id: tenantId, role: role.id } }"
                                 :aria-label="`${role.editable ? 'Bearbeiten' : 'Ansehen'}: ${role.name}`"
                             >

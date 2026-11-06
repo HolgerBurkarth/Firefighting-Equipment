@@ -256,6 +256,37 @@ test('Admin nur ansehen', async ({ page }) => {
     await expect(page).toHaveURL(/staedte\/2\?ansicht=rollen$/);
 });
 
+test('PC: die ganze Zeile öffnet die Rolle, bei Admin „Ansehen“; Knöpfe nur ihr Eigenes', async ({
+    page,
+}) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/firefighting/service/staedte/2?ansicht=rollen');
+    const admin = page.getByTestId('role-1');
+    await expect(admin).toHaveCSS('cursor', 'pointer');
+    await admin.locator('.role-name').click();
+    await expect(page).toHaveURL(/staedte\/2\/rollen\/1$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Rolle ansehen' })).toBeVisible();
+    await page.getByRole('button', { name: 'Zurück' }).click();
+    await expect(page).toHaveURL(/staedte\/2\?ansicht=rollen$/);
+
+    // „Löschen …“ fragt nur nach, die Zeile öffnet sich nicht.
+    await page.getByRole('button', { name: 'Live-Test leer löschen …' }).click();
+    const confirm = page.getByTestId('confirm-dialog');
+    await confirm.getByRole('button', { name: 'Abbrechen' }).click();
+    await expect(confirm).toBeHidden();
+    await expect(page).toHaveURL(/staedte\/2\?ansicht=rollen$/);
+
+    await page.getByTestId('role-4').locator('td.col-count').click();
+    await expect(page).toHaveURL(/staedte\/2\/rollen\/4$/);
+});
+
+test('Handy: die ganze Karte öffnet die Rolle', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/firefighting/service/staedte/2?ansicht=rollen');
+    await page.getByTestId('role-3').locator('.role-name').click();
+    await expect(page).toHaveURL(/staedte\/2\/rollen\/3$/);
+});
+
 test('Handy: Liste und Editor ohne waagerechten Überstand', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/firefighting/service/staedte/2?ansicht=rollen');

@@ -731,7 +731,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   „Ausgesonderte anzeigen“, „Filter zurücksetzen“, Anzahl („45 Geräte“, mit Filter „12 Geräte
   gefunden“). Suche nur in den Feldern von `q` (Gerätetyp und Standort wählt man über die
   Auswahllisten; live geprüft 30.10.2026). Tabelle (ein Klick irgendwo in der Zeile bzw. Karte öffnet das Gerätedetail,
-  außer in der Spalte des Kästchens, auf Links/Knöpfen und beim Markieren von Text, `openRow`, T9;
+  außer in der Spalte des Kästchens, auf Links/Knöpfen und beim Markieren von Text, `vRowLink`, T9;
   per Tastatur der Link der Kennung) Kennung, Gerätetyp,
   Standort, Status, Nächste
   Prüfung (überfällig rot, bis 30 Tage „bald fällig“ gelb, `dueState`; ausgesonderte nie), Spaltenköpfe
@@ -1317,6 +1317,21 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   höchstens `UPDATE_TRACE_MAX` (50), älteste fallen weg; live lesbar per
   `JSON.parse(sessionStorage['ff-update-trace'])`. Nur feste Ereignisse und Build-Kennungen, nie
   Adressen (Token im Fragment) oder persönliche Daten; Fehler des Speichers ohne Folgen.
+- Regel für ALLE Listen (seit 06.11.2026, nach T9): Ist der Name einer Zeile bzw. Karte ein Link
+  (oder führt ein Link der Zeile auf ihr Ziel, z. B. „Bearbeiten“/„Ansehen“ bei den Rollen), tut ein
+  Klick irgendwo in der Zeile dasselbe: `v-row-link` an der Zeile, `data-row-link` an genau einem
+  Link darin (`vRowLink` in `src/components/rowLink.ts`; klickt diesen Link, also derselbe Weg wie
+  von Hand). Nicht bei Links, Knöpfen, Kästchen, Labels, Feldern, Flächen mit `data-row-ignore` (z. B.
+  Spalte des Kästchens), markiertem Text, anderer Maustaste oder Zusatztaste; per Tastatur bleibt der
+  Link. Ohne Link (z. B. ohne Recht auf das Ziel) tut die Zeile nichts; Mauszeiger und Hinterlegung
+  nur mit Link (`[data-row-open]:has([data-row-link])` in `base.css`). Bisher: Geräteliste,
+  `TenantTable` (Dashboard und „Städte“ des Super-Admins), Rollen im Stadtdetail, Gerätetypen,
+  Standorte (Ebene 1 und Fächer), „Letzte Aktivitäten“ des Dashboards; „Nicht einsatzbereit“,
+  Hinweise und `DeviceCard` sind schon ganz ein Link. Nicht in der Benutzerliste (Name ist kein Link,
+  dort der Stift). Neue Listen dieser Art in `tests/unit/rowLinkLists.spec.ts` eintragen (prüft auch
+  je Zeile genau einen Link); je Liste ein Browser-Test am PC (Tabelle) und in Handy-Breite (Karte):
+  Klick in eine andere Zelle öffnet das Ziel, ein Knopf der Zeile nur sein Eigenes. Unit-Test
+  `rowLink.spec.ts`.
 - Regel für ALLE Formulare: ungespeicherte Eingaben über `useUnsavedInput(() => …)`
   (`src/runtime/unsavedInput.ts`) melden: true, solange etwas eingegeben und nicht gespeichert ist;
   nach dem Speichern oder Leeren false. Nur so lädt die App nie mitten in einer Eingabe neu.

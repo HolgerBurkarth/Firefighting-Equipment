@@ -79,6 +79,8 @@ test.use({
         'GET api/v1/auth/me': { status: 200, body: meBody('admin', 'Thomas Keller') },
         ...ADMIN_OVERVIEW,
         ...delegate(() => server.api),
+        // Die Geräteliste (Ziel eines Standorts) lädt die Gerätetypen für ihren Filter.
+        'GET api/v1/device-types': { status: 200, body: { device_types: [] } },
     },
 });
 
@@ -153,6 +155,26 @@ test.describe('Standorte (PC)', () => {
         await expect(tree.locator('.node-name')).toHaveText(['HLF 20', 'G1']);
         await filter.fill('Drehleiter');
         await expect(page.getByText('Kein Standort passt zu „Drehleiter“.')).toBeVisible();
+    });
+
+    test('die ganze Zeile öffnet die Geräteliste des Standorts bzw. Fachs, Knöpfe nicht', async ({
+        page,
+    }) => {
+        await open(page);
+        const group = node(page, 10).locator('.node').first();
+        await expect(group).toHaveCSS('cursor', 'pointer');
+        await page.getByRole('button', { name: 'Fach in HLF 20 anlegen' }).click();
+        await expect(dialog(page)).toBeVisible();
+        await dialog(page).getByRole('button', { name: 'Abbrechen' }).click();
+        await expect(page).toHaveURL(/\/standorte$/);
+
+        // Ebene 1 (hier: Art und Gerätezahl), dann ein Fach.
+        await group.locator('.node-meta').click();
+        await expect(page).toHaveURL(/\/geraete\?standort=10$/);
+        await page.goBack();
+        await expect(page.getByTestId('location-tree')).toBeVisible();
+        await node(page, 11).locator('.node-meta').click();
+        await expect(page).toHaveURL(/\/geraete\?standort=11$/);
     });
 
     test('neuer Standort mit Eingabe: Klick daneben schließt nicht, Escape fragt nach', async ({
@@ -330,6 +352,13 @@ test.describe('Standorte (PC)', () => {
             await expect(node(page, 12).getByText('gesperrt')).toHaveCount(0);
         });
     });
+});
+
+test('Handy: die ganze Zeile öffnet die Geräteliste des Fachs', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page);
+    await node(page, 12).locator('.node-meta').click();
+    await expect(page).toHaveURL(/\/geraete\?standort=12$/);
 });
 
 test('Handy: Baum ohne waagerechtes Scrollen, Knöpfe mindestens 44 px', async ({ page }) => {
