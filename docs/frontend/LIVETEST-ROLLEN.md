@@ -568,3 +568,64 @@ Commits grün (9:40 min, alle Browser-Tests in acht Teilen).
   „reloaded recently“ (10 min), „Jetzt aktualisieren“ lud die neue Version. Keine Fehler in der Konsole.
 - ☐ Offen für Holger: am iPhone bzw. in Handy-Breite eine Karte antippen (Gerätetypen, Städte, Rollen);
   per Browser-Test in allen fünf Profilen belegt.
+
+## Runde 1 – Begriffe und Schritt 1.9 „Konto wechseln“ (06.11.2026, Build `43bb6bbcc027`)
+
+Commits `4cb3618` (Begriffe), `265575b` (Konto wechseln), `43bb6bb` (Popover mit Hintergrund). CI
+grün (10:30 min bzw. 9:30 min), Deploy „Deployment erfolgreich“, `build.json` = `43bb6bbcc027`,
+`health` ok. Agent nur in `test`, nichts gespeichert.
+
+- ☑ Update beim Seitenwechsel: Start mit alter Version, nach dem ersten Wechsel die neue (je Deploy).
+- ☑ Begriffe (Admin, PC): Titel „Test-Feuerwehr – Ausrüstungsverwaltung“, Menü „Ausrüstung“,
+  „Ausrüstungstypen“, unter dem Namen der Stadt „Ausrüstungsverwaltung“. Ausrüstungsliste: „69
+  Ausrüstungen“, Spalten Nummer, Ausrüstungstyp, Standort, Status, Nächste Wartung, „Neue
+  Ausrüstung“, Suchfeld „Nummer, Seriennummer, Hersteller …“. Detailseite HRT 1: „Wartungsdatum
+  ändern“, Stammdaten Nummer/Ausrüstungstyp, „Nächste Wartung: 21.09.2026 · überfällig“. „Termine“
+  (Leiste Dashboard, Suchen, Termine, Profil): „Überfällig 12 Ausrüstungen“, „Wartung: 21.09.2026 ·
+  seit 46 Tagen überfällig“.
+- ☑ CSV (per `fetch`, nicht gespeichert): Export `ausruestung-test-<datum>.csv` mit
+  „Nummer;Scan-Code;Ausrüstungstyp;Standort;Status;Nächste Wartung;…“, Vorlage
+  `ausruestung-vorlage-test.csv` ebenso, Verlauf `historie-…` mit „Ausrüstungs-ID;Nummer;
+  Ausrüstungstyp;…;Wartungsdatum alt;Wartungsdatum neu;…“, „Gültige Werte“ mit „Nummer“ und
+  „Ausrüstungstyp“.
+- ☑ Konto wechseln: `ff-accounts` mit nur `test` (Name, Rolle „Admin“, Konto-ID, keine E-Mail). Menü
+  unten „Holger Burkarth / Test-Feuerwehr · Admin“; Popover rechts neben dem Menü (420 px, eigener
+  Hintergrund, im Fenster) mit „Test-Feuerwehr · aktuell“. Profil: Abschnitt „Konto wechseln“ nach dem
+  Konto. „+ Weitere Stadt hinzufügen …“: Fokus im Feld; leer, `Service`, `a--b` und `test` mit
+  Meldung. Mit eingetippter Farbe in den Einstellungen (nicht gespeichert) und `gibt-es-nicht`:
+  Rückfrage „Ihre Eingaben auf dieser Seite gehen verloren. Trotzdem wechseln?“, Fokus auf
+  „Abbrechen“, danach Eingabe noch da; Farbe verworfen, gespeichert unverändert `#c62828`.
+- ☒ → behoben: Das Popover war in `265575b` durchsichtig (Stile `scoped` erreichen `PopoverContent`
+  nicht); `43bb6bb`, Browser-Test prüft Hintergrund und Ebene.
+- ☐ Offen für Holger (siehe Liste unten): Wechsel zwischen zwei echten Städten, Mails, iPhone.
+
+### Liste für Holger (Runde 1)
+
+Begriffe (beliebiges Konto in `test`, am PC und am iPhone):
+
+1. Menü bzw. Leiste: „Ausrüstung“, „Ausrüstungstypen“, „Termine“; Titel des Browser-Tabs „Test-Feuerwehr
+   – Ausrüstungsverwaltung“. Erwartet: nirgends „Geräte“, „Gerätetyp“, „Prüffristen“, „Kennung“
+   (Ausnahmen: „Angemeldete Geräte“, „auf diesem Gerät“, Gerätewart/Geräteträger).
+2. Installierte App (Home-Bildschirm) nach dem nächsten Start: Name „Test-Feuerwehr –
+   Ausrüstungsverwaltung“ bzw. kurz „FF-Ausrüstung“ (iOS übernimmt den Namen evtl. erst nach neuem
+   Hinzufügen zum Home-Bildschirm).
+3. Eine Umbuchung oder Statusänderung an M90–M99 mit Log-Mail: Absender „Feuerwehr
+   Ausrüstungsverwaltung“, Zeile „Ausrüstung: M9x (Typ)“, Link „Zur Ausrüstung in der Anwendung:“.
+   Danach zurücksetzen.
+4. CSV-Export öffnen: Dateiname `ausruestung-test-<datum>.csv`, Spalten „Nummer“, „Ausrüstungstyp“,
+   „Nächste Wartung“; eine alte Exportdatei (mit „Kennung“) importieren: Vorschau ohne Fehler zu
+   den Spalten.
+
+Konto wechseln (iPhone; zweite Stadt Immendingen, dort nur ansehen):
+
+5. In `test` und in Immendingen je einmal anmelden (Sitzung bestätigt). Profil → „Konto wechseln“:
+   beide Städte, die aktuelle mit „aktuell“, die andere mit „wechseln“, je „Anzeigename · Rolle“.
+6. Andere Stadt antippen: Die andere Stadt öffnet sich angemeldet ohne Passwort; dort umgekehrt.
+7. In `test` offline (Flugmodus) eine Buchung an M9x erfassen, wieder online gehen, ohne zu senden
+   sofort nach Immendingen wechseln: Eintrag `test` zeigt „1 nicht gesendete Buchung – wird nach dem
+   Wechsel gesendet.“ Zurück nach `test`: die Buchung wird gesendet. Danach zurücksetzen.
+8. In einer Stadt abmelden: In der anderen Stadt fehlt danach nur deren Eintrag; die andere bleibt
+   angemeldet.
+9. Abgelaufene Anmeldung (z. B. in der anderen Stadt am PC „Alle anderen Geräte abmelden“): Eintrag
+   bleibt mit „neu anmelden“ erst, nachdem die App das bemerkt hat; Antippen öffnet die Anmeldung.
+10. Ohne Netz in eine schon geöffnete Stadt wechseln: Sie öffnet sich mit der Offline-Kopie.
