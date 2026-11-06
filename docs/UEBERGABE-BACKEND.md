@@ -8,6 +8,22 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-06 – „Rollen: ClientApi::MIN = 2, Apps vor den Rechten aktualisieren sofort (Phase 1, Schritt 1.8a)“
+
+Plan Phase 1, Schritt 1.8a (Holger, 06.11.2026: als eigener Schritt vor den Rollen für Immendingen).
+
+- `ClientApi::MIN` = 2 (vorher 1): Jede Anfrage mit `X-Client-Api: 1` (oder 0) bekommt vor Stadt,
+  Datenbank und Handler 409 `client_outdated` mit `details {"min_client_api": 2}`. Grund: Apps mit 1
+  (04./05.11.2026, vor Schritt 1.7c) richten Menü und Knöpfe nach `role` statt nach den Rechten; sie
+  sollen sich sofort aktualisieren, bevor Städte eigene Rollen bekommen.
+- Unverändert: Anfragen ohne `X-Client-Api` (Apps vor Phase 0, curl, Deploy-Skript) und mit einer
+  Nummer ab 2 gehen durch. `ClientApi::CURRENT` bleibt 2, keine Änderung an Routen, Feldern oder
+  anderen Fehlern.
+
+Tests: `ClientApiTest::testAppsBeforeRightsAreOutdated`, `ApplicationTest` (Fall „Nummer 1 unter einer
+Stadt“, `details.min_client_api` 2). `CLAUDE.md` "Versionierung der API für das Frontend", "Rollen und
+Rechte".
+
 ## 2026-11-05 – „Rollen: Rechte ändern sich während der Sitzung, X-Client-Api 2 (Phase 1, Schritt 1.7c)“
 
 Plan Phase 1, Schritt 1.7c, `X-Client-Api` Variante B (Holger, 05.11.2026).
