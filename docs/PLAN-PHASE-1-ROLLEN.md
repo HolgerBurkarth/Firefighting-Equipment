@@ -720,6 +720,28 @@ bestehende Oberfläche auf die Tabelle in Abschnitt 9.
 
 Offen dazu: F14 (Adressen wie `geraete`, `prueffristen` und Spalten der CSV).
 
+**Umsetzung (Runde 1, Aufgabe 1, 06.11.2026)**, Festlegungen Holger vom 06.11.2026:
+
+- Umgestellt wird alles, was Nutzer sehen: App, Mails, Fehlermeldungen der API, CSV (Überschriften,
+  „Gültige Werte“, Dateinamen). Nicht: Adressen (`geraete`, `prueffristen`, Mail-Links), Bezeichner
+  im Code, Werte der API, Kommandozeile (`bin/*.php`, nur für Betreiber), Kommentare im Code.
+- Gerät → Ausrüstung (mit Zahl „1 Ausrüstung“, „12 Ausrüstungen“; ohne Zahl „Ausrüstung“ als
+  Sammelbegriff, Menü „Ausrüstung“), Gerätetyp → Ausrüstungstyp, Geräteliste → Ausrüstungsliste,
+  Gerätedetail → Detailseite (wie im Rechte-Katalog). „Gerät“ als Handy/PC bleibt („auf diesem
+  Gerät“, „Angemeldete Geräte“, „Unbekanntes Gerät“, „Uhr dieses Geräts“), ebenso „Gerätewart“,
+  „Gerätehaus“, „Geräteträger“ und die Namen der Typen.
+- Name der App: „Ausrüstungsverwaltung“ (Fenstertitel „<Stadt> – Ausrüstungsverwaltung“,
+  Web-App-Manifest, Kurzname „FF-Ausrüstung“, Absender der Mails „Feuerwehr Ausrüstungsverwaltung“).
+- Prüffristen → Termine; Prüfung → Wartung: „Nächste Prüfung“ → „Nächste Wartung“, Prüfdatum →
+  Wartungsdatum („Wartungsdatum ändern“, „Wartungsdatum setzen …“, Ereignis „Wartungsdatum
+  geändert“). Der Status „in Wartung“ bleibt.
+- Kennung → Nummer. „Buchungs-Kennung“ (`client_ref`) und „Build-Kennung“ bleiben.
+- CSV: Export schreibt „Nummer“, „Ausrüstungstyp“, „Nächste Wartung“, im Verlauf „Ausrüstungs-ID“
+  (bisher „Geräte-Nr.“), „Nummer“, „Ausrüstungstyp“, „Wartungsdatum alt/neu“. Der Import nimmt
+  alte und neue Überschriften an (`ImportColumn`, je Spalte eine Liste). Dateinamen
+  `ausruestung-<kürzel>-<datum>.csv` und `ausruestung-vorlage-<kürzel>.csv`; `historie-…` und
+  `gueltige-werte-…` bleiben.
+
 ## 9. Schritte, Reihenfolge, Risiken, offene Fragen
 
 | Schritt | Inhalt | Größe | Live/CI vor dem nächsten |

@@ -7,13 +7,15 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
 
 ## Arbeitsweise
 - Alle Antworten an den Nutzer immer auf Deutsch, auch Zwischenstände und Rückfragen.
-- In kleinen Schritten arbeiten. Vor größeren Änderungen erst einen Plan vorlegen.
+- In Arbeitsrunden arbeiten (seit 06.11.2026, siehe "Arbeitsrunden"): je Aufgabe ein kleiner
+  Schritt mit eigenem Commit. Pläne größerer Änderungen schreibt der Agent in die Plan-Datei und
+  arbeitet weiter; Rückfrage nur bei echten Entscheidungen.
 - Wünsche für später stehen in `docs/TODO-SPAETER.md`; nicht vorziehen, neue Wünsche dort ergänzen.
 - Bestehende Funktionen dürfen nicht kaputtgehen: Jede Änderung bekommt Tests, vor jedem Commit
   müssen die Prüfungen von "Prüfen vor „✅ FERTIG“" grün sein. CI prüft je Push nur die betroffenen
   Bereiche, nachts alles (siehe "GitHub Actions (CI)"); deployt wird nur nach grünem CI-Lauf.
-- Commits (seit 31.10.2026): Nach „✅ FERTIG“ committet der Agent selbst, ein Commit je Schritt mit
-  allen Dateien des Schritts, Betreff wie in der Meldung genannt, mit der üblichen Attribution
+- Commits (seit 31.10.2026; seit 06.11.2026 je Aufgabe einer Runde, ohne Anhalten): Der Agent
+  committet selbst, ein Commit je Aufgabe bzw. Schritt mit allen Dateien, Betreff wie in der Meldung genannt, mit der üblichen Attribution
   (`Co-Authored-By`). Vorher immer `git status` prüfen: keine fremden, temporären oder nicht zum
   Schritt gehörenden Dateien (Testausgaben, Notizen, Konfiguration mit Zugangsdaten). Pushen,
   CI verfolgen und deployen ebenfalls der Agent (seit 31.10.2026, siehe "Autonomer Ablauf"); schon
@@ -31,7 +33,8 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   (Datum, Commit-Betreff, was und warum, Tests), damit der Backend-Chat sie kennt. Als Betreff trägt
   der Agent den Betreff seines Commits ein (nicht „noch nicht committet“).
 - Prüfen vor „✅ FERTIG“ (lokal nur das Nötige; alle Tests in allen fünf Profilen prüft der
-  nächtliche Lauf der CI, siehe "GitHub Actions (CI)"):
+  nächtliche Lauf der CI, siehe "GitHub Actions (CI)"). In einer Arbeitsrunde gilt das erst am Ende
+  der Runde; je Aufgabe nur die schnellen Prüfungen (siehe "Arbeitsrunden"):
   - Frontend geändert: in `frontend/` `npm run lint`, `npm run typecheck`, `npm run test:unit:log`
     (wie `test:unit`, hängt je Lauf Ergebnis und Namen gescheiterter Tests an
     `frontend/test-logs/unit.log` an, Ordner in `.gitignore`; einen Fehler, der sich nicht
@@ -74,6 +77,33 @@ Webanwendung für Feuerwehren: Geräte (z. B. Atemschutzmasken) werden Standorte
   feste Zeitgrenze setzen.
 - Live-Tests (gegen den Server www.prodad.de) nur in der Test-Stadt `/firefighting/test/`, nie in
   echten Städten.
+
+## Arbeitsrunden
+Seit 06.11.2026 (Vorgabe Holger; Grund: die Zeit ging vor allem mit Warten auf Prüfläufe und
+Anhalten nach jedem Schritt verloren). Gilt vor "Autonomer Ablauf", wo es abweicht.
+- Eine Runde besteht aus mehreren Aufgaben, die der Nutzer vorgibt. Der Agent arbeitet sie
+  nacheinander ab, ohne nach jeder Aufgabe anzuhalten.
+- Offene Fragen möglichst gesammelt am Anfang der Runde stellen („❓ RÜCKFRAGE“), nicht einzeln
+  unterwegs. Eindeutiges ohne Rückfrage umsetzen. Pläne in die Plan-Datei schreiben und weiterarbeiten
+  (kein Vorlegen und Warten). „⏳ ZWISCHENSTAND“ gern, ohne anzuhalten.
+- Je Aufgabe nur die schnellen Prüfungen, dann ein eigener Commit (damit sich Fehler zuordnen
+  lassen): in `frontend/` `npm run lint`, `npm run typecheck`, `npm run test:unit:log`, die
+  betroffenen Browser-Testdateien nur in Chromium (`npm run test:e2e -- --project=chromium
+  tests/e2e/<datei>.spec.ts`, nach `npm run build`); bei PHP-Änderungen `composer test` (bei Bedarf
+  mit Filter, Regeln wie unter "Arbeitsweise").
+- Am Ende der Runde einmal:
+  1. lokal alle Browser-Tests in Chromium und WebKit (`npm run test:e2e`); Dateien, die von Breite
+     oder Browser abhängen, in allen fünf Profilen (`npm run test:e2e:all -- <dateien>`); Firefox
+     für Dateien, die unter Windows nicht laufen (z. B. `appUpdate.spec.ts`, T15), unter WSL; Tests,
+     die sich je Betriebssystem anders verhalten können, wie bisher zusätzlich unter WSL;
+  2. ein Push, eine CI (Ablauf, Reparaturen und Ausnahmen wie unter "Autonomer Ablauf"), ein
+     Deploy, ein Live-Test;
+  3. eine „✅ FERTIG“-Meldung mit allen Aufgaben (je Aufgabe Commit-Betreff, Änderungen, Tests) und
+     den übrigen Angaben von "Autonomer Ablauf", Punkt 6, dazu eine Liste für den Nutzer mit allem,
+     was er live prüfen soll, mit erwarteten Werten.
+- Angehalten wird nur bei den Rückfragen unter "Autonomer Ablauf" (Migrationen mit Datenänderung,
+  Deploy-Skript und Deploy im Workflow, Sicherungen, echte Städte) sowie vor einer Änderung von
+  `ClientApi::MIN` oder wenn eine Entscheidung des Nutzers nötig ist.
 
 ## Autonomer Ablauf
 Seit 31.10.2026 arbeitet der Agent eine Runde selbstständig durch: programmieren, testen,
