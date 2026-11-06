@@ -629,3 +629,16 @@ Konto wechseln (iPhone; zweite Stadt Immendingen, dort nur ansehen):
 9. Abgelaufene Anmeldung (z. B. in der anderen Stadt am PC „Alle anderen Geräte abmelden“): Eintrag
    bleibt mit „neu anmelden“ erst, nachdem die App das bemerkt hat; Antippen öffnet die Anmeldung.
 10. Ohne Netz in eine schon geöffnete Stadt wechseln: Sie öffnet sich mit der Offline-Kopie.
+
+### Ergebnis Holger (Runde 1, 06.11.2026)
+
+- ☑ 1, 2: Begriffe am PC und am iPhone.
+- ☑ 5: Immendingen über „+ Weitere Stadt hinzufügen …“ (öffnet sich im selben Fenster); Liste mit
+  „aktuell“ und „wechseln“, je Anzeigename · Rolle.
+- ☑ 6: Wechsel in beide Richtungen ohne Passwort.
+- ☒ 8: Nach dem Abmelden in Immendingen zeigt die App die Anmeldeseite von Immendingen; von dort gibt
+  es keinen Weg zurück zur Test-Stadt, in der Holger weiter angemeldet ist (nur über die Adresszeile).
+  → Runde 2, Aufgabe 1: Anmeldeseite mit „Auf diesem Gerät auch angemeldet:“.
+- 3, 4, 7, 9, 10: übersprungen (per Test belegt).
+- Bestätigt: App-Name „Ausrüstungsverwaltung“/„FF-Ausrüstung“, Absendername „Feuerwehr
+  Ausrüstungsverwaltung“, „Detailseite“.
