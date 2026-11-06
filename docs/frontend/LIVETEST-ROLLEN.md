@@ -548,3 +548,23 @@ Der Agent ändert in Immendingen nichts und prüft danach nur lesend (`GET tenan
 
 - ☐ Holger: beide Rollen angelegt.
 - ☐ Agent (nur lesend): Rechte, Beschreibung, Filter und 0 Personen wie oben.
+
+## Zwischenschritt vor 1.9 – ganze Zeile bzw. Karte öffnet den Link (06.11.2026, Build `daf7d505d486`)
+
+Wunsch Holger beim Anlegen der Rollen: überall, wo der Name einer Zeile ein Link ist, wirkt ein Klick
+irgendwo in der Zeile wie auf den Namen (gemeinsamer Baustein `vRowLink`, Regel in CLAUDE.md). CI des
+Commits grün (9:40 min, alle Browser-Tests in acht Teilen).
+
+- ☑ Deploy „Deployment erfolgreich“, `build.json` = `daf7d505d486`, `health` ok.
+- ☑ Test-Stadt (Admin, nur lesend): Standorte – Zeile „Atemschutzwerkstatt“ (Ebene 1) →
+  `geraete?standort=36`, Fach „Fahrerhaus“ → `geraete?standort=27`, Mauszeiger Hand. Gerätetypen –
+  Zeile „Atemschutzgerät“ → `geraete?typ=9`; der Stift öffnet nur das Fenster (abgebrochen).
+  Geräteliste – das Kästchen wählt nur aus, ein Klick auf den Standort öffnet das Gerätedetail.
+  Dashboard „Letzte Aktivitäten“ – Klick auf die Zeit von M92 → `geraete/137/details`.
+- ☑ Super-Admin (nur lesend): Dashboard, Zeile „Test-Feuerwehr“ (Status) → `staedte/2`; „Städte“,
+  Adresse → `staedte/2`; Rollen der Test-Stadt: *Admin* → „Rolle ansehen“, *Benutzer* → „Rolle
+  bearbeiten“ (nichts gespeichert, „Kopieren“ nicht angetippt).
+- ☑ Update beim Seitenwechsel: Test-Stadt sofort; unter `service` im selben Tab griff die Sperre
+  „reloaded recently“ (10 min), „Jetzt aktualisieren“ lud die neue Version. Keine Fehler in der Konsole.
+- ☐ Offen für Holger: am iPhone bzw. in Handy-Breite eine Karte antippen (Gerätetypen, Städte, Rollen);
+  per Browser-Test in allen fünf Profilen belegt.
