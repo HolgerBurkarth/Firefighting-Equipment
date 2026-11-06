@@ -22,6 +22,7 @@ final readonly class Permissions
      * @param array<string, AreaLevel> $areas    Bereich (Wert von Area) → Stufe
      * @param list<Action>             $actions
      * @param string|null              $revision Rolle und ihr Stand („<id>:<version>“), null ohne Rolle
+     * @param string|null              $roleName Name der Rolle (für auth/me), null ohne Rolle
      */
     private function __construct(
         private bool $all,
@@ -29,6 +30,7 @@ final readonly class Permissions
         private array $actions,
         private DeviceVisibility $visibility,
         private ?string $revision = null,
+        private ?string $roleName = null,
     ) {
     }
 
@@ -125,13 +127,19 @@ final readonly class Permissions
      * Dieselben Rechte mit Angaben zur Rolle, aus der sie stammen (für permissions in auth/me), und
      * ihrem Datenfilter.
      */
-    public function ofRole(int $roleId, int $roleVersion, DeviceVisibility $visibility): self
+    public function ofRole(int $roleId, int $roleVersion, DeviceVisibility $visibility, ?string $roleName = null): self
     {
         if ($this->all && !$visibility->isAll()) {
             throw new \LogicException('Die Rolle Admin hat keinen Datenfilter.');
         }
 
-        return new self($this->all, $this->areas, $this->actions, $visibility, $roleId . ':' . $roleVersion);
+        return new self($this->all, $this->areas, $this->actions, $visibility, $roleId . ':' . $roleVersion, $roleName);
+    }
+
+    /** Name der Rolle, aus der die Rechte stammen (Liste „Konto wechseln“); null ohne Rolle. */
+    public function roleName(): ?string
+    {
+        return $this->roleName;
     }
 
     public function isAll(): bool

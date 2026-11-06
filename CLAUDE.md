@@ -641,6 +641,28 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `tests/e2e/deviceDetails.spec.ts` (Hilfen `fullDevice`, `eventJson`, `eventsEndpoint` in
   `tests/e2e/support/devices.ts`; `deviceDetail` liefert alle Felder) und
   `tests/unit/deviceHistory.spec.ts`.
+- Konto wechseln (Konzept E14, Plan Phase 1, Schritt 1.9, Mockups `Konto-wechseln`,
+  `Handy-Konto-wechseln`): Liste der Konten dieses Geräts in mehreren Städten, `src/data/accounts.ts`
+  (`AccountList` als `accountList` aus `src/data/index.ts`, `installAccountList` in `main.ts`, nur unter
+  Städten): localStorage `ff-accounts` (ein Schlüssel für alle Städte, `{format: ACCOUNTS_FORMAT,
+  accounts}`), je Stadt ein Eintrag `{slug, tenantName, accountId, displayName, roleName}`, sortiert
+  nach Name der Stadt; nie Tokens, E-Mail oder Rechte. Jede bekannte Sitzung dieser Stadt kommt hinein
+  (ein anderes Konto ersetzt den Eintrag), Abmelden beim Server entfernt nur den Eintrag dieser Stadt,
+  eine abgelaufene Sitzung nicht. Kennzeichen (`accountEntries`): `current` „aktuell“, `signed-in`
+  „angemeldet“ (am Handy „wechseln“), wenn `ff-session:<kürzel>` dasselbe Konto hat, sonst `expired`
+  „neu anmelden“ mit Hinweis; je Eintrag die nicht angekommenen Buchungen des Kontos (IndexedDB `queue`
+  `<kürzel>:<konto-id>`, „N nicht gesendete Buchungen – werden nach dem Wechsel gesendet.“) und die
+  Farbe aus `ff-tenant:<kürzel>`. Sitzungen, Kopien und Warteschlangen anderer Städte liest die Liste
+  nur. Baustein `AccountSwitcher` (`variant` `menu`/`profile`): Wechsel per voller Navigation auf
+  `cityUrl(kürzel)` bzw. bei „neu anmelden“ `…/anmelden`, mit ungespeicherten Eingaben
+  (`hasUnsavedInput`) erst nach `ConfirmDialog` „Ihre Eingaben auf dieser Seite gehen verloren.
+  Trotzdem wechseln?“; „+ Weitere Stadt hinzufügen …“ mit Feld „Adresse oder Kürzel der Stadt“
+  (`cityFromInput`: Segment nach `/firefighting/`, `slugProblem`, die eigene Stadt abgelehnt), dann
+  `…/anmelden` der Stadt. Ort: Admin-Konsole unten im Menü der Name mit „Stadt · Rolle“ als Knopf (am PC
+  Reka UI `Popover` rechts neben dem Menü, offen gehalten, solange die Rückfrage offen ist; in der
+  Schublade aufgeklappt darunter), Handy im Profil der Abschnitt „Konto wechseln“. Unter `service`
+  weder Liste noch Knopf. Tests `tests/e2e/accountSwitch.spec.ts` (zwei Städte `test` und `hattingen`
+  im selben Testserver, die API antwortet je `request.area`), Unit `accounts.spec.ts`.
 - Profil (`ProfilePage`, `profil`, KONZEPT.md "User am Handy", Profil): `AccountPanel` (Konto,
   Abmelden), `ThemeModeSetting` (Radiogruppe System/Hell/Dunkel, sofort `saveThemeMode` und
   `applyThemeMode`, Hinweis per `matchMedia`), `PasswordChangeForm` (aufklappbar; `changePassword`
@@ -2090,7 +2112,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Versionskonflikt, F3), `DeviceVisibilityTest`, Mails in `DeviceLogNotificationTest`/
   `DeviceNoticeNotificationTest` (Trait `FilteredRoles`), Frontend `bookingQueue.spec.ts`,
   `deviceHistory.spec.ts`, `notices.spec.ts`, `locationsApi.spec.ts`.
-- `GET auth/me` (auch die Antwort von `auth/login` und `auth/password`, `AuthJson::permissions`):
+- `GET auth/me` (auch die Antwort von `auth/login` und `auth/password`): im Objekt `user` seit Schritt
+  1.9 zusätzlich `role_id` und `role_name` (Rolle der Stadt, `Permissions::roleName`; unter `service`
+  `null`; die App liest `roleName`, ohne Feld `null`). `AuthJson::permissions`:
   `permissions {areas: {bereich: read|write}, actions: [...], restrictions: [], filtered, version}`,
   unter `service` `null`. Nur wirksame Rechte in der Reihenfolge des Katalogs (Aktionen nur mit ihrem
   Bereich, `Permissions::areas()`/`actions()`), `areas` immer ein Objekt, `restrictions` bis Phase 2

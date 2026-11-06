@@ -12,6 +12,11 @@ export interface SessionUser {
     readonly name: string | null;
     readonly displayName: string | null;
     readonly role: UserRole;
+    /**
+     * Name der Rolle der Stadt (`role_name`, seit Schritt 1.9, für „Konto wechseln“); null unter
+     * `service` und in Antworten bzw. gespeicherten Sitzungen ohne das Feld.
+     */
+    readonly roleName: string | null;
 }
 
 /** Antwort von auth/login und auth/me (AuthJson::me), auf das Nötige beschränkt. */
@@ -47,12 +52,15 @@ export function parseAuthState(json: unknown): AuthState | null {
     const name = optionalString(user['name']);
     const displayName = optionalString(user['display_name']);
     const role = user['role'];
+    // Fehlt in älteren Antworten und gespeicherten Sitzungen (vor Schritt 1.9).
+    const roleName = 'role_name' in user ? optionalString(user['role_name']) : null;
     if (
         typeof id !== 'number' ||
         !Number.isInteger(id) ||
         email === undefined ||
         name === undefined ||
         displayName === undefined ||
+        roleName === undefined ||
         !isRole(role)
     ) {
         return null;
@@ -74,7 +82,7 @@ export function parseAuthState(json: unknown): AuthState | null {
     if (permissions === undefined) {
         return null;
     }
-    return { user: { id, email, name, displayName, role }, tenant, permissions };
+    return { user: { id, email, name, displayName, role, roleName }, tenant, permissions };
 }
 
 /** Antworten mit einer Meldung des Servers (202 bei Mail-Abläufen, 200 bei Abmelden u. a.). */

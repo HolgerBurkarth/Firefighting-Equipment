@@ -8,6 +8,19 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-06 – „Konto wechseln: Liste der Konten in mehreren Städten (Runde 1, Aufgabe 2, Schritt 1.9)“
+
+Plan Phase 1, Schritt 1.9 (Konzept E14).
+
+- `GET auth/me` (auch die Antworten von `auth/login` und `auth/password`): im Objekt `user`
+  zusätzlich `role_id` und `role_name` (Rolle der Stadt des Kontos; unter `service` beide `null`).
+  Reine Erweiterung; `role` bleibt die Kontoart. Grund: Die Liste „Konto wechseln“ zeigt je Stadt den
+  Rollennamen. Der Name kommt aus derselben Abfrage wie die Rechte (`PermissionRepository`,
+  `Permissions::roleName`), keine zusätzliche Abfrage.
+
+Tests: `LoginTest::testTenantUserLogsIn` (Felder), `testMeNamesTheRoleOfTheTenant` (Admin, eigene Rolle,
+Super-Admin). `CLAUDE.md` "Rollen und Rechte" (`GET auth/me`), "Frontend" (Konto wechseln).
+
 ## 2026-11-06 – „Begriffe: Ausrüstung, Termine, Wartung und Nummer in App, Mails, Meldungen und CSV (Runde 1, Aufgabe 1)“
 
 Plan Phase 1, Abschnitt 8 (F14), Festlegungen Holger vom 06.11.2026.

@@ -14,7 +14,15 @@ import {
     session,
     sessionCheckError,
 } from './auth/session';
-import { bookingQueue, deviceStore, installDataLayer, locationStore, otherQueues } from './data';
+import {
+    accountList,
+    bookingQueue,
+    deviceStore,
+    installDataLayer,
+    locationStore,
+    otherQueues,
+} from './data';
+import { installAccountList } from './data/accounts';
 import { installBookingQueue, installOfflineCopy } from './data/offline';
 import { installServiceDataLayer } from './data/service';
 import { createAppRouter, preloadPage } from './router';
@@ -57,6 +65,8 @@ if (base.isService) {
         devices: deviceStore,
         others: otherQueues,
     });
+    // Konten in mehreren Städten (Plan Phase 1, Schritt 1.9): Liste „Konto wechseln“.
+    installAccountList(accountList);
     // Rechte ändern sich während der Sitzung (Plan Phase 1, Schritt 1.7c): auth/me neu beim
     // Zurückkehren in die App und nach 403 forbidden; neue Rechte übernimmt setSession.
     setForbiddenHandler(() => {

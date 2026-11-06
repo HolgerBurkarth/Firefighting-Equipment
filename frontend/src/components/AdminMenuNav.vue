@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui';
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { userLabel } from '../api/auth';
@@ -9,14 +10,16 @@ import { adminOverview, bookingQueue } from '../data';
 import { unsentWarning } from '../data/bookingQueue';
 import { ADMIN_MENU, ADMIN_SETTINGS, SERVICE_MENU, type AdminMenuBadge } from '../router/adminMenu';
 import { tenantState } from '../runtime/tenantState';
+import AccountSwitcher from './AccountSwitcher.vue';
 import AdminMenuIcon from './AdminMenuIcon.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ErrorNotice from './ErrorNotice.vue';
 
 /**
  * Inhalt des Menüs der Admin-Konsole: links am PC (`sidebar`, am Tablet eingeklappt auf Symbole)
- * bzw. in der Schublade am Handy (`drawer`). Unten „Einstellungen“, der Name des Kontos als Text und
- * „Abmelden“.
+ * bzw. in der Schublade am Handy (`drawer`). Unten „Einstellungen“, der Name des Kontos und
+ * „Abmelden“. Unter Städten ist der Name ein Knopf für „Konto wechseln“ (Plan Phase 1, Schritt 1.9):
+ * am PC ein Popover rechts neben dem Menü, in der Schublade darunter aufgeklappt.
  */
 const props = defineProps<{
     variant: 'sidebar' | 'drawer';
@@ -36,6 +39,24 @@ const busy = ref(false);
 const error = ref<ApiError | null>(null);
 
 const accountName = computed(() => (session.value === null ? '' : userLabel(session.value.user)));
+/** „FF Immendingen · Admin“ unter dem Namen des Kontos. */
+const accountDetail = computed(() => {
+    const tenant = session.value?.tenant ?? null;
+    const roleName = session.value?.user.roleName ?? null;
+    if (tenant === null) {
+        return '';
+    }
+    return roleName === null ? tenant.name : `${tenant.name} · ${roleName}`;
+});
+const switchOpen = ref(false);
+/** Solange die Rückfrage „Trotzdem wechseln?“ offen ist, bleibt das Popover offen. */
+const switchConfirming = ref(false);
+function setSwitchOpen(open: boolean): void {
+    if (!open && switchConfirming.value) {
+        return;
+    }
+    switchOpen.value = open;
+}
 /** Nur Seiten, die das Konto öffnen darf (Rechte der Rolle, Plan Phase 1, Schritt 1.7b). */
 function allowed(name: string): boolean {
     return session.value !== null && canOpenRoute(router, name, session.value);
@@ -150,10 +171,63 @@ async function onLogout(): Promise<void> {
                 <AdminMenuIcon :name="ADMIN_SETTINGS.icon" />
                 <span class="menu-label">{{ ADMIN_SETTINGS.label }}</span>
             </RouterLink>
-            <p class="menu-account" :title="accountName">
+            <p v-if="service" class="menu-account" :title="accountName">
                 <AdminMenuIcon name="account" />
                 <span class="menu-label" data-testid="account-name">{{ accountName }}</span>
             </p>
+            <template v-else-if="variant === 'drawer'">
+                <button
+                    class="menu-link menu-account menu-account-button"
+                    type="button"
+                    :aria-expanded="switchOpen ? 'true' : 'false'"
+                    aria-controls="account-switch-drawer"
+                    :title="`${accountName} – Konto wechseln`"
+                    @click="switchOpen = !switchOpen"
+                >
+                    <AdminMenuIcon name="account" />
+                    <span class="menu-label menu-account-text">
+                        <span data-testid="account-name">{{ accountName }}</span>
+                        <span class="menu-account-detail">{{ accountDetail }}</span>
+                    </span>
+                    <span class="menu-label menu-account-switch" aria-hidden="true">⇄</span>
+                </button>
+                <section
+                    v-if="switchOpen"
+                    id="account-switch-drawer"
+                    class="menu-account-panel"
+                    aria-label="Konto wechseln"
+                >
+                    <h2 class="menu-account-heading">Konto wechseln</h2>
+                    <AccountSwitcher variant="menu" />
+                </section>
+            </template>
+            <PopoverRoot v-else :open="switchOpen" @update:open="setSwitchOpen">
+                <PopoverTrigger
+                    class="menu-link menu-account menu-account-button"
+                    :title="`${accountName} – Konto wechseln`"
+                >
+                    <AdminMenuIcon name="account" />
+                    <span class="menu-label menu-account-text">
+                        <span data-testid="account-name">{{ accountName }}</span>
+                        <span class="menu-account-detail">{{ accountDetail }}</span>
+                    </span>
+                    <span class="menu-label menu-account-switch" aria-hidden="true">⇄</span>
+                </PopoverTrigger>
+                <PopoverPortal>
+                    <PopoverContent
+                        class="menu-account-popover"
+                        side="right"
+                        align="end"
+                        :side-offset="8"
+                        :collision-padding="8"
+                        aria-label="Konto wechseln"
+                        data-testid="account-switch"
+                    >
+                        <h2 class="menu-account-heading">Konto wechseln</h2>
+                        <AccountSwitcher variant="menu" @confirming="switchConfirming = $event" />
+                    </PopoverContent>
+                </PopoverPortal>
+            </PopoverRoot>
             <button
                 class="menu-link menu-logout"
                 type="button"
@@ -287,6 +361,58 @@ async function onLogout(): Promise<void> {
 
 .menu-account {
     color: var(--muted);
+}
+
+.menu-account-button {
+    width: 100%;
+    color: var(--text);
+}
+
+.menu-account-text {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-width: 0;
+    line-height: 1.25;
+    font-weight: var(--font-weight-semibold);
+}
+
+.menu-account-detail {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-normal);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.menu-account-switch {
+    color: var(--muted);
+    font-size: var(--font-size-xs);
+}
+
+.menu-account-panel {
+    padding: 8px 4px 12px;
+}
+
+.menu-account-heading {
+    margin: 0 0 8px;
+    font-size: var(--font-size-lg);
+}
+
+/* Popover (Portal nach body; die Klasse kommt aus diesem Baustein, daher scoped). */
+.menu-account-popover {
+    z-index: 50;
+    box-sizing: border-box;
+    width: min(420px, calc(100vw - 16px));
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-raised);
+    color: var(--text);
 }
 
 /* Tablet: eingeklappt auf Symbole; Texte bleiben für Bildschirmleser, Tooltip über title. */

@@ -32,6 +32,9 @@ final class AuthJson
                 'name' => $user->name?->value,
                 'display_name' => $user->displayName?->value,
                 'role' => $user->role->value,
+                // Rolle der Stadt (Plan Phase 1, Schritt 1.9: Liste „Konto wechseln“); unter service null.
+                'role_id' => $auth->permissions === null ? null : $user->roleId,
+                'role_name' => $auth->permissions?->roleName(),
                 'protected' => $user->protected,
                 'notifications' => NotificationSettingsHandler::json($user)['notifications'],
             ],

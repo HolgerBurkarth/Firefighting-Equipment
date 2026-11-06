@@ -79,6 +79,7 @@ import { NoticeList } from './noticeList';
 import { UserStore } from './userStore';
 import { BookingQueue } from './bookingQueue';
 import { OtherQueues } from './otherQueues';
+import { AccountList } from './accounts';
 import { currentAppBase } from '../runtime/appBase';
 import { browserLocalDb } from '../runtime/localDb';
 import { newClientRef, setBookingNotice } from './booking';
@@ -126,6 +127,13 @@ export const bookingQueue = new BookingQueue({
  * localStorage.
  */
 export const otherQueues = new OtherQueues({
+    area: () => currentAppBase().area,
+    db: browserLocalDb(),
+    storage: browserStorage(),
+});
+
+/** Konten in anderen Städten auf diesem Gerät („Konto wechseln“, Plan Phase 1, Schritt 1.9). */
+export const accountList = new AccountList({
     area: () => currentAppBase().area,
     db: browserLocalDb(),
     storage: browserStorage(),

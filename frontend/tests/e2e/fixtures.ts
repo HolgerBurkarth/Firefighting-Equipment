@@ -108,6 +108,8 @@ export function meBody(
             name: 'Anna Beispiel',
             display_name: displayName,
             role,
+            role_id: role === 'superadmin' ? null : role === 'admin' ? 1 : 2,
+            role_name: role === 'superadmin' ? null : role === 'admin' ? 'Admin' : 'Benutzer',
             protected: false,
             notifications: { device_log: false },
         },

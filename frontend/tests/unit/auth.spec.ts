@@ -27,11 +27,23 @@ describe('parseAuthState', () => {
                 name: 'Anna Beispiel',
                 displayName: 'Anna',
                 role: 'admin',
+                // Ohne `role_name` (Antwort vor Schritt 1.9): keine Rolle bekannt.
+                roleName: null,
             },
             tenant: { slug: 'test', name: 'Feuerwehr Test' },
             // Ohne `permissions` (Antwort vor Schritt 1.3b): Rechte der Kontoart.
             permissions: null,
         });
+    });
+
+    it('liest den Namen der Rolle (Schritt 1.9)', () => {
+        expect(
+            parseAuthState({ ...ME, user: { ...ME.user, role_name: 'Gerätewart' } })?.user.roleName,
+        ).toBe('Gerätewart');
+        expect(
+            parseAuthState({ ...ME, user: { ...ME.user, role_name: null } })?.user.roleName,
+        ).toBeNull();
+        expect(parseAuthState({ ...ME, user: { ...ME.user, role_name: 3 } })).toBeNull();
     });
 
     it('Super-Admin ohne Stadt', () => {
@@ -81,6 +93,7 @@ describe('userLabel', () => {
         name: 'Name',
         displayName: 'Anzeige',
         role: 'user',
+        roleName: 'Benutzer',
     } as const;
 
     it('bevorzugt den Anzeigenamen', () => {
