@@ -101,6 +101,7 @@ function storedJson(state: AuthState): Record<string, unknown> {
             name: state.user.name,
             display_name: state.user.displayName,
             role: state.user.role,
+            role_name: state.user.roleName,
         },
         tenant: state.tenant,
         // Offline gelten die Rechte der gespeicherten Sitzung (Plan Phase 1, Abschnitt 7).

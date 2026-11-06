@@ -93,22 +93,22 @@ final class DeviceCreateTest extends DeviceApiTestCase
      */
     public static function invalidBodies(): iterable
     {
-        yield 'Kennung fehlt' => [['identifier' => null], 'Das Feld "identifier" fehlt'];
-        yield 'Kennung ungültig' => [['identifier' => 'MA_01'], 'nur Buchstaben, Ziffern'];
-        yield 'Kennung zu lang' => [['identifier' => str_repeat('A', 31)], 'höchstens 30 Zeichen'];
+        yield 'Nummer fehlt' => [['identifier' => null], 'Das Feld "identifier" fehlt'];
+        yield 'Nummer ungültig' => [['identifier' => 'MA_01'], 'nur Buchstaben, Ziffern'];
+        yield 'Nummer zu lang' => [['identifier' => str_repeat('A', 31)], 'höchstens 30 Zeichen'];
         yield 'Typ fehlt' => [['device_type_id' => null], 'Das Feld "device_type_id" muss eine ganze Zahl'];
         yield 'Typ als Text' => [['device_type_id' => '1'], 'Das Feld "device_type_id" muss eine ganze Zahl'];
         yield 'Standort fehlt' => [['location_id' => null], 'Das Feld "location_id" muss eine ganze Zahl'];
-        yield 'Status ausgesondert' => [['status' => 'retired'], 'Ein neues Gerät kann nicht ausgesondert sein.'];
+        yield 'Status ausgesondert' => [['status' => 'retired'], 'Eine neue Ausrüstung kann nicht ausgesondert sein.'];
         yield 'Status unbekannt' => [['status' => 'kaputt'], 'Das Feld "status" muss einer der Werte'];
         yield 'Status großgeschrieben' => [['status' => 'READY'], 'Das Feld "status" muss einer der Werte'];
         yield 'Datum deutsch' => [['procured_on' => '15.04.2021'], 'Das Beschaffungsdatum muss ein gültiges Datum im Format JJJJ-MM-TT sein.'];
-        yield 'Datum Tippfehler' => [['next_inspection_due' => '0202-03-01'], 'Das Datum der nächsten Prüfung muss zwischen 1950-01-01 und 2099-12-31 liegen.'];
+        yield 'Datum Tippfehler' => [['next_inspection_due' => '0202-03-01'], 'Das Datum der nächsten Wartung muss zwischen 1950-01-01 und 2099-12-31 liegen.'];
         yield 'Datum als Zahl' => [['procured_on' => 20210415], 'Das Feld "procured_on" ist kein Text.'];
         yield 'Notiz zu lang' => [['note' => str_repeat('x', 1001)], 'höchstens 1000 Zeichen'];
         yield 'Kommentar mehrzeilig' => [['comment' => "a\nb"], 'Der Kommentar darf keine Steuerzeichen'];
         yield 'unbekanntes Feld' => [['serial' => 'X'], 'Das Feld "serial" ist hier nicht vorgesehen'];
-        yield 'Typ unbekannt' => [['device_type_id' => 999_999_999], 'Der Gerätetyp wurde nicht gefunden.'];
+        yield 'Typ unbekannt' => [['device_type_id' => 999_999_999], 'Der Ausrüstungstyp wurde nicht gefunden.'];
         yield 'Standort unbekannt' => [['location_id' => 999_999_999], 'Der Standort wurde nicht gefunden.'];
     }
 
@@ -139,7 +139,7 @@ final class DeviceCreateTest extends DeviceApiTestCase
         $location = $this->api('POST', 'devices', ['identifier' => 'MA-01', 'device_type_id' => $this->typeId, 'location_id' => $this->otherLocation]);
 
         self::assertError(400, 'invalid_request', $type);
-        self::assertSame('Der Gerätetyp wurde nicht gefunden.', self::json($type)['message']);
+        self::assertSame('Der Ausrüstungstyp wurde nicht gefunden.', self::json($type)['message']);
         self::assertError(400, 'invalid_request', $location);
         self::assertSame('Der Standort wurde nicht gefunden.', self::json($location)['message']);
         self::assertSame($before, $this->deviceSnapshot());
@@ -155,9 +155,9 @@ final class DeviceCreateTest extends DeviceApiTestCase
         $type = $this->api('POST', 'devices', ['identifier' => 'MA-01', 'device_type_id' => $inactive, 'location_id' => $this->g1]);
 
         self::assertError(409, 'rule_violation', $location);
-        self::assertSame('Der Standort „Altes LF“ ist gesperrt und kann keine Geräte aufnehmen.', self::json($location)['message']);
+        self::assertSame('Der Standort „Altes LF“ ist gesperrt und kann keine Ausrüstung aufnehmen.', self::json($location)['message']);
         self::assertError(409, 'rule_violation', $type);
-        self::assertSame('Der Gerätetyp „Pager“ ist deaktiviert und kann keinem Gerät zugeordnet werden.', self::json($type)['message']);
+        self::assertSame('Der Ausrüstungstyp „Pager“ ist deaktiviert und kann keiner Ausrüstung zugeordnet werden.', self::json($type)['message']);
         self::assertSame($before, $this->deviceSnapshot());
     }
 
@@ -171,7 +171,7 @@ final class DeviceCreateTest extends DeviceApiTestCase
 
         self::assertError(409, 'identifier_taken', $response);
         self::assertSame(
-            'Die Kennung „ma-01“ ist bereits an ein anderes Gerät vergeben (Groß- und Kleinschreibung zählt dabei nicht).',
+            'Die Nummer „ma-01“ ist bereits an eine andere Ausrüstung vergeben (Groß- und Kleinschreibung zählt dabei nicht).',
             self::json($response)['message'],
         );
         self::assertSame($before, $this->deviceSnapshot());

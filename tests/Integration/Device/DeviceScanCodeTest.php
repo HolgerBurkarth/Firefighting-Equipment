@@ -81,7 +81,7 @@ final class DeviceScanCodeTest extends DeviceApiTestCase
         $taken = $this->api('POST', 'devices', ['identifier' => 'MA-02', 'device_type_id' => $this->typeId, 'location_id' => $this->g1, 'scan_code' => "abc\x1D1\n"]);
 
         self::assertError(409, 'scan_code_taken', $taken);
-        self::assertSame('Der Scan-Code „abc[GS]1“ ist bereits an ein anderes Gerät vergeben.', self::json($taken)['message']);
+        self::assertSame('Der Scan-Code „abc[GS]1“ ist bereits an eine andere Ausrüstung vergeben.', self::json($taken)['message']);
         self::assertSame($before, $this->deviceSnapshot());
         self::assertSame('ABC' . "\x1D" . '1', $this->createViaApi('MA-02', ['scan_code' => "ABC\x1D1"])['scan_code'], 'Groß- und Kleinschreibung zählt');
         self::assertSame('abc1', $this->createViaApi('MA-03', ['scan_code' => 'abc1'])['scan_code'], 'GS zählt');
@@ -163,14 +163,14 @@ final class DeviceScanCodeTest extends DeviceApiTestCase
         $taken = $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready']);
         self::assertError(409, 'scan_code_taken', $taken);
         self::assertSame(
-            'Der Scan-Code „A[GS]B“ ist inzwischen an ein anderes Gerät vergeben. Bitte beim Wiederaufnehmen einen neuen Scan-Code angeben (Feld "scan_code") oder ihn mit null entfernen.',
+            'Der Scan-Code „A[GS]B“ ist inzwischen an eine andere Ausrüstung vergeben. Bitte beim Wiederaufnehmen einen neuen Scan-Code angeben (Feld "scan_code") oder ihn mit null entfernen.',
             self::json($taken)['message'],
         );
         $alsoTaken = $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'scan_code' => "A\x1DB"]);
         self::assertError(409, 'scan_code_taken', $alsoTaken);
         $newTaken = $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'scan_code' => 'C']);
         self::assertError(409, 'scan_code_taken', $newTaken);
-        self::assertSame('Der Scan-Code „C“ ist bereits an ein anderes Gerät vergeben.', self::json($newTaken)['message']);
+        self::assertSame('Der Scan-Code „C“ ist bereits an eine andere Ausrüstung vergeben.', self::json($newTaken)['message']);
         self::assertSame($before, $this->deviceSnapshot());
 
         $response = $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'scan_code' => null, 'comment' => 'Etikett ab']);

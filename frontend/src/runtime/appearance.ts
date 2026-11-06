@@ -2,7 +2,7 @@ import type { TenantInfo } from '../api/tenant';
 import { applyAccent } from './accent';
 
 /** Wie ManifestHandler::NAME_FORMAT in PHP („<Stadtname> – Geräteverwaltung“). */
-export const TITLE_SUFFIX = ' – Geräteverwaltung';
+export const TITLE_SUFFIX = ' – Ausrüstungsverwaltung';
 
 /**
  * Link auf das Web-App-Manifest der Stadt (relativ zu <base>). Nur unter Städten: Unter service gibt

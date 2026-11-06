@@ -13,7 +13,7 @@ final class DeviceVersionConflictException extends DeviceException
     public function __construct(public readonly Device $current)
     {
         parent::__construct(sprintf(
-            'Das Gerät „%s“ wurde inzwischen geändert (aktuelle Version %d). Bitte die Daten neu laden und die Änderung erneut vornehmen.',
+            'Die Ausrüstung „%s“ wurde inzwischen geändert (aktuelle Version %d). Bitte die Daten neu laden und die Änderung erneut vornehmen.',
             $current->identifier->value,
             $current->version,
         ));

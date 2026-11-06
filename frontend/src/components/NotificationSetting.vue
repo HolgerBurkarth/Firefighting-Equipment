@@ -45,8 +45,8 @@ async function onChange(event: Event): Promise<void> {
     if (result.ok) {
         enabled.value = result.data.deviceLog;
         message.value = result.data.deviceLog
-            ? 'Gespeichert: Sie erhalten ab jetzt eine Mail bei jeder Änderung an Geräten.'
-            : 'Gespeichert: Sie erhalten keine Mails zu Änderungen an Geräten mehr.';
+            ? 'Gespeichert: Sie erhalten ab jetzt eine Mail bei jeder Änderung an der Ausrüstung.'
+            : 'Gespeichert: Sie erhalten keine Mails zu Änderungen an der Ausrüstung mehr.';
     } else {
         saveError.value = result.error;
         input.checked = enabled.value === true;
@@ -72,9 +72,9 @@ async function onChange(event: Event): Promise<void> {
                 @change="onChange"
             />
             <span class="notification-text">
-                <span class="notification-label">Mail bei jeder Änderung an Geräten</span>
+                <span class="notification-label">Mail bei jeder Änderung an der Ausrüstung</span>
                 <span id="notification-hint" class="hint">
-                    Umbuchen, Status, Prüfdatum, Stammdaten und Import, dazu die Hinweise im
+                    Umbuchen, Status, Wartungsdatum, Stammdaten und Import, dazu die Hinweise im
                     Protokoll<template v-if="allTenants === true"> – aus allen Städten</template
                     ><template v-if="email !== null"> – an {{ email }}</template
                     >. Eigene Änderungen sind ausgenommen.

@@ -164,7 +164,7 @@ export interface AdminOverviewData {
     readonly notReady?: readonly Record<string, unknown>[];
     readonly notReadyTotal?: number;
     readonly events?: readonly Record<string, unknown>[];
-    /** Geräteliste ohne `status` (z. B. für „Suchen“). */
+    /** Ausrüstungsliste ohne `status` (z. B. für „Suchen“). */
     readonly devices?: readonly Record<string, unknown>[];
 }
 

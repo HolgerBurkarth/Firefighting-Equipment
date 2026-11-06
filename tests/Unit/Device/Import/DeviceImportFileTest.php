@@ -111,15 +111,15 @@ final class DeviceImportFileTest extends TestCase
             . ";einsatzbereit;;;\r\n");
 
         self::assertSame([
-            'Die Kennung darf nur Buchstaben, Ziffern, Leerzeichen, Bindestrich (-), Schrägstrich (/) und Punkt (.) enthalten.',
+            'Die Nummer darf nur Buchstaben, Ziffern, Leerzeichen, Bindestrich (-), Schrägstrich (/) und Punkt (.) enthalten.',
             'Unbekannter Status „kaputt“ (möglich: einsatzbereit, in Wartung, defekt).',
-            'Das Datum der nächsten Prüfung „31.02.2027“ ist kein gültiger Kalendertag.',
+            'Das Datum der nächsten Wartung „31.02.2027“ ist kein gültiger Kalendertag.',
             'Die Seriennummer darf höchstens 100 Zeichen lang sein (angegeben: 101).',
             'Das Beschaffungsdatum „01.03.27“ muss ein Datum im Format TT.MM.JJJJ (oder JJJJ-MM-TT) sein.',
         ], $file->rows[0]->errors, 'Reihenfolge der Spalten im Export');
         self::assertSame('MA 01!', $file->rows[0]->identifierText);
         self::assertNull($file->rows[0]->identifier);
-        self::assertSame(['Die Kennung fehlt.'], $file->rows[1]->errors);
+        self::assertSame(['Die Nummer fehlt.'], $file->rows[1]->errors);
     }
 
     public function testControlCharactersInSingleLineFieldAreErrors(): void
@@ -154,7 +154,7 @@ final class DeviceImportFileTest extends TestCase
         $e = self::fileError("Kennung;Seriennumer;Farbe\r\nMA-01;1;rot\r\n");
 
         self::assertSame(
-            'Unbekannte Spalten: „Seriennumer“, „Farbe“. Möglich sind: Kennung, Scan-Code, Gerätetyp, Standort, Status, Nächste Prüfung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz.',
+            'Unbekannte Spalten: „Seriennumer“, „Farbe“. Möglich sind: Nummer, Scan-Code, Ausrüstungstyp, Standort, Status, Nächste Wartung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz.',
             $e->getMessage(),
         );
         self::assertSame(['line' => 1, 'columns' => ['Seriennumer', 'Farbe']], $e->details);
@@ -165,6 +165,26 @@ final class DeviceImportFileTest extends TestCase
         $e = self::fileError("Kennung;;Status\r\nMA-01;;defekt\r\n");
 
         self::assertSame(['line' => 1, 'columns' => ['(Spalte 2 ohne Überschrift)']], $e->details);
+    }
+
+    public function testNewAndFormerHeadersCanBeMixed(): void
+    {
+        $file = DeviceImportFile::parse("Nummer;Gerätetyp;Nächste Wartung
+MA-01;Atemschutzmaske;01.03.2027
+");
+
+        self::assertSame([ImportColumn::Identifier, ImportColumn::DeviceType, ImportColumn::NextInspectionDue], $file->columns);
+        self::assertSame('MA-01', $file->rows[0]->identifier?->value);
+        self::assertSame('Atemschutzmaske', $file->rows[0]->deviceType);
+    }
+
+    public function testNewAndFormerHeaderOfTheSameColumnAreDuplicate(): void
+    {
+        $e = self::fileError("Nummer;Kennung
+MA-01;MA-01
+");
+
+        self::assertSame('Die Spalte „Nummer“ kommt in der Kopfzeile mehrfach vor.', $e->getMessage());
     }
 
     public function testDuplicateColumnIsRejected(): void
@@ -178,7 +198,7 @@ final class DeviceImportFileTest extends TestCase
     {
         $e = self::fileError("Gerätetyp;Status\r\nAtemschutzmaske;defekt\r\n");
 
-        self::assertSame('Die Spalte „Kennung“ fehlt; sie ordnet die Zeilen den Geräten zu.', $e->getMessage());
+        self::assertSame('Die Spalte „Nummer“ fehlt; sie ordnet die Zeilen der Ausrüstung zu.', $e->getMessage());
     }
 
     public function testAbortedExportIsRejected(): void
@@ -199,7 +219,7 @@ final class DeviceImportFileTest extends TestCase
     public function testEmptyAndHeaderOnlyFilesAreRejected(): void
     {
         self::assertSame('Die Datei ist leer.', self::fileError('')->getMessage());
-        self::assertSame('Die Datei enthält keine Geräte (nur die Kopfzeile).', self::fileError(self::HEADER . ";;;;;;;;;;\r\n")->getMessage());
+        self::assertSame('Die Datei enthält keine Ausrüstung (nur die Kopfzeile).', self::fileError(self::HEADER . ";;;;;;;;;;\r\n")->getMessage());
     }
 
     public function testUnreadableFileHasLine(): void

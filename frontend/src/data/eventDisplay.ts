@@ -64,7 +64,7 @@ export function eventLines(event: DeviceEventEntry, now: Date = new Date()): Eve
     if (event.inspectionDue !== null) {
         const { from, to } = event.inspectionDue;
         lines.push({
-            label: 'Prüfdatum',
+            label: 'Wartungsdatum',
             value: `${from === null ? 'keins' : germanDate(from)} → ${to === null ? 'keins' : germanDate(to)}`,
         });
     }

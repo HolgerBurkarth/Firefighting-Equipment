@@ -61,7 +61,7 @@ final class DeviceEventListTest extends DeviceApiTestCase
             ],
             [
                 'type' => 'field_changed', 'type_label' => 'Stammdaten geändert', 'user' => $kommandant, 'comment' => null, 'location' => null,
-                'status' => null, 'inspection_due' => null, 'field' => ['name' => 'identifier', 'label' => 'Kennung', 'old' => 'MA-01', 'new' => 'MA-01a'],
+                'status' => null, 'inspection_due' => null, 'field' => ['name' => 'identifier', 'label' => 'Nummer', 'old' => 'MA-01', 'new' => 'MA-01a'],
             ],
             [
                 'type' => 'state_changed', 'type_label' => 'Ausgesondert', 'user' => $kommandant, 'comment' => 'Ausgemustert', 'location' => null,
@@ -84,7 +84,7 @@ final class DeviceEventListTest extends DeviceApiTestCase
                 'location' => ['from' => $g1, 'to' => $room], 'status' => null, 'inspection_due' => null, 'field' => null,
             ],
             [
-                'type' => 'due_changed', 'type_label' => 'Prüfdatum geändert', 'user' => $kommandant, 'comment' => null, 'location' => null,
+                'type' => 'due_changed', 'type_label' => 'Wartungsdatum geändert', 'user' => $kommandant, 'comment' => null, 'location' => null,
                 'status' => null, 'inspection_due' => ['from' => null, 'to' => '2027-03-01'], 'field' => null,
             ],
             [

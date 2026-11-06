@@ -42,7 +42,7 @@ const inactive = computed(() => types.value.filter((type) => !type.active).lengt
 
 const COLUMNS: readonly { key: DeviceTypeSortKey; label: string }[] = [
     { key: 'name', label: 'Name' },
-    { key: 'devices', label: 'Geräte' },
+    { key: 'devices', label: 'Ausrüstungen' },
 ];
 
 /** Klick auf den Spaltenkopf: aufsteigend, zweiter Klick absteigend (KONZEPT.md, "Listen"). */
@@ -89,7 +89,7 @@ const liveProblem = computed(() => {
     const taken = types.value.some(
         (type) => type.id !== editing.value?.id && sameName(type.name, name.value),
     );
-    return taken ? 'Diesen Gerätetyp gibt es schon.' : null;
+    return taken ? 'Diesen Ausrüstungstyp gibt es schon.' : null;
 });
 
 const shownNameError = computed(
@@ -181,8 +181,10 @@ const deactivateDescription = computed(() => {
     const kept =
         type.deviceCount === 0
             ? ''
-            : ` Die ${deviceCountText(type.deviceCount)} dieses Typs behalten ihn.`;
-    return `Neue Geräte können „${type.name}“ dann nicht mehr bekommen.${kept} Sie können den Typ jederzeit wieder aktivieren.`;
+            : type.deviceCount === 1
+              ? ' Die Ausrüstung dieses Typs behält ihn.'
+              : ` Die ${deviceCountText(type.deviceCount)} dieses Typs behalten ihn.`;
+    return `Neue Ausrüstung kann „${type.name}“ dann nicht mehr bekommen.${kept} Sie können den Typ jederzeit wieder aktivieren.`;
 });
 
 function confirmDeactivate(): void {
@@ -208,14 +210,14 @@ onMounted(() => {
 
 <template>
     <div class="page-head">
-        <h1>Gerätetypen</h1>
+        <h1>Ausrüstungstypen</h1>
         <button
             v-if="canWrite"
             class="btn btn-accent"
             type="button"
             @click="openDialog(null, $event)"
         >
-            Neuer Gerätetyp
+            Neuer Ausrüstungstyp
         </button>
     </div>
 
@@ -243,7 +245,7 @@ onMounted(() => {
                 <circle cx="11" cy="11" r="7" />
                 <path d="M20 20l-4-4" />
             </svg>
-            <span class="visually-hidden">Gerätetypen filtern</span>
+            <span class="visually-hidden">Ausrüstungstypen filtern</span>
             <input v-model="query" type="search" placeholder="Filtern, z. B. Funk" />
         </label>
         <label v-if="inactive > 0" class="check">
@@ -278,10 +280,10 @@ onMounted(() => {
         Wird geladen …
     </p>
     <p v-else-if="state.types !== null && types.length === 0" class="hint">
-        Noch keine Gerätetypen. Legen Sie mit „Neuer Gerätetyp“ den ersten an.
+        Noch keine Ausrüstungstypen. Legen Sie mit „Neuer Ausrüstungstyp“ den ersten an.
     </p>
     <p v-else-if="state.types !== null && rows.length === 0" class="hint">
-        Kein Gerätetyp passt zu „{{ query.trim() }}“.
+        Kein Ausrüstungstyp passt zu „{{ query.trim() }}“.
     </p>
 
     <div v-if="rows.length > 0" class="table-card">
@@ -322,7 +324,7 @@ onMounted(() => {
                                 class="type-name"
                                 data-row-link
                                 :to="{ name: 'devices', query: { typ: String(type.id) } }"
-                                :title="`Geräte vom Typ ${type.name}`"
+                                :title="`Ausrüstung vom Typ ${type.name}`"
                                 >{{ type.name }}</RouterLink
                             ><span v-else class="type-name">{{ type.name }}</span>
                             <span v-if="!type.active" class="badge badge-retired">
@@ -362,7 +364,7 @@ onMounted(() => {
     <FormDialog
         v-model:open="dialogOpen"
         :unsaved="unsaved"
-        :title="editing === null ? 'Neuer Gerätetyp' : `${editing.name} bearbeiten`"
+        :title="editing === null ? 'Neuer Ausrüstungstyp' : `${editing.name} bearbeiten`"
         :submit-label="editing === null ? 'Anlegen' : 'Speichern'"
         :busy="busy"
         :can-submit="!touched || liveProblem === null"
@@ -388,7 +390,8 @@ onMounted(() => {
         <template v-if="editing !== null" #extra>
             <template v-if="editing.active">
                 <p class="extra-text">
-                    Deaktivierte Typen bekommen keine neuen Geräte; vorhandene behalten ihn.
+                    Deaktivierte Typen lassen sich keiner neuen Ausrüstung zuordnen; vorhandene
+                    behält ihn.
                 </p>
                 <button
                     class="btn btn-danger"

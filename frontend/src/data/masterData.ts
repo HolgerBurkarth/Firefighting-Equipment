@@ -60,7 +60,7 @@ export function lockBlocker(location: Location | SubLocation): string | null {
         'children' in location ? location.children.filter((child) => child.active).length : 0;
     const parts: string[] = [];
     if (location.deviceCount > 0) {
-        parts.push(countText(location.deviceCount, 'Gerät', 'Geräte'));
+        parts.push(countText(location.deviceCount, 'Ausrüstung', 'Ausrüstungen'));
     }
     if (sublocations > 0) {
         parts.push(countText(sublocations, 'aktives Fach', 'aktive Fächer'));

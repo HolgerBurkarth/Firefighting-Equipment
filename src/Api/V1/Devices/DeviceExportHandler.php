@@ -13,7 +13,7 @@ use FirefightingEquipment\Time\LocalDate;
 
 /**
  * GET api/v1/devices/export (angemeldet): Geräteliste als CSV-Download (Spalten siehe DeviceCsv),
- * Dateiname geraete-<kürzel>-<JJJJ-MM-TT>.csv (heute in deutscher Zeit).
+ * Dateiname ausruestung-<kürzel>-<JJJJ-MM-TT>.csv (heute in deutscher Zeit).
  *
  * Filter und Sortierung wie GET devices (device_type_id, location_id, include_sublocations,
  * status, q, include_retired, sort, dir; Standard natürlich nach Kennung), ohne
@@ -33,7 +33,7 @@ final readonly class DeviceExportHandler implements RequestHandler
         [$sort, $direction] = DeviceListHandler::sort($context);
 
         return new CsvResponse(
-            sprintf('geraete-%s-%s.csv', $tenant->slug->value, LocalDate::today($this->clock)),
+            sprintf('ausruestung-%s-%s.csv', $tenant->slug->value, LocalDate::today($this->clock)),
             DeviceCsv::DEVICE_HEADER,
             new DeviceRepository($context->db->get(), $context->visibility())->export($tenant, $filter, $sort, $direction),
             DeviceCsv::device(...),

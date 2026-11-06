@@ -18,8 +18,33 @@ final class ImportColumnTest extends TestCase
         self::assertSame(DeviceCsv::DEVICE_HEADER, array_map(static fn (ImportColumn $c): string => $c->label(), ImportColumn::cases()));
     }
 
+    public function testExportWritesTheNewTerms(): void
+    {
+        self::assertSame('Nummer', ImportColumn::Identifier->label());
+        self::assertSame('Ausrüstungstyp', ImportColumn::DeviceType->label());
+        self::assertSame('Nächste Wartung', ImportColumn::NextInspectionDue->label());
+    }
+
+    public function testNewAndFormerHeadersAreAccepted(): void
+    {
+        self::assertSame(ImportColumn::Identifier, ImportColumn::fromHeader('Nummer'));
+        self::assertSame(ImportColumn::Identifier, ImportColumn::fromHeader('Kennung'));
+        self::assertSame(ImportColumn::DeviceType, ImportColumn::fromHeader('Ausrüstungstyp'));
+        self::assertSame(ImportColumn::DeviceType, ImportColumn::fromHeader('Gerätetyp'));
+        self::assertSame(ImportColumn::NextInspectionDue, ImportColumn::fromHeader('Nächste Wartung'));
+        self::assertSame(ImportColumn::NextInspectionDue, ImportColumn::fromHeader('Nächste Prüfung'));
+        foreach (ImportColumn::cases() as $column) {
+            self::assertSame($column, ImportColumn::fromHeader($column->label()));
+            if ($column->formerLabel() !== null) {
+                self::assertSame($column, ImportColumn::fromHeader($column->formerLabel()));
+            }
+        }
+    }
+
     public function testHeaderIgnoresCaseAndSurroundingSpace(): void
     {
+        self::assertSame(ImportColumn::Identifier, ImportColumn::fromHeader(' NUMMER '));
+        self::assertSame(ImportColumn::NextInspectionDue, ImportColumn::fromHeader('nächste wartung'));
         self::assertSame(ImportColumn::Identifier, ImportColumn::fromHeader('Kennung'));
         self::assertSame(ImportColumn::Identifier, ImportColumn::fromHeader(' KENNUNG '));
         self::assertSame(ImportColumn::NextInspectionDue, ImportColumn::fromHeader('nächste prüfung'));

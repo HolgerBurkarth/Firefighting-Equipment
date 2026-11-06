@@ -30,7 +30,7 @@ describe('Erscheinungsbild der Stadt', () => {
     beforeEach(() => {
         document.head.innerHTML =
             '<meta name="theme-color" content="#b71c1c">' +
-            '<title>Geräteverwaltung</title>' +
+            '<title>Ausrüstungsverwaltung</title>' +
             '<link rel="icon" type="image/png" href="api/v1/app-icon/192">' +
             '<link rel="apple-touch-icon" href="api/v1/app-icon/180">';
         document.documentElement.removeAttribute('style');
@@ -43,7 +43,7 @@ describe('Erscheinungsbild der Stadt', () => {
         expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
             '#1d3557',
         );
-        expect(document.title).toBe('Feuerwehr Test – Geräteverwaltung');
+        expect(document.title).toBe('Feuerwehr Test – Ausrüstungsverwaltung');
     });
 
     it('lässt ohne Logo das Standard-Symbol stehen', () => {
@@ -76,7 +76,7 @@ describe('Erscheinungsbild der Stadt', () => {
     });
 
     it('Titel wie der Name im Manifest (ManifestHandler::NAME_FORMAT)', () => {
-        expect(TITLE_SUFFIX).toBe(' – Geräteverwaltung');
+        expect(TITLE_SUFFIX).toBe(' – Ausrüstungsverwaltung');
     });
 });
 

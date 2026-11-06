@@ -69,7 +69,7 @@ function allowed(name: string): boolean {
                     <path d="M16 3v4" />
                     <path d="M4 10h16" />
                 </svg>
-                Prüffristen
+                Termine
             </RouterLink>
             <RouterLink class="tab" :to="{ name: 'profile' }">
                 <svg

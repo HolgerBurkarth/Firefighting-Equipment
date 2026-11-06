@@ -166,11 +166,11 @@ async function submit(): Promise<void> {
         @submit="submit"
     >
         <p v-if="conflict" class="notice notice-info" role="alert" data-testid="edit-conflict">
-            Das Gerät wurde inzwischen geändert. Felder, die Sie nicht geändert haben, zeigen jetzt
-            den aktuellen Stand. Bitte prüfen und erneut speichern.
+            Die Ausrüstung wurde inzwischen geändert. Felder, die Sie nicht geändert haben, zeigen
+            jetzt den aktuellen Stand. Bitte prüfen und erneut speichern.
         </p>
         <label class="field">
-            <span class="field-label">Kennung</span>
+            <span class="field-label">Nummer</span>
             <input
                 v-model="form.identifier"
                 class="input"
@@ -190,7 +190,7 @@ async function submit(): Promise<void> {
                 {{ shownProblem('identifier') }}
             </p>
         </label>
-        <AppSelect v-model="typeValue" label="Gerätetyp" :options="typeOptions" />
+        <AppSelect v-model="typeValue" label="Ausrüstungstyp" :options="typeOptions" />
         <label v-for="field in TEXT_FIELDS" :key="field.key" class="field">
             <span class="field-label">{{ field.label }} (optional)</span>
             <input

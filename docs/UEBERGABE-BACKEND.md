@@ -8,6 +8,42 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-06 – „Konto wechseln: Liste der Konten in mehreren Städten (Runde 1, Aufgabe 2, Schritt 1.9)“
+
+Plan Phase 1, Schritt 1.9 (Konzept E14).
+
+- `GET auth/me` (auch die Antworten von `auth/login` und `auth/password`): im Objekt `user`
+  zusätzlich `role_id` und `role_name` (Rolle der Stadt des Kontos; unter `service` beide `null`).
+  Reine Erweiterung; `role` bleibt die Kontoart. Grund: Die Liste „Konto wechseln“ zeigt je Stadt den
+  Rollennamen. Der Name kommt aus derselben Abfrage wie die Rechte (`PermissionRepository`,
+  `Permissions::roleName`), keine zusätzliche Abfrage.
+
+Tests: `LoginTest::testTenantUserLogsIn` (Felder), `testMeNamesTheRoleOfTheTenant` (Admin, eigene Rolle,
+Super-Admin). `CLAUDE.md` "Rollen und Rechte" (`GET auth/me`), "Frontend" (Konto wechseln).
+
+## 2026-11-06 – „Begriffe: Ausrüstung, Termine, Wartung und Nummer in App, Mails, Meldungen und CSV (Runde 1, Aufgabe 1)“
+
+Plan Phase 1, Abschnitt 8 (F14), Festlegungen Holger vom 06.11.2026.
+
+- Texte, die Nutzer sehen: Meldungen der API (`message`, auch in `details`, Vorschau des Imports,
+  `result.message`), Bezeichnungen (`type_label` „Wartungsdatum geändert“, `not_applied_label`
+  „Ausrüstung ausgesondert“, `kind_label`, Feldnamen `field.label` „Nummer“, „Ausrüstungstyp“) und
+  Mails sagen jetzt Ausrüstung statt Gerät, Ausrüstungstyp, Wartungsdatum bzw. Nächste Wartung statt
+  Prüfdatum bzw. Nächste Prüfung, Nummer statt Kennung. Name der App „Ausrüstungsverwaltung“:
+  Manifest (`name` „<Stadt> – Ausrüstungsverwaltung“, `short_name` „FF-Ausrüstung“) und Absender
+  `"Feuerwehr Ausrüstungsverwaltung" <feuerwehr-app@prodad.de>`.
+- CSV: Export schreibt „Nummer“, „Ausrüstungstyp“, „Nächste Wartung“; Verlauf „Ausrüstungs-ID“ (bisher
+  „Geräte-Nr.“), „Nummer“, „Ausrüstungstyp“, „Wartungsdatum alt/neu“. Der Import nimmt alte und neue
+  Überschriften an (`ImportColumn::formerLabel`), `columns` der Vorschau nennt die neuen. Dateinamen
+  `ausruestung-<kürzel>-<datum>.csv` und `ausruestung-vorlage-<kürzel>.csv`.
+- Unverändert: Routen, Felder, Codes und Werte der API, Adressen, Kommandozeile.
+
+Tests: Erwartungen in den betroffenen PHP-Tests angepasst; neu `ImportColumnTest::testNewAndFormerHeadersAreAccepted`,
+`testExportWritesTheNewTerms`, `DeviceImportFileTest::testNewAndFormerHeadersCanBeMixed`,
+`testNewAndFormerHeaderOfTheSameColumnAreDuplicate`; die Import-Tests verwenden weiter die alten
+Überschriften. `CLAUDE.md` "CSV-Export (API)", "CSV-Import (API)", "E-Mail-Versand", "Fachliche
+Entscheidungen".
+
 ## 2026-11-06 – „Rollen: ClientApi::MIN = 2, Apps vor den Rechten aktualisieren sofort (Phase 1, Schritt 1.8a)“
 
 Plan Phase 1, Schritt 1.8a (Holger, 06.11.2026: als eigener Schritt vor den Rollen für Immendingen).

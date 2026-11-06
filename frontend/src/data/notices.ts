@@ -66,13 +66,13 @@ export function emptyNoticeText(filter: NoticeFilter): string {
 /** Was geschehen ist, je Art des Hinweises (NoticeKind). */
 const KIND_EXPLANATIONS: Readonly<Partial<Record<string, string>>> = {
     overwritten:
-        'Die Buchung wurde offline erfasst und kam erst später beim Server an. Inzwischen war das Gerät anders gebucht worden; weil die Buchung danach erfasst wurde, gilt sie und hat diesen Stand überschrieben.',
+        'Die Buchung wurde offline erfasst und kam erst später beim Server an. Inzwischen war die Ausrüstung anders gebucht worden; weil die Buchung danach erfasst wurde, gilt sie und hat diesen Stand überschrieben.',
     history_only:
-        'Die Buchung wurde offline erfasst und kam erst an, nachdem das Gerät später noch einmal geändert worden war. Sie steht nur im Verlauf; das Gerät behielt den neueren Stand.',
+        'Die Buchung wurde offline erfasst und kam erst an, nachdem die Ausrüstung später noch einmal geändert worden war. Sie steht nur im Verlauf; die Ausrüstung behielt den neueren Stand.',
     not_applied_retired:
-        'Das Gerät war beim Eingang der Buchung ausgesondert. Die Buchung steht nur im Verlauf.',
+        'Die Ausrüstung war beim Eingang der Buchung ausgesondert. Die Buchung steht nur im Verlauf.',
     not_applied_location_locked:
-        'Der gewünschte Standort war beim Eingang der Buchung gesperrt. Die Buchung steht nur im Verlauf; das Gerät blieb, wo es war.',
+        'Der gewünschte Standort war beim Eingang der Buchung gesperrt. Die Buchung steht nur im Verlauf; die Ausrüstung blieb, wo sie war.',
     stale_confirmed:
         'Die Buchung war älter als erlaubt und wurde nach einer Rückfrage auf dem Handy trotzdem gesendet.',
 };

@@ -141,8 +141,8 @@ async function submit(): Promise<void> {
     <FormDialog
         v-model:open="dialogOpen"
         :unsaved="unsaved"
-        :title="`Umbuchen / Status ändern (${devices.length === 1 ? '1 Gerät' : `${String(devices.length)} Geräte`})`"
-        description="Gilt für alle ausgewählten Geräte; jedes erhält einen eigenen Eintrag im Verlauf."
+        :title="`Umbuchen / Status ändern (${devices.length === 1 ? '1 Ausrüstung' : `${String(devices.length)} Ausrüstungen`})`"
+        description="Gilt für alle ausgewählten Ausrüstungen; jede erhält einen eigenen Eintrag im Verlauf."
         submit-label="Speichern"
         :busy="busy"
         :can-submit="!touched || (targetProblem === null && commentProblem === null)"

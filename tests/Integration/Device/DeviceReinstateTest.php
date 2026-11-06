@@ -60,7 +60,7 @@ final class DeviceReinstateTest extends DeviceApiTestCase
         $taken = $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'identifier' => 'MA-01']);
         self::assertError(409, 'identifier_taken', $taken);
         self::assertSame(
-            'Die Kennung „MA-01“ ist inzwischen an ein anderes Gerät vergeben. Bitte beim Wiederaufnehmen eine neue Kennung angeben (Feld "identifier").',
+            'Die Nummer „MA-01“ ist inzwischen an eine andere Ausrüstung vergeben. Bitte beim Wiederaufnehmen eine neue Nummer angeben (Feld "identifier").',
             self::json($taken)['message'],
         );
         self::assertSame($before, $this->deviceSnapshot());
@@ -70,7 +70,7 @@ final class DeviceReinstateTest extends DeviceApiTestCase
         $this->createViaApi('MA-02');
         $newTaken = $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'identifier' => 'ma-02']);
         self::assertError(409, 'identifier_taken', $newTaken);
-        self::assertStringStartsWith('Die Kennung „ma-02“ ist bereits an ein anderes Gerät vergeben', self::json($newTaken)['message']);
+        self::assertStringStartsWith('Die Nummer „ma-02“ ist bereits an eine andere Ausrüstung vergeben', self::json($newTaken)['message']);
 
         $response = $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'identifier' => 'MA-01a', 'comment' => 'Neu beschriftet']);
         self::assertSame(200, $response->statusCode(), $response->body());
@@ -93,13 +93,13 @@ final class DeviceReinstateTest extends DeviceApiTestCase
         $response = $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready']);
         self::assertError(409, 'rule_violation', $response);
         self::assertSame(
-            'Der Gerätetyp „Altgerät“ ist deaktiviert; bitte beim Wiederaufnehmen einen aktiven Gerätetyp angeben (Feld "device_type_id") oder den Typ wieder aktivieren.',
+            'Der Ausrüstungstyp „Altgerät“ ist deaktiviert; bitte beim Wiederaufnehmen einen aktiven Ausrüstungstyp angeben (Feld "device_type_id") oder den Typ wieder aktivieren.',
             self::json($response)['message'],
         );
         self::assertError(409, 'rule_violation', $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'device_type_id' => $old]));
         $other = $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'device_type_id' => $inactive]);
         self::assertError(409, 'rule_violation', $other);
-        self::assertSame('Der Gerätetyp „Auch alt“ ist deaktiviert und kann keinem Gerät zugeordnet werden.', self::json($other)['message']);
+        self::assertSame('Der Ausrüstungstyp „Auch alt“ ist deaktiviert und kann keiner Ausrüstung zugeordnet werden.', self::json($other)['message']);
         self::assertError(400, 'invalid_request', $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'device_type_id' => $this->otherTypeId]));
         self::assertSame($before, $this->deviceSnapshot());
 
@@ -128,7 +128,7 @@ final class DeviceReinstateTest extends DeviceApiTestCase
         );
         $other = $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'location_id' => $locked]);
         self::assertError(409, 'rule_violation', $other);
-        self::assertSame('Der Standort „Altes Lager“ ist gesperrt und kann keine Geräte aufnehmen.', self::json($other)['message']);
+        self::assertSame('Der Standort „Altes Lager“ ist gesperrt und kann keine Ausrüstung aufnehmen.', self::json($other)['message']);
         self::assertError(400, 'invalid_request', $this->api('POST', 'devices/' . $id . '/reinstate', ['version' => 1, 'status' => 'ready', 'location_id' => $this->otherLocation]));
         self::assertSame($before, $this->deviceSnapshot());
 
@@ -144,7 +144,7 @@ final class DeviceReinstateTest extends DeviceApiTestCase
         $response = $this->api('POST', 'devices/' . $device['id'] . '/reinstate', ['version' => 1, 'status' => 'ready']);
 
         self::assertError(409, 'rule_violation', $response);
-        self::assertSame('Das Gerät „MA-01“ ist nicht ausgesondert und kann daher nicht wieder aufgenommen werden.', self::json($response)['message']);
+        self::assertSame('Die Ausrüstung „MA-01“ ist nicht ausgesondert und kann daher nicht wieder aufgenommen werden.', self::json($response)['message']);
         self::assertSame($before, $this->deviceSnapshot());
     }
 
@@ -167,9 +167,9 @@ final class DeviceReinstateTest extends DeviceApiTestCase
     {
         yield 'ohne Status' => [['version' => 1], '"status"'];
         yield 'ausgesondert' => [['version' => 1, 'status' => 'retired'], 'retire'];
-        yield 'Kennung leer' => [['version' => 1, 'status' => 'ready', 'identifier' => null], '"identifier"'];
-        yield 'Kennung ungültig' => [['version' => 1, 'status' => 'ready', 'identifier' => 'MA_01'], 'Kennung'];
-        yield 'Gerätetyp als Text' => [['version' => 1, 'status' => 'ready', 'device_type_id' => '1'], '"device_type_id"'];
+        yield 'Nummer leer' => [['version' => 1, 'status' => 'ready', 'identifier' => null], '"identifier"'];
+        yield 'Nummer ungültig' => [['version' => 1, 'status' => 'ready', 'identifier' => 'MA_01'], 'Nummer'];
+        yield 'Ausrüstungstyp als Text' => [['version' => 1, 'status' => 'ready', 'device_type_id' => '1'], '"device_type_id"'];
         yield 'andere Stammdaten' => [['version' => 1, 'status' => 'ready', 'note' => 'x'], '"note"'];
     }
 

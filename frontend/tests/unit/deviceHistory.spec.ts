@@ -125,7 +125,7 @@ describe('parseDeviceEvent', () => {
         ['Standort ohne Pfad', { location: { from: null, to: { id: 1, name: 'X' } } }],
         ['Status als Text', { status: 'ready' }],
         ['Feld ohne Bezeichnung', { field: { name: 'model', old: null, new: 'X' } }],
-        ['Prüfdatum als Zahl', { inspection_due: { from: null, to: 5 } }],
+        ['Wartungsdatum als Zahl', { inspection_due: { from: null, to: 5 } }],
     ])('lehnt ab: %s', (_label, overrides) => {
         expect(parseDeviceEvent(eventJson(1, overrides))).toBeNull();
     });
@@ -299,13 +299,13 @@ describe('Anzeige', () => {
         expect(lines.map((line) => line.label)).toEqual(['Standort']);
     });
 
-    it('Prüfdatum und Stammdaten (Datum, Scan-Code, leer)', () => {
+    it('Wartungsdatum und Stammdaten (Datum, Scan-Code, leer)', () => {
         expect(
             eventLines(
                 event(1, { location: null, inspection_due: { from: '2026-03-01', to: null } }),
                 now,
             ),
-        ).toEqual([{ label: 'Prüfdatum', value: '01.03.2026 → keins' }]);
+        ).toEqual([{ label: 'Wartungsdatum', value: '01.03.2026 → keins' }]);
         const field = (name: string, label: string, old: string | null, next: string | null) =>
             eventLines(event(1, { location: null, field: { name, label, old, new: next } }), now);
         expect(field('procured_on', 'Beschaffungsdatum', null, '2021-04-15')).toEqual([

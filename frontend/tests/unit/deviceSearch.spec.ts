@@ -54,12 +54,12 @@ describe('searchDevices', () => {
     });
 
     it.each([
-        ['Kennung', 'pa 3', [4]],
+        ['Nummer', 'pa 3', [4]],
         ['Scan-Code', '333931', [5]],
         ['Seriennummer', 'sn-47', [4]],
         ['Hersteller ohne Umlaut', 'drager', [4]],
         ['Modell', 'pss', [4]],
-        ['Gerätetyp', 'funkger', [6]],
+        ['Ausrüstungstyp', 'funkger', [6]],
         ['Standortpfad', 'werkstatt', [4]],
         ['ß = ss', 'strasse', [6]],
     ])('findet über %s', (_label, query, expected) => {
@@ -72,7 +72,7 @@ describe('searchDevices', () => {
         expect(ids('dräger hlf')).toEqual([]);
     });
 
-    it('Kennung gleich der Eingabe zuerst, dann Kennung beginnt damit, dann der Rest', () => {
+    it('Nummer gleich der Eingabe zuerst, dann Nummer beginnt damit, dann der Rest', () => {
         // „m1“: M1 genau, M10 beginnt damit, XM1 enthält es nur.
         expect(ids('m1')).toEqual([1, 3, 7]);
     });
@@ -88,12 +88,12 @@ describe('searchDevices', () => {
 });
 
 describe('findByCode', () => {
-    it('Scan-Code exakt vor der Kennung', () => {
+    it('Scan-Code exakt vor der Nummer', () => {
         const list = [device(1, { identifier: 'ABC' }), device(2, { scan_code: 'ABC' })];
         expect(findByCode(list, 'ABC')?.id).toBe(2);
     });
 
-    it('Scan-Code mit Groß-/Kleinschreibung, Kennung ohne', () => {
+    it('Scan-Code mit Groß-/Kleinschreibung, Nummer ohne', () => {
         const list = [device(1, { identifier: 'M1', scan_code: 'Xy-1' })];
         expect(findByCode(list, 'xy-1')).toBeNull();
         expect(findByCode(list, 'Xy-1')?.id).toBe(1);
@@ -106,11 +106,11 @@ describe('findByCode', () => {
         expect(findByCode(LIST, ' \n')).toBeNull();
     });
 
-    it('mehrere Leerzeichen in der Kennung wie ein Leerzeichen', () => {
+    it('mehrere Leerzeichen in der Nummer wie ein Leerzeichen', () => {
         expect(findByCode(LIST, 'PA  3')?.id).toBe(4);
     });
 
-    it('Kennung: ß ≠ ss, großes ẞ = ß (wie identifier_key)', () => {
+    it('Nummer: ß ≠ ss, großes ẞ = ß (wie identifier_key)', () => {
         expect(findByCode(LIST, 'STRASSE 1')).toBeNull();
         expect(findByCode(LIST, 'STRAẞE 1')?.id).toBe(6);
         expect(identifierKey('ẞ')).toBe('ß');
@@ -139,7 +139,7 @@ const keyCases = JSON.parse(
 describe('gemeinsame Testfälle mit identifier_key (IdentifierKeyCasesTest)', () => {
     it.each(keyCases.cases.map((c) => [c.description, c] as const))('%s', (_, c) => {
         expect(codeKey(c.input)).toBe(c.server);
-        // Gespeicherte Kennung (wie DeviceIdentifier) ergibt denselben Schlüssel.
+        // Gespeicherte Nummer (wie DeviceIdentifier) ergibt denselben Schlüssel.
         expect(identifierKey(c.input.normalize('NFC').trim().replace(/ {2,}/g, ' '))).toBe(
             c.server,
         );
@@ -170,7 +170,7 @@ describe('gemeinsame Testfälle mit identifier_key (IdentifierKeyCasesTest)', ()
 });
 
 describe('codeKey', () => {
-    it('zusammengesetzte Form wie gespeicherte Kennungen', () => {
+    it('zusammengesetzte Form wie gespeicherte Nummeren', () => {
         expect(codeKey('É-1')).toBe(codeKey('É-1'));
         expect(codeKey('É-1')).toBe('é-1');
     });

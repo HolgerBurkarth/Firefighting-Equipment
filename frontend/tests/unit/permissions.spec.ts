@@ -64,7 +64,7 @@ describe('Katalog', () => {
 });
 
 describe('parsePermissions', () => {
-    it('liest Bereiche, Aktionen, Datenfilter und Kennung', () => {
+    it('liest Bereiche, Aktionen, Datenfilter und Nummer', () => {
         expect(
             parsePermissions(
                 permissionsJson({ devices: 'write', log: 'read' }, ['device.edit'], true),

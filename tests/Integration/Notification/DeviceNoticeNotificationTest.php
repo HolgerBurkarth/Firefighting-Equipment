@@ -51,7 +51,7 @@ final class DeviceNoticeNotificationTest extends DeviceApiTestCase
         self::assertSame(['admin@example.org', 'log-admin@example.org', 'chef@example.org'], $this->recipients());
         $mail = $this->mailer->sent[0];
         self::assertSame('Log Feuerwehr immendingen: Hinweis – MA-01 Stand überschrieben', $mail->subject);
-        self::assertStringContainsString("Hinweis: Anderen Stand überschrieben\nGerät: MA-01 (Atemschutzmaske)\n", $mail->text);
+        self::assertStringContainsString("Hinweis: Anderen Stand überschrieben\nAusrüstung: MA-01 (Atemschutzmaske)\n", $mail->text);
         self::assertStringContainsString("Buchung vom Handy:\nWer: Gerätewart (user@example.org)\nAktionszeit: ", $mail->text);
         self::assertStringContainsString("Gewünscht: Standort Lager, Status in Wartung\nKommentar: Ventil klemmt\n", $mail->text);
         self::assertStringContainsString("Überschriebener Stand:\nWer: Kommandant (admin@example.org)\nAktionszeit: ", $mail->text);

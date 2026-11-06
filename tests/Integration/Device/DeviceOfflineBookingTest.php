@@ -81,7 +81,7 @@ final class DeviceOfflineBookingTest extends DeviceApiTestCase
             $json = $this->offline($id, ['version' => 1, 'location_id' => $this->room, 'comment' => 'Wache 2', 'occurred_at' => $this->at($action)]);
 
             self::assertSame(['history_only', 'older'], [$json['result']['outcome'], $json['result']['reason']], $case);
-            self::assertStringStartsWith('Nur in der Historie: Das Gerät wurde nach Ihrer Buchung bereits anders gebucht.', $json['result']['message']);
+            self::assertStringStartsWith('Nur in der Historie: Die Ausrüstung wurde nach Ihrer Buchung bereits anders gebucht.', $json['result']['message']);
             self::assertSame($before, $this->deviceSnapshotOf($id), $case);
             $event = $this->lastEvent($id);
             self::assertSame(
@@ -125,7 +125,7 @@ final class DeviceOfflineBookingTest extends DeviceApiTestCase
         $json = $this->offline($id, ['version' => 1, 'status' => 'defective', 'occurred_at' => $this->at('-1 minute')]);
 
         self::assertSame(['not_applied', 'retired'], [$json['result']['outcome'], $json['result']['reason']]);
-        self::assertStringStartsWith('Nicht übernommen: Das Gerät wurde inzwischen ausgesondert.', $json['result']['message']);
+        self::assertStringStartsWith('Nicht übernommen: Die Ausrüstung wurde inzwischen ausgesondert.', $json['result']['message']);
         self::assertSame($before, $this->deviceSnapshotOf($id));
         $event = $this->lastEvent($id);
         self::assertSame([null, 'defective', 0, 'retired'], [$event['to_location_id'], $event['to_status'], $event['applied'], $event['not_applied_reason']]);

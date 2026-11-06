@@ -349,7 +349,7 @@ test.describe('Profil: angemeldete Geräte', () => {
     });
 });
 
-test.describe('Profil: Geräteliste nicht ladbar', () => {
+test.describe('Profil: Ausrüstungsliste nicht ladbar', () => {
     let calls = 0;
     test.use({
         api: {

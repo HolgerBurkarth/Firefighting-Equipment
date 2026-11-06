@@ -34,9 +34,9 @@ enum DeviceField: string
     public function label(): string
     {
         return match ($this) {
-            self::Identifier => 'Kennung',
+            self::Identifier => 'Nummer',
             self::ScanCode => 'Scan-Code',
-            self::DeviceType => 'Gerätetyp',
+            self::DeviceType => 'Ausrüstungstyp',
             self::SerialNumber => 'Seriennummer',
             self::Manufacturer => 'Hersteller',
             self::Model => 'Modell',
@@ -51,9 +51,9 @@ enum DeviceField: string
     public function subject(): string
     {
         return match ($this) {
-            self::Identifier => 'Die Kennung',
+            self::Identifier => 'Die Nummer',
             self::ScanCode => 'Der Scan-Code',
-            self::DeviceType => 'Der Gerätetyp',
+            self::DeviceType => 'Der Ausrüstungstyp',
             self::SerialNumber => 'Die Seriennummer',
             self::Manufacturer => 'Der Hersteller',
             self::Model => 'Das Modell',

@@ -122,8 +122,8 @@ describe('dueState', () => {
 
 describe('deviceCountLabel', () => {
     it('Anzahl, mit Filter „gefunden“', () => {
-        expect(deviceCountLabel(45, false)).toBe('45 Geräte');
-        expect(deviceCountLabel(1, false)).toBe('1 Gerät');
-        expect(deviceCountLabel(12, true)).toBe('12 Geräte gefunden');
+        expect(deviceCountLabel(45, false)).toBe('45 Ausrüstungen');
+        expect(deviceCountLabel(1, false)).toBe('1 Ausrüstung');
+        expect(deviceCountLabel(12, true)).toBe('12 Ausrüstungen gefunden');
     });
 });

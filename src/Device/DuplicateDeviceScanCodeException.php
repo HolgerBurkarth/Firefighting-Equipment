@@ -13,18 +13,18 @@ final class DuplicateDeviceScanCodeException extends DeviceException
     public static function forScanCode(ScanCode $scanCode): self
     {
         return new self(sprintf(
-            'Der Scan-Code „%s“ ist bereits an ein anderes Gerät vergeben.',
+            'Der Scan-Code „%s“ ist bereits an eine andere Ausrüstung vergeben.',
             ScanCode::display($scanCode->value),
         ));
     }
 
     /**
-     * Wiederaufnahme ohne neuen Scan-Code, der alte ist inzwischen an ein anderes Gerät vergeben.
+     * Wiederaufnahme ohne neuen Scan-Code, der alte ist inzwischen an eine andere Ausrüstung vergeben.
      */
     public static function onReinstatement(ScanCode $scanCode): self
     {
         return new self(sprintf(
-            'Der Scan-Code „%s“ ist inzwischen an ein anderes Gerät vergeben. Bitte beim Wiederaufnehmen einen neuen Scan-Code angeben (Feld "scan_code") oder ihn mit null entfernen.',
+            'Der Scan-Code „%s“ ist inzwischen an eine andere Ausrüstung vergeben. Bitte beim Wiederaufnehmen einen neuen Scan-Code angeben (Feld "scan_code") oder ihn mit null entfernen.',
             ScanCode::display($scanCode->value),
         ));
     }

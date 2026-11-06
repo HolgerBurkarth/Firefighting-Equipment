@@ -237,18 +237,18 @@ describe('Ergebnis', () => {
     it('zählt und fasst zusammen', () => {
         expect(bulkCounts(run)).toEqual({ applied: 2, unchanged: 1, errors: 1 });
         expect(bulkResultText('inspection-due', run)).toBe(
-            'Prüfdatum: 2 Geräte geändert, 1 unverändert, 1 nicht möglich.',
+            'Wartungsdatum: 2 Ausrüstungen geändert, 1 unverändert, 1 nicht möglich.',
         );
         expect(
             bulkResultText('state', { results: [item(1, 'applied')], error: null, unsent: [] }),
-        ).toBe('Umbuchen / Status: 1 Gerät geändert.');
+        ).toBe('Umbuchen / Status: 1 Ausrüstung geändert.');
         expect(
             bulkResultText('state', {
                 results: [],
                 error: NETWORK_ERROR,
                 unsent: [1, 2],
             }),
-        ).toBe('Umbuchen / Status: 0 Geräte geändert, 2 nicht gesendet.');
+        ).toBe('Umbuchen / Status: 0 Ausrüstungen geändert, 2 nicht gesendet.');
     });
 
     it('Meldungen je Gerät', () => {
@@ -256,7 +256,7 @@ describe('Ergebnis', () => {
             'Inzwischen geändert – bitte prüfen und erneut senden.',
         );
         expect(bulkErrorText(item(4, 'error', 'not_found'))).toBe(
-            'Dieses Gerät gibt es nicht (mehr).',
+            'Diese Ausrüstung gibt es nicht (mehr).',
         );
         expect(bulkErrorText(item(4, 'error', 'rule_violation'))).toBe('Fehler rule_violation');
     });

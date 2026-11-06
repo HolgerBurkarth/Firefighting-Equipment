@@ -90,7 +90,7 @@ const unknownEntries = computed(() => {
     const locations = suggestionsFor(current.suggestions.locations);
     return [
         ...current.unknown.deviceTypes.map((value) => ({
-            kind: 'Gerätetyp',
+            kind: 'Ausrüstungstyp',
             value,
             suggestions: types.get(value) ?? [],
         })),
@@ -233,12 +233,12 @@ function back(): Promise<void> {
         </button>
     </div>
 
-    <h1>Geräte importieren (CSV)</h1>
+    <h1>Ausrüstung importieren (CSV)</h1>
 
     <p v-if="imported !== null" class="notice notice-success" role="status" data-testid="imported">
         <span
             ><span aria-hidden="true">✓ </span>Import übernommen: {{ importCountsText(imported) }}.
-            <RouterLink :to="{ name: 'devices' }">Zur Geräteliste</RouterLink></span
+            <RouterLink :to="{ name: 'devices' }">Zur Ausrüstungsliste</RouterLink></span
         >
     </p>
 
@@ -246,9 +246,9 @@ function back(): Promise<void> {
         <h2 id="template-heading">1. Vorlage ausfüllen</h2>
         <p class="hint">
             Die Vorlage enthält alle Spalten. Die beiden Beispielzeilen (BEISPIEL-1 und BEISPIEL-2)
-            zeigen das Format; bitte vor dem Import löschen. „Gültige Werte“ listet die Gerätetypen,
-            Standorte und Status, die der Import kennt. Neue Gerätetypen und Standorte legen Sie
-            vorher unter „Gerätetypen“ bzw. „Standorte“ an.
+            zeigen das Format; bitte vor dem Import löschen. „Gültige Werte“ listet die
+            Ausrüstungstypen, Standorte und Status, die der Import kennt. Neue Ausrüstungstypen und
+            Standorte legen Sie vorher unter „Ausrüstungstypen“ bzw. „Standorte“ an.
         </p>
         <div class="actions">
             <button
@@ -270,10 +270,10 @@ function back(): Promise<void> {
         </div>
         <ErrorNotice v-if="downloadError !== null" :error="downloadError" />
         <p class="hint">
-            Vorhandene Geräte ändern: in der Geräteliste „Export (CSV)“, die Datei bearbeiten und
-            hier importieren. Die Kennung ist der Schlüssel. Fehlt eine Spalte, bleibt das Feld
-            unverändert; eine leere Zelle leert es. In Excel die Spalten Kennung und Scan-Code als
-            Text formatieren, sonst gehen führende Nullen verloren.
+            Vorhandene Ausrüstung ändern: in der Ausrüstungsliste „Export (CSV)“, die Datei
+            bearbeiten und hier importieren. Die Nummer ist der Schlüssel. Fehlt eine Spalte, bleibt
+            das Feld unverändert; eine leere Zelle leert es. In Excel die Spalten Nummer und
+            Scan-Code als Text formatieren, sonst gehen führende Nullen verloren.
         </p>
     </section>
 
@@ -324,8 +324,8 @@ function back(): Promise<void> {
     >
         <h2 id="preview-heading" ref="preview-heading" tabindex="-1">3. Vorschau</h2>
         <p v-if="outdated" class="notice notice-info" role="status">
-            Seit der Prüfung hat sich an den Geräten etwas geändert. Die Vorschau ist neu erstellt;
-            bitte noch einmal ansehen.
+            Seit der Prüfung hat sich an der Ausrüstung etwas geändert. Die Vorschau ist neu
+            erstellt; bitte noch einmal ansehen.
         </p>
         <p class="hint">
             Erkannt: {{ encodingLabel(preview.encoding) }}, {{ preview.delimiterLabel }}, Spalten:
@@ -372,8 +372,8 @@ function back(): Promise<void> {
                 </li>
             </ul>
             <p class="hint">
-                Der Import legt keine Gerätetypen oder Standorte an:
-                <RouterLink :to="{ name: 'device-types' }">Gerätetypen</RouterLink>,
+                Der Import legt keine Ausrüstungstypen oder Standorte an:
+                <RouterLink :to="{ name: 'device-types' }">Ausrüstungstypen</RouterLink>,
                 <RouterLink :to="{ name: 'locations' }">Standorte</RouterLink>.
             </p>
         </div>
@@ -404,7 +404,7 @@ function back(): Promise<void> {
             >
                 <div class="row-head">
                     <span class="line">Zeile {{ row.line }}</span>
-                    <strong class="identifier">{{ row.identifier || '(ohne Kennung)' }}</strong>
+                    <strong class="identifier">{{ row.identifier || '(ohne Nummer)' }}</strong>
                     <span class="result" :class="`result-${row.result}`">{{
                         row.resultLabel
                     }}</span>

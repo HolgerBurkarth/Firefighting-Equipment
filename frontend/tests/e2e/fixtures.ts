@@ -108,6 +108,8 @@ export function meBody(
             name: 'Anna Beispiel',
             display_name: displayName,
             role,
+            role_id: role === 'superadmin' ? null : role === 'admin' ? 1 : 2,
+            role_name: role === 'superadmin' ? null : role === 'admin' ? 'Admin' : 'Benutzer',
             protected: false,
             notifications: { device_log: false },
         },
@@ -253,7 +255,7 @@ async function fulfillApi(
             status: 200,
             contentType: 'application/manifest+json; charset=utf-8',
             json: {
-                name: 'Feuerwehr Test – Geräteverwaltung',
+                name: 'Feuerwehr Test – Ausrüstungsverwaltung',
                 start_url: '.',
                 display: 'standalone',
             },

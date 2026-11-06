@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tests\Integration\Import;
 
+use FirefightingEquipment\Api\V1\Devices\DeviceCsv;
 use FirefightingEquipment\Api\V1\Devices\DeviceImportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceImportJson;
 use FirefightingEquipment\Device\DeviceRepository;
@@ -39,7 +40,11 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
         self::assertSame('utf-8', $preview['encoding']);
         self::assertSame(';', $preview['delimiter']);
         self::assertSame('Semikolon', $preview['delimiter_label']);
-        self::assertSame(explode(';', self::HEADER), $preview['columns']);
+        self::assertSame(
+            array_values(array_diff(DeviceCsv::DEVICE_HEADER, ['Scan-Code'])),
+            $preview['columns'],
+            'frühere Überschriften, angezeigt mit den neuen',
+        );
         self::assertSame(['rows' => 1, 'new' => 1, 'changed' => 0, 'unchanged' => 0, 'skipped' => 0, 'errors' => 0, 'warnings' => 0], $preview['summary']);
         self::assertSame(['device_types' => [], 'locations' => []], $preview['unknown']);
         self::assertSame([
@@ -49,11 +54,11 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
             'result_label' => 'neu',
             'device' => null,
             'changes' => [
-                ['field' => 'identifier', 'label' => 'Kennung', 'old' => null, 'new' => 'MA-01'],
-                ['field' => 'device_type', 'label' => 'Gerätetyp', 'old' => null, 'new' => 'Atemschutzmaske'],
+                ['field' => 'identifier', 'label' => 'Nummer', 'old' => null, 'new' => 'MA-01'],
+                ['field' => 'device_type', 'label' => 'Ausrüstungstyp', 'old' => null, 'new' => 'Atemschutzmaske'],
                 ['field' => 'location', 'label' => 'Standort', 'old' => null, 'new' => 'HLF 20 / G1'],
                 ['field' => 'status', 'label' => 'Status', 'old' => null, 'new' => 'in Wartung'],
-                ['field' => 'next_inspection_due', 'label' => 'Nächste Prüfung', 'old' => null, 'new' => '01.03.2027'],
+                ['field' => 'next_inspection_due', 'label' => 'Nächste Wartung', 'old' => null, 'new' => '01.03.2027'],
                 ['field' => 'serial_number', 'label' => 'Seriennummer', 'old' => null, 'new' => '-12'],
                 ['field' => 'manufacturer', 'label' => 'Hersteller', 'old' => null, 'new' => 'Dräger'],
                 ['field' => 'model', 'label' => 'Modell', 'old' => null, 'new' => 'FPS 7000'],
@@ -182,8 +187,8 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
         self::assertSame(['rows' => 4, 'new' => 0, 'changed' => 0, 'unchanged' => 0, 'skipped' => 0, 'errors' => 4, 'warnings' => 0], $preview['summary']);
         self::assertSame(['device_types' => ['Funkgerät', '112'], 'locations' => ['LF 8', 'HLF 20 / G9']], $preview['unknown']);
         self::assertSame(['device_types' => [], 'locations' => [['value' => 'HLF 20 / G9', 'suggestions' => ['HLF 20 / G1']]]], $preview['suggestions']);
-        self::assertSame(['Der Gerätetyp „Funkgerät“ ist nicht bekannt.'], self::row($preview, 2)['messages']);
-        self::assertSame(['Der Gerätetyp „Funkgerät“ ist nicht bekannt.', 'Der Standort „LF 8“ ist nicht bekannt.'], self::row($preview, 3)['messages']);
+        self::assertSame(['Der Ausrüstungstyp „Funkgerät“ ist nicht bekannt.'], self::row($preview, 2)['messages']);
+        self::assertSame(['Der Ausrüstungstyp „Funkgerät“ ist nicht bekannt.', 'Der Standort „LF 8“ ist nicht bekannt.'], self::row($preview, 3)['messages']);
         $existing = self::row($preview, 4);
         self::assertSame('error', $existing['result']);
         self::assertSame('Fehler', $existing['result_label']);
@@ -219,8 +224,8 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
         self::assertSame('changed', self::row($preview, 2)['result'], 'bleibt an gesperrtem Standort und deaktiviertem Typ');
         self::assertSame([['status', 'einsatzbereit', 'defekt']], self::changes(self::row($preview, 2)));
         $expected = [
-            'Der Gerätetyp „Funkgerät“ ist deaktiviert und kann keinem Gerät zugeordnet werden.',
-            'Der Standort „Altbau“ ist gesperrt und kann keine Geräte aufnehmen.',
+            'Der Ausrüstungstyp „Funkgerät“ ist deaktiviert und kann keiner Ausrüstung zugeordnet werden.',
+            'Der Standort „Altbau“ ist gesperrt und kann keine Ausrüstung aufnehmen.',
         ];
         self::assertSame($expected, self::row($preview, 3)['messages']);
         self::assertSame($expected, self::row($preview, 4)['messages']);
@@ -230,11 +235,11 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
     public function testNewDeviceNeedsTypeAndLocation(): void
     {
         $preview = $this->previewOk(self::csv([['MA-01', 'Atemschutzmaske', ''], ['MA-02', '', 'Lager']], 'Kennung;Gerätetyp;Standort'));
-        self::assertSame(['Für ein neues Gerät fehlt der Standort.'], self::row($preview, 2)['messages']);
-        self::assertSame(['Für ein neues Gerät fehlt der Gerätetyp.'], self::row($preview, 3)['messages']);
+        self::assertSame(['Für eine neue Ausrüstung fehlt der Standort.'], self::row($preview, 2)['messages']);
+        self::assertSame(['Für eine neue Ausrüstung fehlt der Ausrüstungstyp.'], self::row($preview, 3)['messages']);
 
         $withoutColumns = $this->previewOk(self::csv([['MA-01', 'defekt']], 'Kennung;Status'));
-        self::assertSame(['Für ein neues Gerät fehlt der Gerätetyp.', 'Für ein neues Gerät fehlt der Standort.'], $withoutColumns['rows'][0]['messages']);
+        self::assertSame(['Für eine neue Ausrüstung fehlt der Ausrüstungstyp.', 'Für eine neue Ausrüstung fehlt der Standort.'], $withoutColumns['rows'][0]['messages']);
     }
 
     public function testInvalidValuesAreRowErrors(): void
@@ -246,9 +251,9 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
 
         self::assertSame([
             'Unbekannter Status „kaputt“ (möglich: einsatzbereit, in Wartung, defekt).',
-            'Das Datum der nächsten Prüfung „31.02.2027“ ist kein gültiger Kalendertag.',
+            'Das Datum der nächsten Wartung „31.02.2027“ ist kein gültiger Kalendertag.',
         ], self::row($preview, 2)['messages']);
-        self::assertSame(['Die Kennung fehlt.'], self::row($preview, 3)['messages']);
+        self::assertSame(['Die Nummer fehlt.'], self::row($preview, 3)['messages']);
         self::assertSame('', self::row($preview, 3)['identifier']);
     }
 
@@ -262,9 +267,9 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
             ['STRASSE-1', 'Atemschutzmaske', 'Lager'],
         ], 'Kennung;Gerätetyp;Standort'));
 
-        self::assertSame(['Die Kennung „MA-01“ kommt in der Datei mehrfach vor (Zeilen 2, 3).'], self::row($preview, 2)['messages']);
-        self::assertSame(['Die Kennung „ma-01“ kommt in der Datei mehrfach vor (Zeilen 2, 3).'], self::row($preview, 3)['messages']);
-        self::assertSame(['Die Kennung „STRAẞE-1“ kommt in der Datei mehrfach vor (Zeilen 4, 5).'], self::row($preview, 4)['messages']);
+        self::assertSame(['Die Nummer „MA-01“ kommt in der Datei mehrfach vor (Zeilen 2, 3).'], self::row($preview, 2)['messages']);
+        self::assertSame(['Die Nummer „ma-01“ kommt in der Datei mehrfach vor (Zeilen 2, 3).'], self::row($preview, 3)['messages']);
+        self::assertSame(['Die Nummer „STRAẞE-1“ kommt in der Datei mehrfach vor (Zeilen 4, 5).'], self::row($preview, 4)['messages']);
         self::assertSame('new', self::row($preview, 6)['result'], 'ß ≠ ss');
         self::assertSame(4, $preview['summary']['errors']);
     }
@@ -275,7 +280,7 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
             $this->createViaApi($identifier);
         }
 
-        $preview = $this->previewOk(self::csv([['straße-1'], ['éclair-2'], ['äöü-3'], ['σω-4'], ['STRASSE-1'], ['ECLAIR-2']], 'Kennung'));
+        $preview = $this->previewOk(self::csv([['straße-1'], ['éclair-2'], ['äöü-3'], ['σω-4'], ['STRASSE-1'], ['ECLAIR-2']], 'Nummer'));
 
         self::assertSame([['identifier', 'STRAẞE-1', 'straße-1']], self::changes(self::row($preview, 2)));
         self::assertSame([['identifier', 'ÉCLAIR-2', 'éclair-2']], self::changes(self::row($preview, 3)));
@@ -301,14 +306,14 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
         self::assertSame(['rows' => 5, 'new' => 4, 'changed' => 0, 'unchanged' => 1, 'skipped' => 0, 'errors' => 0, 'warnings' => 3], $preview['summary']);
         self::assertIsString($preview['token'], 'Warnungen blockieren nicht');
         self::assertSame(
-            ['Die neue Kennung „7“ entspricht ohne führende Nullen dem vorhandenen Gerät „007“. Hat Excel führende Nullen entfernt? Dann die Datei mit der Spalte Kennung als Text öffnen.'],
+            ['Die neue Nummer „7“ entspricht ohne führende Nullen der vorhandenen Ausrüstung „007“. Hat Excel führende Nullen entfernt? Dann die Datei mit der Spalte Nummer als Text öffnen.'],
             self::row($preview, 2)['warnings'],
         );
         self::assertSame(
-            ['Die Kennung „1.3.26“ sieht wie ein Datum aus. Hat Excel sie umgewandelt? Dann die Datei mit der Spalte Kennung als Text öffnen.'],
+            ['Die Nummer „1.3.26“ sieht wie ein Datum aus. Hat Excel sie umgewandelt? Dann die Datei mit der Spalte Nummer als Text öffnen.'],
             self::row($preview, 3)['warnings'],
         );
-        self::assertSame([], self::row($preview, 4)['warnings'], 'vorhandenes Gerät mit genau dieser Kennung');
+        self::assertSame([], self::row($preview, 4)['warnings'], 'vorhandenes Gerät mit genau dieser Nummer');
         self::assertCount(1, self::row($preview, 5)['warnings']);
         self::assertSame([], self::row($preview, 6)['warnings']);
     }

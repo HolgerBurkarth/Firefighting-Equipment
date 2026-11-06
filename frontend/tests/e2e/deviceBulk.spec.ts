@@ -13,8 +13,8 @@ import { horizontalOverflow } from './support/layout';
 import { delegate, deviceTypeServer, locationServer } from './support/masterData';
 
 /**
- * Sammelaktionen der Geräteliste (KONZEPT.md Entscheidung 31): Mehrfachauswahl (auch alle Geräte
- * der gefilterten Liste), „Prüfdatum setzen“ und „Umbuchen / Status ändern“ in Blöcken zu 50,
+ * Sammelaktionen der Ausrüstungsliste (KONZEPT.md Entscheidung 31): Mehrfachauswahl (auch alle Geräte
+ * der gefilterten Liste), „Wartungsdatum setzen“ und „Umbuchen / Status ändern“ in Blöcken zu 50,
  * Ergebnis je Gerät. Der simulierte Server bucht jedes Gerät wie DeviceBulkHandler einzeln (Version
  * + 1, veraltete Version → Fehler nur für dieses Gerät).
  */
@@ -63,7 +63,7 @@ function bulkServer(initial: readonly Record<string, unknown>[]) {
                         device: current,
                         error: {
                             error: 'version_conflict',
-                            message: 'Das Gerät wurde inzwischen geändert.',
+                            message: 'Die Ausrüstung wurde inzwischen geändert.',
                             details: { device: current },
                         },
                     };
@@ -183,7 +183,7 @@ function dialog(page: Page) {
 
 async function open(page: Page): Promise<void> {
     await page.goto('/firefighting/test/geraete');
-    await expect(page.getByTestId('device-count')).toHaveText(/Geräte$/);
+    await expect(page.getByTestId('device-count')).toHaveText(/Ausrüstungen$/);
 }
 
 test.describe('Sammelaktionen (PC)', () => {
@@ -193,7 +193,7 @@ test.describe('Sammelaktionen (PC)', () => {
         await page.setViewportSize({ width: 1280, height: 900 });
     });
 
-    test('Prüfdatum für mehrere Geräte: ein Eintrag je Gerät, Ergebnis, Auswahl leer', async ({
+    test('Wartungsdatum für mehrere Geräte: ein Eintrag je Gerät, Ergebnis, Auswahl leer', async ({
         page,
         apiRequests,
     }) => {
@@ -201,25 +201,27 @@ test.describe('Sammelaktionen (PC)', () => {
         await expect(page.getByTestId('selection-bar')).toBeHidden();
         await page.getByRole('checkbox', { name: 'M1 auswählen' }).check();
         await page.getByRole('checkbox', { name: 'M3 auswählen' }).check();
-        await expect(page.getByTestId('selection-bar')).toContainText('2 Geräte ausgewählt');
+        await expect(page.getByTestId('selection-bar')).toContainText('2 Ausrüstungen ausgewählt');
         await expect(
-            page.getByRole('checkbox', { name: 'Alle angezeigten Geräte auswählen' }),
+            page.getByRole('checkbox', { name: 'Alle angezeigten Ausrüstungen auswählen' }),
         ).toHaveJSProperty('indeterminate', true);
 
-        await page.getByRole('button', { name: 'Prüfdatum setzen …' }).click();
+        await page.getByRole('button', { name: 'Wartungsdatum setzen …' }).click();
         await expect(
-            dialog(page).getByRole('heading', { name: 'Prüfdatum für 2 Geräte' }),
+            dialog(page).getByRole('heading', { name: 'Wartungsdatum für 2 Ausrüstungen' }),
         ).toBeVisible();
-        await dialog(page).getByLabel('Nächste Prüfung fällig am').fill('2027-03-01');
+        await dialog(page).getByLabel('Nächste Wartung fällig am').fill('2027-03-01');
         await dialog(page)
             .getByLabel('Kommentar für den Verlauf (optional)')
             .fill('Prüfung beauftragt');
-        await dialog(page).getByRole('button', { name: 'Prüfdatum setzen' }).click();
+        await dialog(page).getByRole('button', { name: 'Wartungsdatum setzen' }).click();
 
-        await expect(page.getByTestId('bulk-summary')).toHaveText('Prüfdatum: 2 Geräte geändert.');
+        await expect(page.getByTestId('bulk-summary')).toHaveText(
+            'Wartungsdatum: 2 Ausrüstungen geändert.',
+        );
         await expect(dialog(page)).toBeHidden();
         await expect(page.getByTestId('selection-bar')).toBeHidden();
-        await expect(page.getByRole('button', { name: 'Prüfdatum setzen …' })).toBeHidden();
+        await expect(page.getByRole('button', { name: 'Wartungsdatum setzen …' })).toBeHidden();
         expect(bulkBodies(apiRequests, 'inspection-due')).toEqual([
             {
                 devices: [
@@ -243,8 +245,10 @@ test.describe('Sammelaktionen (PC)', () => {
         apiRequests,
     }) => {
         await open(page);
-        await page.getByRole('checkbox', { name: 'Alle angezeigten Geräte auswählen' }).check();
-        await expect(page.getByTestId('selection-bar')).toContainText('3 Geräte ausgewählt');
+        await page
+            .getByRole('checkbox', { name: 'Alle angezeigten Ausrüstungen auswählen' })
+            .check();
+        await expect(page.getByTestId('selection-bar')).toContainText('3 Ausrüstungen ausgewählt');
         // Inzwischen ändert jemand anderes M2.
         server.bump(2);
 
@@ -264,12 +268,12 @@ test.describe('Sammelaktionen (PC)', () => {
         await dialog(page).getByRole('button', { name: 'Speichern' }).click();
 
         await expect(page.getByTestId('bulk-summary')).toHaveText(
-            'Umbuchen / Status: 2 Geräte geändert, 1 nicht möglich.',
+            'Umbuchen / Status: 2 Ausrüstungen geändert, 1 nicht möglich.',
         );
         await expect(page.getByTestId('bulk-failures')).toContainText(
             'M2: Inzwischen geändert – bitte prüfen und erneut senden.',
         );
-        await expect(page.getByTestId('selection-bar')).toContainText('1 Gerät ausgewählt');
+        await expect(page.getByTestId('selection-bar')).toContainText('1 Ausrüstung ausgewählt');
         const [first] = bulkBodies(apiRequests, 'state');
         expect(first?.comment).toBe('Nach Einsatz verschmutzt');
         expect(
@@ -292,12 +296,12 @@ test.describe('Sammelaktionen (PC)', () => {
         // Erneut senden: mit der aktuellen Version.
         await page.getByRole('button', { name: 'Umbuchen / Status ändern …' }).click();
         await expect(
-            dialog(page).getByRole('heading', { name: 'Umbuchen / Status ändern (1 Gerät)' }),
+            dialog(page).getByRole('heading', { name: 'Umbuchen / Status ändern (1 Ausrüstung)' }),
         ).toBeVisible();
         await dialog(page).getByRole('radio', { name: 'in Wartung' }).check();
         await dialog(page).getByRole('button', { name: 'Speichern' }).click();
         await expect(page.getByTestId('bulk-summary')).toHaveText(
-            'Umbuchen / Status: 1 Gerät geändert.',
+            'Umbuchen / Status: 1 Ausrüstung geändert.',
         );
         expect(bulkBodies(apiRequests, 'state')[1]?.devices).toEqual([
             { id: 2, version: 2, status: 'maintenance', client_ref: expect.any(String) as unknown },
@@ -321,8 +325,10 @@ test.describe('Sammelaktionen (PC)', () => {
         await expect(
             page.getByRole('checkbox', { name: 'M9 (ausgesondert, nicht wählbar)' }),
         ).toBeDisabled();
-        await page.getByRole('checkbox', { name: 'Alle angezeigten Geräte auswählen' }).check();
-        await expect(page.getByTestId('selection-bar')).toContainText('3 Geräte ausgewählt');
+        await page
+            .getByRole('checkbox', { name: 'Alle angezeigten Ausrüstungen auswählen' })
+            .check();
+        await expect(page.getByTestId('selection-bar')).toContainText('3 Ausrüstungen ausgewählt');
         await page.getByRole('button', { name: 'Auswahl aufheben' }).click();
         await expect(page.getByTestId('selection-bar')).toBeHidden();
     });
@@ -341,17 +347,17 @@ test.describe('Sammelaktionen ohne Verbindung', () => {
         await page.getByRole('checkbox', { name: 'M1 auswählen' }).check();
         await page.getByRole('checkbox', { name: 'M2 auswählen' }).check();
         server.failNextRequest();
-        await page.getByRole('button', { name: 'Prüfdatum setzen …' }).click();
-        await dialog(page).getByLabel('Nächste Prüfung fällig am').fill('2027-03-01');
-        await dialog(page).getByRole('button', { name: 'Prüfdatum setzen' }).click();
+        await page.getByRole('button', { name: 'Wartungsdatum setzen …' }).click();
+        await dialog(page).getByLabel('Nächste Wartung fällig am').fill('2027-03-01');
+        await dialog(page).getByRole('button', { name: 'Wartungsdatum setzen' }).click();
 
         await expect(page.getByTestId('bulk-summary')).toHaveText(
-            'Prüfdatum: 0 Geräte geändert, 2 nicht gesendet.',
+            'Wartungsdatum: 0 Ausrüstungen geändert, 2 nicht gesendet.',
         );
         await expect(page.getByTestId('bulk-result')).toContainText(
-            'Nicht gesendete Geräte bleiben ausgewählt',
+            'Nicht gesendete Ausrüstungen bleiben ausgewählt',
         );
-        await expect(page.getByTestId('selection-bar')).toContainText('2 Geräte ausgewählt');
+        await expect(page.getByTestId('selection-bar')).toContainText('2 Ausrüstungen ausgewählt');
     });
 });
 
@@ -361,21 +367,27 @@ test.describe('Alle Geräte der Liste', () => {
     test('alle 120 wählen und in Blöcken zu 50 senden', async ({ page, apiRequests }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
         await open(page);
-        await page.getByRole('checkbox', { name: 'Alle angezeigten Geräte auswählen' }).check();
-        await expect(page.getByTestId('selection-bar')).toContainText('50 Geräte ausgewählt');
-        await page.getByRole('button', { name: 'Alle 120 Geräte der Liste auswählen' }).click();
-        await expect(page.getByTestId('selection-bar')).toContainText('120 Geräte ausgewählt');
-        await expect(page.getByRole('button', { name: /Alle 120 Geräte/ })).toBeHidden();
+        await page
+            .getByRole('checkbox', { name: 'Alle angezeigten Ausrüstungen auswählen' })
+            .check();
+        await expect(page.getByTestId('selection-bar')).toContainText('50 Ausrüstungen ausgewählt');
+        await page
+            .getByRole('button', { name: 'Alle 120 Ausrüstungen der Liste auswählen' })
+            .click();
+        await expect(page.getByTestId('selection-bar')).toContainText(
+            '120 Ausrüstungen ausgewählt',
+        );
+        await expect(page.getByRole('button', { name: /Alle 120 Ausrüstungen/ })).toBeHidden();
 
-        await page.getByRole('button', { name: 'Prüfdatum setzen …' }).click();
+        await page.getByRole('button', { name: 'Wartungsdatum setzen …' }).click();
         await expect(
-            dialog(page).getByRole('heading', { name: 'Prüfdatum für 120 Geräte' }),
+            dialog(page).getByRole('heading', { name: 'Wartungsdatum für 120 Ausrüstungen' }),
         ).toBeVisible();
-        await dialog(page).getByLabel('Nächste Prüfung fällig am').fill('2027-03-01');
-        await dialog(page).getByRole('button', { name: 'Prüfdatum setzen' }).click();
+        await dialog(page).getByLabel('Nächste Wartung fällig am').fill('2027-03-01');
+        await dialog(page).getByRole('button', { name: 'Wartungsdatum setzen' }).click();
 
         await expect(page.getByTestId('bulk-summary')).toHaveText(
-            'Prüfdatum: 120 Geräte geändert.',
+            'Wartungsdatum: 120 Ausrüstungen geändert.',
         );
         expect(
             bulkBodies(apiRequests, 'inspection-due').map((body) => body.devices.length),
@@ -393,13 +405,13 @@ test.describe('Sammelaktionen (Handy)', () => {
         await page.setViewportSize({ width: 390, height: 844 });
         await open(page);
         await page.getByRole('checkbox', { name: 'M2 auswählen' }).check();
-        await expect(page.getByTestId('selection-bar')).toContainText('1 Gerät ausgewählt');
+        await expect(page.getByTestId('selection-bar')).toContainText('1 Ausrüstung ausgewählt');
         expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
         await page.getByRole('button', { name: 'Umbuchen / Status ändern …' }).click();
         await dialog(page).getByRole('radio', { name: 'in Wartung' }).check();
         await dialog(page).getByRole('button', { name: 'Speichern' }).click();
         await expect(page.getByTestId('bulk-summary')).toHaveText(
-            'Umbuchen / Status: 1 Gerät geändert.',
+            'Umbuchen / Status: 1 Ausrüstung geändert.',
         );
         await expect(page.getByTestId('device-row-2')).toContainText('in Wartung');
         expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);

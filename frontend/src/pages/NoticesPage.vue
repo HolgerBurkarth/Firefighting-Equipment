@@ -107,8 +107,8 @@ function retry(): void {
             <p class="hint">
                 Hinweise entstehen bei Buchungen, die offline erfasst wurden und erst später
                 ankamen: wenn sie einen anderen Stand überschrieben haben, nicht übernommen wurden
-                oder älter als erlaubt waren. Prüfen Sie den Stand des Geräts und erledigen Sie den
-                Hinweis.
+                oder älter als erlaubt waren. Prüfen Sie den Stand der Ausrüstung und erledigen Sie
+                den Hinweis.
             </p>
 
             <div class="toolbar">

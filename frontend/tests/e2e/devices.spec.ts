@@ -60,7 +60,7 @@ const PARENTS: Readonly<Record<number, number>> = { 11: 10, 12: 10 };
 
 /**
  * GET devices wie DeviceListHandler, so weit die Tests es brauchen: Status (ohne Angabe ohne
- * ausgesonderte), include_retired, Typ, Standort mit Fächern, `q` in der Kennung, Seiten. Die
+ * ausgesonderte), include_retired, Typ, Standort mit Fächern, `q` in der Nummer, Seiten. Die
  * Sortierung rechnet der Server; hier nur „desc“ = umgekehrte Reihenfolge.
  */
 function deviceServer(all: readonly Record<string, unknown>[]) {
@@ -148,7 +148,7 @@ function lastListQuery(requests: readonly MockRequest[]): URLSearchParams {
 
 async function open(page: Page, query = ''): Promise<void> {
     await page.goto(`/firefighting/test/geraete${query}`);
-    await expect(page.getByRole('heading', { level: 1, name: 'Geräte' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Ausrüstung' })).toBeVisible();
 }
 
 async function choose(page: Page, label: string, option: string): Promise<void> {
@@ -156,19 +156,22 @@ async function choose(page: Page, label: string, option: string): Promise<void> 
     await page.getByRole('option', { name: option, exact: true }).click();
 }
 
-test.describe('Geräteliste (PC)', () => {
+test.describe('Ausrüstungsliste (PC)', () => {
     test.beforeEach(async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
     });
 
-    test('Spalten, Prüfdatum farbig, ausgesonderte ausgeblendet', async ({ page, apiRequests }) => {
+    test('Spalten, Wartungsdatum farbig, ausgesonderte ausgeblendet', async ({
+        page,
+        apiRequests,
+    }) => {
         await open(page);
         await expect(identifiers(page)).toHaveText(['M1', 'M2', 'PA 4', 'HRT 2']);
-        await expect(page.getByTestId('device-count')).toHaveText('4 Geräte');
+        await expect(page.getByTestId('device-count')).toHaveText('4 Ausrüstungen');
         await expect(
             page
                 .getByRole('navigation', { name: 'Hauptmenü' })
-                .getByRole('link', { name: 'Geräte', exact: true }),
+                .getByRole('link', { name: 'Ausrüstung', exact: true }),
         ).toHaveAttribute('aria-current', 'page');
         await expect(page.getByTestId('device-row-3')).toContainText('Atemschutzgerät');
         await expect(page.getByTestId('device-row-3')).toContainText('Lager');
@@ -182,7 +185,7 @@ test.describe('Geräteliste (PC)', () => {
         await expect(page.getByTestId('device-row-4').locator('.cell-due')).toHaveText('–', {
             useInnerText: true,
         });
-        await expect(page.getByRole('columnheader', { name: 'Kennung' })).toHaveAttribute(
+        await expect(page.getByRole('columnheader', { name: 'Nummer' })).toHaveAttribute(
             'aria-sort',
             'ascending',
         );
@@ -205,7 +208,7 @@ test.describe('Geräteliste (PC)', () => {
             'aria-pressed',
             'true',
         );
-        await expect(page.getByTestId('device-count')).toHaveText('1 Gerät gefunden');
+        await expect(page.getByTestId('device-count')).toHaveText('1 Ausrüstung gefunden');
         expect(lastListQuery(apiRequests).get('status')).toBe('defective');
 
         // Mit Statusfilter kommen ausgesonderte als weiterer Status dazu.
@@ -221,7 +224,7 @@ test.describe('Geräteliste (PC)', () => {
         await expect(identifiers(page)).toHaveText(['M1', 'M2']);
         expect(lastListQuery(apiRequests).get('include_sublocations')).toBe('1');
 
-        await choose(page, 'Gerätetyp', 'Atemschutzmaske');
+        await choose(page, 'Ausrüstungstyp', 'Atemschutzmaske');
         await expect(page).toHaveURL(/typ=1/);
         await page.getByLabel('Ausgesonderte anzeigen').check();
         expect(lastListQuery(apiRequests).get('include_retired')).toBe('1');
@@ -229,7 +232,7 @@ test.describe('Geräteliste (PC)', () => {
         // Nach dem Neuladen gelten dieselben Filter.
         await page.reload();
         await expect(page.getByRole('combobox', { name: 'Standort' })).toHaveText(/HLF 20/);
-        await expect(page.getByRole('combobox', { name: 'Gerätetyp' })).toHaveText(
+        await expect(page.getByRole('combobox', { name: 'Ausrüstungstyp' })).toHaveText(
             /Atemschutzmaske/,
         );
         await expect(page.getByLabel('Ausgesonderte anzeigen')).toBeChecked();
@@ -245,14 +248,14 @@ test.describe('Geräteliste (PC)', () => {
 
     test('Suche erst nach dem Tippen, Spaltenköpfe sortieren', async ({ page, apiRequests }) => {
         await open(page);
-        await page.getByRole('searchbox', { name: 'Geräte filtern' }).fill('pa');
+        await page.getByRole('searchbox', { name: 'Ausrüstung filtern' }).fill('pa');
         await expect(page).toHaveURL(/suche=pa/);
         await expect(identifiers(page)).toHaveText(['PA 4']);
         expect(lastListQuery(apiRequests).get('q')).toBe('pa');
         // Eine Abfrage für die ganze Eingabe, nicht je Buchstabe.
         expect(apiRequests.filter((r) => new URL(r.url).searchParams.has('q'))).toHaveLength(1);
 
-        await page.getByRole('searchbox', { name: 'Geräte filtern' }).fill('');
+        await page.getByRole('searchbox', { name: 'Ausrüstung filtern' }).fill('');
         await expect(page).toHaveURL(/\/geraete$/);
         const status = page.getByRole('button', { name: 'Status', exact: true });
         await status.click();
@@ -265,7 +268,7 @@ test.describe('Geräteliste (PC)', () => {
             'descending',
         );
         await expect(identifiers(page)).toHaveText(['HRT 2', 'PA 4', 'M2', 'M1']);
-        await expect(page.getByRole('columnheader', { name: 'Kennung' })).toHaveAttribute(
+        await expect(page.getByRole('columnheader', { name: 'Nummer' })).toHaveAttribute(
             'aria-sort',
             'none',
         );
@@ -284,7 +287,7 @@ test.describe('Geräteliste (PC)', () => {
                     headers: {
                         'Content-Disposition': 'attachment; filename="geraete-test-2026-10-30.csv"',
                     },
-                    text: '﻿Kennung;Gerätetyp\r\nPA 4;Atemschutzgerät\r\n',
+                    text: '﻿Nummer;Ausrüstungstyp\r\nPA 4;Atemschutzgerät\r\n',
                 },
             },
         });
@@ -297,7 +300,7 @@ test.describe('Geräteliste (PC)', () => {
             const file = await download;
             expect(file.suggestedFilename()).toBe('geraete-test-2026-10-30.csv');
             expect(await readFile(await file.path(), 'utf8')).toBe(
-                '﻿Kennung;Gerätetyp\r\nPA 4;Atemschutzgerät\r\n',
+                '﻿Nummer;Ausrüstungstyp\r\nPA 4;Atemschutzgerät\r\n',
             );
             const exported = apiRequests.find((r) => r.path === 'api/v1/devices/export');
             expect(Object.fromEntries(new URL(exported?.url ?? 'http://x/').searchParams)).toEqual({
@@ -382,8 +385,8 @@ test('Handy: Karten, Sortierung über Auswahl und Richtung', async ({ page }) =>
     await page.setViewportSize({ width: 390, height: 844 });
     await open(page);
     await expect(identifiers(page)).toHaveText(['M1', 'M2', 'PA 4', 'HRT 2']);
-    await expect(page.getByRole('columnheader', { name: 'Kennung' })).toBeHidden();
-    await expect(page.getByTestId('device-row-3')).toContainText('Prüfung:');
+    await expect(page.getByRole('columnheader', { name: 'Nummer' })).toBeHidden();
+    await expect(page.getByTestId('device-row-3')).toContainText('Wartung:');
     await choose(page, 'Sortieren nach', 'Standort');
     await expect(page).toHaveURL(/sortierung=location$/);
     await page.getByRole('button', { name: 'Absteigend sortieren' }).click();
@@ -440,7 +443,7 @@ test.describe('Buchung aus der Liste', () => {
         await expect(row).toHaveCSS('cursor', 'pointer');
         // Das Kästchen wählt nur aus.
         await row.getByRole('checkbox', { name: 'M1 auswählen' }).click();
-        await expect(page.getByTestId('selection-bar')).toContainText('1 Gerät ausgewählt');
+        await expect(page.getByTestId('selection-bar')).toContainText('1 Ausrüstung ausgewählt');
         await expect(page).toHaveURL(/\/geraete$/);
         // Ein Klick irgendwo in der Zeile (hier: Standort) öffnet das Gerät.
         await row.locator('.cell-location').click();
@@ -456,9 +459,7 @@ test.describe('Buchung aus der Liste', () => {
         await expect(page).toHaveURL(/\/geraete\/1\/details$/);
     });
 
-    test('Kennung öffnet das Gerätedetail; Zurück führt zur gefilterten Liste', async ({
-        page,
-    }) => {
+    test('Nummer öffnet das Gerätedetail; Zurück führt zur gefilterten Liste', async ({ page }) => {
         await open(page, '?status=ready');
         await identifiers(page).first().click();
         await expect(page).toHaveURL(/\/geraete\/1\/details$/);

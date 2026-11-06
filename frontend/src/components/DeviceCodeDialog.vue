@@ -166,7 +166,8 @@ async function submit(): Promise<void> {
         @submit="submit"
     >
         <p v-if="conflict" class="notice notice-info" role="alert" data-testid="code-conflict">
-            Das Gerät wurde inzwischen geändert (siehe oben). Bitte prüfen und erneut speichern.
+            Die Ausrüstung wurde inzwischen geändert (siehe oben). Bitte prüfen und erneut
+            speichern.
         </p>
         <label class="field">
             <span class="field-label">Scan-Code</span>

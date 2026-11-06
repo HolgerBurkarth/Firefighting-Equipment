@@ -311,7 +311,7 @@ describe('Kacheln des Dashboards', () => {
     it('Einsatzbereitschaft mit Anteil', () => {
         expect(readinessTile(summary())).toEqual({
             value: '42 von 45',
-            detail: 'Geräte einsatzbereit',
+            detail: 'Ausrüstungen einsatzbereit',
             percent: 93,
         });
         const empty = summary({
@@ -326,10 +326,13 @@ describe('Kacheln des Dashboards', () => {
         });
         expect(readinessTile(empty)).toEqual({
             value: '0 von 0',
-            detail: 'Noch keine Geräte erfasst',
+            detail: 'Noch keine Ausrüstung erfasst',
             percent: 0,
         });
-        expect(notReadyTile(empty)).toEqual({ value: '0', detail: 'Alle Geräte einsatzbereit' });
+        expect(notReadyTile(empty)).toEqual({
+            value: '0',
+            detail: 'Alle Ausrüstungen einsatzbereit',
+        });
     });
 
     it('nicht einsatzbereit ohne Teile mit 0', () => {
@@ -347,7 +350,7 @@ describe('Kacheln des Dashboards', () => {
         expect(notReadyTile(onlyDefective).detail).toBe('1 defekt');
     });
 
-    it('Prüffristen und offene Hinweise (Einzahl und Mehrzahl)', () => {
+    it('Termine und offene Hinweise (Einzahl und Mehrzahl)', () => {
         expect(inspectionTile(summary())).toEqual({
             value: '2 überfällig',
             detail: '4 in den nächsten 30 Tagen',

@@ -207,7 +207,7 @@ describe('Verwaltung der Standorte', () => {
     it('meldet 409 mit details beim Sperren eines vollen Standorts', async () => {
         const { fetch } = respond(409, {
             error: 'rule_violation',
-            message: 'Der Standort „G1“ ist nicht leer (3 Geräte).',
+            message: 'Der Standort „G1“ ist nicht leer (3 Ausrüstungen).',
             details: { devices: 3, sublocations: 0 },
         });
         const result = await setLocationActive(11, false, fetch);

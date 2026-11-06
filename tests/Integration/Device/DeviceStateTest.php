@@ -119,7 +119,7 @@ final class DeviceStateTest extends DeviceApiTestCase
         $response = $this->api('POST', 'devices/' . $device['id'] . '/state', ['version' => 1, 'location_id' => $this->room, 'status' => 'defective'], $this->user);
 
         self::assertError(409, 'rule_violation', $response);
-        self::assertSame('Der Standort „Lager“ ist gesperrt und kann keine Geräte aufnehmen.', self::json($response)['message']);
+        self::assertSame('Der Standort „Lager“ ist gesperrt und kann keine Ausrüstung aufnehmen.', self::json($response)['message']);
         self::assertSame($before, $this->deviceSnapshot());
     }
 
@@ -145,7 +145,7 @@ final class DeviceStateTest extends DeviceApiTestCase
 
         self::assertError(409, 'rule_violation', $response);
         self::assertSame(
-            'Das Gerät „MA-01“ ist ausgesondert; Standort und Status lassen sich erst nach der Wiederaufnahme ändern.',
+            'Die Ausrüstung „MA-01“ ist ausgesondert; Standort und Status lassen sich erst nach der Wiederaufnahme ändern.',
             self::json($response)['message'],
         );
         self::assertSame($before, $this->deviceSnapshot());

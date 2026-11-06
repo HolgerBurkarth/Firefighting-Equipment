@@ -101,8 +101,8 @@ describe('Hilfen', () => {
     });
 
     it('Anzahl der Geräte', () => {
-        expect(deviceCountText(0)).toBe('0 Geräte');
-        expect(deviceCountText(1)).toBe('1 Gerät');
-        expect(deviceCountText(12)).toBe('12 Geräte');
+        expect(deviceCountText(0)).toBe('0 Ausrüstungen');
+        expect(deviceCountText(1)).toBe('1 Ausrüstung');
+        expect(deviceCountText(12)).toBe('12 Ausrüstungen');
     });
 });

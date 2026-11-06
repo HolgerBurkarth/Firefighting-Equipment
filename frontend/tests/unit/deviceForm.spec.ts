@@ -45,7 +45,7 @@ describe('identifierProblem (wie DeviceIdentifier)', () => {
     });
 
     it('Fehler mit verständlicher Meldung', () => {
-        expect(identifierProblem('   ')).toBe('Bitte eine Kennung eingeben.');
+        expect(identifierProblem('   ')).toBe('Bitte eine Nummer eingeben.');
         expect(identifierProblem('A'.repeat(31))).toBe('Höchstens 30 Zeichen (jetzt 31).');
         expect(identifierProblem('A'.repeat(30))).toBeNull();
         expect(identifierProblem('M_1')).toMatch(/^Nur Buchstaben, Ziffern/);
@@ -138,7 +138,7 @@ describe('Bearbeiten', () => {
         expect(editFormChanges(device, { ...form, serialNumber: ' SN-5 ' })).toEqual({});
     });
 
-    it('nur geänderte Felder; leer = null; Schreibweise der Kennung zählt', () => {
+    it('nur geänderte Felder; leer = null; Schreibweise der Nummer zählt', () => {
         const form = {
             ...editFormFromDevice(device),
             identifier: 'm5',
@@ -233,15 +233,15 @@ describe('Wieder aufnehmen', () => {
         expect(reinstateRequest(without, form, '')).toEqual({ version: 1, status: 'ready' });
     });
 
-    it('eigene Meldungen, wenn Kennung bzw. Scan-Code vergeben sind (ohne Felder der API)', () => {
+    it('eigene Meldungen, wenn Nummer bzw. Scan-Code vergeben sind (ohne Felder der API)', () => {
         expect(reinstateIdentifierTaken(' M  5 ')).toBe(
-            'Die Kennung „M 5“ ist inzwischen an ein anderes Gerät vergeben. Bitte geben Sie eine andere Kennung ein.',
+            'Die Nummer „M 5“ ist inzwischen an eine andere Ausrüstung vergeben. Bitte geben Sie eine andere Nummer ein.',
         );
         expect(REINSTATE_SCAN_CODE_TAKEN).not.toMatch(/Feld|null|scan_code/);
     });
 });
 
-describe('Neues Gerät', () => {
+describe('Neue Ausrüstung', () => {
     function filled(overrides: Partial<NewDeviceForm> = {}): NewDeviceForm {
         return {
             ...emptyNewDeviceForm(),
@@ -252,10 +252,10 @@ describe('Neues Gerät', () => {
         };
     }
 
-    it('leeres Formular: Kennung, Gerätetyp und Standort fehlen, sonst nichts', () => {
+    it('leeres Formular: Nummer, Ausrüstungstyp und Standort fehlen, sonst nichts', () => {
         expect(newDeviceProblems(emptyNewDeviceForm())).toEqual({
-            identifier: 'Bitte eine Kennung eingeben.',
-            deviceTypeId: 'Bitte einen Gerätetyp wählen.',
+            identifier: 'Bitte eine Nummer eingeben.',
+            deviceTypeId: 'Bitte einen Ausrüstungstyp wählen.',
             locationId: 'Bitte einen Standort wählen.',
         });
         expect(newDeviceProblems(filled())).toEqual({});
@@ -320,7 +320,7 @@ describe('Neues Gerät', () => {
         });
     });
 
-    it('ohne Gerätetyp oder Standort kein Body', () => {
+    it('ohne Ausrüstungstyp oder Standort kein Body', () => {
         expect(() => newDeviceRequest(filled({ locationId: null }))).toThrow();
     });
 
@@ -341,7 +341,7 @@ describe('Neues Gerät', () => {
         expect(nextIdentifier(identifier)).toBe(next);
     });
 
-    it('Speichern und nächstes: Typ, Standort und Prüfdatum bleiben, Kennung zählt weiter', () => {
+    it('Speichern und nächstes: Typ, Standort und Wartungsdatum bleiben, Nummer zählt weiter', () => {
         const saved = filled({
             status: 'defective',
             scanCode: 'ABC',

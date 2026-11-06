@@ -30,12 +30,12 @@ enum ImportColumn: string
     public function label(): string
     {
         return match ($this) {
-            self::Identifier => 'Kennung',
+            self::Identifier => 'Nummer',
             self::ScanCode => 'Scan-Code',
-            self::DeviceType => 'Gerätetyp',
+            self::DeviceType => 'Ausrüstungstyp',
             self::Location => 'Standort',
             self::Status => 'Status',
-            self::NextInspectionDue => 'Nächste Prüfung',
+            self::NextInspectionDue => 'Nächste Wartung',
             self::SerialNumber => 'Seriennummer',
             self::Manufacturer => 'Hersteller',
             self::Model => 'Modell',
@@ -45,13 +45,29 @@ enum ImportColumn: string
     }
 
     /**
-     * Spalte zu einer Überschrift: Leerraum am Rand und Groß-/Kleinschreibung zählen nicht.
+     * Frühere Überschrift (bis zur Umstellung der Begriffe am 06.11.2026); der Import nimmt sie
+     * weiter an, damit ältere Exporte und ausgefüllte Vorlagen lesbar bleiben.
+     */
+    public function formerLabel(): ?string
+    {
+        return match ($this) {
+            self::Identifier => 'Kennung',
+            self::DeviceType => 'Gerätetyp',
+            self::NextInspectionDue => 'Nächste Prüfung',
+            default => null,
+        };
+    }
+
+    /**
+     * Spalte zu einer Überschrift (neue oder frühere): Leerraum am Rand und Groß-/Kleinschreibung
+     * zählen nicht.
      */
     public static function fromHeader(string $header): ?self
     {
         $header = mb_strtolower(trim($header));
         foreach (self::cases() as $column) {
-            if (mb_strtolower($column->label()) === $header) {
+            $former = $column->formerLabel();
+            if (mb_strtolower($column->label()) === $header || ($former !== null && mb_strtolower($former) === $header)) {
                 return $column;
             }
         }

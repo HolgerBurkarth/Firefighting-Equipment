@@ -41,7 +41,7 @@ function rejectDrehleiter(request: MockRequest): MockResponse | null {
               status: 409,
               body: {
                   error: 'name_taken',
-                  message: 'Es gibt bereits einen Gerätetyp „Drehleiter“.',
+                  message: 'Es gibt bereits einen Ausrüstungstyp „Drehleiter“.',
               },
           }
         : null;
@@ -57,11 +57,11 @@ function dialog(page: Page): Locator {
 
 async function open(page: Page): Promise<void> {
     await page.goto('/firefighting/test/geraetetypen');
-    await expect(page.getByRole('heading', { level: 1, name: 'Gerätetypen' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Ausrüstungstypen' })).toBeVisible();
     await expect(page.getByTestId('device-type-table')).toBeVisible();
 }
 
-test.describe('Gerätetypen (PC)', () => {
+test.describe('Ausrüstungstypen (PC)', () => {
     test.beforeEach(async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
     });
@@ -76,11 +76,11 @@ test.describe('Gerätetypen (PC)', () => {
         ).toBe(true);
         await expect(
             page.getByRole('navigation', { name: 'Hauptmenü' }).getByRole('link', {
-                name: 'Gerätetypen',
+                name: 'Ausrüstungstypen',
             }),
         ).toHaveAttribute('aria-current', 'page');
         await expect(names(page)).toHaveText(['Atemschutzgerät', 'Atemschutzmaske', 'Funkgerät']);
-        await expect(page.getByTestId('device-type-2')).toContainText('40 Geräte');
+        await expect(page.getByTestId('device-type-2')).toContainText('40 Ausrüstungen');
         await expect(page.getByRole('columnheader', { name: 'Name' })).toHaveAttribute(
             'aria-sort',
             'ascending',
@@ -88,16 +88,16 @@ test.describe('Gerätetypen (PC)', () => {
         // Am PC sortieren die Spaltenköpfe, die Sortier-Knöpfe gibt es nur am Handy.
         await expect(page.getByRole('group', { name: 'Sortieren' })).toBeHidden();
 
-        const count = page.getByRole('button', { name: 'Geräte', exact: true });
+        const count = page.getByRole('button', { name: 'Ausrüstungen', exact: true });
         await count.click();
         await expect(names(page)).toHaveText(['Atemschutzgerät', 'Funkgerät', 'Atemschutzmaske']);
-        await expect(page.getByRole('columnheader', { name: 'Geräte' })).toHaveAttribute(
+        await expect(page.getByRole('columnheader', { name: 'Ausrüstungen' })).toHaveAttribute(
             'aria-sort',
             'ascending',
         );
         await count.click();
         await expect(names(page)).toHaveText(['Atemschutzmaske', 'Atemschutzgerät', 'Funkgerät']);
-        await expect(page.getByRole('columnheader', { name: 'Geräte' })).toHaveAttribute(
+        await expect(page.getByRole('columnheader', { name: 'Ausrüstungen' })).toHaveAttribute(
             'aria-sort',
             'descending',
         );
@@ -108,7 +108,7 @@ test.describe('Gerätetypen (PC)', () => {
 
         await page.getByLabel('Deaktivierte anzeigen (1)').check();
         await expect(page.getByTestId('device-type-4')).toContainText('deaktiviert');
-        await page.getByRole('searchbox', { name: 'Gerätetypen filtern' }).fill('warme');
+        await page.getByRole('searchbox', { name: 'Ausrüstungstypen filtern' }).fill('warme');
         await expect(names(page)).toHaveText(['Wärmebildkamera']);
     });
 
@@ -117,12 +117,12 @@ test.describe('Gerätetypen (PC)', () => {
         apiRequests,
     }) => {
         await open(page);
-        await page.getByRole('button', { name: 'Neuer Gerätetyp' }).click();
+        await page.getByRole('button', { name: 'Neuer Ausrüstungstyp' }).click();
         const form = dialog(page);
-        await expect(form.getByRole('heading', { name: 'Neuer Gerätetyp' })).toBeVisible();
+        await expect(form.getByRole('heading', { name: 'Neuer Ausrüstungstyp' })).toBeVisible();
         const name = form.getByLabel('Name');
         await name.fill('funkgerät');
-        await expect(form.getByText('Diesen Gerätetyp gibt es schon.')).toBeVisible();
+        await expect(form.getByText('Diesen Ausrüstungstyp gibt es schon.')).toBeVisible();
         await expect(form.getByRole('button', { name: 'Anlegen' })).toBeDisabled();
         await name.fill('x'.repeat(51));
         await expect(form.getByText('Höchstens 50 Zeichen (jetzt 51).')).toBeVisible();
@@ -168,7 +168,7 @@ test.describe('Gerätetypen (PC)', () => {
             confirm.getByRole('heading', { name: 'Funkgerät deaktivieren?' }),
         ).toBeVisible();
         await expect(confirm).toContainText(
-            'Neue Geräte können „Funkgerät“ dann nicht mehr bekommen. Die 12 Geräte dieses Typs behalten ihn.',
+            'Neue Ausrüstung kann „Funkgerät“ dann nicht mehr bekommen. Die 12 Ausrüstungen dieses Typs behalten ihn.',
         );
         await expect(confirm.getByRole('button', { name: 'Abbrechen' })).toBeFocused();
         await confirm.getByRole('button', { name: 'Deaktivieren' }).click();
@@ -187,7 +187,7 @@ test.describe('Gerätetypen (PC)', () => {
         ).toEqual(['api/v1/device-types/3/deactivate', 'api/v1/device-types/3/activate']);
     });
 
-    test('die ganze Zeile öffnet die Geräteliste des Typs, der Stift nur das Fenster', async ({
+    test('die ganze Zeile öffnet die Ausrüstungsliste des Typs, der Stift nur das Fenster', async ({
         page,
     }) => {
         await open(page);
@@ -208,19 +208,19 @@ test.describe('Gerätetypen (PC)', () => {
         test('Meldung am Feld, das Fenster bleibt offen', async ({ page }) => {
             override = rejectDrehleiter;
             await open(page);
-            await page.getByRole('button', { name: 'Neuer Gerätetyp' }).click();
+            await page.getByRole('button', { name: 'Neuer Ausrüstungstyp' }).click();
             const form = dialog(page);
             await form.getByLabel('Name').fill('Drehleiter');
             await form.getByRole('button', { name: 'Anlegen' }).click();
             await expect(
-                form.getByText('Es gibt bereits einen Gerätetyp „Drehleiter“.'),
+                form.getByText('Es gibt bereits einen Ausrüstungstyp „Drehleiter“.'),
             ).toBeVisible();
             await expect(form.getByLabel('Name')).toHaveAttribute('aria-invalid', 'true');
         });
     });
 });
 
-test('Handy: die ganze Karte öffnet die Geräteliste des Typs', async ({ page }) => {
+test('Handy: die ganze Karte öffnet die Ausrüstungsliste des Typs', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await open(page);
     await page.getByTestId('device-type-2').locator('.col-count').click();
@@ -236,7 +236,7 @@ test('Handy: Karten mit Sortier-Knöpfen', async ({ page }) => {
         'aria-pressed',
         'true',
     );
-    const count = sort.getByRole('button', { name: 'Geräte' });
+    const count = sort.getByRole('button', { name: 'Ausrüstungen' });
     await count.click();
     await expect(count).toHaveAttribute('aria-pressed', 'true');
     await expect(names(page)).toHaveText(['Atemschutzgerät', 'Funkgerät', 'Atemschutzmaske']);

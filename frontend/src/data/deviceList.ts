@@ -188,6 +188,6 @@ export function dueState(
  * ab).
  */
 export function deviceCountLabel(total: number, filtered: boolean): string {
-    const count = total === 1 ? '1 Gerät' : `${String(total)} Geräte`;
+    const count = total === 1 ? '1 Ausrüstung' : `${String(total)} Ausrüstungen`;
     return filtered ? `${count} gefunden` : count;
 }

@@ -21,7 +21,7 @@ import { delegate, deviceTypeServer, locationServer } from './support/masterData
  */
 
 const TOKEN = 'c'.repeat(64);
-const CSV = '﻿Kennung;Gerätetyp;Standort\r\nM1;Atemschutzmaske;HLF20\r\n';
+const CSV = '﻿Nummer;Ausrüstungstyp;Standort\r\nM1;Atemschutzmaske;HLF20\r\n';
 
 function summary(overrides: Record<string, number> = {}): Record<string, number> {
     return {
@@ -44,7 +44,7 @@ function row(line: number, overrides: Record<string, unknown> = {}): Record<stri
         result_label: 'Neu',
         device: null,
         changes: [
-            { field: 'identifier', label: 'Kennung', old: null, new: `M${String(line - 1)}` },
+            { field: 'identifier', label: 'Nummer', old: null, new: `M${String(line - 1)}` },
             { field: 'location', label: 'Standort', old: null, new: 'HLF 20 / G1' },
         ],
         messages: [],
@@ -59,7 +59,7 @@ function preview(overrides: Record<string, unknown> = {}): Record<string, unknow
         encoding: 'utf-8',
         delimiter: ';',
         delimiter_label: 'Semikolon',
-        columns: ['Kennung', 'Gerätetyp', 'Standort'],
+        columns: ['Nummer', 'Ausrüstungstyp', 'Standort'],
         summary: summary(),
         unknown: { device_types: [], locations: [] },
         suggestions: { device_types: [], locations: [] },
@@ -90,7 +90,7 @@ const WITH_ERRORS = preview({
     rows: [
         row(2, {
             identifier: 'BEISPIEL-1',
-            warnings: ['Die Kennung „BEISPIEL-1“ gehört zu den Beispielzeilen der Vorlage.'],
+            warnings: ['Die Nummer „BEISPIEL-1“ gehört zu den Beispielzeilen der Vorlage.'],
         }),
         row(3, {
             identifier: 'M2',
@@ -98,7 +98,7 @@ const WITH_ERRORS = preview({
             result_label: 'Fehler',
             changes: [],
             messages: [
-                'Der Gerätetyp „Atemschutzmaskee“ ist nicht bekannt. Meinten Sie „Atemschutzmaske“?',
+                'Der Ausrüstungstyp „Atemschutzmaskee“ ist nicht bekannt. Meinten Sie „Atemschutzmaske“?',
             ],
         }),
         row(4, {
@@ -143,7 +143,7 @@ test.use({
             status: 200,
             contentType: 'text/csv; charset=utf-8',
             headers: { 'Content-Disposition': 'attachment; filename="geraete-vorlage-test.csv"' },
-            text: '﻿Kennung;Scan-Code\r\nBEISPIEL-1;\r\n',
+            text: '﻿Nummer;Scan-Code\r\nBEISPIEL-1;\r\n',
         },
         'GET api/v1/devices/import/values': {
             status: 200,
@@ -151,14 +151,16 @@ test.use({
             headers: {
                 'Content-Disposition': 'attachment; filename="gueltige-werte-test-2026-10-30.csv"',
             },
-            text: '﻿Spalte;Gültiger Wert\r\nGerätetyp;Atemschutzmaske\r\n',
+            text: '﻿Spalte;Gültiger Wert\r\nAusrüstungstyp;Atemschutzmaske\r\n',
         },
     },
 });
 
 async function open(page: Page): Promise<void> {
     await page.goto('/firefighting/test/geraete/import');
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Geräte importieren (CSV)');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+        'Ausrüstung importieren (CSV)',
+    );
 }
 
 /** Datei über den Knopf und die Dateiauswahl des Browsers wählen. */
@@ -185,7 +187,9 @@ function sent(requests: readonly MockRequest[], path: string): unknown[] {
 test.describe('Import-Seite', () => {
     useServer([{ status: 200, body: preview() }]);
 
-    test('aus der Geräteliste, „Geräte“ bleibt im Menü hervorgehoben', async ({ page }) => {
+    test('aus der Ausrüstungsliste, „Ausrüstung“ bleibt im Menü hervorgehoben', async ({
+        page,
+    }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
         await page.goto('/firefighting/test/geraete');
         await page.getByRole('link', { name: 'Import (CSV)' }).click();
@@ -193,7 +197,7 @@ test.describe('Import-Seite', () => {
         await expect(
             page
                 .getByRole('navigation', { name: 'Hauptmenü' })
-                .getByRole('link', { name: 'Geräte', exact: true }),
+                .getByRole('link', { name: 'Ausrüstung', exact: true }),
         ).toHaveClass(/menu-link-active/);
         await page.getByRole('button', { name: 'Zurück' }).click();
         await expect(page).toHaveURL(/\/geraete$/);
@@ -206,7 +210,7 @@ test.describe('Import-Seite', () => {
         const templateFile = await template;
         expect(templateFile.suggestedFilename()).toBe('geraete-vorlage-test.csv');
         expect(await readFile(await templateFile.path(), 'utf8')).toBe(
-            '﻿Kennung;Scan-Code\r\nBEISPIEL-1;\r\n',
+            '﻿Nummer;Scan-Code\r\nBEISPIEL-1;\r\n',
         );
 
         const values = page.waitForEvent('download');
@@ -258,7 +262,7 @@ test.describe('Import-Seite', () => {
         ]);
         await expect(page.getByTestId('preview')).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'CSV-Datei wählen …' })).toBeVisible();
-        await page.getByRole('link', { name: 'Zur Geräteliste' }).click();
+        await page.getByRole('link', { name: 'Zur Ausrüstungsliste' }).click();
         await expect(page).toHaveURL(/\/geraete$/);
     });
 
@@ -288,10 +292,10 @@ test.describe('Fehler in der Datei', () => {
         );
         await expect(rowsShown(page)).toHaveText(['M2', 'M3']);
         await expect(page.getByTestId('import-rows')).toContainText(
-            'Der Gerätetyp „Atemschutzmaskee“ ist nicht bekannt. Meinten Sie „Atemschutzmaske“?',
+            'Der Ausrüstungstyp „Atemschutzmaskee“ ist nicht bekannt. Meinten Sie „Atemschutzmaske“?',
         );
         await expect(page.getByTestId('unknown').locator('li')).toHaveText([
-            'Gerätetyp „Atemschutzmaskee“: Meinten Sie „Atemschutzmaske“?',
+            'Ausrüstungstyp „Atemschutzmaskee“: Meinten Sie „Atemschutzmaske“?',
             'Standort „HLF20“: Meinten Sie „HLF 20“ oder „HLF 20 / G1“?',
             'Standort „Wache Nord“',
         ]);
@@ -300,7 +304,7 @@ test.describe('Fehler in der Datei', () => {
         await page.getByRole('button', { name: 'Mit Warnung (1)' }).click();
         await expect(rowsShown(page)).toHaveText(['BEISPIEL-1']);
         await expect(page.getByTestId('import-rows')).toContainText(
-            'Die Kennung „BEISPIEL-1“ gehört zu den Beispielzeilen der Vorlage.',
+            'Die Nummer „BEISPIEL-1“ gehört zu den Beispielzeilen der Vorlage.',
         );
     });
 });
@@ -365,7 +369,7 @@ test.describe('Datei nicht lesbar', () => {
             status: 400,
             body: {
                 error: 'invalid_request',
-                message: 'Die Spalte „Kennung“ fehlt.',
+                message: 'Die Spalte „Nummer“ fehlt.',
                 details: { line: 1 },
             },
         },
@@ -375,7 +379,7 @@ test.describe('Datei nicht lesbar', () => {
     test('Meldung des Servers, keine Vorschau', async ({ page }) => {
         await open(page);
         await chooseFile(page);
-        await expect(page.getByText('Die Spalte „Kennung“ fehlt.')).toBeVisible();
+        await expect(page.getByText('Die Spalte „Nummer“ fehlt.')).toBeVisible();
         await expect(page.getByTestId('preview')).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Erneut prüfen' })).toBeEnabled();
     });

@@ -79,7 +79,7 @@ test.describe('Code scannen (lokale Liste)', () => {
         await expect(page.getByRole('dialog', { name: 'Code scannen' })).toHaveCount(0);
     });
 
-    test('Kennung als Barcode (Code 128) ohne Groß-/Kleinschreibung', async ({ page }) => {
+    test('Nummer als Barcode (Code 128) ohne Groß-/Kleinschreibung', async ({ page }) => {
         await fakeCamera(page, { kind: 'code', symbol: identifierBarcode });
         await page.goto('/firefighting/test/suchen');
         await page.getByRole('button', { name: 'Code scannen' }).click();
@@ -92,24 +92,24 @@ test.describe('Code scannen (lokale Liste)', () => {
         await page.getByRole('button', { name: 'Code scannen' }).click();
 
         await expect(page.getByTestId('search-not-found')).toHaveText(
-            'Kein Gerät mit diesem Code gefunden.',
+            'Keine Ausrüstung mit diesem Code gefunden.',
         );
         await expect(page).toHaveURL(/\/suchen$/);
-        await expect(page.getByRole('searchbox', { name: 'Gerät suchen' })).toHaveValue(
+        await expect(page.getByRole('searchbox', { name: 'Ausrüstung suchen' })).toHaveValue(
             'UNBEKANNT-9',
         );
         await expect(page.getByRole('button', { name: 'Code scannen' })).toBeFocused();
         expect(await cameraCounts(page)).toEqual(cameraReleased(1));
 
         // Tippen blendet den Hinweis aus.
-        await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('M1');
+        await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('M1');
         await expect(page.getByTestId('search-not-found')).toHaveCount(0);
     });
 
     test('Zurück-Knopf des Browsers schließt nur den Scanner, Kamera aus', async ({ page }) => {
         await fakeCamera(page, { kind: 'blank' });
         await page.goto('/firefighting/test/suchen');
-        await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('M');
+        await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('M');
         await page.getByRole('button', { name: 'Code scannen' }).click();
         await expect(
             page.getByText('Halten Sie den Barcode oder QR-Code in den Rahmen.'),
@@ -119,7 +119,7 @@ test.describe('Code scannen (lokale Liste)', () => {
         await page.goBack();
         await expect(page).toHaveURL(/\/suchen$/);
         await expect(page.getByRole('dialog', { name: 'Code scannen' })).toHaveCount(0);
-        await expect(page.getByRole('searchbox', { name: 'Gerät suchen' })).toHaveValue('M');
+        await expect(page.getByRole('searchbox', { name: 'Ausrüstung suchen' })).toHaveValue('M');
         expect(await cameraCounts(page)).toEqual(cameraReleased(1));
     });
 
@@ -169,7 +169,9 @@ test.describe('Code scannen (lokale Liste)', () => {
         await fakeCamera(page, { kind: 'blank' });
         await page.goto('/firefighting/test/suchen');
         const button = page.getByRole('button', { name: 'Code scannen' });
-        const field = await page.getByRole('searchbox', { name: 'Gerät suchen' }).boundingBox();
+        const field = await page
+            .getByRole('searchbox', { name: 'Ausrüstung suchen' })
+            .boundingBox();
         const box = await button.boundingBox();
         expect(box?.height).toBeGreaterThanOrEqual(48);
         expect((box?.y ?? 0) > (field?.y ?? 0)).toBe(true);
@@ -212,7 +214,7 @@ test.describe('Code scannen (Lesemodul nicht ladbar)', () => {
     });
 });
 
-test.describe('Code scannen (mehr als 2000 Geräte, Suche auf dem Server)', () => {
+test.describe('Code scannen (mehr als 2000 Ausrüstungen, Suche auf dem Server)', () => {
     const hrt = deviceJson(4711, { identifier: 'HRT 5', scan_code: GS1_CODE });
     test.use({
         api: {

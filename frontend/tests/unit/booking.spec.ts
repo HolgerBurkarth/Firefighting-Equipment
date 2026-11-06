@@ -53,7 +53,7 @@ describe('client_ref', () => {
         }
     });
 
-    it('gleicher Inhalt behält die Kennung, anderer bekommt eine neue', () => {
+    it('gleicher Inhalt behält die Nummer, anderer bekommt eine neue', () => {
         let count = 0;
         const keeper = new ClientRefKeeper(() => `ref-${String(++count)}`);
         expect(keeper.refFor({ deviceId: 5, version: 1, status: 'defective' })).toBe('ref-1');
@@ -61,11 +61,11 @@ describe('client_ref', () => {
         // Nach einem Konflikt: neue Version → neue Buchung.
         expect(keeper.refFor({ deviceId: 5, version: 2, status: 'defective' })).toBe('ref-2');
         expect(keeper.refFor({ deviceId: 5, version: 2, status: 'ready' })).toBe('ref-3');
-        // Zurück zu einem früheren Inhalt: nicht die alte Kennung (der Server kennt sie vielleicht).
+        // Zurück zu einem früheren Inhalt: nicht die alte Nummer (der Server kennt sie vielleicht).
         expect(keeper.refFor({ deviceId: 5, version: 1, status: 'defective' })).toBe('ref-4');
     });
 
-    it('merkt sich die Zeit des ersten Versuchs je Kennung', () => {
+    it('merkt sich die Zeit des ersten Versuchs je Nummer', () => {
         let now = Date.parse('2026-11-01T10:00:00Z');
         let count = 0;
         const keeper = new ClientRefKeeper(
@@ -78,7 +78,7 @@ describe('client_ref', () => {
             at: new Date('2026-11-01T10:00:00Z'),
         });
         now += 60_000;
-        // Erneuter Versuch (z. B. nach einem Netzwerkfehler): dieselbe Kennung, dieselbe Zeit.
+        // Erneuter Versuch (z. B. nach einem Netzwerkfehler): dieselbe Nummer, dieselbe Zeit.
         expect(keeper.attemptFor(content)).toEqual({
             ref: 'ref-1',
             at: new Date('2026-11-01T10:00:00Z'),

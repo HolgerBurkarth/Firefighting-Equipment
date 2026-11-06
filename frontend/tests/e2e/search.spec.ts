@@ -58,15 +58,15 @@ test.describe('Suchen (lokal)', () => {
 
     test('sucht beim Tippen, mehrere Wörter mit UND', async ({ page }) => {
         await page.goto('/firefighting/test/suchen');
-        const search = page.getByRole('searchbox', { name: 'Gerät suchen' });
-        await expect(page.getByText('Hier erscheinen die Geräte')).toBeVisible();
+        const search = page.getByRole('searchbox', { name: 'Ausrüstung suchen' });
+        await expect(page.getByText('Hier erscheint die Ausrüstung')).toBeVisible();
         expect(
             await search.boundingBox().then((box) => Math.round(box?.height ?? 0)),
         ).toBeGreaterThanOrEqual(44);
 
         await search.fill('m1');
         const cards = page.getByTestId('device-card');
-        // Kennung genau zuerst, dann Kennung beginnt damit.
+        // Nummer genau zuerst, dann Nummer beginnt damit.
         await expect(cards.locator('.device-identifier')).toHaveText(['M1', 'M10']);
         await expect(page.getByTestId('search-count')).toHaveText('2 Treffer');
 
@@ -82,7 +82,7 @@ test.describe('Suchen (lokal)', () => {
 
         await search.fill('gibtsnicht');
         await expect(page.getByTestId('search-count')).toHaveText(
-            'Kein Gerät passt zu „gibtsnicht“.',
+            'Keine Ausrüstung passt zu „gibtsnicht“.',
         );
         await search.fill('');
         await expect(page.getByRole('heading', { name: 'Zuletzt benutzt' })).toBeVisible();
@@ -90,7 +90,7 @@ test.describe('Suchen (lokal)', () => {
 
     test('Antippen öffnet das Gerät; danach unter „Zuletzt benutzt“', async ({ page }) => {
         await page.goto('/firefighting/test/suchen');
-        await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('pa 3');
+        await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('pa 3');
         await page.getByTestId('device-card').first().click();
         await expect(page).toHaveURL(/\/firefighting\/test\/geraete\/4$/);
         await page.getByRole('button', { name: 'Zurück' }).click();
@@ -102,19 +102,17 @@ test.describe('Suchen (lokal)', () => {
 
     test('Enter: Scan-Code genau öffnet das Gerät', async ({ page }) => {
         await page.goto('/firefighting/test/suchen');
-        const search = page.getByRole('searchbox', { name: 'Gerät suchen' });
-        await expect(page.getByText('Hier erscheinen die Geräte')).toBeVisible();
+        const search = page.getByRole('searchbox', { name: 'Ausrüstung suchen' });
+        await expect(page.getByText('Hier erscheint die Ausrüstung')).toBeVisible();
         await search.fill('04006381333931');
         await search.press('Enter');
         await expect(page).toHaveURL(/\/geraete\/5$/);
     });
 
-    test('Enter: Kennung ohne Groß-/Kleinschreibung, auch wenn mehrere passen', async ({
-        page,
-    }) => {
+    test('Enter: Nummer ohne Groß-/Kleinschreibung, auch wenn mehrere passen', async ({ page }) => {
         await page.goto('/firefighting/test/suchen');
-        const search = page.getByRole('searchbox', { name: 'Gerät suchen' });
-        await expect(page.getByText('Hier erscheinen die Geräte')).toBeVisible();
+        const search = page.getByRole('searchbox', { name: 'Ausrüstung suchen' });
+        await expect(page.getByText('Hier erscheint die Ausrüstung')).toBeVisible();
         await search.fill('m1');
         await search.press('Enter');
         await expect(page).toHaveURL(/\/geraete\/1$/);
@@ -122,7 +120,7 @@ test.describe('Suchen (lokal)', () => {
 
     test('Enter: ein einziger Treffer öffnet das Gerät', async ({ page }) => {
         await page.goto('/firefighting/test/suchen');
-        const search = page.getByRole('searchbox', { name: 'Gerät suchen' });
+        const search = page.getByRole('searchbox', { name: 'Ausrüstung suchen' });
         await search.fill('dräger');
         await expect(page.getByTestId('search-count')).toHaveText('1 Treffer');
         await search.press('Enter');
@@ -131,12 +129,12 @@ test.describe('Suchen (lokal)', () => {
 
     test('Enter ohne Treffer: Hinweis, Text bleibt im Suchfeld', async ({ page }) => {
         await page.goto('/firefighting/test/suchen');
-        const search = page.getByRole('searchbox', { name: 'Gerät suchen' });
+        const search = page.getByRole('searchbox', { name: 'Ausrüstung suchen' });
         await search.fill('XYZ-999');
         await expect(page.getByTestId('search-count')).toBeVisible();
         await search.press('Enter');
         await expect(page.getByTestId('search-not-found')).toHaveText(
-            'Kein Gerät mit diesem Code gefunden.',
+            'Keine Ausrüstung mit diesem Code gefunden.',
         );
         await expect(search).toHaveValue('XYZ-999');
         await search.press('Backspace');
@@ -282,7 +280,7 @@ test.describe('Viele Geräte', () => {
 
         test('lädt zwei Blöcke, zeigt höchstens 50 Treffer', async ({ page, apiRequests }) => {
             await page.goto('/firefighting/test/suchen');
-            const search = page.getByRole('searchbox', { name: 'Gerät suchen' });
+            const search = page.getByRole('searchbox', { name: 'Ausrüstung suchen' });
             await search.fill('m230');
             await expect(page.getByTestId('device-card')).toHaveCount(1);
             const offsets = apiRequests
@@ -330,16 +328,16 @@ test.describe('Viele Geräte', () => {
                 'ABC-1',
             ]);
 
-            await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('abc');
+            await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('abc');
             await expect(page.getByTestId('search-count')).toHaveText('2 Treffer');
             const list = apiRequests.filter((r) => r.path === 'api/v1/devices');
             // Nur der erste Block, dann die Suche.
             expect(list.map((r) => new URL(r.url).searchParams.get('offset'))).toEqual(['0', '0']);
             expect(new URL(list.at(-1)?.url ?? '').searchParams.get('q')).toBe('abc');
 
-            // Enter: Kennung genau (Treffer der Suche auf dem Server) öffnet das Gerät.
-            await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('ABC-1');
-            await page.getByRole('searchbox', { name: 'Gerät suchen' }).press('Enter');
+            // Enter: Nummer genau (Treffer der Suche auf dem Server) öffnet das Gerät.
+            await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('ABC-1');
+            await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).press('Enter');
             await expect(page).toHaveURL(/\/geraete\/4711$/);
 
             // Zurück auf „Suchen“: „Zuletzt benutzt“ kommt erneut vom Server.
@@ -372,8 +370,8 @@ test.describe('Liste nicht ladbar', () => {
         await page.goto('/firefighting/test/suchen');
         await expect(page.getByRole('alert')).toContainText('database_unavailable');
         await page.getByRole('button', { name: 'Erneut versuchen' }).click();
-        await expect(page.getByText('Hier erscheinen die Geräte')).toBeVisible();
-        await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('m2');
+        await expect(page.getByText('Hier erscheint die Ausrüstung')).toBeVisible();
+        await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('m2');
         await expect(page.getByTestId('device-card')).toHaveCount(1);
     });
 });
@@ -404,7 +402,7 @@ test.describe('Dunkel', () => {
 
     test('Karten und Suchfeld auf dunkler Fläche', async ({ page }) => {
         await page.goto('/firefighting/test/suchen');
-        await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('m1');
+        await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('m1');
         await expect(page.getByTestId('device-card').first()).toHaveCSS(
             'background-color',
             'rgb(27, 34, 43)',

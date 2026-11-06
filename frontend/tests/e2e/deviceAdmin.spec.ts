@@ -21,7 +21,7 @@ import { delegate, deviceTypeServer, locationServer } from './support/masterData
 
 /**
  * Gerätedetail für Admins (`geraete/<id>/details`, KONZEPT.md, "Bereiche des Admins" und
- * Entscheidung 33): Stand, Stammdaten, Verlauf; Bearbeiten, Prüfdatum, Code zuordnen, Aussondern,
+ * Entscheidung 33): Stand, Stammdaten, Verlauf; Bearbeiten, Wartungsdatum, Code zuordnen, Aussondern,
  * Wieder aufnehmen. Der simulierte Server ändert das Gerät wie die API (Version + 1, Einträge im
  * Verlauf) und lehnt veraltete Versionen mit 409 version_conflict ab.
  */
@@ -86,7 +86,7 @@ function deviceServer(initial: Record<string, unknown>, respond: Respond = () =>
                 status: 409,
                 body: {
                     error: 'version_conflict',
-                    message: 'Das Gerät wurde inzwischen geändert.',
+                    message: 'Die Ausrüstung wurde inzwischen geändert.',
                     details: { device },
                 },
             };
@@ -129,7 +129,7 @@ function deviceServer(initial: Record<string, unknown>, respond: Respond = () =>
             write(
                 request,
                 (sent) => ({ next_inspection_due: sent['next_inspection_due'] }),
-                'Prüfdatum geändert',
+                'Wartungsdatum geändert',
             ),
         'POST api/v1/devices/1/retire': (request) =>
             write(
@@ -252,7 +252,7 @@ async function choose(page: Page, label: string, option: string): Promise<void> 
 test.describe('Gerätedetail', () => {
     useServer(M1);
 
-    test('aus der Geräteliste: Stand, Stammdaten, Verlauf', async ({ page }) => {
+    test('aus der Ausrüstungsliste: Stand, Stammdaten, Verlauf', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
         await page.goto('/firefighting/test/geraete');
         await page.getByTestId('device-table').getByRole('link', { name: 'M1' }).click();
@@ -261,18 +261,18 @@ test.describe('Gerätedetail', () => {
         await expect(page.getByTestId('device-state')).toContainText('HLF 20 / G1');
         await expect(page.getByTestId('device-state')).toContainText('einsatzbereit');
         await expect(page.getByTestId('device-state')).toContainText(
-            'Nächste Prüfung: nicht festgelegt',
+            'Nächste Wartung: nicht festgelegt',
         );
         const master = page.getByTestId('master-data');
         await expect(master).toContainText('SeriennummerSN-1');
         await expect(master).toContainText('Beschaffungsdatum01.03.2020');
         await expect(master).toContainText('NotizGröße M');
         await expect(page.getByTestId('history-entry')).toHaveText([/Angelegt/]);
-        // „Geräte“ bleibt im Menü hervorgehoben.
+        // „Ausrüstung“ bleibt im Menü hervorgehoben.
         await expect(
             page
                 .getByRole('navigation', { name: 'Hauptmenü' })
-                .getByRole('link', { name: 'Geräte', exact: true }),
+                .getByRole('link', { name: 'Ausrüstung', exact: true }),
         ).toHaveClass(/menu-link-active/);
 
         await page.getByRole('button', { name: 'Zurück' }).click();
@@ -283,14 +283,14 @@ test.describe('Gerätedetail', () => {
         await open(page);
         await page.getByRole('button', { name: 'Bearbeiten' }).click();
         await expect(dialog(page)).toContainText('M1 bearbeiten');
-        const identifier = dialog(page).getByLabel('Kennung');
+        const identifier = dialog(page).getByLabel(/^Nummer/);
         await identifier.fill('M#1');
         await expect(dialog(page).getByText('Nur Buchstaben, Ziffern')).toBeVisible();
         await expect(identifier).toHaveAttribute('aria-invalid', 'true');
         await expect(dialog(page).getByRole('button', { name: 'Speichern' })).toBeDisabled();
 
         await identifier.fill('M 1');
-        await choose(page, 'Gerätetyp', 'Atemschutzgerät');
+        await choose(page, 'Ausrüstungstyp', 'Atemschutzgerät');
         await dialog(page).getByLabel('Seriennummer (optional)').fill('SN-99');
         await dialog(page).getByLabel('Hersteller (optional)').fill('');
         await dialog(page).getByLabel('Beschaffungsdatum (optional)').fill('2021-05-04');
@@ -312,7 +312,7 @@ test.describe('Gerätedetail', () => {
         });
         await expect(page.getByRole('heading', { level: 1 })).toHaveText('M 1');
         const master = page.getByTestId('master-data');
-        await expect(master).toContainText('GerätetypAtemschutzgerät');
+        await expect(master).toContainText('AusrüstungstypAtemschutzgerät');
         await expect(master).toContainText('Hersteller–');
         await expect(master).toContainText('Beschaffungsdatum04.05.2021');
         // Der Verlauf lädt neu.
@@ -372,7 +372,7 @@ test.describe('Gerätedetail', () => {
         await expect(dialog(page)).toBeVisible();
         await page.mouse.click(5, 5);
         await expect(dialog(page)).toHaveCount(0);
-        await page.getByRole('button', { name: 'Prüfdatum ändern' }).click();
+        await page.getByRole('button', { name: 'Wartungsdatum ändern' }).click();
         await expect(dialog(page)).toBeVisible();
         await page.keyboard.press('Escape');
         await expect(dialog(page)).toHaveCount(0);
@@ -387,26 +387,28 @@ test.describe('Gerätedetail', () => {
         expect(apiRequests.filter((r) => r.method === 'POST')).toHaveLength(0);
     });
 
-    test('Prüfdatum setzen und entfernen', async ({ page, apiRequests }) => {
+    test('Wartungsdatum setzen und entfernen', async ({ page, apiRequests }) => {
         await open(page);
-        await page.getByRole('button', { name: 'Prüfdatum ändern' }).click();
-        await expect(dialog(page)).toContainText('Bisher ist kein Prüfdatum festgelegt.');
-        await dialog(page).getByLabel('Nächste Prüfung fällig am').fill('2027-12-01');
+        await page.getByRole('button', { name: 'Wartungsdatum ändern' }).click();
+        await expect(dialog(page)).toContainText('Bisher ist kein Wartungsdatum festgelegt.');
+        await dialog(page).getByLabel('Nächste Wartung fällig am').fill('2027-12-01');
         await dialog(page).getByRole('button', { name: 'Speichern' }).click();
         await expect(page.getByTestId('success-notice')).toHaveText(
-            'Nächste Prüfung von M1: 01.12.2027.',
+            'Nächste Wartung von M1: 01.12.2027.',
         );
-        await expect(page.getByTestId('device-state')).toContainText('Nächste Prüfung: 01.12.2027');
+        await expect(page.getByTestId('device-state')).toContainText('Nächste Wartung: 01.12.2027');
         expect(lastBody(apiRequests, 'api/v1/devices/1/inspection-due')).toEqual({
             version: 1,
             next_inspection_due: '2027-12-01',
         });
 
-        await page.getByRole('button', { name: 'Prüfdatum ändern' }).click();
+        await page.getByRole('button', { name: 'Wartungsdatum ändern' }).click();
         await expect(dialog(page)).toContainText('Bisher: 01.12.2027');
-        await dialog(page).getByLabel('Nächste Prüfung fällig am').fill('');
+        await dialog(page).getByLabel('Nächste Wartung fällig am').fill('');
         await dialog(page).getByRole('button', { name: 'Speichern' }).click();
-        await expect(page.getByTestId('success-notice')).toHaveText('Prüfdatum von M1 entfernt.');
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Wartungsdatum von M1 entfernt.',
+        );
         expect(lastBody(apiRequests, 'api/v1/devices/1/inspection-due')).toEqual({
             version: 2,
             next_inspection_due: null,
@@ -449,7 +451,7 @@ test.describe('Gerätedetail', () => {
         await dialog(page).getByLabel('Grund (optional)').fill('Sichtprüfung nicht bestanden');
         await dialog(page).getByRole('button', { name: 'M1 aussondern' }).click();
         await expect(page.getByTestId('success-notice')).toHaveText(
-            'M1 ist ausgesondert. Kennung und Scan-Code sind wieder frei.',
+            'M1 ist ausgesondert. Nummer und Scan-Code sind wieder frei.',
         );
         expect(lastBody(apiRequests, 'api/v1/devices/1/retire')).toEqual({
             version: 1,
@@ -474,7 +476,7 @@ test.describe('Gerätedetail', () => {
 
         // Von der Umbuchen-Seite führt ein Link für Admins zum Gerätedetail.
         await page.getByRole('link', { name: 'Umbuchen / Status ändern' }).click();
-        await page.getByRole('link', { name: 'Gerätedetail (Admin)' }).click();
+        await page.getByRole('link', { name: 'Detailseite (Admin)' }).click();
         await expect(page).toHaveURL(/\/geraete\/1\/details$/);
     });
 
@@ -529,7 +531,7 @@ test.describe('Gerätedetail: Ablehnungen des Servers', () => {
                 status: 409,
                 body: {
                     error: 'identifier_taken',
-                    message: 'Die Kennung „M2“ ist schon vergeben.',
+                    message: 'Die Nummer „M2“ ist schon vergeben.',
                 },
             };
         }
@@ -545,15 +547,19 @@ test.describe('Gerätedetail: Ablehnungen des Servers', () => {
         return null;
     });
 
-    test('Kennung vergeben: Meldung am Feld, Fenster bleibt offen', async ({ page }) => {
+    test('Nummer vergeben: Meldung am Feld, Fenster bleibt offen', async ({ page }) => {
         await open(page);
         await page.getByRole('button', { name: 'Bearbeiten' }).click();
-        await dialog(page).getByLabel('Kennung').fill('M2');
+        await dialog(page)
+            .getByLabel(/^Nummer/)
+            .fill('M2');
         await dialog(page).getByRole('button', { name: 'Speichern' }).click();
-        await expect(dialog(page).getByText('Die Kennung „M2“ ist schon vergeben.')).toBeVisible();
-        await expect(dialog(page).getByLabel('Kennung')).toHaveAttribute('aria-invalid', 'true');
+        await expect(dialog(page).getByText('Die Nummer „M2“ ist schon vergeben.')).toBeVisible();
+        await expect(dialog(page).getByLabel(/^Nummer/)).toHaveAttribute('aria-invalid', 'true');
         // Neue Eingabe: Die Meldung verschwindet.
-        await dialog(page).getByLabel('Kennung').fill('M3');
+        await dialog(page)
+            .getByLabel(/^Nummer/)
+            .fill('M3');
         await expect(dialog(page).getByText('ist schon vergeben')).toHaveCount(0);
     });
 
@@ -639,9 +645,9 @@ test.describe('Gerätedetail: Wieder aufnehmen', () => {
     });
 });
 
-test.describe('Gerätedetail: Wieder aufnehmen, Kennung und Scan-Code vergeben', () => {
+test.describe('Gerätedetail: Wieder aufnehmen, Nummer und Scan-Code vergeben', () => {
     test.use({ allowedConsoleError: HTTP_ERROR_CONSOLE });
-    // Wie der Server: Kennung bzw. Scan-Code inzwischen vergeben, Meldung mit Feldern der API.
+    // Wie der Server: Nummer bzw. Scan-Code inzwischen vergeben, Meldung mit Feldern der API.
     useServer(
         {
             ...M1,
@@ -659,7 +665,7 @@ test.describe('Gerätedetail: Wieder aufnehmen, Kennung und Scan-Code vergeben',
                     body: {
                         error: 'identifier_taken',
                         message:
-                            'Die Kennung „M1“ ist inzwischen an ein anderes Gerät vergeben. Bitte beim Wiederaufnehmen eine neue Kennung angeben (Feld "identifier").',
+                            'Die Nummer „M1“ ist inzwischen an ein anderes Gerät vergeben. Bitte beim Wiederaufnehmen eine neue Nummer angeben (Feld "identifier").',
                     },
                 };
             }
@@ -684,17 +690,17 @@ test.describe('Gerätedetail: Wieder aufnehmen, Kennung und Scan-Code vergeben',
         await form.getByRole('button', { name: 'Wieder aufnehmen' }).click();
         await expect(
             form.getByText(
-                'Die Kennung „M1“ ist inzwischen an ein anderes Gerät vergeben. Bitte geben Sie eine andere Kennung ein.',
+                'Die Nummer „M1“ ist inzwischen an eine andere Ausrüstung vergeben. Bitte geben Sie eine andere Nummer ein.',
             ),
         ).toBeVisible();
-        await expect(form.getByLabel('Kennung')).toHaveAttribute('aria-invalid', 'true');
+        await expect(form.getByLabel(/^Nummer/)).toHaveAttribute('aria-invalid', 'true');
         await expect(form).not.toContainText('Feld "');
 
-        await form.getByLabel('Kennung').fill('M1a');
+        await form.getByLabel(/^Nummer/).fill('M1a');
         await expect(form.getByText('ist inzwischen an ein anderes Gerät vergeben')).toHaveCount(0);
         await form.getByRole('button', { name: 'Wieder aufnehmen' }).click();
         await expect(form.getByTestId('scan-code-error')).toHaveText(
-            'Dieser Scan-Code ist inzwischen einem anderen Gerät zugeordnet. Entfernen Sie das Häkchen, um das Gerät ohne Scan-Code wieder aufzunehmen.',
+            'Dieser Scan-Code ist inzwischen einer anderen Ausrüstung zugeordnet. Entfernen Sie das Häkchen, um die Ausrüstung ohne Scan-Code wieder aufzunehmen.',
         );
         await expect(form).not.toContainText('null');
 

@@ -35,7 +35,7 @@ final class DeviceImportTemplateTest extends ImportApiTestCase
         self::assertSame(200, $response->statusCode(), $body);
         self::assertInstanceOf(CsvResponse::class, $response);
         self::assertSame('text/csv; charset=utf-8', $response->headers()['Content-Type']);
-        self::assertSame('attachment; filename="geraete-vorlage-immendingen.csv"', $response->headers()['Content-Disposition']);
+        self::assertSame('attachment; filename="ausruestung-vorlage-immendingen.csv"', $response->headers()['Content-Disposition']);
         self::assertSame('no-store', $response->headers()['Cache-Control']);
         $rows = self::parse($body);
         self::assertSame(DeviceCsv::DEVICE_HEADER, $rows[0]);
@@ -66,11 +66,11 @@ final class DeviceImportTemplateTest extends ImportApiTestCase
         self::assertIsString($preview['token'], 'Beispielzeilen sind gültig');
         self::assertSame(['rows' => 2, 'new' => 2, 'changed' => 0, 'unchanged' => 0, 'skipped' => 0, 'errors' => 0, 'warnings' => 2], $preview['summary']);
         self::assertSame(
-            ['Die Kennung „BEISPIEL-1“ gehört zu den Beispielzeilen der Vorlage. Bitte die Zeile vor dem Import löschen.'],
+            ['Die Nummer „BEISPIEL-1“ gehört zu den Beispielzeilen der Vorlage. Bitte die Zeile vor dem Import löschen.'],
             self::row($preview, 2)['warnings'],
         );
         self::assertSame(
-            ['Die Kennung „BEISPIEL-2“ gehört zu den Beispielzeilen der Vorlage. Bitte die Zeile vor dem Import löschen.'],
+            ['Die Nummer „BEISPIEL-2“ gehört zu den Beispielzeilen der Vorlage. Bitte die Zeile vor dem Import löschen.'],
             self::row($preview, 3)['warnings'],
         );
     }
@@ -82,9 +82,9 @@ final class DeviceImportTemplateTest extends ImportApiTestCase
         $preview = $this->previewOk(self::csv([['beispiel-1', 'Atemschutzmaske', 'HLF 20 / G1']], 'Kennung;Gerätetyp;Standort'));
 
         $row = self::row($preview, 2);
-        self::assertSame('changed', $row['result'], 'nur die Schreibweise der Kennung');
+        self::assertSame('changed', $row['result'], 'nur die Schreibweise der Nummer');
         self::assertSame(
-            ['Die Kennung „beispiel-1“ gehört zu den Beispielzeilen der Vorlage. Bitte die Zeile vor dem Import löschen.'],
+            ['Die Nummer „beispiel-1“ gehört zu den Beispielzeilen der Vorlage. Bitte die Zeile vor dem Import löschen.'],
             $row['warnings'],
         );
     }
@@ -103,16 +103,16 @@ final class DeviceImportTemplateTest extends ImportApiTestCase
         self::assertSame('attachment; filename="gueltige-werte-immendingen-2026-06-15.csv"', $response->headers()['Content-Disposition']);
         self::assertSame([
             ['Spalte', 'Gültiger Wert'],
-            ['Kennung', 'Pflicht, höchstens 30 Zeichen: Buchstaben, Ziffern, Leerzeichen und - / .'],
-            ['Gerätetyp', 'Atemschutzmaske'],
-            ['Gerätetyp', 'Funkgerät'],
+            ['Nummer', 'Pflicht, höchstens 30 Zeichen: Buchstaben, Ziffern, Leerzeichen und - / .'],
+            ['Ausrüstungstyp', 'Atemschutzmaske'],
+            ['Ausrüstungstyp', 'Funkgerät'],
             ['Standort', 'HLF 20'],
             ['Standort', 'HLF 20 / G1'],
             ['Standort', 'Lager'],
             ['Status', 'einsatzbereit'],
             ['Status', 'in Wartung'],
             ['Status', 'defekt'],
-            ['Nächste Prüfung', 'Datum TT.MM.JJJJ, z. B. 01.03.2027'],
+            ['Nächste Wartung', 'Datum TT.MM.JJJJ, z. B. 01.03.2027'],
             ['Beschaffungsdatum', 'Datum TT.MM.JJJJ, z. B. 01.03.2027'],
         ], self::parse($body), 'nur aktive, nur die eigene Stadt (tuttlingen hat auch HLF 20)');
     }
@@ -133,17 +133,17 @@ final class DeviceImportTemplateTest extends ImportApiTestCase
         ], 'Kennung;Gerätetyp;Standort'));
 
         self::assertSame([
-            'Der Gerätetyp „Atemschutzmaskee“ ist nicht bekannt. Meinten Sie „Atemschutzmaske“?',
+            'Der Ausrüstungstyp „Atemschutzmaskee“ ist nicht bekannt. Meinten Sie „Atemschutzmaske“?',
             'Der Standort „HLF20“ ist nicht bekannt. Meinten Sie „HLF 20“?',
         ], self::row($preview, 2)['messages']);
         self::assertSame([
-            'Der Gerätetyp „atemschutz maske“ ist nicht bekannt. Meinten Sie „Atemschutzmaske“?',
+            'Der Ausrüstungstyp „atemschutz maske“ ist nicht bekannt. Meinten Sie „Atemschutzmaske“?',
             'Der Standort „G1“ ist nicht bekannt. Meinten Sie „HLF 20 / G1“?',
         ], self::row($preview, 3)['messages']);
         self::assertSame([
-            'Der Gerätetyp „Funkgeraet“ ist nicht bekannt.',
+            'Der Ausrüstungstyp „Funkgeraet“ ist nicht bekannt.',
             'Der Standort „Lagr“ ist nicht bekannt. Meinten Sie „Lager“?',
-        ], self::row($preview, 4)['messages'], 'deaktivierte Gerätetypen werden nicht vorgeschlagen');
+        ], self::row($preview, 4)['messages'], 'deaktivierte Ausrüstungstypen werden nicht vorgeschlagen');
         self::assertSame(['Der Standort „LF 1“ ist nicht bekannt. Meinten Sie „LF 10“ oder „LF 16“?'], self::row($preview, 5)['messages']);
         self::assertSame(['Der Standort „Wache Nord“ ist nicht bekannt.'], self::row($preview, 6)['messages']);
 

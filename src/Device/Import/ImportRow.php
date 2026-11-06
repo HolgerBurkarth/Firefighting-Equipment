@@ -60,7 +60,7 @@ final readonly class ImportRow
         $identifierText = trim($cell(ImportColumn::Identifier) ?? '');
         $identifier = null;
         if ($identifierText === '') {
-            $errors[] = 'Die Kennung fehlt.';
+            $errors[] = 'Die Nummer fehlt.';
         } else {
             try {
                 $identifier = DeviceIdentifier::fromString($identifierText);
@@ -164,7 +164,7 @@ final readonly class ImportRow
     {
         return match ($column) {
             ImportColumn::ScanCode => ScanCode::fromString($value),
-            ImportColumn::NextInspectionDue => trim($value) === '' ? null : ImportDate::parse(trim($value), 'Das Datum der nächsten Prüfung'),
+            ImportColumn::NextInspectionDue => trim($value) === '' ? null : ImportDate::parse(trim($value), 'Das Datum der nächsten Wartung'),
             ImportColumn::ProcuredOn => trim($value) === '' ? null : ImportDate::parse(trim($value), 'Das Beschaffungsdatum'),
             default => DeviceText::field($value, $column->deviceField() ?? throw new \LogicException('Kein Textfeld.')),
         };

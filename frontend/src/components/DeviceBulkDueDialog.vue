@@ -79,16 +79,16 @@ async function submit(): Promise<void> {
     <FormDialog
         v-model:open="dialogOpen"
         :unsaved="unsaved"
-        :title="`Prüfdatum für ${devices.length === 1 ? '1 Gerät' : `${String(devices.length)} Geräte`}`"
-        description="Gilt für alle ausgewählten Geräte; jedes erhält einen eigenen Eintrag im Verlauf."
-        submit-label="Prüfdatum setzen"
+        :title="`Wartungsdatum für ${devices.length === 1 ? '1 Ausrüstung' : `${String(devices.length)} Ausrüstungen`}`"
+        description="Gilt für alle ausgewählten Ausrüstungen; jede erhält einen eigenen Eintrag im Verlauf."
+        submit-label="Wartungsdatum setzen"
         :busy="busy"
         :can-submit="!touched || problem === null"
         :return-focus="returnFocus"
         @submit="submit"
     >
         <label class="field">
-            <span class="field-label">Nächste Prüfung fällig am</span>
+            <span class="field-label">Nächste Wartung fällig am</span>
             <input
                 v-model="due"
                 class="input"
@@ -101,7 +101,7 @@ async function submit(): Promise<void> {
                 @input="touched = true"
             />
             <span :id="`${id}-hint`" class="field-hint">
-                Leer lassen, um das Prüfdatum zu entfernen.
+                Leer lassen, um das Wartungsdatum zu entfernen.
             </span>
             <p v-if="shownProblem !== null" :id="`${id}-error`" class="field-error">
                 {{ shownProblem }}

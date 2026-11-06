@@ -17,7 +17,7 @@ namespace FirefightingEquipment\Mail;
  */
 final readonly class MimeMessage
 {
-    public const string FROM_NAME = 'Feuerwehr Geräteverwaltung';
+    public const string FROM_NAME = 'Feuerwehr Ausrüstungsverwaltung';
     public const string FROM_ADDRESS = 'feuerwehr-app@prodad.de';
     public const string MESSAGE_ID_DOMAIN = 'prodad.de';
 

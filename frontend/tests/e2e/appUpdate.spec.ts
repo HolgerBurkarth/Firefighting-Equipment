@@ -320,7 +320,7 @@ test.describe('Updates der App: Seiten ohne Kontrolle des Service Workers, mehre
 });
 
 /**
- * API eines Admins mit Gerätedetail (M1) und Geräteliste, als feste Antworten (Funktionen einmal mit
+ * API eines Admins mit Gerätedetail (M1) und Ausrüstungsliste, als feste Antworten (Funktionen einmal mit
  * einer Anfrage ohne Query ausgewertet).
  */
 function adminDeviceApi(area: string): Record<string, MockResponse> {
@@ -470,7 +470,7 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         await mail.close();
     });
 
-    test('Start mit neuer Kennung, aber ohne neuen Service Worker: Seite sofort, kein Warten', async ({
+    test('Start mit neuer Nummer, aber ohne neuen Service Worker: Seite sofort, kein Warten', async ({
         page,
     }, testInfo) => {
         // Bis Schritt 1.7d wartete der Start hier bis rund 30 s und zeigte dann „Neu laden“. Jetzt
@@ -484,12 +484,12 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         await expect(page.locator('html')).not.toHaveAttribute('data-build', NEXT_BUILD_ID);
         await expect(page.getByTestId('update-reload-needed')).toBeHidden();
 
-        // Später ist auch sw.js neu: Die nächste Prüfung findet sie, der Seitenwechsel lädt sie.
+        // Später ist auch sw.js neu: Die nächste Wartung findet sie, der Seitenwechsel lädt sie.
         await deployAndCheck(page, area);
         await expectNewVersionAfterNavigation(page, area);
     });
 
-    test('„Seite nicht gefunden“ mit neuer Kennung, aber ohne neuen Service Worker: nach rund 30 s „Neu laden“', async ({
+    test('„Seite nicht gefunden“ mit neuer Nummer, aber ohne neuen Service Worker: nach rund 30 s „Neu laden“', async ({
         page,
     }, testInfo) => {
         const area = newArea(testInfo.project.name);
@@ -627,7 +627,7 @@ test.describe('Updates der App: Start mit veralteter Version', () => {
         await other.getByRole('button', { name: 'Zurück' }).click();
         await expect(other.locator('html')).toHaveAttribute('data-build', NEXT_BUILD_ID);
         await expect(other).toHaveURL(`/firefighting/${area}/geraete`);
-        await expect(other.getByRole('heading', { level: 1, name: 'Geräte' })).toBeVisible();
+        await expect(other.getByRole('heading', { level: 1, name: 'Ausrüstung' })).toBeVisible();
         expect(problems).toEqual([]);
         await other.close();
     });

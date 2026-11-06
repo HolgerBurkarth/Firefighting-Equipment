@@ -9,7 +9,7 @@ function constant(file: string, name: string): number {
     return Number(match?.[1]);
 }
 
-describe('Prüffristen wie im Backend', () => {
+describe('Termine wie im Backend', () => {
     it('Fenster 30 Tage wie InspectionWindow::DEFAULT_DAYS', () => {
         expect(INSPECTION_WINDOW_DAYS).toBe(
             constant('Device/InspectionWindow.php', 'DEFAULT_DAYS'),

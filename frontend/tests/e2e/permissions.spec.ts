@@ -70,24 +70,24 @@ test.describe('Gerätewart: alles zu Geräten, keine Benutzer, kein Import', () 
         },
     });
 
-    test('Menü ohne „Benutzer“, Geräteliste ohne Import', async ({ page }) => {
+    test('Menü ohne „Benutzer“, Ausrüstungsliste ohne Import', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 800 });
         await page.goto('/firefighting/test/dashboard');
         await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
         expect(await menuLabels(page)).toEqual([
             'Dashboard',
             'Suchen',
-            'Geräte',
+            'Ausrüstung',
             'Standorte',
-            'Gerätetypen',
+            'Ausrüstungstypen',
             'Protokoll',
             'Einstellungen',
         ]);
 
-        await menu(page).getByRole('link', { name: 'Geräte', exact: true }).click();
-        await expect(page.getByRole('heading', { name: 'Geräte', level: 1 })).toBeVisible();
+        await menu(page).getByRole('link', { name: 'Ausrüstung', exact: true }).click();
+        await expect(page.getByRole('heading', { name: 'Ausrüstung', level: 1 })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Export (CSV)' })).toBeVisible();
-        await expect(page.getByRole('link', { name: 'Neues Gerät' })).toBeVisible();
+        await expect(page.getByRole('link', { name: 'Neue Ausrüstung' })).toBeVisible();
         await expect(page.getByRole('link', { name: 'Import (CSV)' })).toHaveCount(0);
         await expect(page.getByRole('checkbox', { name: 'M1 auswählen' })).toBeVisible();
 
@@ -97,7 +97,7 @@ test.describe('Gerätewart: alles zu Geräten, keine Benutzer, kein Import', () 
     });
 });
 
-test.describe('Nur ansehen: Geräteliste und Gerätedetail ohne Aktionen', () => {
+test.describe('Nur ansehen: Ausrüstungsliste und Gerätedetail ohne Aktionen', () => {
     test.use({
         api: {
             'GET api/v1/auth/me': me({ devices: 'read' }),
@@ -109,16 +109,16 @@ test.describe('Nur ansehen: Geräteliste und Gerätedetail ohne Aktionen', () =>
         },
     });
 
-    test('Startseite ist die Geräteliste; keine Knöpfe, kein Kästchen, kein Aussondern', async ({
+    test('Startseite ist die Ausrüstungsliste; keine Knöpfe, kein Kästchen, kein Aussondern', async ({
         page,
     }) => {
         await page.setViewportSize({ width: 1280, height: 800 });
         await page.goto('/firefighting/test/');
         await expect(page).toHaveURL(/\/firefighting\/test\/geraete$/);
-        expect(await menuLabels(page)).toEqual(['Geräte', 'Einstellungen']);
+        expect(await menuLabels(page)).toEqual(['Ausrüstung', 'Einstellungen']);
         await expect(page.getByRole('row', { name: /M1/ })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Export (CSV)' })).toHaveCount(0);
-        await expect(page.getByRole('link', { name: 'Neues Gerät' })).toHaveCount(0);
+        await expect(page.getByRole('link', { name: 'Neue Ausrüstung' })).toHaveCount(0);
         await expect(page.getByRole('checkbox')).toHaveCount(1);
         await expect(page.getByRole('checkbox', { name: 'Ausgesonderte anzeigen' })).toBeVisible();
 
@@ -127,7 +127,7 @@ test.describe('Nur ansehen: Geräteliste und Gerätedetail ohne Aktionen', () =>
         await expect(page.getByRole('heading', { name: 'Stammdaten' })).toBeVisible();
         await expect(page.getByRole('link', { name: 'Umbuchen / Status ändern' })).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Bearbeiten' })).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Prüfdatum ändern' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Wartungsdatum ändern' })).toHaveCount(0);
         await expect(page.getByTestId('danger-zone')).toHaveCount(0);
     });
 });
@@ -180,7 +180,7 @@ test.describe('Handy: nur umbuchen, kein Status', () => {
         },
     });
 
-    test('Leiste ohne Prüffristen und Dashboard; Umbuchen ohne Status', async ({ page }) => {
+    test('Leiste ohne Termine und Dashboard; Umbuchen ohne Status', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto('/firefighting/test/');
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
@@ -204,7 +204,7 @@ test.describe('Handy: nur umbuchen, kein Status', () => {
 });
 
 test.describe('Rechte ändern sich bei offener App (Schritt 1.7c)', () => {
-    // auth/me liefert zuerst eine Rolle mit Geräteliste, nach dem Wechsel nur noch Suchen.
+    // auth/me liefert zuerst eine Rolle mit Ausrüstungsliste, nach dem Wechsel nur noch Suchen.
     let rights: Record<string, unknown> = permissionsJson({ devices: 'read', search: 'read' });
 
     test.beforeEach(() => {
@@ -227,7 +227,7 @@ test.describe('Rechte ändern sich bei offener App (Schritt 1.7c)', () => {
         await page.clock.install();
         await page.setViewportSize({ width: 1280, height: 800 });
         await page.goto('/firefighting/test/geraete');
-        await expect(page.getByRole('heading', { name: 'Geräte', level: 1 })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Ausrüstung', level: 1 })).toBeVisible();
         const checks = (): number =>
             apiRequests.filter((request) => request.url.endsWith('/api/v1/auth/me')).length;
         expect(checks()).toBe(1);

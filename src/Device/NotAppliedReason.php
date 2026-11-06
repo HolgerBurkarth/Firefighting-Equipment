@@ -21,7 +21,7 @@ enum NotAppliedReason: string
     {
         return match ($this) {
             self::Older => 'Neuerer Stand vorhanden',
-            self::Retired => 'Gerät ausgesondert',
+            self::Retired => 'Ausrüstung ausgesondert',
             self::LocationLocked => 'Standort gesperrt',
         };
     }

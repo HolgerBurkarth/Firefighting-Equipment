@@ -63,7 +63,7 @@ const presetActive = (days: number): boolean => {
 };
 
 const typeOptions = computed((): SelectOption[] => [
-    { value: ALL, label: 'Alle Gerätetypen' },
+    { value: ALL, label: 'Alle Ausrüstungstypen' },
     ...[...(deviceTypeStore.state.types ?? [])]
         .sort((a, b) => compareNames(a.name, b.name))
         .map((type) => ({
@@ -125,9 +125,9 @@ async function download(): Promise<void> {
     <section class="card export" aria-labelledby="export-heading">
         <h2 id="export-heading">Verlauf exportieren</h2>
         <p class="hint">
-            Alle Einträge im Verlauf der Geräte (auch ausgesonderter) als CSV-Datei für Excel:
-            Umbuchungen, Statusänderungen, Prüfdaten und Stammdaten mit Zeit, Person und Kommentar.
-            Höchstens {{ HISTORY_EXPORT_MAX_DAYS }} Tage auf einmal.
+            Alle Einträge im Verlauf der Ausrüstung (auch ausgesonderter) als CSV-Datei für Excel:
+            Umbuchungen, Statusänderungen, Wartungsdaten und Stammdaten mit Zeit, Person und
+            Kommentar. Höchstens {{ HISTORY_EXPORT_MAX_DAYS }} Tage auf einmal.
         </p>
 
         <div class="presets" role="group" aria-label="Zeitraum">
@@ -189,7 +189,7 @@ async function download(): Promise<void> {
         </p>
 
         <div class="filters">
-            <AppSelect v-model="typeValue" label="Gerätetyp" :options="typeOptions" />
+            <AppSelect v-model="typeValue" label="Ausrüstungstyp" :options="typeOptions" />
             <AppSelect
                 v-model="locationValue"
                 label="Standort (mit Fächern)"

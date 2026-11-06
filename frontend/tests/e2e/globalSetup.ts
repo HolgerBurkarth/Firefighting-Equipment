@@ -3,14 +3,14 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Zweiter Build mit anderer Kennung für die Update-Tests (tests/e2e/appUpdate.spec.ts). */
+/** Zweiter Build mit anderer Nummer für die Update-Tests (tests/e2e/appUpdate.spec.ts). */
 export const NEXT_BUILD_ID = 'e2e-next';
 
 const frontend = fileURLToPath(new URL('../../', import.meta.url));
 
 /**
  * Baut die „neue Version“ nach test-builds/next (frontend/dist ist die alte, von `npm run build`).
- * Gleicher Quellcode, nur eine andere Build-Kennung: dadurch andere Dateinamen und ein anderes
+ * Gleicher Quellcode, nur eine andere Build-Nummer: dadurch andere Dateinamen und ein anderes
  * sw.js, also für den Browser ein echtes Update. Die Schaltdateien in test-builds/state werden
  * geleert (siehe tests/e2e/support/update-server.php).
  */

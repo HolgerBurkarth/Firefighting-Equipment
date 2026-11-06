@@ -152,7 +152,7 @@ const locationChoices = computed<BookingLocationChoice[]>(() => {
 
 const title = computed(() =>
     device.value === null
-        ? 'Gerät'
+        ? 'Ausrüstung'
         : `${device.value.identifier} · ${device.value.deviceType.name}`,
 );
 const subtitle = computed(() =>
@@ -421,9 +421,9 @@ async function save(): Promise<void> {
         <FocusHeader :title="title" :subtitle="subtitle" />
 
         <div v-if="device === null" class="device-content">
-            <p v-if="loadError === null" class="hint" role="status">Gerät wird geladen …</p>
+            <p v-if="loadError === null" class="hint" role="status">Ausrüstung wird geladen …</p>
             <div v-else-if="loadError.status === 404" class="notice notice-info" role="alert">
-                <p>Dieses Gerät gibt es nicht (mehr).</p>
+                <p>Diese Ausrüstung gibt es nicht (mehr).</p>
             </div>
             <ErrorNotice v-else :error="loadError">
                 <button class="btn" type="button" :disabled="loading" @click="load">
@@ -434,7 +434,7 @@ async function save(): Promise<void> {
 
         <div v-else-if="device.status === 'retired'" class="device-content">
             <div class="notice notice-info" role="status" data-testid="device-retired">
-                <p>Dieses Gerät ist ausgesondert und kann nicht umgebucht werden.</p>
+                <p>Diese Ausrüstung ist ausgesondert und kann nicht umgebucht werden.</p>
             </div>
             <button ref="detailsLink" class="details-link" type="button" @click="openDetails">
                 Details und Verlauf
@@ -444,13 +444,13 @@ async function save(): Promise<void> {
                 class="details-link"
                 :to="{ name: 'device-details', params: { id: deviceId } }"
             >
-                Gerätedetail (Admin)
+                Detailseite (Admin)
             </RouterLink>
         </div>
 
         <div v-else-if="!canMove && !canSetStatus" class="device-content">
             <div class="notice notice-info" role="status" data-testid="device-view-only">
-                <p>Sie dürfen dieses Gerät nur ansehen, nicht umbuchen.</p>
+                <p>Sie dürfen diese Ausrüstung nur ansehen, nicht umbuchen.</p>
             </div>
             <button ref="detailsLink" class="details-link" type="button" @click="openDetails">
                 Details und Verlauf
@@ -460,7 +460,7 @@ async function save(): Promise<void> {
                 class="details-link"
                 :to="{ name: 'device-details', params: { id: deviceId } }"
             >
-                Gerätedetail (Admin)
+                Detailseite (Admin)
             </RouterLink>
         </div>
 
@@ -473,8 +473,8 @@ async function save(): Promise<void> {
                     data-testid="booking-conflict"
                 >
                     <p>
-                        Das Gerät wurde inzwischen geändert. Oben steht jetzt der aktuelle Stand.
-                        Bitte prüfen Sie Ihre Auswahl und speichern Sie erneut.
+                        Die Ausrüstung wurde inzwischen geändert. Oben steht jetzt der aktuelle
+                        Stand. Bitte prüfen Sie Ihre Auswahl und speichern Sie erneut.
                     </p>
                 </div>
 
@@ -605,7 +605,7 @@ async function save(): Promise<void> {
                     class="details-link"
                     :to="{ name: 'device-details', params: { id: deviceId } }"
                 >
-                    Gerätedetail (Admin)
+                    Detailseite (Admin)
                 </RouterLink>
             </div>
 

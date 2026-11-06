@@ -64,7 +64,7 @@ function stateBodies(requests: readonly MockRequest[]): Record<string, unknown>[
 
 async function openFromSearch(page: Page): Promise<void> {
     await page.goto('/firefighting/test/suchen');
-    await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('M1');
+    await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('M1');
     await page.getByTestId('device-card').first().click();
     await expect(
         page.getByRole('heading', { level: 1, name: 'M1 · Atemschutzmaske' }),
@@ -97,17 +97,17 @@ test.describe('Standortwahl', () => {
             'Fahrzeug antippen klappt die Fächer auf. Fach antippen wählt es.',
         );
         await expect(page.getByTestId('picker-group')).toHaveText([
-            /HLF 20\s*9 Geräte/,
-            /LF 10\s*2 Geräte/,
-            /Lager\s*5 Geräte/,
+            /HLF 20\s*9 Ausrüstungen/,
+            /LF 10\s*2 Ausrüstungen/,
+            /Lager\s*5 Ausrüstungen/,
         ]);
         await expect(group(page, 'HLF 20')).toHaveAttribute('aria-expanded', 'true');
         // Ohne Fächer: kein Aufklappen, Antippen wählt.
         await expect(group(page, 'LF 10')).not.toHaveAttribute('aria-expanded');
         await expect(page.getByTestId('picker-entry')).toHaveText([
             'Ganzes Fahrzeug, ohne Fach',
-            /G1\s*aktuell\s*6 Geräte/,
-            /G2\s*3 Geräte/,
+            /G1\s*aktuell\s*6 Ausrüstungen/,
+            /G2\s*3 Ausrüstungen/,
         ]);
         await expect(entry(page, 'G1').getByRole('img', { name: 'gewählt' })).toBeVisible();
 
@@ -197,14 +197,14 @@ test.describe('Standortwahl', () => {
         const search = page.getByRole('searchbox', { name: 'Standort suchen' });
         await search.fill('hlf g2');
         await expect(page.getByTestId('picker-hint')).toHaveText('1 Treffer');
-        await expect(page.getByTestId('picker-entry')).toHaveText([/G2\s*HLF 20\s*3 Geräte/]);
+        await expect(page.getByTestId('picker-entry')).toHaveText([/G2\s*HLF 20\s*3 Ausrüstungen/]);
         await expect(page.getByTestId('picker-group')).toHaveCount(0);
 
         await search.fill('xyz');
         await expect(page.getByText('Kein Standort passt zu „xyz“.')).toBeVisible();
 
         await search.fill('LAGER');
-        await expect(page.getByTestId('picker-entry')).toHaveText([/Lager\s*5 Geräte/]);
+        await expect(page.getByTestId('picker-entry')).toHaveText([/Lager\s*5 Ausrüstungen/]);
         await entry(page, 'Lager').click();
         await page.getByRole('button', { name: 'Speichern' }).click();
         await expect(page.getByTestId('booking-notice')).toHaveText('✓ M1 → Lager · einsatzbereit');

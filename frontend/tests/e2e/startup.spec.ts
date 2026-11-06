@@ -83,7 +83,7 @@ test.describe('Schnellstart: Angemeldete starten sofort', () => {
                 DEVICES.flatMap((device) => Object.entries(deviceDetail(device))),
             ),
             ...LOCATIONS,
-            // Prüffristen ohne Recht auf die Suche fragen den Server (Test mit neuen Rechten).
+            // Termine ohne Recht auf die Suche fragen den Server (Test mit neuen Rechten).
             'GET api/v1/inspection-due': {
                 status: 200,
                 body: {
@@ -149,7 +149,7 @@ test.describe('Schnellstart: Angemeldete starten sofort', () => {
         await page.reload();
         await expect(page.getByRole('searchbox')).toBeVisible();
 
-        // Die Rolle darf inzwischen nur noch Prüffristen ansehen.
+        // Die Rolle darf inzwischen nur noch Termine ansehen.
         me.release(200, meBody('user', undefined, permissionsJson({ due: 'read' }, [])));
         await expect(page).toHaveURL(/\/firefighting\/test\/prueffristen$/);
         await expect(page.getByRole('link', { name: 'Suchen' })).toHaveCount(0);
@@ -202,7 +202,7 @@ test.describe('Schnellstart: Startbild', () => {
         await expect(splash).toHaveAttribute('data-step', 'session');
         await expect(splash.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '66');
         await expect(splash).toContainText('Anmeldung wird geprüft …');
-        await expect(splash).toContainText('Geräteverwaltung');
+        await expect(splash).toContainText('Ausrüstungsverwaltung');
         // Nur per CSS verzögert (Animation), dann voll sichtbar.
         await expect(splash).toHaveCSS('animation-delay', '0.4s');
         await expect(splash).toHaveCSS('opacity', '1');

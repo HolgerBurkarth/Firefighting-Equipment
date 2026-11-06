@@ -41,6 +41,8 @@ final class LoginTest extends AuthTestCase
                 'name' => 'Erika Musterfrau',
                 'display_name' => 'Erika',
                 'role' => 'user',
+                'role_id' => $this->systemRoleId($this->tenant('immendingen')->id, 'user'),
+                'role_name' => 'Benutzer',
                 'protected' => false,
                 'notifications' => ['device_log' => false],
             ],
@@ -58,6 +60,25 @@ final class LoginTest extends AuthTestCase
             $cookie,
         );
         self::assertSame('no-store', $response->headers()['Cache-Control']);
+    }
+
+    /** Rolle der Stadt in auth/me (Plan Phase 1, Schritt 1.9: Liste „Konto wechseln“). */
+    public function testMeNamesTheRoleOfTheTenant(): void
+    {
+        $tenantId = $this->tenant('immendingen')->id;
+        $this->account('immendingen', 'admin@example.org', ['role' => 'admin']);
+        $stmt = $this->pdo()->prepare('INSERT INTO fe_roles (tenant_id, name) VALUES (?, ?)');
+        $stmt->execute([$tenantId, 'Gerätewart']);
+        $roleId = (int) $this->pdo()->lastInsertId();
+        $this->account('immendingen', 'wart@example.org', ['role_id' => $roleId]);
+        $this->account(null, 'chef@example.org');
+
+        $admin = self::json($this->login('immendingen', 'admin@example.org'))['user'];
+        self::assertSame([$this->systemRoleId($tenantId, 'admin'), 'Admin'], [$admin['role_id'], $admin['role_name']]);
+        $own = self::json($this->login('immendingen', 'wart@example.org'))['user'];
+        self::assertSame([$roleId, 'Gerätewart'], [$own['role_id'], $own['role_name']]);
+        $superAdmin = self::json($this->login(null, 'chef@example.org'))['user'];
+        self::assertSame([null, null], [$superAdmin['role_id'], $superAdmin['role_name']]);
     }
 
     public function testStoredSessionHasOnlyHashAndDeviceLabel(): void

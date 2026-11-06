@@ -202,6 +202,58 @@ Mockups `Konto-wechseln` (Admin-Konsole) und `Handy-Konto-wechseln` (Profil) in
 - **Tests**: Browser-Tests mit zwei Städten (zwei Bereiche im selben Testserver), Unit-Tests der
   Liste.
 
+**Umsetzung (Runde 1, Aufgabe 2, 06.11.2026)**, ergänzt um die Fragen von Holger vom 06.11.2026:
+
+- **API**: `auth/me` (auch `auth/login`, `auth/password`) bekommt im Objekt `user` zusätzlich
+  `role_id` und `role_name` (Rolle der Stadt; unter `service` `null`). Reine Erweiterung, nötig für
+  den Rollennamen in der Liste. `UEBERGABE-BACKEND.md`.
+- **Liste** `src/data/accounts.ts` (`AccountList`): localStorage `ff-accounts` (ein Schlüssel für alle
+  Städte, Formatversion wie die Warteschlange), je Stadt höchstens ein Eintrag `{slug, tenantName,
+  accountId, displayName, roleName}`, sortiert nach Name der Stadt. Geschrieben bei jeder
+  bestätigten Sitzung (auch beim Start mit gespeicherter Sitzung, dann mit deren Stand); ein anderes
+  Konto derselben Stadt ersetzt den Eintrag. Nie Tokens, E-Mail oder Rechte. Fehler des Speichers
+  ohne Folgen (dann keine Liste).
+- **Kennzeichen**: „aktuell“ (diese Stadt), sonst „angemeldet“ (am Handy wie im Mockup „wechseln“),
+  wenn `ff-session:<kürzel>` dasselbe Konto enthält; sonst „neu anmelden“ mit „Anmeldung abgelaufen –
+  beim Antippen öffnet sich die Anmeldung dieser Stadt.“ Ob die Sitzung auf dem Server noch gilt,
+  prüft erst die andere Stadt beim Öffnen (wie heute beim Start): abgelaufen → ihre Anmeldung.
+- **Warteschlangen und Offline-Kopien anderer Städte**: Sie liegen schon heute je `<kürzel>:<konto-id>`
+  getrennt (IndexedDB `queue` und `snapshots`, localStorage `ff-session:<kürzel>`,
+  `ff-queue-owners:<kürzel>`); die Liste liest nur. Je Eintrag zählt sie die nicht angekommenen
+  Buchungen des Kontos (`queue`, `readStoredQueue`) und zeigt „N nicht gesendete Buchungen – werden
+  nach dem Wechsel gesendet.“ Gesendet wird nur in der eigenen Stadt (die App läuft je Stadt), also
+  nach dem Wechsel. Die Offline-Kopie der anderen Stadt bleibt unberührt und zeigt sich nach dem
+  Wechsel wie beim Start. `OtherQueuesNotice` (andere Konten DERSELBEN Stadt) bleibt unverändert.
+- **Abmelden in einer Stadt**: entfernt nur deren Eintrag (wie heute nur deren Sitzung, Kopie,
+  Warteschlange und „Zuletzt benutzt“). Einträge, Sitzungen, Kopien und Warteschlangen anderer Städte
+  bleiben. Eine abgelaufene Sitzung (401) entfernt den Eintrag nicht, er zeigt dann „neu anmelden“.
+  Super-Admin: `service` schreibt und zeigt keine Liste.
+- **Wechseln**: volle Navigation auf `../<kürzel>/` relativ zum Basispfad (`location.assign`); bei
+  „neu anmelden“ auf `../<kürzel>/anmelden`. Mit ungespeicherten Eingaben vorher `ConfirmDialog`
+  „Ihre Eingaben auf dieser Seite gehen verloren. Trotzdem wechseln?“ (Standard „Abbrechen“).
+  Offline klappt der Wechsel nur in eine Stadt, die auf diesem Gerät schon geöffnet war (jede Stadt
+  hat ihren eigenen Service Worker).
+- **„+ Weitere Stadt hinzufügen …“**: Feld „Adresse oder Kürzel der Stadt“ (Adresse: das Segment nach
+  `/firefighting/`), geprüft mit `slugProblem`; die eigene Stadt → Hinweis; dann zur Anmeldung dieser
+  Stadt. Eine unbekannte Stadt meldet die Anmeldeseite dort wie heute.
+- **Ort**: Admin-Konsole unten im Menü der Name des Kontos als Knopf mit „Stadt · Rolle“ (Reka UI
+  `Popover`, rechts neben dem Menü, in der Schublade darunter); Handy-Seiten im Profil der Abschnitt
+  „Konto wechseln“. Gemeinsamer Baustein `AccountSwitcher`.
+- **Tests**: Unit `accounts.spec.ts` (Eintrag, Ersetzen, Abmelden, Kennzeichen, Warteschlange, Adresse
+  oder Kürzel), Browser `accountSwitch.spec.ts` mit zwei Bereichen (`test` und eine zweite Stadt im
+  selben Testserver): Liste am PC und am Handy, Wechsel lädt die andere Stadt, „neu anmelden“,
+  Rückfrage bei Eingaben, Abmelden entfernt nur den eigenen Eintrag, Super-Admin ohne Liste. PHP:
+  `role_id`/`role_name` in `auth/me`.
+- **Live prüfbar (Agent, nur `test`)**: Liste mit „test · aktuell“ und dem Rollennamen, „+ Weitere
+  Stadt hinzufügen …“ mit ungültigen Eingaben (z. B. `Service`, `a--b`) und der eigenen Stadt, ein
+  unbekanntes Kürzel führt zur Anmeldeseite mit „Stadt nicht gefunden“ (keine echte Stadt), Rückfrage
+  bei ungespeicherten Eingaben. Eine zweite Stadt gibt es live nicht; den Wechsel selbst prüfen die
+  Browser-Tests.
+- **Für Holger am iPhone**: Wechsel zwischen `test` und Immendingen (beide angemeldet, beide
+  Einträge, Kennzeichen), nicht gesendete Buchungen offline in einer Stadt, dann Wechsel (Hinweis in
+  der Liste, nach dem Wechsel gesendet), Abmelden in einer Stadt entfernt nur deren Eintrag,
+  abgelaufene Anmeldung („neu anmelden“), Wechsel ohne Netz in eine schon geöffnete Stadt.
+
 ## 1. Datenmodell
 
 Neue Tabellen mit `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`, feste Werte
@@ -719,6 +771,28 @@ bestehende Oberfläche auf die Tabelle in Abschnitt 9.
 | Wartung/Prüfung → Wartung, Neudatum → „in Betrieb seit“ | erst mit Phase 3 | – |
 
 Offen dazu: F14 (Adressen wie `geraete`, `prueffristen` und Spalten der CSV).
+
+**Umsetzung (Runde 1, Aufgabe 1, 06.11.2026)**, Festlegungen Holger vom 06.11.2026:
+
+- Umgestellt wird alles, was Nutzer sehen: App, Mails, Fehlermeldungen der API, CSV (Überschriften,
+  „Gültige Werte“, Dateinamen). Nicht: Adressen (`geraete`, `prueffristen`, Mail-Links), Bezeichner
+  im Code, Werte der API, Kommandozeile (`bin/*.php`, nur für Betreiber), Kommentare im Code.
+- Gerät → Ausrüstung (mit Zahl „1 Ausrüstung“, „12 Ausrüstungen“; ohne Zahl „Ausrüstung“ als
+  Sammelbegriff, Menü „Ausrüstung“), Gerätetyp → Ausrüstungstyp, Geräteliste → Ausrüstungsliste,
+  Gerätedetail → Detailseite (wie im Rechte-Katalog). „Gerät“ als Handy/PC bleibt („auf diesem
+  Gerät“, „Angemeldete Geräte“, „Unbekanntes Gerät“, „Uhr dieses Geräts“), ebenso „Gerätewart“,
+  „Gerätehaus“, „Geräteträger“ und die Namen der Typen.
+- Name der App: „Ausrüstungsverwaltung“ (Fenstertitel „<Stadt> – Ausrüstungsverwaltung“,
+  Web-App-Manifest, Kurzname „FF-Ausrüstung“, Absender der Mails „Feuerwehr Ausrüstungsverwaltung“).
+- Prüffristen → Termine; Prüfung → Wartung: „Nächste Prüfung“ → „Nächste Wartung“, Prüfdatum →
+  Wartungsdatum („Wartungsdatum ändern“, „Wartungsdatum setzen …“, Ereignis „Wartungsdatum
+  geändert“). Der Status „in Wartung“ bleibt.
+- Kennung → Nummer. „Buchungs-Kennung“ (`client_ref`) und „Build-Kennung“ bleiben.
+- CSV: Export schreibt „Nummer“, „Ausrüstungstyp“, „Nächste Wartung“, im Verlauf „Ausrüstungs-ID“
+  (bisher „Geräte-Nr.“), „Nummer“, „Ausrüstungstyp“, „Wartungsdatum alt/neu“. Der Import nimmt
+  alte und neue Überschriften an (`ImportColumn`, je Spalte eine Liste). Dateinamen
+  `ausruestung-<kürzel>-<datum>.csv` und `ausruestung-vorlage-<kürzel>.csv`; `historie-…` und
+  `gueltige-werte-…` bleiben.
 
 ## 9. Schritte, Reihenfolge, Risiken, offene Fragen
 

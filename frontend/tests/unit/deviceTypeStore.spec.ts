@@ -20,7 +20,7 @@ const FAILED: ApiResult<readonly DeviceType[]> = {
 };
 
 describe('DeviceTypeStore', () => {
-    it('lädt alle Gerätetypen und behält sie bei einem Fehler', async () => {
+    it('lädt alle Ausrüstungstypen und behält sie bei einem Fehler', async () => {
         const results: ApiResult<readonly DeviceType[]>[] = [
             { ok: true, status: 200, data: TYPES },
             FAILED,

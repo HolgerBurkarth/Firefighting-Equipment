@@ -23,13 +23,13 @@ use FirefightingEquipment\Time\GermanFormat;
 final class DeviceCsv
 {
     public const array DEVICE_HEADER = [
-        'Kennung', 'Scan-Code', 'Gerätetyp', 'Standort', 'Status', 'Nächste Prüfung', 'Seriennummer',
+        'Nummer', 'Scan-Code', 'Ausrüstungstyp', 'Standort', 'Status', 'Nächste Wartung', 'Seriennummer',
         'Hersteller', 'Modell', 'Beschaffungsdatum', 'Notiz',
     ];
 
     public const array EVENT_HEADER = [
-        'Aktionszeit', 'Eingang beim Server', 'Geräte-Nr.', 'Kennung', 'Gerätetyp', 'Ereignis', 'Wer',
-        'Standort von', 'Standort nach', 'Status von', 'Status nach', 'Prüfdatum alt', 'Prüfdatum neu',
+        'Aktionszeit', 'Eingang beim Server', 'Ausrüstungs-ID', 'Nummer', 'Ausrüstungstyp', 'Ereignis', 'Wer',
+        'Standort von', 'Standort nach', 'Status von', 'Status nach', 'Wartungsdatum alt', 'Wartungsdatum neu',
         'Feld', 'Alter Wert', 'Neuer Wert', 'Kommentar', 'Übernommen', 'Grund (nicht übernommen)',
         'Buchungs-Kennung',
     ];

@@ -60,10 +60,10 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         self::assertSame([2], $this->mailer->batches, 'eine Sammlung, also eine SMTP-Verbindung');
         $mail = $this->mailer->sent[0];
         self::assertSame(self::SUBJECT_PREFIX . 'MA-01 angelegt', $mail->subject);
-        self::assertStringContainsString("Vorgang: Angelegt\nGerät: MA-01 (Atemschutzmaske)\nWer: Kommandant\nWann: ", $mail->text);
+        self::assertStringContainsString("Vorgang: Angelegt\nAusrüstung: MA-01 (Atemschutzmaske)\nWer: Kommandant\nWann: ", $mail->text);
         self::assertStringContainsString("Standort: HLF 20 / G1\nStatus: einsatzbereit\nKommentar: Neu beschafft\n", $mail->text);
         self::assertStringContainsString(
-            "\nZum Gerät in der Anwendung:\n\n" . self::BASE_URL . "/firefighting/immendingen/geraete/{$id}/details\n\nSie erhalten",
+            "\nZur Ausrüstung in der Anwendung:\n\n" . self::BASE_URL . "/firefighting/immendingen/geraete/{$id}/details\n\nSie erhalten",
             $mail->text,
             'Admins: Link auf das Gerätedetail',
         );
@@ -96,7 +96,7 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         $actions = [
             ['state', ['version' => 1, 'location_id' => $this->room], 'MA-01 umgebucht'],
             ['state', ['version' => 2, 'status' => 'maintenance'], 'MA-01 Status in Wartung'],
-            ['inspection-due', ['version' => 3, 'next_inspection_due' => '2027-03-01'], 'MA-01 Prüfdatum geändert'],
+            ['inspection-due', ['version' => 3, 'next_inspection_due' => '2027-03-01'], 'MA-01 Wartungsdatum geändert'],
             ['fields', ['version' => 4, 'identifier' => 'MA-1', 'model' => 'FPS 7000'], 'MA-1 Stammdaten geändert'],
             ['retire', ['version' => 5], 'MA-1 ausgesondert'],
             ['reinstate', ['version' => 6, 'status' => 'ready', 'identifier' => 'MA-01'], 'MA-01 wieder aufgenommen'],
@@ -112,7 +112,7 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
 
         $mail = $this->mailer->sent[0];
         self::assertStringContainsString('Vorgang: Wieder aufgenommen', $mail->text);
-        self::assertStringContainsString("Kennung: MA-1 → MA-01\nStatus: ausgesondert → einsatzbereit", $mail->text);
+        self::assertStringContainsString("Nummer: MA-1 → MA-01\nStatus: ausgesondert → einsatzbereit", $mail->text);
     }
 
     public function testFieldChangesAreListedInOneMail(): void
@@ -164,9 +164,9 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         self::assertSame(['log-admin@example.org', 'chef@example.org'], $this->recipients());
         self::assertSame([2], $this->mailer->batches, 'eine Sammlung, also eine SMTP-Verbindung');
         $mail = $this->mailer->sent[0];
-        self::assertSame(self::SUBJECT_PREFIX . '2 Geräte – umgebucht, Status defekt', $mail->subject);
+        self::assertSame(self::SUBJECT_PREFIX . '2 Ausrüstungen – umgebucht, Status defekt', $mail->subject);
         self::assertStringContainsString(
-            "Vorgang: Sammelaktion (umgebucht, Status defekt)\nGeräte: 2\nWer: Kommandant\nWann: ",
+            "Vorgang: Sammelaktion (umgebucht, Status defekt)\nAusrüstungen: 2\nWer: Kommandant\nWann: ",
             $mail->text,
         );
         self::assertStringContainsString("Kommentar: Nach Einsatz\n", $mail->text);
@@ -177,7 +177,7 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         );
         self::assertStringNotContainsString('MA-03', $mail->text, 'unverändert');
         self::assertStringContainsString(
-            "\nZur Geräteliste in der Anwendung:\n\n" . self::BASE_URL . "/firefighting/immendingen/geraete\n\nSie erhalten",
+            "\nZur Ausrüstungsliste in der Anwendung:\n\n" . self::BASE_URL . "/firefighting/immendingen/geraete\n\nSie erhalten",
             $mail->text,
         );
         self::assertNoLink($this->mailer->sent[1]);
@@ -193,8 +193,8 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
             ['id' => $first, 'version' => 1, 'next_inspection_due' => '2027-03-01'],
             ['id' => $second, 'version' => 1, 'next_inspection_due' => '2027-03-01'],
         ]]);
-        self::assertSame(self::SUBJECT_PREFIX . '2 Geräte – Prüfdatum geändert', $this->mailer->sent[0]->subject);
-        self::assertStringContainsString("MA-02 (Atemschutzmaske)\n  Nächste Prüfung: – → 01.03.2027\n", $this->mailer->sent[0]->text);
+        self::assertSame(self::SUBJECT_PREFIX . '2 Ausrüstungen – Wartungsdatum geändert', $this->mailer->sent[0]->subject);
+        self::assertStringContainsString("MA-02 (Atemschutzmaske)\n  Nächste Wartung: – → 01.03.2027\n", $this->mailer->sent[0]->text);
 
         // Nur ein Gerät geändert: die gewöhnliche Mail zum Gerät.
         $this->mailer->sent = [];
@@ -203,7 +203,7 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
             ['id' => $second, 'version' => 2, 'next_inspection_due' => '2028-03-01'],
         ]]);
         self::assertSame(['log-admin@example.org', 'chef@example.org'], $this->recipients());
-        self::assertSame(self::SUBJECT_PREFIX . 'MA-02 Prüfdatum geändert', $this->mailer->sent[0]->subject);
+        self::assertSame(self::SUBJECT_PREFIX . 'MA-02 Wartungsdatum geändert', $this->mailer->sent[0]->subject);
 
         // Nichts geändert oder nur Fehler: keine Mail.
         $this->mailer->sent = [];
@@ -246,7 +246,7 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         self::assertStringContainsString('Zeile 3: MA-02 neu: ', $mail->text);
         self::assertStringContainsString('Zeile 4: MA-03 neu: ', $mail->text);
         self::assertStringContainsString(
-            "\nZur Geräteliste in der Anwendung:\n\n" . self::BASE_URL . "/firefighting/immendingen/geraete\n\nSie erhalten",
+            "\nZur Ausrüstungsliste in der Anwendung:\n\n" . self::BASE_URL . "/firefighting/immendingen/geraete\n\nSie erhalten",
             $mail->text,
         );
         self::assertNoLink($this->mailer->sent[1]);
@@ -293,7 +293,7 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
             ['id' => $second, 'version' => 1, 'status' => 'defective'],
         ]]);
         self::assertSame(['log-admin@example.org', 'wache@example.org', 'chef@example.org'], $this->recipients());
-        self::assertSame(self::SUBJECT_PREFIX . '2 Geräte – Status defekt', $this->mailer->sent[0]->subject);
+        self::assertSame(self::SUBJECT_PREFIX . '2 Ausrüstungen – Status defekt', $this->mailer->sent[0]->subject);
         self::assertSame(self::SUBJECT_PREFIX . 'MA-01 Status defekt', $this->mailer->sent[1]->subject, 'nur ein sichtbares Gerät: die Mail zum Gerät');
         self::assertStringNotContainsString('MA-02', $this->mailer->sent[1]->text);
 

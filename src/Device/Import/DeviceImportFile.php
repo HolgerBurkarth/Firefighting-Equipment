@@ -69,7 +69,7 @@ final readonly class DeviceImportFile
             }
         }
         if ($table->records === []) {
-            throw new ImportFileException('Die Datei enthält keine Geräte (nur die Kopfzeile).');
+            throw new ImportFileException('Die Datei enthält keine Ausrüstung (nur die Kopfzeile).');
         }
         if (count($table->records) > self::MAX_ROWS) {
             throw new ImportFileException(
@@ -134,7 +134,7 @@ final readonly class DeviceImportFile
             );
         }
         if (!in_array(ImportColumn::Identifier, $columns, true)) {
-            throw new ImportFileException('Die Spalte „Kennung“ fehlt; sie ordnet die Zeilen den Geräten zu.', ['line' => 1]);
+            throw new ImportFileException('Die Spalte „Nummer“ fehlt; sie ordnet die Zeilen der Ausrüstung zu.', ['line' => 1]);
         }
 
         return $columns;

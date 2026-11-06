@@ -157,7 +157,7 @@ const locationProblem = computed(() =>
 const typeProblem = computed(() =>
     deviceTypeStore.state.types?.find((type) => type.id === form.value.deviceTypeId)?.active ===
     false
-        ? 'Dieser Gerätetyp ist deaktiviert. Bitte wählen Sie einen anderen.'
+        ? 'Dieser Ausrüstungstyp ist deaktiviert. Bitte wählen Sie einen anderen.'
         : null,
 );
 
@@ -217,7 +217,7 @@ async function submit(): Promise<void> {
         v-model:open="open"
         :unsaved="unsaved"
         :title="`${device.identifier} wieder aufnehmen`"
-        description="Das Gerät erscheint danach wieder in Suche, Listen und Prüffristen."
+        description="Die Ausrüstung erscheint danach wieder in Suche, Listen und Terminen."
         submit-label="Wieder aufnehmen"
         :busy="busy"
         :can-submit="canSubmit"
@@ -226,7 +226,8 @@ async function submit(): Promise<void> {
         @submit="submit"
     >
         <p v-if="conflict" class="notice notice-info" role="alert" data-testid="reinstate-conflict">
-            Das Gerät wurde inzwischen geändert (siehe oben). Bitte prüfen und erneut speichern.
+            Die Ausrüstung wurde inzwischen geändert (siehe oben). Bitte prüfen und erneut
+            speichern.
         </p>
         <fieldset class="statuses">
             <legend class="field-label">Status</legend>
@@ -242,7 +243,7 @@ async function submit(): Promise<void> {
             </p>
         </div>
         <label v-if="canEdit" class="field">
-            <span class="field-label">Kennung</span>
+            <span class="field-label">Nummer</span>
             <input
                 v-model="form.identifier"
                 class="input"
@@ -257,7 +258,7 @@ async function submit(): Promise<void> {
             </p>
         </label>
         <div v-if="canEdit" class="field">
-            <AppSelect v-model="typeValue" label="Gerätetyp" :options="typeOptions" />
+            <AppSelect v-model="typeValue" label="Ausrüstungstyp" :options="typeOptions" />
             <p v-if="typeProblem !== null" class="field-error">{{ typeProblem }}</p>
         </div>
         <div v-if="device.scanCode !== null && canCode" class="field">

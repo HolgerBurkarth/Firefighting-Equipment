@@ -28,8 +28,8 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(DeviceHistoryFilter::class)]
 final class DeviceHistoryExportTest extends ExportApiTestCase
 {
-    private const string HEADER = "\xEF\xBB\xBFAktionszeit;Eingang beim Server;Geräte-Nr.;Kennung;Gerätetyp;Ereignis;Wer;"
-        . "Standort von;Standort nach;Status von;Status nach;Prüfdatum alt;Prüfdatum neu;Feld;Alter Wert;Neuer Wert;"
+    private const string HEADER = "\xEF\xBB\xBFAktionszeit;Eingang beim Server;Ausrüstungs-ID;Nummer;Ausrüstungstyp;Ereignis;Wer;"
+        . "Standort von;Standort nach;Status von;Status nach;Wartungsdatum alt;Wartungsdatum neu;Feld;Alter Wert;Neuer Wert;"
         . "Kommentar;Übernommen;Grund (nicht übernommen);Buchungs-Kennung\r\n";
 
     private int $device;
@@ -70,7 +70,7 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
             self::HEADER
             . "15.06.2026 00:30;15.06.2026 00:30;$id;MA-01;Atemschutzmaske;Angelegt;Kommandant;;HLF 20 / G1;;einsatzbereit;;;;;;Neu beschafft;Ja;;\r\n"
             . "15.06.2026 10:05;15.06.2026 10:05;$id;MA-01;Atemschutzmaske;Umgebucht und Status geändert;Gerätewart;HLF 20 / G1;Lager;einsatzbereit;defekt;;;;;;\"Riss; \"\"Ventil\"\"\";Ja;;\r\n"
-            . "15.06.2026 10:06;15.06.2026 10:06;$id;MA-01;Atemschutzmaske;Prüfdatum geändert;Kommandant;;;;;;01.03.2027;;;;;Ja;;\r\n"
+            . "15.06.2026 10:06;15.06.2026 10:06;$id;MA-01;Atemschutzmaske;Wartungsdatum geändert;Kommandant;;;;;;01.03.2027;;;;;Ja;;\r\n"
             . "15.06.2026 10:07;15.06.2026 10:07;$id;MA-01;Atemschutzmaske;Stammdaten geändert;Kommandant;;;;;;;Beschaffungsdatum;01.05.2024;02.05.2024;;Ja;;\r\n"
             . "15.06.2026 10:08;15.06.2026 10:08;$id;MA-01;Atemschutzmaske;Stammdaten geändert;Kommandant;;;;;;;Notiz;alt;\"'=Größe\nM\";;Ja;;\r\n",
             $body,
@@ -97,7 +97,7 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         self::assertSame(
             self::HEADER
             . "14.06.2026 08:00;15.06.2026 10:05;$id;MA-01;Atemschutzmaske;Umgebucht;Gerätewart;HLF 20 / G1;Lager;;;;;;;;;Ja;;3f2c8a1e-5b7d-4c9e-8f10-2a3b4c5d6e7f\r\n"
-            . "13.06.2026 08:00;15.06.2026 10:06;$id;MA-01;Atemschutzmaske;Statusänderung nicht übernommen;Gerätewart;;;;defekt;;;;;;;Nein;Gerät ausgesondert;\r\n",
+            . "13.06.2026 08:00;15.06.2026 10:06;$id;MA-01;Atemschutzmaske;Statusänderung nicht übernommen;Gerätewart;;;;defekt;;;;;;;Nein;Ausrüstung ausgesondert;\r\n",
             $body,
         );
     }
@@ -109,7 +109,7 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         $this->event('2026-06-15 08:00:00', ['event_type' => 'due_changed', 'to_due' => '2027-03-01']);
         $this->event('2026-06-14 08:00:00', ['event_type' => 'due_changed', 'to_due' => '2027-04-01']);
 
-        self::assertSame(['Prüfdatum geändert', 'Angelegt', 'Prüfdatum geändert'], self::column($this->rows('device-events/export'), 5));
+        self::assertSame(['Wartungsdatum geändert', 'Angelegt', 'Wartungsdatum geändert'], self::column($this->rows('device-events/export'), 5));
         self::assertSame(['01.03.2027', '', '01.04.2027'], self::column($this->rows('device-events/export'), 12));
         self::assertSame(['01.04.2027', '', '01.03.2027'], self::column($this->rows('device-events/export?order=oldest'), 12));
     }

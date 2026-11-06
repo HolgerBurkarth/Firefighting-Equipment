@@ -17,7 +17,8 @@ export function readinessTile(summary: DeviceSummaryCounts): DashboardTile & { p
     const ready = summary.byStatus.ready;
     return {
         value: `${String(ready)} von ${String(summary.total)}`,
-        detail: summary.total === 0 ? 'Noch keine Geräte erfasst' : 'Geräte einsatzbereit',
+        detail:
+            summary.total === 0 ? 'Noch keine Ausrüstung erfasst' : 'Ausrüstungen einsatzbereit',
         percent: summary.total === 0 ? 0 : Math.round((ready / summary.total) * 100),
     };
 }
@@ -31,7 +32,7 @@ export function notReadyTile(summary: DeviceSummaryCounts): DashboardTile {
     ];
     return {
         value: String(defective + maintenance),
-        detail: parts.length === 0 ? 'Alle Geräte einsatzbereit' : parts.join(' · '),
+        detail: parts.length === 0 ? 'Alle Ausrüstungen einsatzbereit' : parts.join(' · '),
     };
 }
 

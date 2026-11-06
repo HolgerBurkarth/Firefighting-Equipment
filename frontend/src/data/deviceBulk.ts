@@ -71,11 +71,11 @@ export function bulkCounts(run: BulkRun): BulkCounts {
 }
 
 function devices(count: number): string {
-    return count === 1 ? '1 Gerät' : `${String(count)} Geräte`;
+    return count === 1 ? '1 Ausrüstung' : `${String(count)} Ausrüstungen`;
 }
 
 const ACTION_LABELS: Readonly<Record<BulkAction, string>> = {
-    'inspection-due': 'Prüfdatum',
+    'inspection-due': 'Wartungsdatum',
     state: 'Umbuchen / Status',
 };
 
@@ -101,7 +101,7 @@ export function bulkErrorText(result: BulkItemResult): string {
         case 'version_conflict':
             return 'Inzwischen geändert – bitte prüfen und erneut senden.';
         case 'not_found':
-            return 'Dieses Gerät gibt es nicht (mehr).';
+            return 'Diese Ausrüstung gibt es nicht (mehr).';
         default:
             return result.error?.message ?? 'Nicht möglich.';
     }

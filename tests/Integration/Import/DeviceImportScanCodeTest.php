@@ -124,10 +124,10 @@ final class DeviceImportScanCodeTest extends ImportApiTestCase
         self::assertNull($preview['token']);
         self::assertSame(['error', 'error', 'error', 'new', 'new'], array_column($preview['rows'], 'result'));
         self::assertSame([
-            'Der Scan-Code „C“ ist bereits an das Gerät „MA-03“ vergeben. Per Import lassen sich Scan-Codes nicht übertragen; dazu den Scan-Code zuerst bei „MA-03“ entfernen.',
+            'Der Scan-Code „C“ ist bereits an die Ausrüstung „MA-03“ vergeben. Per Import lassen sich Scan-Codes nicht übertragen; dazu den Scan-Code zuerst bei „MA-03“ entfernen.',
         ], self::row($preview, 2)['messages']);
-        self::assertStringStartsWith('Der Scan-Code „B“ ist bereits an das Gerät „MA-02“ vergeben.', self::row($preview, 3)['messages'][0], 'Tausch');
-        self::assertStringStartsWith('Der Scan-Code „A[GS]1“ ist bereits an das Gerät „MA-01“ vergeben.', self::row($preview, 4)['messages'][0], 'Tausch');
+        self::assertStringStartsWith('Der Scan-Code „B“ ist bereits an die Ausrüstung „MA-02“ vergeben.', self::row($preview, 3)['messages'][0], 'Tausch');
+        self::assertStringStartsWith('Der Scan-Code „A[GS]1“ ist bereits an die Ausrüstung „MA-01“ vergeben.', self::row($preview, 4)['messages'][0], 'Tausch');
     }
 
     public function testWarningsForExcelConversions(): void
@@ -147,9 +147,9 @@ final class DeviceImportScanCodeTest extends ImportApiTestCase
         self::assertIsString($preview['token'], 'Warnungen blockieren nicht');
         self::assertSame(3, $preview['summary']['warnings']);
         self::assertSame([
-            'Der Scan-Code „4006381333931“ entspricht ohne führende Nullen dem vorhandenen Scan-Code „04006381333931“ (Gerät „MA-01“). Hat Excel führende Nullen entfernt? Dann die Datei mit der Spalte Scan-Code als Text öffnen.',
+            'Der Scan-Code „4006381333931“ entspricht ohne führende Nullen dem vorhandenen Scan-Code „04006381333931“ (Ausrüstung „MA-01“). Hat Excel führende Nullen entfernt? Dann die Datei mit der Spalte Scan-Code als Text öffnen.',
         ], self::row($preview, 2)['warnings']);
-        self::assertStringContainsString('„0000815“ (Gerät „MA-02“)', self::row($preview, 3)['warnings'][0]);
+        self::assertStringContainsString('„0000815“ (Ausrüstung „MA-02“)', self::row($preview, 3)['warnings'][0]);
         self::assertSame([
             'Der Scan-Code „4,00638E+12“ sieht wie eine Zahl in wissenschaftlicher Schreibweise aus. Hat Excel ihn umgewandelt (dabei gehen Ziffern verloren)? Dann die Datei mit der Spalte Scan-Code als Text öffnen.',
         ], self::row($preview, 4)['warnings']);

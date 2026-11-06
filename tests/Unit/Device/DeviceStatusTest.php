@@ -31,7 +31,7 @@ final class DeviceStatusTest extends TestCase
             array_map(static fn (DeviceField $f): string => $f->value, DeviceField::cases()),
         );
         self::assertSame(
-            ['Kennung', 'Scan-Code', 'Gerätetyp', 'Seriennummer', 'Hersteller', 'Modell', 'Beschaffungsdatum', 'Notiz'],
+            ['Nummer', 'Scan-Code', 'Ausrüstungstyp', 'Seriennummer', 'Hersteller', 'Modell', 'Beschaffungsdatum', 'Notiz'],
             array_map(static fn (DeviceField $f): string => $f->label(), DeviceField::cases()),
         );
         self::assertSame('device_type_id', DeviceField::DeviceType->bodyKey());

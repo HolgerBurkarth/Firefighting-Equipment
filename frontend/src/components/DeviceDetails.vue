@@ -54,7 +54,7 @@ function close(): Promise<void> {
             <span class="details-location">{{ device.location.path }}</span>
             <StatusBadge :status="device.status" :label="device.statusLabel" />
             <span class="details-due" :class="{ 'details-due-overdue': overdue }">
-                Nächste Prüfung:
+                Nächste Wartung:
                 {{
                     device.nextInspectionDue === null
                         ? 'nicht festgelegt'

@@ -29,7 +29,7 @@ test.describe('Handy-Seiten als User', () => {
         await expect(page.getByTestId('app-title')).toHaveText('Feuerwehr Test');
         await expect(page.getByTestId('app-subtitle')).toHaveText('Hallo Jonas');
         const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
-        await expect(nav.getByRole('link')).toHaveText(['Suchen', 'Prüffristen', 'Profil']);
+        await expect(nav.getByRole('link')).toHaveText(['Suchen', 'Termine', 'Profil']);
         await expect(nav.getByRole('link', { name: 'Suchen' })).toHaveAttribute(
             'aria-current',
             'page',
@@ -46,14 +46,14 @@ test.describe('Handy-Seiten als User', () => {
         expect(bottom.nav).toBe(bottom.window);
     });
 
-    test('wechselt zwischen Suchen, Prüffristen und Profil', async ({ page, apiCalls }) => {
+    test('wechselt zwischen Suchen, Termine und Profil', async ({ page, apiCalls }) => {
         await page.goto('/firefighting/test/suchen');
         const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
 
-        await nav.getByRole('link', { name: 'Prüffristen' }).click();
+        await nav.getByRole('link', { name: 'Termine' }).click();
         await expect(page).toHaveURL(/\/firefighting\/test\/prueffristen$/);
-        await expect(page.getByRole('heading', { level: 1, name: 'Prüffristen' })).toBeVisible();
-        await expect(nav.getByRole('link', { name: 'Prüffristen' })).toHaveAttribute(
+        await expect(page.getByRole('heading', { level: 1, name: 'Termine' })).toBeVisible();
+        await expect(nav.getByRole('link', { name: 'Termine' })).toHaveAttribute(
             'aria-current',
             'page',
         );
@@ -124,7 +124,7 @@ test.describe('Handy-Seiten als Admin', () => {
             await expect(nav.getByRole('link')).toHaveText([
                 'Dashboard',
                 'Suchen',
-                'Prüffristen',
+                'Termine',
                 'Profil',
             ]);
             await nav.getByRole('link', { name: 'Dashboard' }).click();

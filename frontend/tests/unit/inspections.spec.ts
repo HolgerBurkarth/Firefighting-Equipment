@@ -57,14 +57,14 @@ describe('inspectionOverview', () => {
     it('Texte', () => {
         const overview = inspectionOverview(devices, TODAY);
         expect(overview.overdue.entries.map((e) => inspectionText(e, true))).toEqual([
-            'Prüfung: 01.10.2026 · seit 28 Tagen überfällig',
-            'Prüfung: 01.10.2026 · seit 28 Tagen überfällig',
-            'Prüfung: 28.10.2026 · seit 1 Tag überfällig',
+            'Wartung: 01.10.2026 · seit 28 Tagen überfällig',
+            'Wartung: 01.10.2026 · seit 28 Tagen überfällig',
+            'Wartung: 28.10.2026 · seit 1 Tag überfällig',
         ]);
         expect(overview.dueSoon.entries.map((e) => inspectionText(e, false))).toEqual([
-            'Prüfung: 29.10.2026 · heute fällig',
-            'Prüfung: 30.10.2026 · morgen fällig',
-            'Prüfung: 28.11.2026 · in 30 Tagen fällig',
+            'Wartung: 29.10.2026 · heute fällig',
+            'Wartung: 30.10.2026 · morgen fällig',
+            'Wartung: 28.11.2026 · in 30 Tagen fällig',
         ]);
     });
 });

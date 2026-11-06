@@ -67,7 +67,7 @@ onMounted(() => {
                 <DialogContent class="drawer" data-testid="menu-drawer">
                     <DialogTitle class="visually-hidden">Menü</DialogTitle>
                     <DialogDescription class="visually-hidden">
-                        Seiten der Geräteverwaltung
+                        Seiten der Ausrüstungsverwaltung
                     </DialogDescription>
                     <DialogClose class="drawer-close" aria-label="Menü schließen">
                         <svg
@@ -95,7 +95,9 @@ onMounted(() => {
             <span class="topbar-title" data-testid="app-title">
                 {{ service ? 'Service' : (tenantState.tenant?.name ?? 'Feuerwehr') }}
             </span>
-            <span class="topbar-subtitle">{{ service ? 'Super-Admin' : 'Geräteverwaltung' }}</span>
+            <span class="topbar-subtitle">{{
+                service ? 'Super-Admin' : 'Ausrüstungsverwaltung'
+            }}</span>
         </div>
     </header>
 
