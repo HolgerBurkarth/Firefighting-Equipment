@@ -302,8 +302,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (per Test).
   - Grundregel: Die API nur erweitern (neue Felder optional, alte noch mindestens einen Deploy
     lang behalten). `n` steigt nur bei einer inkompatiblen Änderung, dann in Datei, `ClientApi` und
-    Frontend gemeinsam. `ClientApi::MIN` (MIN_CLIENT_API, derzeit 1, höchstens `CURRENT`, per Test)
-    erst nach Rückfrage anheben.
+    Frontend gemeinsam. `ClientApi::MIN` (MIN_CLIENT_API, höchstens `CURRENT`, per Test) erst nach
+    Rückfrage anheben; derzeit 2 (seit 06.11.2026, Plan Phase 1, Schritt 1.8a: Apps mit 1 richten
+    die Oberfläche nach `role` und aktualisieren sich sofort; vorher 1).
   - Backend: Ist `X-Client-Api` eine Nummer (`ClientApi::fromHeader`: nur Ziffern ohne führende
     Null, höchstens 9 Stellen) unter `ClientApi::MIN`, antwortet `Application` nach `RequestGuard`
     und vor der Stadt mit 409 `client_outdated` (`HttpException::clientOutdated`, `details
@@ -2000,8 +2001,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `csv.export` für die Exporte, F2) 1.7b (App nach Rechten, siehe unten „App nach Rechten“) und 1.7c (Rechte ändern sich während der
   Sitzung, `X-Client-Api` 2, ebenda). Schritt 1.7 ist geteilt (Holger 05.11.2026): 1.7a Backend,
   1.7b App nach Rechten (Wächter, Menü, Handy-Leiste, Knöpfe), 1.7c Rechte ändern sich während der
-  Sitzung (Offline-Kopie, Warteschlange) mit `X-Client-Api` 2 und `ClientApi::MIN` = 1 (Variante B;
-  über MIN = 2 wird in Schritt 1.8 entschieden, bevor Immendingen eigene Rollen bekommt).
+  Sitzung (Offline-Kopie, Warteschlange) mit `X-Client-Api` 2 und `ClientApi::MIN` = 1 (Variante B).
+  Schritt 1.8 (Holger 06.11.2026): 1.8a `ClientApi::MIN` = 2 (Apps ohne Header bleiben unberührt),
+  danach 1.8b Rollen für Immendingen (Gerätewart, Geräteträger), die Holger selbst anlegt; Agenten
+  ändern in Immendingen nichts und prüfen dort nur lesend, Konten werden vorerst keine zugewiesen.
   Für *Admin* und *Benutzer* verhält sich jede Route wie vorher (per Test), ebenso Sitzungsdauer und
   Empfänger der Log-Mails; einzige gewollte Ausnahme: *Benutzer* bekommt bei beiden Exporten seit
   1.7a 403 `forbidden` (kein `csv.export`; die App bietet ihm den Export nirgends an). Neu sind
