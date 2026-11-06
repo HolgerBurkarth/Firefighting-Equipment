@@ -3107,8 +3107,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Caches: npm über `actions/setup-node` (`cache: npm`); Composer-Downloads über `actions/cache`
   (Schlüssel `composer.lock`, angelegt im Job `php`, `e2e` liest nur); Playwright-Browser
   (`~/.cache/ms-playwright`, Schlüssel = Playwright-Version, gespeichert gleich nach dem
-  Installieren nur von Teil 1). Bei Treffer installiert `npx playwright install-deps` nur die
-  Systempakete.
+  Installieren nur von Teil 1). Die Systempakete installiert `npx playwright install-deps` in jedem
+  Teil über `scripts/install-browser-deps.sh` (seit 06.11.2026; der Mirror
+  `azure.archive.ubuntu.com` hing mehrmals bis zum Abbruch des Jobs, normal dauert der Schritt
+  25–70 s): je Versuch höchstens 180 s, insgesamt 3 Versuche, vor jeder Wiederholung `dpkg
+  --configure -a` und Umstellen auf `archive.ubuntu.com`; Schritt höchstens 12 min, Job `e2e`
+  25 min. Danach ohne Treffer `npx playwright install` (nur die Browser). Tests
+  `tests/Unit/Scripts/InstallBrowserDepsTest` (Ersatz für Befehl, sudo und Paketquellen über
+  `FF_BROWSER_DEPS_*`, nur für Tests).
 - Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Zwei Ausnahmen, je mit
   `gh run rerun <id> --failed`:
   - Ein Lauf, der ausschließlich am bekannten Firefox-Fehler beim Schließen des Browser-Kontexts
