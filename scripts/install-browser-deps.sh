@@ -7,11 +7,12 @@
 # Der Paket-Mirror des Runners (azure.archive.ubuntu.com) lieferte mehrmals so langsam, dass der
 # Job nach 20 Minuten abbrach, bevor ein Test lief (05./06.11.2026, normal dauert der Schritt
 # 25–70 s). Daher: jeder Versuch höchstens TIMEOUT Sekunden, insgesamt ATTEMPTS Versuche; vor
-# jeder Wiederholung wird ein abgebrochener dpkg-Lauf abgeschlossen und auf archive.ubuntu.com
-# umgestellt. Schon geladene Pakete bleiben im Cache von apt und werden nicht erneut geladen.
+# jeder Wiederholung werden übrig gebliebene apt-get/dpkg beendet, ein abgebrochener dpkg-Lauf
+# abgeschlossen und auf archive.ubuntu.com umgestellt. Schon geladene Pakete bleiben im Cache von
+# apt und werden nicht erneut geladen.
 #
 # Nur für Tests (nie in der CI setzen): FF_BROWSER_DEPS_TIMEOUT (Sekunden je Versuch),
-# FF_BROWSER_DEPS_SUDO (Befehl vor dpkg und sed), FF_BROWSER_DEPS_SOURCES (Paketquellen,
+# FF_BROWSER_DEPS_SUDO (Befehl vor pkill, pgrep, dpkg und sed), FF_BROWSER_DEPS_SOURCES (Paketquellen,
 # durch Leerzeichen getrennt).
 #
 # Exit-Codes: 0 OK, 1 alle Versuche gescheitert, 2 falscher Aufruf.
@@ -19,9 +20,13 @@
 set -uo pipefail
 
 ATTEMPTS=3
+# Sekunden, die übrig gebliebene apt-get/dpkg nach SIGTERM zum Beenden haben (danach SIGKILL).
+STOP_WAIT=30
 TIMEOUT="${FF_BROWSER_DEPS_TIMEOUT:-180}"
 SUDO="${FF_BROWSER_DEPS_SUDO:-sudo}"
-SOURCES="${FF_BROWSER_DEPS_SOURCES:-/etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list}"
+# Die Runner laden über die Mirror-Liste apt-mirrors.txt (ubuntu.sources verweist mit
+# mirror+file: darauf); apt wechselt dort nur bei Fehlern, nicht bei langsamen Downloads.
+SOURCES="${FF_BROWSER_DEPS_SOURCES:-/etc/apt/apt-mirrors.txt /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list}"
 MIRROR=azure.archive.ubuntu.com
 FALLBACK=archive.ubuntu.com
 
@@ -32,12 +37,22 @@ fi
 
 for attempt in $(seq 1 "$ATTEMPTS"); do
     if [ "$attempt" -gt 1 ]; then
+        # timeout beendet nur den Befehl; das von sudo gestartete apt-get läuft in einer eigenen
+        # Sitzung weiter und hält die Sperre von dpkg (CI 06.11.2026). Erst beenden, dann warten.
+        $SUDO pkill -TERM -x apt-get || true
+        $SUDO pkill -TERM -x dpkg || true
+        for _ in $(seq 1 "$STOP_WAIT"); do
+            $SUDO pgrep -x 'apt-get|dpkg' > /dev/null || break
+            sleep 1
+        done
+        $SUDO pkill -KILL -x 'apt-get|dpkg' || true
         # Ein abgebrochener Versuch kann dpkg mitten in der Installation verlassen haben.
         $SUDO dpkg --configure -a || true
         for file in $SOURCES; do
             if [ -f "$file" ] && grep -q "$MIRROR" "$file"; then
                 $SUDO sed -i "s/$MIRROR/$FALLBACK/g" "$file"
                 echo "Paketquelle umgestellt: $file → $FALLBACK"
+                grep -n "$FALLBACK" "$file" | sed 's/^/  /'
             fi
         done
     fi

@@ -474,6 +474,22 @@ V1–V4 hat der Agent am 06.11.2026 mit Holgers Super-Admin-Sitzung selbst angel
 - ☐ E2 Super-Admin: die drei Rollen „Live-Test …“ löschen; danach nur *Admin* und *Benutzer*.
 - ☐ E3 M92 wieder Lager Gerätehaus, einsatzbereit (nach H11 c schon so); Inkognito-Fenster schließen.
 
+## Schritt 1.8a – `ClientApi::MIN` = 2 (06.11.2026, Build `bc3fe040a178`)
+
+Deploy am Freitagmorgen (rund 07:00 Uhr), außerhalb eines Dienstabends. CI des Commits grün (14 min,
+der Lauf wartete auf den vorigen).
+
+- ☑ Deploy „Deployment erfolgreich“, `build.json` = `bc3fe040a178`, `health` ok (das Deploy-Skript
+  fragt ohne `X-Client-Api` und kommt weiter durch).
+- ☑ `GET api/v1/tenant` der Test-Stadt: mit `X-Client-Api: 1` → 409 `client_outdated`, „Diese
+  Version der App ist veraltet – bitte aktualisieren.“, `details {"min_client_api": 2}`; mit 2 und
+  ohne Header → 200.
+- ☑ App als *Admin*: Der offene Tab lief noch mit `9de6683e1f98` (sendet schon 2) ohne Hinweis und
+  Fehler weiter; beim Wechsel auf „Geräte“ kam `bc3fe040a178`. Keine Fehler in der Konsole.
+- ☐ Eine App mit 1 (04./05.11.) live: nicht mehr vorhanden bzw. nicht nachstellbar; das Verhalten
+  (Hinweis, sofortiges Update, Warteschlange wartet) ist per Test belegt (`client.spec.ts`,
+  `appUpdate.spec.ts`, `bookingQueue.spec.ts`), siehe auch LIVETEST-OFFLINE V4.
+
 ## Schritt 1.8b – Rollen für Immendingen (Anlegen durch Holger, nach 1.8a)
 
 Freigabe Holger 06.11.2026: Holger legt die beiden Rollen selbst als Super-Admin an (Stadtdetail

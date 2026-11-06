@@ -68,7 +68,8 @@ Beantwortet die beiden Rückfragen oben (`ClientApi::MIN` und Rollen für Immend
 - **Reihenfolge**: zuerst `ClientApi::MIN` = 2 live, danach die Rollen für Immendingen.
 - **`ClientApi::MIN` = 2**: ein eigener kleiner Schritt **1.8a** vor den Rollen für Immendingen,
   mit Tests, CLAUDE.md, `UEBERGABE-BACKEND.md` und einem Deploy außerhalb eines Dienstabends. Apps
-  ohne `X-Client-Api` (vor Phase 0) bleiben davon unberührt.
+  ohne `X-Client-Api` (vor Phase 0) bleiben davon unberührt. Umgesetzt und live am 06.11.2026
+  (Build `bc3fe040a178`, LIVETEST-ROLLEN „Schritt 1.8a“).
 - **Rollen für Immendingen (1.8b)**: wie die Tabelle in Abschnitt 6, also *Admin* und *Benutzer*
   (bestehen schon) plus *Gerätewart* und *Geräteträger*, „Sieht nur …“ jeweils alle. Der Agent liefert
   eine genaue Liste zum Anlegen (je Rolle Name, Kurzbeschreibung, jede Ansicht mit Stufe, jede
