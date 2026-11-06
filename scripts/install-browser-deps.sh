@@ -24,7 +24,9 @@ ATTEMPTS=3
 STOP_WAIT=30
 TIMEOUT="${FF_BROWSER_DEPS_TIMEOUT:-180}"
 SUDO="${FF_BROWSER_DEPS_SUDO:-sudo}"
-SOURCES="${FF_BROWSER_DEPS_SOURCES:-/etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list}"
+# Die Runner laden über die Mirror-Liste apt-mirrors.txt (ubuntu.sources verweist mit
+# mirror+file: darauf); apt wechselt dort nur bei Fehlern, nicht bei langsamen Downloads.
+SOURCES="${FF_BROWSER_DEPS_SOURCES:-/etc/apt/apt-mirrors.txt /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list}"
 MIRROR=azure.archive.ubuntu.com
 FALLBACK=archive.ubuntu.com
 
@@ -50,6 +52,7 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
             if [ -f "$file" ] && grep -q "$MIRROR" "$file"; then
                 $SUDO sed -i "s/$MIRROR/$FALLBACK/g" "$file"
                 echo "Paketquelle umgestellt: $file → $FALLBACK"
+                grep -n "$FALLBACK" "$file" | sed 's/^/  /'
             fi
         done
     fi

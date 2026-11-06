@@ -18,6 +18,10 @@ final class InstallBrowserDepsTest extends TestCase
 {
     private const string SCRIPT = __DIR__ . '/../../../scripts/install-browser-deps.sh';
     private const string SOURCES = "Types: deb\nURIs: http://azure.archive.ubuntu.com/ubuntu/\nSuites: noble noble-updates\n";
+    /** Wie auf den Runnern: ubuntu.sources verweist mit mirror+file: auf diese Liste. */
+    private const string MIRRORS = "http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n"
+        . "https://archive.ubuntu.com/ubuntu/\tpriority:2\n"
+        . "https://security.ubuntu.com/ubuntu/\tpriority:3\n";
 
     private TempDirectory $dir;
 
@@ -28,6 +32,7 @@ final class InstallBrowserDepsTest extends TestCase
         }
         $this->dir = new TempDirectory();
         $this->dir->write('ubuntu.sources', self::SOURCES);
+        $this->dir->write('apt-mirrors.txt', self::MIRRORS);
         // Ersatz für sudo: protokolliert den Aufruf, führt sed aus, pkill und dpkg nicht; pgrep
         // findet keinen übrig gebliebenen Prozess.
         $this->dir->write('sudo.sh', "#!/usr/bin/env bash\n"
@@ -63,11 +68,16 @@ final class InstallBrowserDepsTest extends TestCase
         self::assertSame(3, $this->calls());
         self::assertSame(2, substr_count($stdout, 'endete mit Exit-Code 100.'));
         self::assertStringContainsString('Versuch 3 von 3', $stdout);
-        // Umgestellt wird einmal; die zweite Wiederholung findet den Mirror nicht mehr.
-        self::assertSame(1, substr_count($stdout, 'Paketquelle umgestellt:'));
+        // Umgestellt wird je Datei einmal; die zweite Wiederholung findet den Mirror nicht mehr.
+        self::assertSame(2, substr_count($stdout, 'Paketquelle umgestellt:'));
+        self::assertStringContainsString("  1:http://archive.ubuntu.com/ubuntu/\tpriority:1\n", $stdout);
         self::assertSame(
             "Types: deb\nURIs: http://archive.ubuntu.com/ubuntu/\nSuites: noble noble-updates\n",
             $this->sources(),
+        );
+        self::assertSame(
+            str_replace('azure.archive.ubuntu.com', 'archive.ubuntu.com', self::MIRRORS),
+            (string) file_get_contents($this->dir->file('apt-mirrors.txt')),
         );
         $log = (string) file_get_contents($this->dir->file('sudo.log'));
         // Je Wiederholung zuerst übrig gebliebene apt-get/dpkg beenden (sie hielten in der CI die
@@ -80,7 +90,7 @@ final class InstallBrowserDepsTest extends TestCase
         self::assertSame(2, substr_count($log, "pkill -TERM -x apt-get\n"));
         self::assertSame(2, substr_count($log, "pkill -KILL -x apt-get|dpkg\n"));
         self::assertSame(2, substr_count($log, "dpkg --configure -a\n"));
-        self::assertSame(1, substr_count($log, 'sed -i s/azure.archive.ubuntu.com/archive.ubuntu.com/g'));
+        self::assertSame(2, substr_count($log, 'sed -i s/azure.archive.ubuntu.com/archive.ubuntu.com/g'));
     }
 
     public function testEveryAttemptIsLimitedAndAllFailedGivesExitCode1(): void
@@ -121,7 +131,8 @@ final class InstallBrowserDepsTest extends TestCase
         return Bash::run(self::SCRIPT, ['bash', Bash::toPath($this->dir->file('deps.sh'))], null, [
             'FF_BROWSER_DEPS_TIMEOUT' => (string) $timeout,
             'FF_BROWSER_DEPS_SUDO' => 'bash ' . Bash::toPath($this->dir->file('sudo.sh')),
-            'FF_BROWSER_DEPS_SOURCES' => Bash::toPath($this->dir->file('ubuntu.sources'))
+            'FF_BROWSER_DEPS_SOURCES' => Bash::toPath($this->dir->file('apt-mirrors.txt'))
+                . ' ' . Bash::toPath($this->dir->file('ubuntu.sources'))
                 . ' ' . Bash::toPath($this->dir->file('fehlt.list')),
         ]);
     }

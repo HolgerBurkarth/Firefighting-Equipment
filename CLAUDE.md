@@ -3116,7 +3116,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   25–70 s): je Versuch höchstens 180 s, insgesamt 3 Versuche, vor jeder Wiederholung übrig
   gebliebene `apt-get`/`dpkg` beenden (`timeout` trifft nur `npx`, das von `sudo` gestartete
   `apt-get` hielt sonst die Sperre von dpkg, CI 06.11.2026), `dpkg --configure -a` und Umstellen
-  auf `archive.ubuntu.com`; Schritt höchstens 14 min, Job `e2e` 25 min. Danach ohne Treffer `npx playwright install` (nur die Browser). Tests
+  auf `archive.ubuntu.com` in `/etc/apt/apt-mirrors.txt` (dorthin verweist `ubuntu.sources` der
+  Runner mit `mirror+file:`; apt wechselt den Mirror nur bei Fehlern, nicht bei langsamen
+  Downloads) sowie in `ubuntu.sources`/`sources.list`; Schritt höchstens 14 min, Job `e2e` 25 min. Danach ohne Treffer `npx playwright install` (nur die Browser). Tests
   `tests/Unit/Scripts/InstallBrowserDepsTest` (Ersatz für Befehl, sudo und Paketquellen über
   `FF_BROWSER_DEPS_*`, nur für Tests).
 - Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Zwei Ausnahmen, je mit
