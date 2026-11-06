@@ -660,8 +660,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`cityFromInput`: Segment nach `/firefighting/`, `slugProblem`, die eigene Stadt abgelehnt), dann
   `…/anmelden` der Stadt. Ort: Admin-Konsole unten im Menü der Name mit „Stadt · Rolle“ als Knopf (am PC
   Reka UI `Popover` rechts neben dem Menü, offen gehalten, solange die Rückfrage offen ist; in der
-  Schublade aufgeklappt darunter), Handy im Profil der Abschnitt „Konto wechseln“. Unter `service`
-  weder Liste noch Knopf. Tests `tests/e2e/accountSwitch.spec.ts` (zwei Städte `test` und `hattingen`
+  Schublade aufgeklappt darunter), Handy im Profil der Abschnitt „Konto wechseln“, dazu die
+  Anmeldeseite (Runde 2, Aufgabe 1; `variant` `login`, `otherAccountEntries`): unter dem Formular
+  „Auf diesem Gerät auch angemeldet:“ nur die anderen Städte mit Kennzeichen wie im Profil, ohne
+  „Weitere Stadt“; ohne andere Einträge entfällt der Abschnitt (auch nach Abmelden oder abgelaufener
+  Anmeldung, auch bei unbekannter Stadt). Unter `service` weder Liste noch Knopf. Tests `tests/e2e/accountSwitch.spec.ts` (zwei Städte `test` und `hattingen`
   im selben Testserver, die API antwortet je `request.area`), Unit `accounts.spec.ts`.
 - Profil (`ProfilePage`, `profil`, KONZEPT.md "User am Handy", Profil): `AccountPanel` (Konto,
   Abmelden), `ThemeModeSetting` (Radiogruppe System/Hell/Dunkel, sofort `saveThemeMode` und

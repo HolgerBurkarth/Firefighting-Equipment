@@ -1,5 +1,13 @@
 import type { Locator, Page } from '@playwright/test';
-import { expect, meBody, test, TEST_TENANT, type MockRequest } from './fixtures';
+import {
+    expect,
+    HTTP_ERROR_CONSOLE,
+    meBody,
+    NOT_AUTHENTICATED,
+    test,
+    TEST_TENANT,
+    type MockRequest,
+} from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
 import { NO_DEVICES } from './support/devices';
 import { CURRENT_SESSION_ONLY } from './support/profile';
@@ -259,6 +267,86 @@ test.describe('Konto wechseln im Profil', () => {
     });
 });
 
+test.describe('Anmeldeseite mit den anderen Konten des Geräts', () => {
+    test.use({
+        api: {
+            'GET api/v1/tenant': tenantOf,
+            'GET api/v1/auth/me': meOf('user'),
+            'POST api/v1/auth/logout': { status: 200, body: { logged_out: true } },
+            ...NO_DEVICES,
+            ...CURRENT_SESSION_ONLY,
+        },
+    });
+
+    test('in einer Stadt abmelden, über die Anmeldeseite in die andere wechseln', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await rememberOtherCities(page);
+        // In test angemeldet (Sitzung gespeichert), dann nach Hattingen und dort abmelden.
+        await page.goto('/firefighting/test/profil');
+        await page.getByTestId('account-switch').getByTestId('account-hattingen').click();
+        await expect(page).toHaveURL(/\/firefighting\/hattingen\/suchen$/);
+        await page.goto('/firefighting/hattingen/profil');
+        await page.getByRole('button', { name: 'Abmelden' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/hattingen\/anmelden$/);
+        await expect(page.getByTestId('login-notice')).toHaveText('Sie wurden abgemeldet.');
+
+        const others = page.getByTestId('login-accounts');
+        await expect(others).toContainText('Auf diesem Gerät auch angemeldet:');
+        await expect(others.getByRole('button')).toHaveText([
+            /Feuerwehr Test\s*Anna · Benutzer\s*wechseln/,
+            /FF Tuttlingen\s*A\. Beispiel · Benutzer\s*neu anmelden/,
+        ]);
+        await expect(others.getByTestId('account-hattingen')).toHaveCount(0);
+        await expect(others.getByRole('button', { name: /Weitere Stadt/ })).toHaveCount(0);
+
+        await others.getByTestId('account-test').click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
+        await expect(page.getByText('Hallo Anna')).toBeVisible();
+    });
+
+    test('ohne andere Städte kein Abschnitt', async ({ page }) => {
+        await page.goto('/firefighting/test/profil');
+        await page.getByRole('button', { name: 'Abmelden' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/anmelden$/);
+        await expect(page.getByTestId('login-notice')).toBeVisible();
+        await expect(page.getByTestId('login-accounts')).toHaveCount(0);
+    });
+});
+
+test.describe('Anmeldeseite nach abgelaufener Anmeldung', () => {
+    test.use({
+        api: {
+            'GET api/v1/tenant': tenantOf,
+            'GET api/v1/auth/me': meOf('user'),
+            ...NO_DEVICES,
+            'GET api/v1/auth/sessions': NOT_AUTHENTICATED,
+        },
+        allowedConsoleError: HTTP_ERROR_CONSOLE,
+    });
+
+    test('die anderen Städte ohne die aktuelle; Eingaben erst nach Rückfrage', async ({ page }) => {
+        await rememberOtherCities(page);
+        await page.goto('/firefighting/test/profil');
+        await expect(page).toHaveURL(/\/firefighting\/test\/anmelden\?weiter=/);
+        await expect(page.getByTestId('login-notice')).toHaveText(
+            'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
+        );
+        // Die abgelaufene Anmeldung bleibt in der Liste, erscheint hier aber nicht.
+        await expect.poll(() => accounts(page)).toEqual(['test', 'hattingen', 'tuttlingen']);
+        const others = page.getByTestId('login-accounts');
+        await expect(others.getByRole('button')).toHaveText([/FF Hattingen/, /FF Tuttlingen/]);
+
+        await page.getByLabel('E-Mail-Adresse').fill('anna@example.org');
+        await others.getByTestId('account-hattingen').click();
+        const confirm = page.getByTestId('confirm-dialog');
+        await expect(confirm).toContainText('Trotzdem wechseln?');
+        await confirm.getByRole('button', { name: 'Wechseln' }).click();
+        await expect(page).toHaveURL(/\/firefighting\/hattingen\/suchen$/);
+    });
+});
+
 test.describe('Super-Admin', () => {
     test.use({
         api: {
@@ -273,5 +361,12 @@ test.describe('Super-Admin', () => {
         await expect(menu(page).getByTestId('account-name')).toBeVisible();
         await expect(menu(page).getByRole('button', { name: /Anna/ })).toHaveCount(0);
         expect(await page.evaluate(() => localStorage.getItem('ff-accounts'))).toBeNull();
+    });
+
+    test('Anmeldeseite unter service ohne Konten der Städte', async ({ page }) => {
+        await rememberOtherCities(page);
+        await page.goto('/firefighting/service/anmelden');
+        await expect(page.getByRole('heading', { name: 'Anmelden' })).toBeVisible();
+        await expect(page.getByTestId('login-accounts')).toHaveCount(0);
     });
 });

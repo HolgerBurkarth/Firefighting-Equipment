@@ -10,6 +10,7 @@ import {
     cityFromInput,
     cityUrl,
     forgetAccount,
+    otherAccountEntries,
     readAccounts,
     rememberAccount,
 } from '../../src/data/accounts';
@@ -187,6 +188,26 @@ describe('Einträge mit Kennzeichen', () => {
             ['hattingen', 'signed-in', '#1d3557'],
             ['tuttlingen', 'expired', null],
         ]);
+    });
+
+    it('Anmeldeseite: nur die anderen Städte, ohne andere leer', async () => {
+        const storage = new MemoryStorage();
+        rememberAccount(storage, account('test', 'Feuerwehr Test', 7));
+        expect(otherAccountEntries(await accountEntries(storage, null, 'test'))).toEqual([]);
+
+        rememberAccount(storage, account('hattingen', 'FF Hattingen', 9));
+        rememberAccount(storage, account('tuttlingen', 'FF Tuttlingen', 11));
+        storeSession(storage, 'hattingen', 9);
+        const others = otherAccountEntries(await accountEntries(storage, null, 'test'));
+        expect(others.map((entry) => [entry.slug, entry.state])).toEqual([
+            ['hattingen', 'signed-in'],
+            ['tuttlingen', 'expired'],
+        ]);
+        // Ohne eigenen Eintrag (nach dem Abmelden) bleiben alle anderen.
+        forgetAccount(storage, 'test');
+        expect(
+            otherAccountEntries(await accountEntries(storage, null, 'test')).map((e) => e.slug),
+        ).toEqual(['hattingen', 'tuttlingen']);
     });
 
     it('zählt nicht gesendete Buchungen des Kontos der anderen Stadt', async () => {

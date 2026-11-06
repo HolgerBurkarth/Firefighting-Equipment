@@ -7,6 +7,7 @@ import {
     accountStateLabel,
     cityFromInput,
     cityUrl,
+    otherAccountEntries,
     type AccountEntry,
 } from '../data/accounts';
 import { currentAppBase } from '../runtime/appBase';
@@ -17,14 +18,19 @@ import ConfirmDialog from './ConfirmDialog.vue';
  * „Konto wechseln“ (Konzept E14, Plan Phase 1, Schritt 1.9, Mockups Seite 8): die Konten dieses
  * Geräts in anderen Städten mit Kennzeichen, Wechsel per voller Navigation (mit ungespeicherten
  * Eingaben erst nach Rückfrage) und „+ Weitere Stadt hinzufügen …“. In der Admin-Konsole im Menü
- * (`variant` `menu`), am Handy im Profil (`profile`).
+ * (`variant` `menu`), am Handy im Profil (`profile`). Auf der Anmeldeseite (`login`, Runde 2,
+ * Aufgabe 1) nur die anderen Städte, ohne „Weitere Stadt“; ohne andere Einträge entfällt alles.
  */
-const props = defineProps<{ variant: 'menu' | 'profile' }>();
+const props = defineProps<{ variant: 'menu' | 'profile' | 'login' }>();
 /** `confirming`: die Rückfrage ist offen (das Menü bleibt dann offen, sonst verschwände sie). */
 const emit = defineEmits<{ confirming: [open: boolean] }>();
 
 const area = currentAppBase().area;
-const entries = computed(() => accountList.entries);
+const entries = computed(() =>
+    props.variant === 'login' ? otherAccountEntries(accountList.entries) : accountList.entries,
+);
+/** Am Handy und auf der Anmeldeseite heißt „angemeldet“ wie im Mockup „wechseln“. */
+const compactLabels = props.variant !== 'menu';
 const adding = ref(false);
 const cityInput = ref('');
 const cityProblem = ref<string | null>(null);
@@ -97,8 +103,19 @@ function chipClass(entry: AccountEntry): string {
 </script>
 
 <template>
-    <div class="account-switcher" :class="`account-switcher-${props.variant}`">
-        <p v-if="entries.length > 0" class="account-intro">Auf diesem Gerät angemeldet:</p>
+    <div
+        v-if="props.variant !== 'login' || entries.length > 0"
+        class="account-switcher"
+        :class="`account-switcher-${props.variant}`"
+        :data-testid="props.variant === 'login' ? 'login-accounts' : undefined"
+    >
+        <p v-if="entries.length > 0" class="account-intro">
+            {{
+                props.variant === 'login'
+                    ? 'Auf diesem Gerät auch angemeldet:'
+                    : 'Auf diesem Gerät angemeldet:'
+            }}
+        </p>
         <ul class="account-list" data-testid="account-list">
             <li v-for="entry in entries" :key="entry.slug" class="account-item">
                 <button
@@ -127,7 +144,7 @@ function chipClass(entry: AccountEntry): string {
                         </span>
                     </span>
                     <span :class="chipClass(entry)">{{
-                        accountStateLabel(entry.state, props.variant === 'profile')
+                        accountStateLabel(entry.state, compactLabels)
                     }}</span>
                 </button>
                 <p v-for="hint in accountHints(entry)" :key="hint" class="account-hint">
@@ -136,38 +153,42 @@ function chipClass(entry: AccountEntry): string {
             </li>
         </ul>
 
-        <form v-if="adding" class="account-add" novalidate @submit.prevent="addCity">
-            <label class="field-label" :for="inputId">Adresse oder Kürzel der Stadt</label>
-            <input
-                :id="inputId"
-                ref="city-input"
-                v-model="cityInput"
-                class="input"
-                type="text"
-                autocomplete="off"
-                autocapitalize="none"
-                spellcheck="false"
-                :aria-invalid="cityProblem === null ? undefined : 'true'"
-                :aria-describedby="`${inputId}-hint`"
-            />
-            <p v-if="cityProblem !== null" class="field-error" role="alert">{{ cityProblem }}</p>
-            <p :id="`${inputId}-hint`" class="hint">
-                Danach öffnet sich die Anmeldung dieser Stadt. Jede Stadt hat ihr eigenes Konto und
-                Passwort.
-            </p>
-            <div class="account-add-actions">
-                <button class="btn btn-primary" type="submit">Zur Anmeldung</button>
-                <button class="btn" type="button" @click="stopAdding">Abbrechen</button>
-            </div>
-        </form>
-        <button v-else class="btn account-add-start" type="button" @click="startAdding">
-            + Weitere Stadt hinzufügen …
-        </button>
+        <template v-if="props.variant !== 'login'">
+            <form v-if="adding" class="account-add" novalidate @submit.prevent="addCity">
+                <label class="field-label" :for="inputId">Adresse oder Kürzel der Stadt</label>
+                <input
+                    :id="inputId"
+                    ref="city-input"
+                    v-model="cityInput"
+                    class="input"
+                    type="text"
+                    autocomplete="off"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    :aria-invalid="cityProblem === null ? undefined : 'true'"
+                    :aria-describedby="`${inputId}-hint`"
+                />
+                <p v-if="cityProblem !== null" class="field-error" role="alert">
+                    {{ cityProblem }}
+                </p>
+                <p :id="`${inputId}-hint`" class="hint">
+                    Danach öffnet sich die Anmeldung dieser Stadt. Jede Stadt hat ihr eigenes Konto
+                    und Passwort.
+                </p>
+                <div class="account-add-actions">
+                    <button class="btn btn-primary" type="submit">Zur Anmeldung</button>
+                    <button class="btn" type="button" @click="stopAdding">Abbrechen</button>
+                </div>
+            </form>
+            <button v-else class="btn account-add-start" type="button" @click="startAdding">
+                + Weitere Stadt hinzufügen …
+            </button>
 
-        <p class="hint account-footnote">
-            Die Liste steht nur auf diesem Gerät. Abmelden in einer Stadt entfernt sie aus der
-            Liste.
-        </p>
+            <p class="hint account-footnote">
+                Die Liste steht nur auf diesem Gerät. Abmelden in einer Stadt entfernt sie aus der
+                Liste.
+            </p>
+        </template>
 
         <ConfirmDialog
             :open="confirmOpen"
