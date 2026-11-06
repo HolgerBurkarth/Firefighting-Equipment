@@ -361,8 +361,9 @@ gefilterten Empfängers, Buchen auf ein Ziel bzw. Gerät außerhalb (400/404).
 
 ## Schritt 1.8 – Durchlauf aller Rollen (06.11.2026, Build `9de6683e1f98`)
 
-Ohne neuen Code und ohne Deploy. Der Agent hat keine Sitzung unter `/service/` (401) und meldet sich
-nicht an. Rollen anlegen und alles, was als #7 läuft, steht deshalb in der Liste für Holger unten.
+Ohne neuen Code und ohne Deploy. Der Agent meldet sich nicht an: Alles, was als #7 läuft, steht in
+der Liste für Holger unten. Die Rollen (V1–V4) hat er angelegt, nachdem Holger sich als Super-Admin
+angemeldet hatte.
 
 **Vom Agenten geprüft (als *Admin*, bestehende Sitzung):**
 
@@ -386,19 +387,25 @@ wandern. Nach jedem Rollenwechsel im Inkognito-Fenster neu laden (F5), dann gilt
 
 **V – Vorbereitung (Super-Admin, Stadtdetail „Test-Feuerwehr“ → „Rollen“ → „Neue Rolle“)**
 
-- ☐ V1 „Live-Test Gerätewart“ (Vorschlag für Immendingen): Dashboard Ansehen, Suchen Ansehen,
+V1–V4 hat der Agent am 06.11.2026 mit Holgers Super-Admin-Sitzung selbst angelegt und geprüft (IDs
+18, 19, 20, je Version 1, keine Fehler in der Konsole); die Rollen bleiben für G, T und H stehen.
+
+- ☑ V1 „Live-Test Gerätewart“ (Vorschlag für Immendingen): Dashboard Ansehen, Suchen Ansehen,
   Ausrüstungsliste Ändern, Standorte Ändern, Ausrüstungstypen Ändern, Termine Ändern, Protokoll Ändern,
   Benutzer und Einstellungen Kein Zugriff; alle 10 Aktionen; „Sieht nur“ alle. Erwartet in „So sieht
   es die Rolle“ (Begriffe der Vorschau schon nach Konzept Abschnitt 9): Menü am PC „Dashboard ·
   Ausrüstung · Standorte · Ausrüstungstypen · Termine · Protokoll · Einstellungen“, Leiste am Handy
   „Suchen · Termine · Dashboard · Profil“, „alle Standorte, alle Ausrüstungstypen“.
-- ☐ V2 „Live-Test Geräteträger“: nur Suchen Ansehen, Aktionen „Umbuchen“ und „Status setzen“. Erwartet:
+- ☑ V2 „Live-Test Geräteträger“: nur Suchen Ansehen, Aktionen „Umbuchen“ und „Status setzen“. Erwartet:
   „Keine Konsole – nur die Handy-Seiten.“, Leiste „Suchen · Profil“.
-- ☐ V3 „Live-Test Gerätewart HLF“: wie V1, dazu „Sieht nur“ Standorte = nur „HLF 20“ (Ebene 1, schließt
+- ☑ V3 „Live-Test Gerätewart HLF“: wie V1, dazu „Sieht nur“ Standorte = nur „HLF 20“ (Ebene 1, schließt
   die Fächer ein), Ausrüstungstypen alle. Erwartet: „Standorte: Ändern“, „Ausrüstungstypen: Ändern“ und
   „CSV-Import“ grau mit Hinweis (F3); erst nach Umstellen auf Ansehen bzw. Abwählen lässt sich
-  speichern. „1 von 20 Standorten, alle Ausrüstungstypen“.
-- ☐ V4 In der Tabelle „Rollen“ fünf Rollen, die drei neuen mit 0 Personen.
+  speichern. „1 von 20 Standorten, alle Ausrüstungstypen“. (Erst alle Rechte wie V1, dann der Filter:
+  Hinweis „Mit „Sieht nur …“ darf die Rolle nicht verwalten: „Standorte: Ändern“,
+  „Ausrüstungstypen: Ändern“, „CSV-Import“ …“, „Speichern“ → „Nicht gespeichert …“ ohne Anfrage;
+  danach Standorte und Typen Ansehen, ohne CSV-Import gespeichert, Filter `locations` [22].)
+- ☑ V4 In der Tabelle „Rollen“ fünf Rollen, die drei neuen mit 0 Personen.
 
 **G – #7 als „Live-Test Gerätewart“ (PC, Admin: Benutzer → Stift an #7 → Rolle)**
 
@@ -466,3 +473,52 @@ wandern. Nach jedem Rollenwechsel im Inkognito-Fenster neu laden (F5), dann gilt
   kein `mail.log`).
 - ☐ E2 Super-Admin: die drei Rollen „Live-Test …“ löschen; danach nur *Admin* und *Benutzer*.
 - ☐ E3 M92 wieder Lager Gerätehaus, einsatzbereit (nach H11 c schon so); Inkognito-Fenster schließen.
+
+## Schritt 1.8b – Rollen für Immendingen (Anlegen durch Holger, nach 1.8a)
+
+Freigabe Holger 06.11.2026: Holger legt die beiden Rollen selbst als Super-Admin an (Stadtdetail
+„Feuerwehr Immendingen“ → Reiter „Rollen“ → „Neue Rolle“), Konten werden vorerst keine zugewiesen.
+Der Agent ändert in Immendingen nichts und prüft danach nur lesend (`GET tenants/1/roles`). Ausgang
+(06.11.2026, gelesen): *Admin* (1 Konto) und *Benutzer* (0 Konten, 0 Codes), je Version 1.
+
+**Rolle 1 – Gerätewart**
+
+- Name: `Gerätewart`
+- Kurzbeschreibung: `Pflegt die Ausrüstung: anlegen, bearbeiten, Termine, Protokoll; ohne Benutzer und Einstellungen`
+- 1 · Ansichten und Bereiche:
+  - Dashboard: **Ansehen**
+  - Suchen und Ausrüstung ansehen: **Ansehen**
+  - Ausrüstungsliste: **Ändern**
+  - Standorte: **Ändern**
+  - Ausrüstungstypen: **Ändern**
+  - Termine: **Ändern**
+  - Protokoll und Hinweise: **Ändern**
+  - Benutzer: **Kein Zugriff**
+  - Einstellungen der Stadt: **Kein Zugriff**
+- 2 · Aktionen (alle 10 angehakt):
+  - Buchen: Umbuchen, Status setzen
+  - Ausrüstung verwalten: Ausrüstung anlegen, Stammdaten bearbeiten, Aussondern und wieder
+    aufnehmen, Code zuordnen
+  - Mehrere Ausrüstungen: Sammelaktionen, CSV-Import, CSV-Export
+  - Benachrichtigungen: Log-Mails empfangen
+- 4 · Sieht nur …: Standorte **Alle Standorte**, Ausrüstungstypen **Alle Ausrüstungstypen**
+- Erwartet in „So sieht es die Rolle“: Menü am PC „Dashboard · Ausrüstung · Standorte ·
+  Ausrüstungstypen · Termine · Protokoll · Einstellungen“, Leiste „Suchen · Termine · Dashboard ·
+  Profil“, „alle Standorte, alle Ausrüstungstypen“. Sitzung 7 / 30 Tage.
+
+**Rolle 2 – Geräteträger**
+
+- Name: `Geräteträger`
+- Kurzbeschreibung: `Sucht Ausrüstung, bucht um und setzt den Status; ohne Termine`
+- 1 · Ansichten und Bereiche: Suchen und Ausrüstung ansehen **Ansehen**; alle anderen acht
+  **Kein Zugriff**
+- 2 · Aktionen: nur Umbuchen und Status setzen
+- 4 · Sieht nur …: **Alle Standorte**, **Alle Ausrüstungstypen**
+- Erwartet: „Keine Konsole – nur die Handy-Seiten.“, Leiste „Suchen · Profil“, „Darf: Umbuchen,
+  Status setzen“. Sitzung 30 / 90 Tage. Eigene Rechte (Benutzt melden, Tauschen, Einmalgeräte) erst
+  mit Phase 2.
+
+**Danach in der Tabelle „Rollen“:** Admin (1 Person), Benutzer (0), Gerätewart (0), Geräteträger (0).
+
+- ☐ Holger: beide Rollen angelegt.
+- ☐ Agent (nur lesend): Rechte, Beschreibung, Filter und 0 Personen wie oben.
