@@ -28,10 +28,11 @@ final class InstallBrowserDepsTest extends TestCase
         }
         $this->dir = new TempDirectory();
         $this->dir->write('ubuntu.sources', self::SOURCES);
-        // Ersatz für sudo: protokolliert den Aufruf, führt sed aus, dpkg nicht.
+        // Ersatz für sudo: protokolliert den Aufruf, führt sed aus, pkill und dpkg nicht; pgrep
+        // findet keinen übrig gebliebenen Prozess.
         $this->dir->write('sudo.sh', "#!/usr/bin/env bash\n"
             . 'echo "$*" >> ' . escapeshellarg(Bash::toPath($this->dir->file('sudo.log'))) . "\n"
-            . "[ \"\$1\" = dpkg ] && exit 0\n"
+            . "case \"\$1\" in dpkg|pkill) exit 0 ;; pgrep) exit 1 ;; esac\n"
             . "exec \"\$@\"\n");
     }
 
@@ -69,6 +70,15 @@ final class InstallBrowserDepsTest extends TestCase
             $this->sources(),
         );
         $log = (string) file_get_contents($this->dir->file('sudo.log'));
+        // Je Wiederholung zuerst übrig gebliebene apt-get/dpkg beenden (sie hielten in der CI die
+        // Sperre von dpkg), dann dpkg abschließen.
+        self::assertStringStartsWith(
+            "pkill -TERM -x apt-get\npkill -TERM -x dpkg\npgrep -x apt-get|dpkg\n"
+            . "pkill -KILL -x apt-get|dpkg\ndpkg --configure -a\nsed -i ",
+            $log,
+        );
+        self::assertSame(2, substr_count($log, "pkill -TERM -x apt-get\n"));
+        self::assertSame(2, substr_count($log, "pkill -KILL -x apt-get|dpkg\n"));
         self::assertSame(2, substr_count($log, "dpkg --configure -a\n"));
         self::assertSame(1, substr_count($log, 'sed -i s/azure.archive.ubuntu.com/archive.ubuntu.com/g'));
     }

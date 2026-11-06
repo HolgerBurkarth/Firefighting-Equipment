@@ -216,7 +216,7 @@ jobs:
     needs: [changes, frontend-build]
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-24.04
-    # Normal 3–5 min; Reserve für bis zu drei Versuche der Systempakete (höchstens 12 min).
+    # Normal 3–5 min; Reserve für bis zu drei Versuche der Systempakete (höchstens 14 min).
     timeout-minutes: 25
     strategy:
       # Alle Teile laufen zu Ende, damit der Bericht vollständig ist.
@@ -276,7 +276,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Systempakete der Browser
         working-directory: frontend
-        timeout-minutes: 12
+        timeout-minutes: 14
         run: bash ../scripts/install-browser-deps.sh npx playwright install-deps chromium firefox webkit
       - name: Playwright-Browser installieren
         if: steps.playwright-cache.outputs.cache-hit != 'true'

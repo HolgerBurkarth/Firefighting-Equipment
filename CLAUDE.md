@@ -3113,9 +3113,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Installieren nur von Teil 1). Die Systempakete installiert `npx playwright install-deps` in jedem
   Teil über `scripts/install-browser-deps.sh` (seit 06.11.2026; der Mirror
   `azure.archive.ubuntu.com` hing mehrmals bis zum Abbruch des Jobs, normal dauert der Schritt
-  25–70 s): je Versuch höchstens 180 s, insgesamt 3 Versuche, vor jeder Wiederholung `dpkg
-  --configure -a` und Umstellen auf `archive.ubuntu.com`; Schritt höchstens 12 min, Job `e2e`
-  25 min. Danach ohne Treffer `npx playwright install` (nur die Browser). Tests
+  25–70 s): je Versuch höchstens 180 s, insgesamt 3 Versuche, vor jeder Wiederholung übrig
+  gebliebene `apt-get`/`dpkg` beenden (`timeout` trifft nur `npx`, das von `sudo` gestartete
+  `apt-get` hielt sonst die Sperre von dpkg, CI 06.11.2026), `dpkg --configure -a` und Umstellen
+  auf `archive.ubuntu.com`; Schritt höchstens 14 min, Job `e2e` 25 min. Danach ohne Treffer `npx playwright install` (nur die Browser). Tests
   `tests/Unit/Scripts/InstallBrowserDepsTest` (Ersatz für Befehl, sudo und Paketquellen über
   `FF_BROWSER_DEPS_*`, nur für Tests).
 - Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Zwei Ausnahmen, je mit
