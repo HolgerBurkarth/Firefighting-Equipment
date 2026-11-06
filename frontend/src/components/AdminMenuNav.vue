@@ -400,21 +400,6 @@ async function onLogout(): Promise<void> {
     font-size: var(--font-size-lg);
 }
 
-/* Popover (Portal nach body; die Klasse kommt aus diesem Baustein, daher scoped). */
-.menu-account-popover {
-    z-index: 50;
-    box-sizing: border-box;
-    width: min(420px, calc(100vw - 16px));
-    max-height: calc(100vh - 16px);
-    overflow-y: auto;
-    padding: 18px 20px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    box-shadow: var(--shadow-raised);
-    color: var(--text);
-}
-
 /* Tablet: eingeklappt auf Symbole; Texte bleiben für Bildschirmleser, Tooltip über title. */
 @media (min-width: 768px) and (max-width: 1023.98px) {
     .menu-sidebar {
@@ -456,5 +441,30 @@ async function onLogout(): Promise<void> {
         margin: 0;
         padding: 0 6px;
     }
+}
+</style>
+
+<style>
+/*
+ * Popover „Konto wechseln“ (Portal nach body): Reka UI gibt das Scope-Attribut nicht an das Element
+ * weiter, daher ohne scoped; die Klasse gibt es nur hier.
+ */
+.menu-account-popover {
+    z-index: 50;
+    box-sizing: border-box;
+    width: min(420px, calc(100vw - 16px));
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-raised);
+    color: var(--text);
+}
+
+.menu-account-popover .menu-account-heading {
+    margin: 0 0 8px;
+    font-size: var(--font-size-lg);
 }
 </style>
