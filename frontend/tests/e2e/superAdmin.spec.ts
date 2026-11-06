@@ -460,6 +460,29 @@ test.describe('Stadtdetail', () => {
         await expect(page).toHaveURL(/\/firefighting\/service\/staedte$/);
     });
 
+    test('PC: die ganze Zeile öffnet das Stadtdetail, in „Städte“ und auf dem Dashboard', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await page.goto('/firefighting/service/staedte');
+        const row = page.getByTestId('tenant-test');
+        await expect(row).toHaveCSS('cursor', 'pointer');
+        // Ein Klick irgendwo in der Zeile (hier: Adresse) wie auf den Namen.
+        await row.locator('.col-address').click();
+        await expect(page).toHaveURL(/\/firefighting\/service\/staedte\/2$/);
+
+        await page.goto('/firefighting/service/dashboard');
+        await page.getByTestId('tenant-immendingen').locator('.col-status').click();
+        await expect(page).toHaveURL(/\/firefighting\/service\/staedte\/1$/);
+    });
+
+    test('Handy: die ganze Karte öffnet das Stadtdetail', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto('/firefighting/service/staedte');
+        await page.getByTestId('tenant-test').getByText('Benutzer: 13').click();
+        await expect(page).toHaveURL(/\/firefighting\/service\/staedte\/2$/);
+    });
+
     test('umbenennen: Kürzel bleibt, leerer Name geht nicht', async ({ page, apiRequests }) => {
         await page.goto('/firefighting/service/staedte/2');
         await page.getByRole('button', { name: 'Umbenennen …' }).click();

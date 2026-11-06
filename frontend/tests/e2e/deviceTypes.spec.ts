@@ -187,6 +187,21 @@ test.describe('Gerätetypen (PC)', () => {
         ).toEqual(['api/v1/device-types/3/deactivate', 'api/v1/device-types/3/activate']);
     });
 
+    test('die ganze Zeile öffnet die Geräteliste des Typs, der Stift nur das Fenster', async ({
+        page,
+    }) => {
+        await open(page);
+        const row = page.getByTestId('device-type-3');
+        await expect(row).toHaveCSS('cursor', 'pointer');
+        await row.getByRole('button', { name: 'Funkgerät bearbeiten' }).click();
+        await expect(dialog(page)).toBeVisible();
+        await dialog(page).getByRole('button', { name: 'Abbrechen' }).click();
+        await expect(page).toHaveURL(/\/geraetetypen$/);
+        // Ein Klick irgendwo in der Zeile (hier: Gerätezahl) wie auf den Namen.
+        await row.locator('.col-count').click();
+        await expect(page).toHaveURL(/\/geraete\?typ=3$/);
+    });
+
     test.describe('Name vom Server abgelehnt', () => {
         test.use({ allowedConsoleError: HTTP_ERROR_CONSOLE });
 
@@ -203,6 +218,13 @@ test.describe('Gerätetypen (PC)', () => {
             await expect(form.getByLabel('Name')).toHaveAttribute('aria-invalid', 'true');
         });
     });
+});
+
+test('Handy: die ganze Karte öffnet die Geräteliste des Typs', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page);
+    await page.getByTestId('device-type-2').locator('.col-count').click();
+    await expect(page).toHaveURL(/\/geraete\?typ=2$/);
 });
 
 test('Handy: Karten mit Sortier-Knöpfen', async ({ page }) => {

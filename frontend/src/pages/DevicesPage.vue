@@ -10,6 +10,7 @@ import BookingNoticeMessage from '../components/BookingNoticeMessage.vue';
 import DeviceBulkDueDialog from '../components/DeviceBulkDueDialog.vue';
 import DeviceBulkStateDialog from '../components/DeviceBulkStateDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
+import { vRowLink } from '../components/rowLink';
 import StatusBadge from '../components/StatusBadge.vue';
 import { adminDeviceList, adminLocationStore, deviceTypeStore } from '../data';
 import { takeBookingNotice } from '../data/booking';
@@ -247,23 +248,6 @@ function loadMore(): void {
 /** Ausgesonderte Geräte nehmen an keiner Sammelaktion teil. */
 function selectable(device: DeviceListItem): boolean {
     return device.status !== 'retired';
-}
-
-/**
- * Klick irgendwo in der Zeile bzw. Karte öffnet das Gerätedetail (T9); nicht in der Spalte des
- * Kästchens (ein knapp verfehltes Kästchen soll nichts öffnen), auf Links und Knöpfen (die tun ihr
- * Eigenes) und nicht, wenn Text markiert wurde. Per Tastatur bleibt der Link
- * der Kennung.
- */
-function openRow(event: MouseEvent, device: DeviceListItem): void {
-    const target = event.target instanceof Element ? event.target : null;
-    if (
-        target?.closest('a, button, input, label, .cell-select') != null ||
-        window.getSelection()?.isCollapsed === false
-    ) {
-        return;
-    }
-    void router.push({ name: 'device-details', params: { id: device.id } });
 }
 
 function isSelected(device: DeviceListItem): boolean {
@@ -701,12 +685,11 @@ const canBulk = computed(
                 <tr
                     v-for="{ device, due } in rows"
                     :key="device.id"
-                    class="device-row"
+                    v-row-link
                     :class="{ 'row-retired': device.status === 'retired' }"
                     :data-testid="`device-row-${String(device.id)}`"
-                    @click="openRow($event, device)"
                 >
-                    <td v-if="canBulk" class="cell-select">
+                    <td v-if="canBulk" class="cell-select" data-row-ignore>
                         <label class="select-box">
                             <input
                                 type="checkbox"
@@ -724,6 +707,7 @@ const canBulk = computed(
                     <td class="cell-identifier">
                         <RouterLink
                             class="device-link"
+                            data-row-link
                             :to="{ name: 'device-details', params: { id: device.id } }"
                         >
                             {{ device.identifier }}
@@ -867,11 +851,7 @@ const canBulk = computed(
 }
 
 /* Zeilen am PC kräftig hinterlegt mit Randbalken links (KONZEPT.md, "Oberfläche: Grundsätze"); die
-   ganze Zeile öffnet das Gerät (T9). */
-.device-row {
-    cursor: pointer;
-}
-
+   ganze Zeile öffnet das Gerät (T9, `vRowLink`). */
 .list-table tbody tr:hover td {
     background: var(--surface-hover);
 }

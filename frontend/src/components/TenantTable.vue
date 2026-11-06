@@ -10,6 +10,7 @@ import {
     type SortDir,
     type TenantSortKey,
 } from '../data/tenants';
+import { vRowLink } from './rowLink';
 
 /**
  * Städte des Super-Admins (Mockup „SuperAdmin“, KONZEPT.md, "Super-Admin – Entscheidungen", 42):
@@ -100,12 +101,14 @@ const STATE_BADGES = {
                 <tr
                     v-for="tenant in rows"
                     :key="tenant.id"
+                    v-row-link
                     :class="{ 'row-inactive': !tenant.active }"
                     :data-testid="`tenant-${tenant.slug}`"
                 >
                     <td class="col-name">
                         <RouterLink
                             class="tenant-name"
+                            data-row-link
                             :to="{ name: 'tenant', params: { id: String(tenant.id) } }"
                             >{{ tenant.name }}</RouterLink
                         >

@@ -8,6 +8,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
 import { KIND_ICONS, SUB_ICON } from '../components/locationIcons';
+import { vRowLink } from '../components/rowLink';
 import { addLocation, adminLocationStore, renameLocation, setLocationActive } from '../data';
 import { deviceCountText } from '../data/locationSearch';
 import {
@@ -330,7 +331,7 @@ onMounted(() => {
             class="card group"
             :data-testid="`location-${String(group.location.id)}`"
         >
-            <div class="node" :class="{ 'node-locked': !group.location.active }">
+            <div v-row-link class="node" :class="{ 'node-locked': !group.location.active }">
                 <svg
                     class="node-icon"
                     width="24"
@@ -347,6 +348,7 @@ onMounted(() => {
                     <RouterLink
                         v-if="canListDevices"
                         class="node-name"
+                        data-row-link
                         :to="{ name: 'devices', query: { standort: String(group.location.id) } }"
                         :title="`Geräte in ${group.location.name}`"
                         >{{ group.location.name }}</RouterLink
@@ -404,6 +406,7 @@ onMounted(() => {
                 <li
                     v-for="child in group.children"
                     :key="child.id"
+                    v-row-link
                     class="node node-child"
                     :class="{ 'node-locked': !child.active }"
                     :data-testid="`location-${String(child.id)}`"
@@ -424,6 +427,7 @@ onMounted(() => {
                         <RouterLink
                             v-if="canListDevices"
                             class="node-name"
+                            data-row-link
                             :to="{ name: 'devices', query: { standort: String(child.id) } }"
                             :title="`Geräte in ${group.location.name} / ${child.name}`"
                             >{{ child.name }}</RouterLink

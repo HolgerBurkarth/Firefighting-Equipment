@@ -158,6 +158,16 @@ h2 {
     opacity: 0.6;
 }
 
+/* Zeilen und Karten, die als Ganzes ihren Link öffnen (`vRowLink`, src/components/rowLink.ts);
+   ohne Link (z. B. ohne Recht auf das Ziel) bleiben sie unverändert. */
+[data-row-open]:has([data-row-link]) {
+    cursor: pointer;
+}
+
+[data-row-open]:has([data-row-link]):hover {
+    background: var(--surface-hover);
+}
+
 .field {
     display: flex;
     flex-direction: column;

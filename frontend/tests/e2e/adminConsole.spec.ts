@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { DATABASE_UNAVAILABLE, expect, HTTP_ERROR_CONSOLE, meBody, test } from './fixtures';
 import { adminOverview, summaryJson, tenantEventJson, userJson } from './support/admin';
-import { deviceJson } from './support/devices';
+import { deviceDetail, deviceJson, eventsEndpoint } from './support/devices';
 
 /** Höhe bzw. Breite in px, gerundet (WebKit misst z. B. 43,99 statt 44). */
 async function size(locator: Locator): Promise<{ width: number; height: number }> {
@@ -272,6 +272,36 @@ test.describe('Dashboard', () => {
         await expect(items.nth(1)).toContainText(
             'Standort (gewünscht): HLF 20 / G1 · Status (gewünscht): defekt · Grund: Neuerer Stand vorhanden',
         );
+    });
+
+    test.describe('ganze Zeile der Letzten Aktivitäten', () => {
+        test.use({
+            api: {
+                'GET api/v1/auth/me': ME,
+                ...OVERVIEW,
+                ...deviceDetail(deviceJson(5)),
+                'GET api/v1/devices/5/events': eventsEndpoint([]),
+                // Das Gerätedetail lädt die Gerätetypen (für „Bearbeiten“).
+                'GET api/v1/device-types': { status: 200, body: { device_types: [] } },
+            },
+        });
+
+        test('PC: ein Klick in die Zeile öffnet das Gerätedetail', async ({ page }) => {
+            await page.setViewportSize({ width: 1280, height: 800 });
+            await page.goto('/firefighting/test/dashboard');
+            const item = page.getByTestId('activity-list').getByRole('listitem').first();
+            await expect(item).toHaveCSS('cursor', 'pointer');
+            await item.getByText('„Nach der Übung“').click();
+            await expect(page).toHaveURL(/\/firefighting\/test\/geraete\/5\/details$/);
+        });
+
+        test('Handy: ein Klick in die Zeile öffnet das Gerätedetail', async ({ page }) => {
+            await page.setViewportSize({ width: 390, height: 844 });
+            await page.goto('/firefighting/test/dashboard');
+            const item = page.getByTestId('activity-list').getByRole('listitem').first();
+            await item.getByText('heute 08:12').click();
+            await expect(page).toHaveURL(/\/firefighting\/test\/geraete\/5\/details$/);
+        });
     });
 
     test('Kachel „Prüffristen“ führt zu den Prüffristen', async ({ page }) => {

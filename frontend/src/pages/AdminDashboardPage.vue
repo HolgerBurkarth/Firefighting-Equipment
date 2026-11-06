@@ -4,6 +4,7 @@ import { RouterLink, useRouter, type RouteLocationRaw } from 'vue-router';
 import { canOpenRoute } from '../auth/redirect';
 import { session } from '../auth/session';
 import ErrorNotice from '../components/ErrorNotice.vue';
+import { vRowLink } from '../components/rowLink';
 import StatusBadge from '../components/StatusBadge.vue';
 import { adminOverview } from '../data';
 import { eventTimeText } from '../data/changeTime';
@@ -216,6 +217,7 @@ onMounted(() => {
                     <li
                         v-for="event in overview.activity"
                         :key="event.id"
+                        v-row-link
                         class="row activity"
                         :class="{ 'activity-not-applied': !event.applied }"
                     >
@@ -227,6 +229,7 @@ onMounted(() => {
                                 <RouterLink
                                     v-if="deviceLink(event.device.id) !== null"
                                     class="activity-device"
+                                    data-row-link
                                     :to="deviceLink(event.device.id) ?? {}"
                                 >
                                     {{ event.device.identifier }}</RouterLink

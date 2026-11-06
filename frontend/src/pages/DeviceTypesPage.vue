@@ -7,6 +7,7 @@ import { currentPermissions } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
+import { vRowLink } from '../components/rowLink';
 import { addDeviceType, deviceTypeStore, renameDeviceType, setDeviceTypeActive } from '../data';
 import { deviceCountText } from '../data/locationSearch';
 import {
@@ -310,6 +311,7 @@ onMounted(() => {
                 <tr
                     v-for="type in rows"
                     :key="type.id"
+                    v-row-link
                     :class="{ 'row-inactive': !type.active }"
                     :data-testid="`device-type-${String(type.id)}`"
                 >
@@ -318,6 +320,7 @@ onMounted(() => {
                             <RouterLink
                                 v-if="canListDevices"
                                 class="type-name"
+                                data-row-link
                                 :to="{ name: 'devices', query: { typ: String(type.id) } }"
                                 :title="`Geräte vom Typ ${type.name}`"
                                 >{{ type.name }}</RouterLink
