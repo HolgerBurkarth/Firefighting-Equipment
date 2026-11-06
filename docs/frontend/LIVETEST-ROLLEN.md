@@ -2,8 +2,8 @@
 
 Nur in der Test-Stadt `https://www.prodad.de/firefighting/test/`, nie in echten Städten. Plan:
 [`../PLAN-PHASE-1-ROLLEN.md`](../PLAN-PHASE-1-ROLLEN.md). Je Schritt wird ergänzt, was live geprüft
-ist (☑ bestanden, ☒ Fehler, ☐ offen für Holger). Der vollständige Durchlauf aller Rollen folgt mit
-Schritt 1.8.
+ist (☑ bestanden, ☒ Fehler, ☐ offen für Holger). Der vollständige Durchlauf aller Rollen steht unter
+Schritt 1.8 (unten).
 
 ## Schritt 1.1 – Schema und Standard-Rollen (05.11.2026, Build `f054b88c6ce2`)
 
@@ -351,7 +351,118 @@ Standorte = nur die Fächer von HLF 20 (nicht HLF 20 selbst), Ausrüstungstypen 
   Suchen, Prüffristen, Profil.
 - ☑ E2 PC (Super-Admin): „Live-Test 1.7 löschen …“ (geht erst, wenn kein Konto sie mehr hat).
 - ☑ E3 Das in A3 umgebuchte Gerät auf Standort und Status von vorher zurücksetzen. (#7 wieder
-  *Benutzer*, Rolle gelöscht, M1 zurück auf HLF 20 / G1, einsatzbereit.)
+  *Benutzer*, Rolle gelöscht, M1 zurück auf HLF 20 / G1, einsatzbereit.) Nachtrag 06.11.2026: Laut
+  Server stand M1 noch auf HLF 20 / G2, in Wartung (letzter Eintrag die Buchung von #7 am 05.11.,
+  15:56); das Zurücksetzen kam nicht an. Vom Agenten als *Admin* nachgeholt (Kommentar „Live-Test 1.7c
+  E3 nachgeholt“, Version 3).
 
 Nicht in dieser Liste (folgt mit 1.8 bzw. per Test): Verlauf mit „anderer Standort“, Log-Mails eines
 gefilterten Empfängers, Buchen auf ein Ziel bzw. Gerät außerhalb (400/404).
+
+## Schritt 1.8 – Durchlauf aller Rollen (06.11.2026, Build `9de6683e1f98`)
+
+Ohne neuen Code und ohne Deploy. Der Agent hat keine Sitzung unter `/service/` (401) und meldet sich
+nicht an. Rollen anlegen und alles, was als #7 läuft, steht deshalb in der Liste für Holger unten.
+
+**Vom Agenten geprüft (als *Admin*, bestehende Sitzung):**
+
+- ☑ `build.json` = `9de6683e1f98`, `health` = `{"status":"ok","database":"ok"}`, keine Fehler in der
+  Konsole.
+- ☑ *Admin*: `auth/me` mit allen 10 Aktionen. Dashboard „55 von 69“, „6 defekt · 8 in Wartung“,
+  „12 überfällig“, „8 in den nächsten 30 Tagen“, 2 offene Hinweise (beide M90).
+- ☑ Rollen der Stadt: nur *Admin* (3 Konten) und *Benutzer* (2 Konten, 3 Codes); Konten #4, #6, #8
+  *Admin*, #5, #7 *Benutzer*, alle aktiv.
+- ☑ M1 auf HLF 20 / G1, einsatzbereit zurückgesetzt (Nachtrag zu E3 oben).
+- ☑ *Benutzer* (#7): bestanden mit der iPhone-Liste nach 1.7c (A1–A3), unverändert seitdem.
+- ☐ Die drei neuen Rollen: siehe Liste unten.
+
+### Liste für Holger (Stand der Daten 06.11.2026)
+
+PC, normales Fenster: angemeldet als Admin der Test-Stadt und als Super-Admin. PC, **Inkognito-Fenster**:
+angemeldet als #7 „Holger Test 1“ unter `https://www.prodad.de/firefighting/test/` (eigene Cookies,
+die Admin-Sitzung bleibt). Keine der Rollen ist *Admin*, #7 bleibt also immer angemeldet. Prüffristen
+gelten für den 06.11.2026; an einem späteren Tag können Geräte von „bald fällig“ nach „überfällig“
+wandern. Nach jedem Rollenwechsel im Inkognito-Fenster neu laden (F5), dann gilt die neue Rolle sofort.
+
+**V – Vorbereitung (Super-Admin, Stadtdetail „Test-Feuerwehr“ → „Rollen“ → „Neue Rolle“)**
+
+- ☐ V1 „Live-Test Gerätewart“ (Vorschlag für Immendingen): Dashboard Ansehen, Suchen Ansehen,
+  Ausrüstungsliste Ändern, Standorte Ändern, Ausrüstungstypen Ändern, Termine Ändern, Protokoll Ändern,
+  Benutzer und Einstellungen Kein Zugriff; alle 10 Aktionen; „Sieht nur“ alle. Erwartet in „So sieht
+  es die Rolle“ (Begriffe der Vorschau schon nach Konzept Abschnitt 9): Menü am PC „Dashboard ·
+  Ausrüstung · Standorte · Ausrüstungstypen · Termine · Protokoll · Einstellungen“, Leiste am Handy
+  „Suchen · Termine · Dashboard · Profil“, „alle Standorte, alle Ausrüstungstypen“.
+- ☐ V2 „Live-Test Geräteträger“: nur Suchen Ansehen, Aktionen „Umbuchen“ und „Status setzen“. Erwartet:
+  „Keine Konsole – nur die Handy-Seiten.“, Leiste „Suchen · Profil“.
+- ☐ V3 „Live-Test Gerätewart HLF“: wie V1, dazu „Sieht nur“ Standorte = nur „HLF 20“ (Ebene 1, schließt
+  die Fächer ein), Ausrüstungstypen alle. Erwartet: „Standorte: Ändern“, „Ausrüstungstypen: Ändern“ und
+  „CSV-Import“ grau mit Hinweis (F3); erst nach Umstellen auf Ansehen bzw. Abwählen lässt sich
+  speichern. „1 von 20 Standorten, alle Ausrüstungstypen“.
+- ☐ V4 In der Tabelle „Rollen“ fünf Rollen, die drei neuen mit 0 Personen.
+
+**G – #7 als „Live-Test Gerätewart“ (PC, Admin: Benutzer → Stift an #7 → Rolle)**
+
+- ☐ G1 Im Fenster nur der Hinweis „Die neue Rolle gilt beim nächsten Aufruf der App. Handys laden
+  dabei ihre Offline-Kopie neu.“, kein Hinweis auf Abmelden. Speichern.
+- ☐ G2 Inkognito (#7), neu laden: Startseite Dashboard. Menü „Dashboard, Suchen, Geräte, Standorte,
+  Gerätetypen, Protokoll“, unten „Einstellungen“; **kein „Benutzer“**.
+- ☐ G3 Dashboard wie beim Admin: „55 von 69“, „6 defekt · 8 in Wartung“, „12 überfällig“, „8 in den
+  nächsten 30 Tagen“, „Offene Hinweise 2“ mit „Hinweise ansehen“, ohne „Freischaltungen ansehen“.
+- ☐ G4 Geräte: „69 Geräte“, Knöpfe „Export (CSV)“, „Import (CSV)“, „Neues Gerät“, Kästchen je Zeile.
+  Gerätedetail M90: „Umbuchen / Status ändern“, „Bearbeiten“, „Prüfdatum ändern“, „Code zuordnen“,
+  „Aussondern …“ (nichts speichern).
+- ☐ G5 Standorte und Gerätetypen mit „Neu …“ und Stift (nichts speichern); Protokoll mit beiden
+  Reitern, „Erledigen …“ an einem offenen Hinweis sichtbar (nicht erledigen).
+- ☐ G6 Einstellungen: Anzeigemodus, Benachrichtigung „Log“, Passwort, angemeldete Geräte; **ohne**
+  Farbe und Logo und ohne den Hinweis „Farbe und Logo der Feuerwehr dürfen Sie nicht ändern.“
+- ☐ G7 Adresse `…/firefighting/test/benutzer` eingeben: still zurück auf das Dashboard.
+
+**T – #7 als „Live-Test Geräteträger“**
+
+- ☐ T1 Admin: Rolle von #7 auf „Live-Test Geräteträger“. Inkognito neu laden: Seite „Suchen“, Leiste
+  „Suchen, Profil“ (keine „Prüffristen“, kein „Dashboard“), alle 69 Geräte.
+- ☐ T2 M90 öffnen: Standort und Status wählbar, kein Link „Gerätedetail (Admin)“ (nichts speichern).
+- ☐ T3 Adresse `…/firefighting/test/prueffristen`: still auf „Suchen“.
+- ☐ T4 (optional, iPhone als #7) Leiste ebenso „Suchen, Profil“ nach 30 s im Hintergrund.
+
+**H – #7 als „Live-Test Gerätewart HLF“ (Datenfilter, mit Log-Mails)**
+
+- ☐ H1 Admin: Rolle von #7 auf „Live-Test Gerätewart HLF“. Inkognito neu laden: Menü wie G2 (ohne
+  „Benutzer“); in „Geräte“ kein „Import (CSV)“ (F3), „Export (CSV)“ und „Neues Gerät“ bleiben.
+- ☐ H2 Dashboard: „22 von 25“, „2 defekt · 1 in Wartung“, „6 überfällig“, „2 in den nächsten 30
+  Tagen“, „Offene Hinweise 2“. „Nicht einsatzbereit“ nur M5, PA 6 (defekt), M31 (in Wartung).
+- ☐ H3 Geräte: „25 Geräte“ (HRT 1–4, HRT 7, M1–M6, M8, M9, M27, M31, M32, M90, M93, PA 1–6, WBK 1);
+  Filter „Standort“ bietet nur HLF 20 und seine Fächer. „Export (CSV)“ ergibt 25 Zeilen plus Kopfzeile.
+- ☐ H4 Prüffristen: überfällig HRT 1, PA 1, HRT 7, M1, M2, HRT 2; bald fällig M8 (heute), PA 2.
+- ☐ H5 Standorte: nur „HLF 20“ mit Fahrerhaus 5, G1 9, G2 2, G3 4, G4 2 (gesamt 25), **ohne** „Neu …“
+  und Stift. Gerätetypen: Atemschutzmaske 10, Atemschutzgerät 7, Funkgerät 5, Live-Testtyp 2 2,
+  Wärmebildkamera 1, ohne „Neu …“ und Stift.
+- ☐ H6 Verlauf mit „anderer Standort“: Gerätedetail M27 → Eintrag vom 02.11. „anderer Standort → HLF 20
+  / G1“ (für den Admin „Lager Gerätehaus → …“); ebenso HRT 7 (01.11., vorher LF 10 / Fahrerhaus) und
+  WBK 1 (30.10., vorher LF 10).
+- ☐ H7 Protokoll → „Verlauf exportieren“, Standard (letzte 90 Tage): 78 Einträge (nur Geräte, die jetzt
+  auf HLF 20 stehen), Standorte außerhalb als „anderer Standort“.
+- ☐ H8 Gerät außerhalb: Adresse `…/firefighting/test/geraete/74` (M7, Lager Gerätehaus) → „Dieses Gerät
+  gibt es nicht (mehr).“; Suchen nach „ARFK-1007“ (Scan-Code von M7) + Enter → „Kein Gerät mit diesem
+  Code gefunden.“
+- ☐ H9 Ziel außerhalb (400): Inkognito auf „Suchen“, Entwicklerwerkzeuge (F12) → Konsole, einfügen:
+  `fetch('api/v1/devices/134',{headers:{'X-Client-Api':'2'}}).then(r=>r.json()).then(d=>fetch('api/v1/devices/134/state',{method:'POST',headers:{'Content-Type':'application/json','X-Client-Api':'2'},body:JSON.stringify({version:d.device.version,location_id:34})})).then(r=>r.json()).then(console.log)`
+  (M90 → Lager Gerätehaus). Erwartet `{error: "invalid_request", …}`, M90 bleibt auf HLF 20 / G1.
+- ☐ H10 Umbuchen in der App: M90 → „Anderen Standort suchen …“ zeigt nur HLF 20 (mit „Ganzes Fahrzeug,
+  ohne Fach“, da die ganze Ebene gewählt ist) und seine Fächer (nichts speichern).
+- ☐ H11 Log-Mails: Inkognito → Einstellungen → Benachrichtigung „Log“ einschalten. Dann im normalen
+  Fenster als Admin mit M92 (Lager Gerätehaus, einsatzbereit):
+  - a) Status „in Wartung“ → **keine** Mail an #7 (M92 ist für #7 nicht sichtbar).
+  - b) Umbuchen auf HLF 20 / G1 → Mail an #7, Betreff beginnt mit „Log Test-Feuerwehr: M92
+    umgebucht“, Von „anderer Standort“, Nach „HLF 20 / G1“. Inkognito: M92 jetzt in der Liste (26 Geräte), Verlauf „anderer
+    Standort → HLF 20 / G1“.
+  - c) Zurück auf Lager Gerätehaus, einsatzbereit → Mail an #7 (vorher sichtbar), Nach „anderer
+    Standort“. Inkognito: wieder 25 Geräte, `geraete/137` → „Dieses Gerät gibt es nicht (mehr).“
+  Mails gehen nie an den Auslöser (#4), wohl aber an andere Admins mit eingeschalteter Option.
+
+**E – Aufräumen**
+
+- ☐ E1 Admin: #7 wieder *Benutzer* (die Benachrichtigung „Log“ schaltet sich dabei aus, *Benutzer* hat
+  kein `mail.log`).
+- ☐ E2 Super-Admin: die drei Rollen „Live-Test …“ löschen; danach nur *Admin* und *Benutzer*.
+- ☐ E3 M92 wieder Lager Gerätehaus, einsatzbereit (nach H11 c schon so); Inkognito-Fenster schließen.
