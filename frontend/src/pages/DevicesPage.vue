@@ -121,7 +121,7 @@ onBeforeUnmount(() => {
 const ALL = 'all';
 
 const typeOptions = computed((): SelectOption[] => [
-    { value: ALL, label: 'Alle Gerätetypen' },
+    { value: ALL, label: 'Alle Ausrüstungstypen' },
     ...[...(deviceTypeStore.state.types ?? [])]
         .sort((a, b) => compareNames(a.name, b.name))
         .map((type) => ({
@@ -181,11 +181,11 @@ function resetFilters(): void {
 }
 
 const COLUMNS: readonly { key: DeviceSort; label: string }[] = [
-    { key: 'identifier', label: 'Kennung' },
-    { key: 'device_type', label: 'Gerätetyp' },
+    { key: 'identifier', label: 'Nummer' },
+    { key: 'device_type', label: 'Ausrüstungstyp' },
     { key: 'location', label: 'Standort' },
     { key: 'status', label: 'Status' },
-    { key: 'next_inspection_due', label: 'Nächste Prüfung' },
+    { key: 'next_inspection_due', label: 'Nächste Wartung' },
 ];
 
 /** Klick auf den Spaltenkopf: aufsteigend, zweiter Klick absteigend (KONZEPT.md, "Listen"). */
@@ -340,8 +340,8 @@ async function selectAll(): Promise<void> {
 const selectedDevices = computed(() => [...selected.value.values()]);
 const selectedText = computed(() =>
     selected.value.size === 1
-        ? '1 Gerät ausgewählt'
-        : `${String(selected.value.size)} Geräte ausgewählt`,
+        ? '1 Ausrüstung ausgewählt'
+        : `${String(selected.value.size)} Ausrüstungen ausgewählt`,
 );
 
 const dueOpen = ref(false);
@@ -445,7 +445,7 @@ const canBulk = computed(
 
 <template>
     <div class="page-head">
-        <h1>Geräte</h1>
+        <h1>Ausrüstung</h1>
         <button
             v-if="canExport"
             class="btn"
@@ -471,7 +471,7 @@ const canBulk = computed(
                 <path d="M12 5v14" />
                 <path d="M5 12h14" />
             </svg>
-            Neues Gerät
+            Neue Ausrüstung
         </RouterLink>
     </div>
 
@@ -492,11 +492,11 @@ const canBulk = computed(
                 <circle cx="11" cy="11" r="7" />
                 <path d="M20 20l-4-4" />
             </svg>
-            <span class="visually-hidden">Geräte filtern</span>
+            <span class="visually-hidden">Ausrüstung filtern</span>
             <input
                 v-model="queryInput"
                 type="search"
-                placeholder="Kennung, Seriennummer, Hersteller …"
+                placeholder="Nummer, Seriennummer, Hersteller …"
                 :maxlength="DEVICE_QUERY_MAX_LENGTH"
                 @input="onSearchInput"
             />
@@ -504,7 +504,7 @@ const canBulk = computed(
         <AppSelect
             v-model="typeValue"
             class="filter-select"
-            label="Gerätetyp"
+            label="Ausrüstungstyp"
             :options="typeOptions"
         />
         <AppSelect
@@ -592,7 +592,7 @@ const canBulk = computed(
             </ul>
         </div>
         <p v-if="bulkResult.run.unsent.length > 0" class="hint">
-            Nicht gesendete Geräte bleiben ausgewählt; bitte erneut versuchen.
+            Nicht gesendete Ausrüstungen bleiben ausgewählt; bitte erneut versuchen.
         </p>
     </section>
 
@@ -605,7 +605,7 @@ const canBulk = computed(
             type="button"
             @click="openBulk('inspection-due')"
         >
-            Prüfdatum setzen …
+            Wartungsdatum setzen …
         </button>
         <button
             v-if="canBulkState"
@@ -627,7 +627,7 @@ const canBulk = computed(
             {{
                 selectingAll
                     ? 'Wird geladen …'
-                    : `Alle ${String(state.total)} Geräte der Liste auswählen${filter.showRetired ? ' (ohne ausgesonderte)' : ''}`
+                    : `Alle ${String(state.total)} Ausrüstungen der Liste auswählen${filter.showRetired ? ' (ohne ausgesonderte)' : ''}`
             }}
         </button>
     </div>
@@ -647,7 +647,7 @@ const canBulk = computed(
     />
 
     <p v-if="state.total === 0" class="hint">
-        {{ filtered ? 'Kein Gerät passt zu den Filtern.' : 'Noch keine Geräte.' }}
+        {{ filtered ? 'Keine Ausrüstung passt zu den Filtern.' : 'Noch keine Ausrüstung.' }}
     </p>
 
     <div v-if="state.devices.length > 0" class="table-card">
@@ -661,7 +661,7 @@ const canBulk = computed(
                                 :checked="allVisibleSelected"
                                 :indeterminate="someVisibleSelected"
                                 :disabled="visibleSelectable.length === 0"
-                                aria-label="Alle angezeigten Geräte auswählen"
+                                aria-label="Alle angezeigten Ausrüstungen auswählen"
                                 @change="toggleVisible"
                             />
                         </label>
@@ -719,7 +719,7 @@ const canBulk = computed(
                         <StatusBadge :status="device.status" :label="device.statusLabel" />
                     </td>
                     <td class="cell-due" :class="`due-${due ?? 'none'}`">
-                        <span class="due-label">Prüfung: </span>
+                        <span class="due-label">Wartung: </span>
                         {{ dueText(device.nextInspectionDue) }}
                         <span v-if="due !== null" class="due-note">{{ DUE_NOTES[due] }}</span>
                     </td>

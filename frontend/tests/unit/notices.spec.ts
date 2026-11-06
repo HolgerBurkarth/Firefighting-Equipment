@@ -440,7 +440,7 @@ describe('Export des Verlaufs', () => {
         ).toBe(
             'from=2026-08-02&to=2026-10-31&device_type_id=3&location_id=10&include_sublocations=1&order=oldest',
         );
-        const { fetch, requests } = respond(200, 'Aktionszeit;Kennung\r\n', {
+        const { fetch, requests } = respond(200, 'Aktionszeit;Nummer\r\n', {
             'Content-Type': 'text/csv; charset=utf-8',
             'Content-Disposition':
                 'attachment; filename="historie-test-2026-08-02-bis-2026-10-31.csv"',

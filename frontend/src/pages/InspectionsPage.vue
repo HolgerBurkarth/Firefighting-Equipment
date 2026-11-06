@@ -82,18 +82,18 @@ function retry(): void {
 }
 
 function countText(total: number): string {
-    return total === 1 ? '1 Gerät' : `${String(total)} Geräte`;
+    return total === 1 ? '1 Ausrüstung' : `${String(total)} Ausrüstungen`;
 }
 </script>
 
 <!-- Prüffristen am Handy: überfällig und in 30 Tagen fällig; Antippen öffnet das Umbuchen (Entscheidung 25). -->
 <template>
-    <h1 class="page-heading">Prüffristen</h1>
+    <h1 class="page-heading">Termine</h1>
 
     <BookingNoticeMessage v-if="bookingNotice !== null" :notice="bookingNotice" />
 
     <template v-if="overview === null">
-        <p v-if="error === null" class="hint" role="status">Prüffristen werden geladen …</p>
+        <p v-if="error === null" class="hint" role="status">Termine werden geladen …</p>
         <ErrorNotice v-else :error="error">
             <button class="btn" type="button" :disabled="list.loading" @click="retry">
                 Erneut versuchen
@@ -115,7 +115,7 @@ function countText(total: number): string {
                 }}</span>
             </h2>
             <p v-if="overview.overdue.total === 0" class="hint" data-testid="overdue-empty">
-                Keine Prüfung überfällig.
+                Keine Wartung überfällig.
             </p>
             <ul v-else class="device-list" data-testid="overdue-list">
                 <li v-for="entry in overview.overdue.entries" :key="entry.device.id">
@@ -143,7 +143,7 @@ function countText(total: number): string {
                 }}</span>
             </h2>
             <p v-if="overview.dueSoon.total === 0" class="hint" data-testid="due-soon-empty">
-                In den nächsten {{ overview.days }} Tagen ist keine Prüfung fällig.
+                In den nächsten {{ overview.days }} Tagen ist keine Wartung fällig.
             </p>
             <ul v-else class="device-list" data-testid="due-soon-list">
                 <li v-for="entry in overview.dueSoon.entries" :key="entry.device.id">

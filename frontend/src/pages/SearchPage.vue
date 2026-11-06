@@ -185,7 +185,7 @@ watch(scannerOpen, async (open) => {
 /**
  * Gescannter Code (KONZEPT.md, Entscheidung 17): Scan-Code genau, dann Kennung → Gerät öffnen (an
  * Stelle des Scanners, Zurück führt also zu „Suchen“). Sonst Scanner zu, der Text steht im
- * Suchfeld, darüber „Kein Gerät mit diesem Code gefunden.“ bzw. der Fehler.
+ * Suchfeld, darüber „Keine Ausrüstung mit diesem Code gefunden.“ bzw. der Fehler.
  */
 async function onDetected(code: string): Promise<void> {
     const result = await deviceStore.findByCode(code);
@@ -264,13 +264,13 @@ function retry(): void {
                 <circle cx="11" cy="11" r="7" />
                 <path d="M20 20l-4-4" />
             </svg>
-            <span class="visually-hidden">Gerät suchen</span>
+            <span class="visually-hidden">Ausrüstung suchen</span>
             <input
                 ref="input"
                 v-model="query"
                 class="search-input"
                 type="search"
-                placeholder="Gerät suchen, z. B. M1"
+                placeholder="Ausrüstung suchen, z. B. M1"
                 autocomplete="off"
                 autocapitalize="off"
                 spellcheck="false"
@@ -312,13 +312,13 @@ function retry(): void {
     <BookingQueuePanel />
 
     <p v-if="notFound" class="notice notice-info" role="status" data-testid="search-not-found">
-        Kein Gerät mit diesem Code gefunden.
+        Keine Ausrüstung mit diesem Code gefunden.
     </p>
     <ErrorNotice v-if="scanError !== null" :error="scanError" />
 
     <!-- Noch nie geladen: Laden bzw. Fehler mit erneutem Versuch. -->
     <template v-if="list.mode === null">
-        <p v-if="list.error === null" class="hint" role="status">Geräte werden geladen …</p>
+        <p v-if="list.error === null" class="hint" role="status">Ausrüstung wird geladen …</p>
         <ErrorNotice v-else :error="list.error">
             <button class="btn" type="button" :disabled="list.loading" @click="retry">
                 Erneut versuchen
@@ -346,7 +346,7 @@ function retry(): void {
             <template v-else>
                 <p class="hint" role="status" data-testid="search-count">
                     <template v-if="result.total === 0"
-                        >Kein Gerät passt zu „{{ query.trim() }}“.</template
+                        >Keine Ausrüstung passt zu „{{ query.trim() }}“.</template
                     >
                     <template v-else-if="result.total === 1">1 Treffer</template>
                     <template v-else>{{ result.total }} Treffer</template>
@@ -369,7 +369,7 @@ function retry(): void {
         <section v-else class="results" aria-labelledby="recent-heading">
             <h2 id="recent-heading" class="section-heading">Zuletzt benutzt</h2>
             <p v-if="recent.length === 0" class="hint">
-                Hier erscheinen die Geräte, die Sie zuletzt geöffnet haben.
+                Hier erscheint die Ausrüstung, die Sie zuletzt geöffnet haben.
             </p>
             <ul v-else class="device-list" data-testid="recent-list">
                 <li v-for="device in recent" :key="device.id">

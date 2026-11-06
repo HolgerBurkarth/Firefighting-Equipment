@@ -278,8 +278,8 @@ final class AppearanceApiTest extends AuthTestCase
         self::assertArrayNotHasKey('Set-Cookie', $response->headers());
         self::assertSame([
             'id' => self::AREA,
-            'name' => 'Feuerwehr immendingen – Geräteverwaltung',
-            'short_name' => 'FF-Geräte',
+            'name' => 'Feuerwehr immendingen – Ausrüstungsverwaltung',
+            'short_name' => 'FF-Ausrüstung',
             'lang' => 'de',
             'dir' => 'ltr',
             'start_url' => self::AREA,

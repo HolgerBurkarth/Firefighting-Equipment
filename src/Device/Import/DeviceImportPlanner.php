@@ -101,7 +101,7 @@ final readonly class DeviceImportPlanner
             $key = $keys[$row->line] ?? null;
             if ($key !== null && count($linesByKey[$key]) > 1) {
                 $errors[] = sprintf(
-                    'Die Kennung „%s“ kommt in der Datei mehrfach vor (Zeilen %s).',
+                    'Die Nummer „%s“ kommt in der Datei mehrfach vor (Zeilen %s).',
                     $row->identifierText,
                     implode(', ', $linesByKey[$key]),
                 );
@@ -124,7 +124,7 @@ final readonly class DeviceImportPlanner
                         new DeviceTypeRepository($this->pdo, DeviceVisibility::all())->listByTenant($tenant, false),
                     ));
                     $suggestions = $unknownTypes['v:' . $row->deviceType] ??= $typeSuggestions->suggest($row->deviceType);
-                    $errors[] = self::unknown(sprintf('Der Gerätetyp „%s“ ist nicht bekannt.', $row->deviceType), $suggestions);
+                    $errors[] = self::unknown(sprintf('Der Ausrüstungstyp „%s“ ist nicht bekannt.', $row->deviceType), $suggestions);
                 }
             }
             $location = null;
@@ -149,7 +149,7 @@ final readonly class DeviceImportPlanner
                 $owner = $owners[$scanCode] ?? null;
                 if ($owner !== null && $owner->id !== $device?->id) {
                     $errors[] = sprintf(
-                        'Der Scan-Code „%s“ ist bereits an das Gerät „%s“ vergeben. Per Import lassen sich Scan-Codes nicht übertragen; dazu den Scan-Code zuerst bei „%s“ entfernen.',
+                        'Der Scan-Code „%s“ ist bereits an die Ausrüstung „%s“ vergeben. Per Import lassen sich Scan-Codes nicht übertragen; dazu den Scan-Code zuerst bei „%s“ entfernen.',
                         ScanCode::display($scanCode),
                         $owner->identifier->value,
                         $owner->identifier->value,
@@ -183,12 +183,12 @@ final readonly class DeviceImportPlanner
     private function planNew(ImportRow $row, ?string $key, ?array $type, ?array $location, array $errors, array $digitIdentifiers, array $scanCodeWarnings): ImportRowPlan
     {
         if ($row->deviceType === null) {
-            $errors[] = 'Für ein neues Gerät fehlt der Gerätetyp.';
+            $errors[] = 'Für eine neue Ausrüstung fehlt der Ausrüstungstyp.';
         } elseif ($type !== null && !$type['active']) {
             $errors[] = self::typeInactive($type['name']);
         }
         if ($row->location === null) {
-            $errors[] = 'Für ein neues Gerät fehlt der Standort.';
+            $errors[] = 'Für eine neue Ausrüstung fehlt der Standort.';
         } elseif ($location !== null && !$location['active']) {
             $errors[] = self::locationLocked($location['path']);
         }
@@ -232,7 +232,7 @@ final readonly class DeviceImportPlanner
         $digits = ImportWarnings::withoutLeadingZeros($row->identifier->value);
         if ($digits !== null && isset($digitIdentifiers[$digits])) {
             $warnings[] = sprintf(
-                'Die neue Kennung „%s“ entspricht ohne führende Nullen dem vorhandenen Gerät „%s“. Hat Excel führende Nullen entfernt? Dann die Datei mit der Spalte Kennung als Text öffnen.',
+                'Die neue Nummer „%s“ entspricht ohne führende Nullen der vorhandenen Ausrüstung „%s“. Hat Excel führende Nullen entfernt? Dann die Datei mit der Spalte Nummer als Text öffnen.',
                 $row->identifier->value,
                 implode('“, „', $digitIdentifiers[$digits]),
             );
@@ -255,7 +255,7 @@ final readonly class DeviceImportPlanner
      */
     private function planUpdate(ImportRow $row, Device $device, ?array $type, ?array $location, array $errors, array $scanCodeWarnings): ImportRowPlan
     {
-        $identifier = $row->identifier ?? throw new \LogicException('Gerät ohne Kennung zugeordnet.');
+        $identifier = $row->identifier ?? throw new \LogicException('Gerät ohne Nummer zugeordnet.');
         $changes = [];
         /** @var array<string, array{?string, ?string, int|string|null}> $fields */
         $fields = [];
@@ -405,7 +405,7 @@ final readonly class DeviceImportPlanner
             $warnings[] = sprintf(
                 'Der Scan-Code „%s“ entspricht ohne führende Nullen dem vorhandenen Scan-Code %s. Hat Excel führende Nullen entfernt? Dann die Datei mit der Spalte Scan-Code als Text öffnen.',
                 $scanCode,
-                implode(', ', array_map(static fn (array $e): string => sprintf('„%s“ (Gerät „%s“)', $e[0], $e[1]), $longer)),
+                implode(', ', array_map(static fn (array $e): string => sprintf('„%s“ (Ausrüstung „%s“)', $e[0], $e[1]), $longer)),
             );
         }
 
@@ -609,25 +609,25 @@ final readonly class DeviceImportPlanner
     private static function exampleWarnings(string $identifier): array
     {
         return DeviceImportTemplate::isExample($identifier) ? [sprintf(
-            'Die Kennung „%s“ gehört zu den Beispielzeilen der Vorlage. Bitte die Zeile vor dem Import löschen.',
+            'Die Nummer „%s“ gehört zu den Beispielzeilen der Vorlage. Bitte die Zeile vor dem Import löschen.',
             $identifier,
         )] : [];
     }
 
     private static function typeInactive(string $name): string
     {
-        return sprintf('Der Gerätetyp „%s“ ist deaktiviert und kann keinem Gerät zugeordnet werden.', $name);
+        return sprintf('Der Ausrüstungstyp „%s“ ist deaktiviert und kann keiner Ausrüstung zugeordnet werden.', $name);
     }
 
     private static function locationLocked(string $path): string
     {
-        return sprintf('Der Standort „%s“ ist gesperrt und kann keine Geräte aufnehmen.', $path);
+        return sprintf('Der Standort „%s“ ist gesperrt und kann keine Ausrüstung aufnehmen.', $path);
     }
 
     private static function dateWarning(string $identifier): string
     {
         return sprintf(
-            'Die Kennung „%s“ sieht wie ein Datum aus. Hat Excel sie umgewandelt? Dann die Datei mit der Spalte Kennung als Text öffnen.',
+            'Die Nummer „%s“ sieht wie ein Datum aus. Hat Excel sie umgewandelt? Dann die Datei mit der Spalte Nummer als Text öffnen.',
             $identifier,
         );
     }

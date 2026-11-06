@@ -54,7 +54,7 @@ final readonly class DeviceTypeRepository
         }
 
         return $this->find($tenant, (int) $this->pdo->lastInsertId())
-            ?? throw new \LogicException('Angelegter Gerätetyp nicht gefunden.');
+            ?? throw new \LogicException('Angelegter Ausrüstungstyp nicht gefunden.');
     }
 
     /**

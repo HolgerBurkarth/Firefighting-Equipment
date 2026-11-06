@@ -29,7 +29,7 @@ final class DeviceFields
     /** Größte ID bzw. Version (INT UNSIGNED). */
     public const int MAX_ID = 4_294_967_295;
 
-    private const string DUE_SUBJECT = 'Das Datum der nächsten Prüfung';
+    private const string DUE_SUBJECT = 'Das Datum der nächsten Wartung';
 
     private function __construct()
     {
@@ -165,7 +165,7 @@ final class DeviceFields
         self::rejectUnknown($context, ['devices', 'comment']);
         $entries = $context->body['devices'] ?? null;
         if (!is_array($entries) || !array_is_list($entries) || $entries === [] || count($entries) > $max) {
-            throw HttpException::invalidRequest(sprintf('Das Feld "devices" muss eine Liste mit 1 bis %d Geräten sein.', $max));
+            throw HttpException::invalidRequest(sprintf('Das Feld "devices" muss eine Liste mit 1 bis %d Ausrüstungen sein.', $max));
         }
 
         $result = [];

@@ -39,7 +39,7 @@ describe('DeviceStore: Laden in Blöcken', () => {
         expect(store.state.loading).toBe(false);
     });
 
-    it(`genau ${MAX_LOCAL_DEVICES} Geräte → noch lokal (10 Blöcke)`, async () => {
+    it(`genau ${MAX_LOCAL_DEVICES} Ausrüstungen → noch lokal (10 Blöcke)`, async () => {
         const source = pagedSource(devices(1, MAX_LOCAL_DEVICES));
         const store = new DeviceStore(source.fetchPage);
         await store.refresh('open');
@@ -48,7 +48,7 @@ describe('DeviceStore: Laden in Blöcken', () => {
         expect(store.state.devices).toHaveLength(MAX_LOCAL_DEVICES);
     });
 
-    it(`${MAX_LOCAL_DEVICES + 1} Geräte → Suche auf dem Server, nur ein Aufruf`, async () => {
+    it(`${MAX_LOCAL_DEVICES + 1} Ausrüstungen → Suche auf dem Server, nur ein Aufruf`, async () => {
         const source = pagedSource(devices(1, MAX_LOCAL_DEVICES + 1));
         const store = new DeviceStore(source.fetchPage);
         await store.refresh('open');
@@ -309,7 +309,7 @@ describe('DeviceStore: Gerät zu einem Code', () => {
         expect(queries).toEqual([{ limit: 1, offset: 0, scanCode: code }]);
     });
 
-    it('Server: dann q mit der Kennung und genauer Vergleich', async () => {
+    it('Server: dann q mit der Nummer und genauer Vergleich', async () => {
         const { store, queries } = await serverStore((query) =>
             query.q === undefined
                 ? page([])
@@ -323,7 +323,7 @@ describe('DeviceStore: Gerät zu einem Code', () => {
         ]);
     });
 
-    it('Server: nur die möglichen Anfragen (kein Scan-Code bzw. Kennung zu lang)', async () => {
+    it('Server: nur die möglichen Anfragen (kein Scan-Code bzw. Nummer zu lang)', async () => {
         const { store, queries } = await serverStore(() => page([]));
         const tab = await store.findByCode('a\tb');
         expect(tab.ok && tab.data).toBeNull();

@@ -124,7 +124,7 @@ final readonly class DeviceBulkHandler implements RequestHandler
                 throw HttpException::invalidRequest(sprintf('Eintrag %d in "devices": %s', $index + 1, $e->getMessage()));
             }
             if (isset($seen[$id])) {
-                throw HttpException::invalidRequest(sprintf('Das Gerät #%d steht mehrfach in "devices".', $id));
+                throw HttpException::invalidRequest(sprintf('Die Ausrüstung #%d steht mehrfach in "devices".', $id));
             }
             $seen[$id] = true;
             $entries[] = ['id' => $id, 'version' => $version, 'due' => $due, 'change' => $change, 'clientRef' => $clientRef];

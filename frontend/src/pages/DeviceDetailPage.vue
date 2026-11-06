@@ -150,10 +150,10 @@ onMounted(() => {
     </div>
 
     <template v-if="device === null">
-        <h1>Gerät</h1>
-        <p v-if="loadError === null" class="hint" role="status">Gerät wird geladen …</p>
+        <h1>Ausrüstung</h1>
+        <p v-if="loadError === null" class="hint" role="status">Ausrüstung wird geladen …</p>
         <div v-else-if="loadError.status === 404" class="notice notice-info" role="alert">
-            <p>Dieses Gerät gibt es nicht (mehr).</p>
+            <p>Diese Ausrüstung gibt es nicht (mehr).</p>
         </div>
         <ErrorNotice v-else :error="loadError">
             <button class="btn retry" type="button" :disabled="loading" @click="load">
@@ -177,7 +177,7 @@ onMounted(() => {
             <span class="state-location">{{ device.location.path }}</span>
             <StatusBadge class="state-badge" :status="device.status" :label="device.statusLabel" />
             <span class="state-due" :class="due === null ? null : `due-${due}`">
-                Nächste Prüfung:
+                Nächste Wartung:
                 {{
                     device.nextInspectionDue === null
                         ? 'nicht festgelegt'
@@ -198,7 +198,7 @@ onMounted(() => {
 
         <div v-if="retired" class="notice notice-info retired-box" data-testid="device-retired">
             <p>
-                Dieses Gerät ist ausgesondert: Es fehlt in Suche, Prüffristen und Gerätezahlen und
+                Diese Ausrüstung ist ausgesondert: Sie fehlt in Suche, Terminen und Zählern und
                 lässt sich nicht umbuchen oder bearbeiten.
             </p>
             <button
@@ -223,7 +223,7 @@ onMounted(() => {
                 Bearbeiten
             </button>
             <button v-if="may.due" class="btn" type="button" @click="show('due', $event)">
-                Prüfdatum ändern
+                Wartungsdatum ändern
             </button>
             <button v-if="may.code" class="btn" type="button" @click="show('code', $event)">
                 Code zuordnen
@@ -245,8 +245,8 @@ onMounted(() => {
                 >
                     <h2 id="retire-heading" class="section-heading">Aussondern</h2>
                     <p class="hint">
-                        Für Geräte, die nicht mehr genutzt werden. Der Verlauf bleibt erhalten, das
-                        Gerät lässt sich wieder aufnehmen.
+                        Für Ausrüstung, die nicht mehr genutzt wird. Der Verlauf bleibt erhalten,
+                        die Ausrüstung lässt sich wieder aufnehmen.
                     </p>
                     <button class="btn btn-danger" type="button" @click="show('retire', $event)">
                         Aussondern …

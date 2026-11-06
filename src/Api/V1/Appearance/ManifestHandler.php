@@ -22,8 +22,8 @@ use FirefightingEquipment\Tenant\TenantAppearanceRepository;
  */
 final readonly class ManifestHandler implements RequestHandler
 {
-    public const string NAME_FORMAT = '%s – Geräteverwaltung';
-    public const string SHORT_NAME = 'FF-Geräte';
+    public const string NAME_FORMAT = '%s – Ausrüstungsverwaltung';
+    public const string SHORT_NAME = 'FF-Ausrüstung';
 
     /**
      * Hintergrund des Ladebildschirms beim Start der installierten App: --bg (hell) aus

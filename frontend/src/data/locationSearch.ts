@@ -132,5 +132,5 @@ export function groupOf(tree: readonly Location[], id: number): number | null {
 
 /** „1 Gerät“, „3 Geräte“. */
 export function deviceCountText(count: number): string {
-    return count === 1 ? '1 Gerät' : `${String(count)} Geräte`;
+    return count === 1 ? '1 Ausrüstung' : `${String(count)} Ausrüstungen`;
 }

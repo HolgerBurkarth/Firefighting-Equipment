@@ -22,10 +22,10 @@ final class DeviceRuleViolationExceptionTest extends TestCase
      */
     public static function contents(): iterable
     {
-        yield 'ein Gerät' => [1, 0, '(1 Gerät)'];
-        yield 'mehrere Geräte' => [3, 0, '(3 Geräte)'];
+        yield 'ein Gerät' => [1, 0, '(1 Ausrüstung)'];
+        yield 'mehrere Geräte' => [3, 0, '(3 Ausrüstungen)'];
         yield 'ein Unterstandort' => [0, 1, '(1 aktiver Unterstandort)'];
-        yield 'beides' => [2, 4, '(2 Geräte, 4 aktive Unterstandorte)'];
+        yield 'beides' => [2, 4, '(2 Ausrüstungen, 4 aktive Unterstandorte)'];
     }
 
     #[DataProvider('contents')]

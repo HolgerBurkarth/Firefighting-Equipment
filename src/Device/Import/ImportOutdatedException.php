@@ -17,7 +17,7 @@ final class ImportOutdatedException extends DeviceException
     public function __construct(public readonly ?DeviceImportPlan $plan)
     {
         parent::__construct($plan !== null && $plan->token === null
-            ? 'Die Datei enthält inzwischen Fehler (z. B. weil sich Geräte, Standorte oder Gerätetypen geändert haben). Bitte die Vorschau neu erstellen.'
-            : 'Seit der Vorschau wurden Geräte, Standorte oder Gerätetypen geändert, oder die Datei ist eine andere. Bitte die Vorschau neu erstellen.');
+            ? 'Die Datei enthält inzwischen Fehler (z. B. weil sich Ausrüstung, Standorte oder Ausrüstungstypen geändert haben). Bitte die Vorschau neu erstellen.'
+            : 'Seit der Vorschau wurden Ausrüstung, Standorte oder Ausrüstungstypen geändert, oder die Datei ist eine andere. Bitte die Vorschau neu erstellen.');
     }
 }

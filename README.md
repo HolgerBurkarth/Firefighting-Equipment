@@ -810,7 +810,7 @@ ein Download (`Content-Type: text/csv; charset=utf-8`, `Content-Disposition: att
 
 | Methode | Pfad                          | Zugriff    | Datei                                   |
 | ------- | ----------------------------- | ---------- | --------------------------------------- |
-| GET     | `api/v1/devices/export`       | angemeldet | `geraete-<kürzel>-<JJJJ-MM-TT>.csv`     |
+| GET     | `api/v1/devices/export`       | angemeldet | `ausruestung-<kürzel>-<JJJJ-MM-TT>.csv` |
 | GET     | `api/v1/device-events/export` | angemeldet | `historie-<kürzel>-<von>-bis-<bis>.csv` |
 
 Format (für Excel unter Windows gedacht, Doppelklick öffnet die Datei mit korrekten Umlauten):
@@ -825,8 +825,8 @@ Format (für Excel unter Windows gedacht, Doppelklick öffnet die Datei mit korr
 - Bricht der Export mittendrin ab (z. B. Datenbankfehler), endet die Datei mit der Zeile
   `Export abgebrochen – Datei unvollständig`; der Fehler steht im Server-Log.
 
-**Geräteliste** (`devices/export`): Spalten Kennung, Scan-Code, Gerätetyp, Standort (Pfad wie
-„HLF 20 / G1“), Status, Nächste Prüfung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz.
+**Geräteliste** (`devices/export`): Spalten Nummer, Scan-Code, Ausrüstungstyp, Standort (Pfad wie
+„HLF 20 / G1“), Status, Nächste Wartung, Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz.
 Der Scan-Code steht unverändert in der Datei (Trennzeichen wie GS als Steuerzeichen). Filter wie in
 der Geräteliste (`device_type_id`, `location_id`, `include_sublocations=1`, `status`, `q`,
 `scan_code`, `include_retired=1`), Sortierung ebenso (`sort`, `dir`; Standard natürlich nach Kennung), ohne
@@ -889,10 +889,11 @@ Datumsformat). Zu unbekannten Gerätetypen und Standorten schlägt die Vorschau 
 
 **Datei**
 
-- Spalten wie im Export (Kennung, Scan-Code, Gerätetyp, Standort, Status, Nächste Prüfung,
+- Spalten wie im Export (Nummer, Scan-Code, Ausrüstungstyp, Standort, Status, Nächste Wartung,
   Seriennummer, Hersteller, Modell, Beschaffungsdatum, Notiz). Zugeordnet wird über die Überschrift, Reihenfolge
-  und Groß-/Kleinschreibung sind egal. Unbekannte Spalten (z. B. Tippfehler „Seriennumer“) sind ein
-  Fehler. Nur die Spalte Kennung ist Pflicht.
+  und Groß-/Kleinschreibung sind egal. Die früheren Überschriften Kennung, Gerätetyp und Nächste
+  Prüfung (Exporte vor dem 06.11.2026) gelten weiter. Unbekannte Spalten (z. B. Tippfehler „Seriennumer“) sind ein
+  Fehler. Nur die Spalte Nummer (bzw. Kennung) ist Pflicht.
 - Die Kennung ordnet die Zeile einem nicht ausgesonderten Gerät zu (ohne Groß-/Kleinschreibung,
   „ß“ ≠ „ss“). Ohne passendes Gerät entsteht ein neues; dafür sind Gerätetyp und Standort Pflicht, der
   Status ist ohne Angabe „einsatzbereit“. Dieselbe Kennung zweimal in der Datei ist ein Fehler.
@@ -1002,7 +1003,7 @@ Import nicht erkennen. Zum Bearbeiten daher so öffnen:
 1. In einer leeren Arbeitsmappe **Daten → Aus Text/CSV** wählen und die Datei auswählen.
 2. Dateiursprung „65001: Unicode (UTF-8)“ und Trennzeichen „Semikolon“ prüfen, dann **Daten
    transformieren** wählen.
-3. Im Power-Query-Editor die Spalten **Kennung** und **Scan-Code** markieren, **Datentyp → Text**
+3. Im Power-Query-Editor die Spalten **Nummer** und **Scan-Code** markieren, **Datentyp → Text**
    wählen und „Aktuelle ersetzen“ bestätigen. Am besten ebenso für Seriennummer und Modell. Dann
    **Schließen & laden**.
 4. Nach dem Bearbeiten **Datei → Speichern unter → „CSV UTF-8 (durch Trennzeichen getrennt)“**

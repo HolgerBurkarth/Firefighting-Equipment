@@ -131,7 +131,7 @@ const problems = computed(() => {
         deviceTypeStore.state.types !== null &&
         !typeOptions.value.some((option) => option.value === String(typeId))
     ) {
-        found.deviceTypeId = 'Dieser Gerätetyp ist deaktiviert. Bitte einen anderen wählen.';
+        found.deviceTypeId = 'Dieser Ausrüstungstyp ist deaktiviert. Bitte einen anderen wählen.';
     }
     const locationId = form.value.locationId;
     if (
@@ -321,13 +321,13 @@ onMounted(() => {
         </button>
     </div>
 
-    <h1>Neues Gerät</h1>
+    <h1>Neue Ausrüstung</h1>
 
     <p v-if="created !== null" class="notice notice-success" role="status" data-testid="created">
         <span
             ><span aria-hidden="true">✓ </span>{{ created.identifier }} angelegt.
             <RouterLink :to="{ name: 'device-details', params: { id: created.id } }"
-                >Gerät öffnen</RouterLink
+                >Ausrüstung öffnen</RouterLink
             ></span
         >
     </p>
@@ -335,7 +335,7 @@ onMounted(() => {
     <form ref="form" class="card new-device" novalidate @submit.prevent="save(true)">
         <div class="grid">
             <label class="field" data-field="identifier">
-                <span class="field-label">Kennung</span>
+                <span class="field-label">Nummer</span>
                 <input
                     ref="identifier-input"
                     v-model="form.identifier"
@@ -357,7 +357,7 @@ onMounted(() => {
             <div class="field" data-field="deviceTypeId">
                 <AppSelect
                     v-model="typeValue"
-                    label="Gerätetyp"
+                    label="Ausrüstungstyp"
                     placeholder="Bitte wählen"
                     :options="typeOptions"
                 />
@@ -445,7 +445,7 @@ onMounted(() => {
                 </button>
             </div>
             <label class="field" data-field="nextInspectionDue">
-                <span class="field-label">Nächste Prüfung (optional)</span>
+                <span class="field-label">Nächste Wartung (optional)</span>
                 <input
                     v-model="form.nextInspectionDue"
                     class="input"
@@ -538,8 +538,8 @@ onMounted(() => {
         <ErrorNotice v-if="error !== null" :error="error" />
 
         <p class="hint">
-            „Speichern und nächstes“ behält Gerätetyp, Standort und nächste Prüfung und zählt die
-            Kennung weiter.
+            „Speichern und nächstes“ behält Ausrüstungstyp, Standort und nächste Wartung und zählt
+            die Nummer weiter.
         </p>
         <div class="actions">
             <!-- Erster Knopf: Enter in einem Feld speichert und bleibt auf der Seite. -->

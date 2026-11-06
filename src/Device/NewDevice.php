@@ -27,7 +27,7 @@ final readonly class NewDevice
         public ?ScanCode $scanCode = null,
     ) {
         if ($status === DeviceStatus::Retired) {
-            throw new InvalidDeviceValueException('Ein neues Gerät kann nicht ausgesondert sein.');
+            throw new InvalidDeviceValueException('Eine neue Ausrüstung kann nicht ausgesondert sein.');
         }
     }
 }

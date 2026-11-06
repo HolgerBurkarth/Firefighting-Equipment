@@ -19,7 +19,7 @@ const layout = computed(() => route.meta.layout ?? 'standard');
 const subtitle = computed(() =>
     layout.value === 'user' && session.value !== null
         ? `Hallo ${userLabel(session.value.user)}`
-        : 'Geräteverwaltung',
+        : 'Ausrüstungsverwaltung',
 );
 
 onMounted(() => {

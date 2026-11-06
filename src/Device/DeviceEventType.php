@@ -22,7 +22,7 @@ enum DeviceEventType: string
             self::Created => 'Angelegt',
             self::Imported => 'Importiert',
             self::StateChanged => 'Standort/Status geändert',
-            self::DueChanged => 'Prüfdatum geändert',
+            self::DueChanged => 'Wartungsdatum geändert',
             self::FieldChanged => 'Stammdaten geändert',
         };
     }

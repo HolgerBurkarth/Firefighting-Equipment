@@ -97,7 +97,7 @@ final class DeviceInspectionDueTest extends DeviceApiTestCase
         yield 'Datum fehlt' => [['version' => 1], 'Das Feld "next_inspection_due" fehlt'];
         yield 'Version fehlt' => [['next_inspection_due' => '2027-03-01'], 'Das Feld "version" muss eine ganze Zahl'];
         yield 'Version 0' => [['version' => 0, 'next_inspection_due' => null], 'Das Feld "version" muss eine ganze Zahl'];
-        yield 'Format' => [['version' => 1, 'next_inspection_due' => '1.3.2027'], 'Das Datum der nächsten Prüfung muss ein gültiges Datum'];
+        yield 'Format' => [['version' => 1, 'next_inspection_due' => '1.3.2027'], 'Das Datum der nächsten Wartung muss ein gültiges Datum'];
         yield 'Grenze' => [['version' => 1, 'next_inspection_due' => '2100-01-01'], 'muss zwischen 1950-01-01 und 2099-12-31 liegen'];
         yield 'anderes Feld' => [['version' => 1, 'next_inspection_due' => null, 'model' => 'X'], 'Das Feld "model" ist hier nicht vorgesehen'];
         yield 'Kommentar zu lang' => [['version' => 1, 'next_inspection_due' => null, 'comment' => str_repeat('x', 501)], 'höchstens 500 Zeichen'];

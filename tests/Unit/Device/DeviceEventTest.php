@@ -31,7 +31,7 @@ final class DeviceEventTest extends TestCase
                 'created' => 'Angelegt',
                 'imported' => 'Importiert',
                 'state_changed' => 'Standort/Status geändert',
-                'due_changed' => 'Prüfdatum geändert',
+                'due_changed' => 'Wartungsdatum geändert',
                 'field_changed' => 'Stammdaten geändert',
             ],
             array_combine(
@@ -63,7 +63,7 @@ final class DeviceEventTest extends TestCase
     public function testOtherTypesUseTypeLabel(): void
     {
         self::assertSame('Angelegt', self::event(DeviceEventType::Created, false, null, DeviceStatus::Ready)->label());
-        self::assertSame('Prüfdatum geändert', self::event(DeviceEventType::DueChanged, false, null, null)->label());
+        self::assertSame('Wartungsdatum geändert', self::event(DeviceEventType::DueChanged, false, null, null)->label());
     }
 
     public function testNotAppliedLabelsAndActionTime(): void
@@ -86,7 +86,7 @@ final class DeviceEventTest extends TestCase
     public function testNotAppliedReasonsMatchSchemaAndHaveGermanLabels(): void
     {
         self::assertSame(
-            ['older' => 'Neuerer Stand vorhanden', 'retired' => 'Gerät ausgesondert', 'location_locked' => 'Standort gesperrt'],
+            ['older' => 'Neuerer Stand vorhanden', 'retired' => 'Ausrüstung ausgesondert', 'location_locked' => 'Standort gesperrt'],
             array_combine(
                 array_map(static fn (NotAppliedReason $r): string => $r->value, NotAppliedReason::cases()),
                 array_map(static fn (NotAppliedReason $r): string => $r->label(), NotAppliedReason::cases()),

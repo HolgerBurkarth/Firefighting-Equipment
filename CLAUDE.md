@@ -523,7 +523,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `codeKey`: zusammengesetzte Form, Leerraum am Rand weg, mehrere Leerzeichen wie eines, dann
   `identifierKey`) → Gerät öffnen (im Modus `server` zuerst unter den Treffern, sonst
   `deviceStore.findByCode`); sonst genau ein Treffer → öffnen; mehrere → Tastatur schließen;
-  keiner → „Kein Gerät mit diesem Code gefunden.“, Text bleibt. `identifierKey` schreibt klein wie
+  keiner → „Keine Ausrüstung mit diesem Code gefunden.“, Text bleibt. `identifierKey` schreibt klein wie
   `LOWER()` in MariaDB unter `utf8mb4_unicode_ci` (Unicode von UCA 4.0.0): je Zeichen (kein Sigma
   am Wortende), İ → i, Großbuchstaben aus `DATABASE_UNCASED` und alle außerhalb der BMP bleiben
   (dort kennt die Kollation keine Kleinbuchstaben), dann ẞ → ß. Gemeinsame Testfälle
@@ -544,7 +544,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Rückkamera, ohne Ton, 1280 × 720 ideal); alle `SCAN_INTERVAL_MS` (120 ms) ein Bild über eine
   Canvas (höchstens `MAX_FRAME_EDGE` 1280 px) lesen. Erster Code: Kamera sofort aus, dann
   `deviceStore.findByCode`; gefunden → `router.replace` auf das Gerät (Zurück führt zu „Suchen“);
-  sonst Scanner zu, Text (`trimCode`) im Suchfeld, „Kein Gerät mit diesem Code gefunden.“ bzw.
+  sonst Scanner zu, Text (`trimCode`) im Suchfeld, „Keine Ausrüstung mit diesem Code gefunden.“ bzw.
   `ErrorNotice`, Fokus auf „Code scannen“. Fehler (`CAMERA_ERROR_MESSAGES`): `unsupported` (kein
   `navigator.mediaDevices`, ohne „Erneut versuchen“), `denied`, `missing`, `busy`, `load` (Lesemodul
   nicht ladbar). Schließen, Zurück und Verlassen beenden die Kamera immer. Browser-Tests
@@ -572,7 +572,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `NO_DEVICES` (`tests/e2e/support/devices.ts`; dort auch `deviceJson`, `devicesEndpoint`).
 - Umbuchen (`DevicePage`, `geraete/<id>`, KONZEPT.md Entscheidungen 13, 15, 18, 21, 22): Stand
   sofort aus `deviceStore.find`, dann `fetchCurrent`; ausgesondert → Hinweis ohne Formular, 404 →
-  „Dieses Gerät gibt es nicht (mehr).“. Standort: aktueller und das letzte eigene Ziel außer dem
+  „Diese Ausrüstung gibt es nicht (mehr).“. Standort: aktueller und das letzte eigene Ziel außer dem
   aktuellen (`bookingLocationChoices`, `SHOWN_RECENT_LOCATIONS` = 1, T2; gespeichert werden die
   letzten 3 als Reserve, `recentLocationIds`/`rememberLocation` aus `src/data/index.ts`, `src/data/recentLocations.ts`,
   localStorage `ff-recent-locations:<kürzel>:<konto-id>`; gemeinsame Klasse `RecentIds` in
@@ -597,10 +597,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice'])` (`src/router/back.ts`:
   ist eine der Seiten die vorige, `back()`, sonst `replace` auf die erste, also „Suchen“ nach einem
   direkt geöffneten Link). Die Seite zeigt die Bestätigung (`BookingNoticeMessage`, holt sie per
-  `takeBookingNotice`): „Suchen“ bis zur nächsten Eingabe, „Prüffristen“, die Geräteliste, das
+  `takeBookingNotice`): „Suchen“ bis zur nächsten Eingabe, „Termine“, die Geräteliste, das
   Gerätedetail und der Hinweis des Protokolls in der Admin-Konsole bis zum Verlassen (Gerätedetail
   und Hinweis bis zur nächsten Aktion). Mit
-  Recht auf das Gerätedetail zusätzlich der Link „Gerätedetail (Admin)“ unter „Details und Verlauf“;
+  Recht auf das Gerätedetail zusätzlich der Link „Detailseite (Admin)“ unter „Details und Verlauf“;
   Standort nur mit `book.move`, Status nur mit `book.status`, ohne beide nur „Sie dürfen dieses Gerät
   nur ansehen, nicht umbuchen.“ (`device-view-only`, Schritt 1.7b). Nach jeder Buchung `locationStore.refresh('changed')` und
   `adminDeviceList.refresh('changed')` (nur, wenn die Geräteliste schon geladen ist)
@@ -621,7 +621,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `DeviceCard` (Typ `DeviceSummary`, Zusatzzeile per Slot) mit „Prüfung: 01.10.2026 · seit 28 Tagen
   überfällig“ (rot, `--status-defective-fg`) bzw. „· heute/morgen/in N Tagen fällig“ (gelb,
   `--status-maintenance-fg`; `inspectionText`). Antippen öffnet das Umbuchen; nach dem Speichern
-  zurück auf „Prüffristen“ mit Bestätigung (siehe Umbuchen). Tests
+  zurück auf „Termine“ mit Bestätigung (siehe Umbuchen). Tests
   `tests/e2e/inspections.spec.ts`, `tests/unit/inspections.spec.ts`, `inspectionWindow.spec.ts`.
 - Details und Verlauf (`DeviceDetails` in `src/components/`, KONZEPT.md Entscheidung 15): Link
   „Details und Verlauf“ unten auf der Umbuchen-Seite (auch bei ausgesonderten Geräten), eine
@@ -687,7 +687,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Stadt, unten „Einstellungen“ (`ADMIN_SETTINGS`), der Name des Kontos als Text und „Abmelden“;
   Zähler an Einträgen (`badge`:
   `pendingUsers`, `openNotices`) aus `adminOverview`; `sections` hebt einen Eintrag auch auf
-  Unterseiten hervor („Geräte“ auf dem Gerätedetail). Auf den Handy-Seiten behält der Admin die Leiste
+  Unterseiten hervor („Ausrüstung“ auf dem Gerätedetail). Auf den Handy-Seiten behält der Admin die Leiste
   unten mit „Dashboard“. Seit Schritt 1.7b nach den Rechten (siehe "Rollen und Rechte", App): Menü
   nur mit Seiten, die die Rolle öffnen darf; `adminOverview` fragt nur, was sie darf (`overviewScope`,
   der Rest `null`), das Dashboard zeigt nur diese Teile, Kacheln und Geräte sind nur mit Recht auf
@@ -710,7 +710,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `tests/e2e/adminConsole.spec.ts` (Menü in drei Breiten, Dashboard) und
   `tests/unit/adminOverview.spec.ts`.
 - Standorte und Gerätetypen der Admin-Konsole (`LocationsPage`, `standorte`; `DeviceTypesPage`,
-  `geraetetypen`; nur `admin`, `layout: 'admin'`, Menü „Standorte“ und „Gerätetypen“ nach „Suchen“):
+  `geraetetypen`; nur `admin`, `layout: 'admin'`, Menü „Standorte“ und „Ausrüstungstypen“ nach „Suchen“):
   Lesen über eigene Stores (`adminLocationStore` = `LocationStore` mit `GET
   locations?include_inactive=1`, `deviceTypeStore` = `DeviceTypeStore` mit `GET
   device-types?include_inactive=1`, beide in `installDataLayer`), Ändern nur über `src/data/index.ts`
@@ -744,7 +744,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `deviceTypeStore.spec.ts`, `locationsApi.spec.ts`, `router.spec.ts` (jeder Menüeintrag hat eine
   Seite).
 - Geräteliste der Admin-Konsole (`DevicesPage`, `geraete`, nur `admin`, `layout: 'admin'`, Menü
-  „Geräte“ nach „Suchen“; Mockups „Geraete“ und „AdminHandy“, KONZEPT.md Entscheidung 33): anders
+  „Ausrüstung“ nach „Suchen“; Mockups „Geraete“ und „AdminHandy“, KONZEPT.md Entscheidung 33): anders
   als „Suchen“ ohne lokale Kopie, Filter und Sortierung rechnet der Server (wie beim Export, auch
   ausgesonderte und mehr als 2.000 Geräte). Store `adminDeviceList` (`AdminDeviceList` in
   `src/data/adminDeviceList.ts`, in `installDataLayer`): `show(filter)` lädt bei neuem Filter die
@@ -756,9 +756,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `standort` (immer mit Fächern, `include_sublocations=1`), `status` (`ready`, `maintenance`,
   `defective`, kommagetrennt), `ausgesonderte=1` (mit Status als weiterer Status `retired`, sonst
   `include_retired=1`), `sortierung` (`DeviceSort`), `richtung` (`desc`); Unbekanntes fällt still auf
-  den Standard. Oberfläche: Suchfeld, `AppSelect` „Gerätetyp“ und „Standort“ (aus `deviceTypeStore`
+  den Standard. Oberfläche: Suchfeld, `AppSelect` „Ausrüstungstyp“ und „Standort“ (aus `deviceTypeStore`
   bzw. `adminLocationStore`, gesperrte/deaktivierte markiert), Status als Knöpfe mit `aria-pressed`,
-  „Ausgesonderte anzeigen“, „Filter zurücksetzen“, Anzahl („45 Geräte“, mit Filter „12 Geräte
+  „Ausgesonderte anzeigen“, „Filter zurücksetzen“, Anzahl („45 Ausrüstungen“, mit Filter „12 Geräte
   gefunden“). Suche nur in den Feldern von `q` (Gerätetyp und Standort wählt man über die
   Auswahllisten; live geprüft 30.10.2026). Tabelle (ein Klick irgendwo in der Zeile bzw. Karte öffnet das Gerätedetail,
   außer in der Spalte des Kästchens, auf Links/Knöpfen und beim Markieren von Text, `vRowLink`, T9;
@@ -767,19 +767,19 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Prüfung (überfällig rot, bis 30 Tage „bald fällig“ gelb, `dueState`; ausgesonderte nie), Spaltenköpfe
   mit `aria-sort`; unter 768 px Karten mit `AppSelect` „Sortieren nach“ und Knopf für die Richtung.
   „Export (CSV)“: `GET devices/export` mit denselben Filtern und derselben Sortierung
-  (`downloadDeviceExport`, `apiDownload`), Fehler als `ErrorNotice`. „Neues Gerät“ (Stadtfarbe)
+  (`downloadDeviceExport`, `apiDownload`), Fehler als `ErrorNotice`. „Neue Ausrüstung“ (Stadtfarbe)
   führt zu `geraete/neu`, „Import (CSV)“ zu `geraete/import`. Browser-Tests `tests/e2e/devices.spec.ts`
   (Server-Attrappe `deviceServer` mit Status, Typ, Standort samt Fächern, `q` und Seiten; Download über
   `MockResponse.text`/`contentType`); Unit-Tests `deviceList.spec.ts`, `adminDeviceList.spec.ts`,
   `client.spec.ts` (`apiDownload`).
 - Sammelaktionen der Geräteliste (KONZEPT.md Entscheidung 31, Schritt 10): erste Spalte bzw. Karte mit
   Kontrollkästchen („M1 auswählen“; ausgesonderte gesperrt, „… (ausgesondert, nicht wählbar)“), im
-  Kopf „Alle angezeigten Geräte auswählen“ (auch `indeterminate`). Auswahl = ID → zuletzt bekannter
+  Kopf „Alle angezeigten Ausrüstungen auswählen“ (auch `indeterminate`). Auswahl = ID → zuletzt bekannter
   Stand (`DeviceListItem`, die Version wird mitgesendet); ein neuerer Stand beim Auffrischen ersetzt
   ihn, ein neuer Filter hebt die Auswahl auf. Sind alle angezeigten gewählt und passen mehr (bis
-  `MAX_LOCAL_DEVICES` = 2000), „Alle N Geräte der Liste auswählen“ (`adminDeviceList.all()`: alle
-  Seiten zu 200 des Filters, die angezeigte Liste bleibt). Leiste „N Geräte ausgewählt“ mit
-  „Prüfdatum setzen …“ (`DeviceBulkDueDialog`: Datum, leer = entfernen, Kommentar) und „Umbuchen /
+  `MAX_LOCAL_DEVICES` = 2000), „Alle N Ausrüstungen der Liste auswählen“ (`adminDeviceList.all()`: alle
+  Seiten zu 200 des Filters, die angezeigte Liste bleibt). Leiste „N Ausrüstungen ausgewählt“ mit
+  „Wartungsdatum setzen …“ (`DeviceBulkDueDialog`: Datum, leer = entfernen, Kommentar) und „Umbuchen /
   Status ändern …“ (`DeviceBulkStateDialog`: „Neuer Standort“ als `AppSelect` mit „Standort nicht
   ändern“ und nur aktiven Standorten bzw. Fächern unter aktiven, „Neuer Status“ als Radiogruppe mit
   „Status nicht ändern“; mindestens eines, bei „defekt“ Kommentar „Was ist defekt?“ mit mindestens 5
@@ -804,7 +804,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Stammdaten (`DeviceMasterData`) und Verlauf (`DeviceHistoryList`, ab 1200 px nebeneinander).
   Gerät per `deviceStore.fetchCurrent` (auch ausgesonderte; 404 „Dieses Gerät gibt es nicht
   (mehr).“). Aktionen: groß „Umbuchen / Status ändern“ (Link auf `geraete/<id>`, danach zurück hierher
-  mit Bestätigung), „Bearbeiten“, „Prüfdatum ändern“, „Code zuordnen“; rot und abseits (Kasten unter
+  mit Bestätigung), „Bearbeiten“, „Wartungsdatum ändern“, „Code zuordnen“; rot und abseits (Kasten unter
   den Stammdaten) „Aussondern …“; ausgesondert stattdessen ein Hinweis mit „Wieder aufnehmen“. Je
   Aktion ein `FormDialog` in `src/components/` (`DeviceEditDialog`, `DeviceDueDialog`,
   `DeviceCodeDialog`, `DeviceRetireDialog`, `DeviceReinstateDialog`), jeweils mit optionalem
@@ -833,7 +833,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `tests/e2e/deviceAdmin.spec.ts` (zustandsbehafteter Server je Test über `delegate`, Kamera über
   `fakeCamera`); Unit-Tests `deviceForm.spec.ts`, `deviceAdminApi.spec.ts`, `router.spec.ts`.
 - Neues Gerät der Admin-Konsole (`DeviceNewPage`, `geraete/neu`, Route `device-new`, nur `admin`,
-  `layout: 'admin'`, im Menü unter „Geräte“; KONZEPT.md Entscheidung 32): eine Seite statt eines
+  `layout: 'admin'`, im Menü unter „Ausrüstung“; KONZEPT.md Entscheidung 32): eine Seite statt eines
   Fensters (Serienerfassung). Felder Kennung (Fokus beim Öffnen), Gerätetyp und Standort (`AppSelect`
   mit `placeholder` „Bitte wählen“, nur aktive Typen bzw. aktive Standorte und Fächer unter aktiven
   Standorten), Status (Radiogruppe, Standard einsatzbereit), Scan-Code (optional; Handscanner,
@@ -844,7 +844,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   der inzwischen deaktiviert bzw. gesperrt ist, gilt als Problem). Anlegen über `createDevice`
   (`src/data/index.ts`, `postDevice` → `POST devices`, danach Auffrischen wie bei jeder Änderung).
   „Speichern und nächstes“ (erster Knopf, auch Enter in einem Feld): grüne Meldung „M24 angelegt.“ mit
-  Link „Gerät öffnen“, dann `nextNewDeviceForm`: Gerätetyp, Standort und nächste Prüfung bleiben, die
+  Link „Ausrüstung öffnen“, dann `nextNewDeviceForm`: Gerätetyp, Standort und nächste Prüfung bleiben, die
   Kennung zählt weiter (`nextIdentifier`: Zahl am Ende + 1, führende Nullen bleiben, M99 → M100;
   ohne Zahl am Ende leer), alles andere leer, Fokus und Auswahl auf der Kennung (fokussiert schon beim
   Antippen vor der Anfrage, sonst fokussiert das iPhone nicht; nach Erfolg `window.scrollTo(0, 0)`,
@@ -936,7 +936,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `invitations.spec.ts` (auch: der gezeichnete QR-Code, gelesen mit zxing-wasm, ergibt genau den
   Link), `invitationCodesApi.spec.ts`, `tokens.spec.ts`.
 - CSV-Import der Admin-Konsole (`DeviceImportPage`, `geraete/import`, Route `device-import`, nur
-  `admin`, `layout: 'admin'`, im Menü unter „Geräte“; KONZEPT.md Entscheidung 32): „1. Vorlage
+  `admin`, `layout: 'admin'`, im Menü unter „Ausrüstung“; KONZEPT.md Entscheidung 32): „1. Vorlage
   ausfüllen“ mit „Vorlage herunterladen“ und „Gültige Werte herunterladen“ (`downloadImportTemplate`,
   `downloadImportValues` in `src/api/deviceImport.ts`, `saveDownload`); „2. Datei prüfen“: Knopf
   „CSV-Datei wählen …“ öffnet ein verstecktes `<input type="file">` (danach geleert, damit dieselbe
@@ -953,7 +953,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   etwas Neuem bzw. Geändertem (sonst „Die Datei ändert nichts“): Kommentar (`normalizeComment`),
   „Import übernehmen (2 neu, 1 geändert)“ → `applyDeviceImport` (`POST devices/import`, danach laden
   die schon geladenen Listen neu wie nach jeder Änderung); Erfolg grün „Import übernommen: …“ mit
-  „Zur Geräteliste“, Datei und Vorschau weg; 409 `import_outdated` → neu prüfen und Hinweis „Die
+  „Zur Ausrüstungsliste“, Datei und Vorschau weg; 409 `import_outdated` → neu prüfen und Hinweis „Die
   Vorschau ist neu erstellt“; andere Fehler als `ErrorNotice`. Ungespeichert (`useUnsavedInput`) =
   Vorschau vorhanden oder Kommentar. Logik in `src/data/deviceImport.ts`. Browser-Tests
   `tests/e2e/deviceImport.spec.ts` (Datei über das Ereignis `filechooser`, Vorschau-Server mit Liste
@@ -974,9 +974,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   nicht.“): Überschrift `kind_label` mit Status, Gerät (Link zum Gerätedetail), Erklärung je Art
   (`noticeExplanation`, bei `stale_confirmed` zusätzlich der Satz zur Rückfrage), Karten „Buchung“
   (Konto mit E-Mail, Erfasst, Eingang, gewünschter Standort/Status, Kommentar), anderer Stand und
-  „Gerät jetzt“ (`deviceStore.fetchCurrent`, „Umbuchen / Status ändern“ auf `geraete/<id>`, danach
+  „Ausrüstung jetzt“ (`deviceStore.fetchCurrent`, „Umbuchen / Status ändern“ auf `geraete/<id>`, danach
   zurück mit Bestätigung; ausgesondert nur ein Hinweis). „Rückfrage per E-Mail“ je Konto mit E-Mail
-  (`inquiryMailLink`: `mailto:` mit Betreff „Rückfrage zu Ihrer Buchung von <Typ> <Kennung>“ und
+  (`inquiryMailLink`: `mailto:` mit Betreff „Rückfrage zu Ihrer Buchung von <Typ> <Nummer>“ und
   Anfang des Textes mit Zeit und Stand; ohne E-Mail kein Link). „Erledigen …“ (`FormDialog`, Notiz
   freiwillig, mehrzeilig: `noticeNote` wie `DeviceText::noticeNote`, andere Steuerzeichen werden
   Leerzeichen, höchstens 500 Zeichen per `noticeNoteProblem`; leer = `{}`) bzw. „Wieder öffnen“
@@ -986,7 +986,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (einschließlich)“ (`<input type="date">`, Standard die letzten 90 Tage bis heute wie der Server;
   Prüfung `historyExportProblems`: leer, ungültig, Ende vor Beginn, mehr als
   `HISTORY_EXPORT_MAX_DAYS` = 366; `HISTORY_EXPORT_DEFAULT_DAYS` und `MAX_DAYS` per Test gleich PHP),
-  `AppSelect` „Gerätetyp“ und „Standort (mit Fächern)“ (aus `deviceTypeStore` bzw.
+  `AppSelect` „Ausrüstungstyp“ und „Standort (mit Fächern)“ (aus `deviceTypeStore` bzw.
   `adminLocationStore`, mit deaktivierten/gesperrten), Reihenfolge als Radiogruppe; Download
   `downloadHistoryExport` (`src/api/deviceEvents.ts`, `apiDownload`, Standort immer mit
   `include_sublocations=1`, `order` nur bei `oldest`) und `saveDownload`; 409 (zu viele Einträge) und
@@ -1713,7 +1713,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Migration `0008`, `verify_resend` seit `0009`, mit E-Mail-Hash, `invitation_accept` seit `0010`).
   E-Mail nur als SHA-256 (bei `verify_email`, `reset_confirm` und `invitation_accept` ohne E-Mail möglich), IP-Adressen nur gekürzt
   (IPv4 /24, IPv6 /48, binär). Einträge werden nach 24 Stunden beim Aufruf gelöscht (kein Cron).
-- E-Mail-Absender: `"Feuerwehr Geräteverwaltung" <feuerwehr-app@prodad.de>`.
+- E-Mail-Absender: `"Feuerwehr Ausrüstungsverwaltung" <feuerwehr-app@prodad.de>` (bis 06.11.2026
+  „Feuerwehr Geräteverwaltung“, siehe "Begriffe in der Oberfläche").
 
 ## Benutzerverwaltung im Code
 - Code in `src/User/`: `EmailAddress` (getrimmt, kleingeschrieben, mindestens so streng wie
@@ -1860,7 +1861,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `MailTemplates` (alle Texte), `Notifier`. Tests verwenden `tests/Support/FakeMailer`, nie einen
   echten Transport.
 - Nur Klartext (kein HTML) in Version 1, UTF-8, quoted-printable, CRLF. Absender immer
-  `"Feuerwehr Geräteverwaltung" <feuerwehr-app@prodad.de>`. Betreff und Namen außerhalb von ASCII
+  `"Feuerwehr Ausrüstungsverwaltung" <feuerwehr-app@prodad.de>`. Betreff und Namen außerhalb von ASCII
   als RFC-2047-encoded-words (Base64, höchstens 75 Zeichen je Wort, nur an Zeichengrenzen
   geteilt). Kopfzeilen `Date` (UTC), `Message-ID` (`<32 Hex@prodad.de>`), `MIME-Version`,
   `Content-Type`, `Content-Transfer-Encoding` und in jeder Mail `Auto-Submitted: auto-generated`.
@@ -2112,13 +2113,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `einstellungen` jede Konsole `hasConsole` = ein Bereich außer `search`/`due`; `profil` jedes Konto);
   Prüfung `canOpen`/`canOpenRoute` (`meta` aus `router.getRoutes()`, nie `resolve`: Seiten mit
   Platzhalter). Knöpfe: Geräteliste „Export (CSV)“ `csv.export`, „Import (CSV)“ `csv.import`, „Neues
-  Gerät“ `device.create`, Kästchen nur mit `devices.bulk` und einer Sammelaktion („Prüfdatum setzen“
+  Gerät“ `device.create`, Kästchen nur mit `devices.bulk` und einer Sammelaktion („Wartungsdatum setzen“
   `due` Ändern, „Umbuchen / Status ändern“ `book.move`/`book.status`, im Fenster Standort bzw. Status
   je nach Aktion); Gerätedetail je Aktion (`book.*`, `device.edit`, `due` Ändern, `device.code`,
   `device.retire`; beim Wiederaufnehmen Kennung und Typ nur mit `device.edit`, Scan-Code nur mit
   `device.code`); Standorte und Gerätetypen ändern nur mit Ändern, der Name nur mit `devices` als Link;
   Benutzer und Einladungscodes ändern nur mit `users` Ändern; Protokoll „Verlauf exportieren“ nur mit
-  `csv.export`, Erledigen/Wieder öffnen nur mit `log` Ändern, „Gerät jetzt“ nur mit `search` oder
+  `csv.export`, Erledigen/Wieder öffnen nur mit `log` Ändern, „Ausrüstung jetzt“ nur mit `search` oder
   `devices`; Einstellungen Farbe und Logo nur mit `settings` Ändern (mit Ansehen ein Hinweis),
   Benachrichtigung „Log“ nur mit `mail.log`; Prüffristen ohne `search` und `devices` vom Server
   (`inspection-due`) und Karten ohne Link (`DeviceCard` `link`). Standorte mit `selectable` false
@@ -2603,7 +2604,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   heißen „Umbuchung nicht übernommen“, „Statusänderung nicht übernommen“ bzw. „Umbuchung und
   Statusänderung nicht übernommen“. `type_label` bei `state_changed` nach Inhalt: „Ausgesondert“, „Wieder aufgenommen“,
   „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“; sonst „Angelegt“, „Importiert“,
-  „Prüfdatum geändert“, „Stammdaten geändert“. Standorte erscheinen mit ihrem aktuellen Namen und
+  „Wartungsdatum geändert“, „Stammdaten geändert“. Standorte erscheinen mit ihrem aktuellen Namen und
   Pfad (die Historie speichert nur die ID; nach dem Umbenennen steht dort der neue Name; bewusst so
   in Version 1, Namen zum Zeitpunkt bräuchten eine Migration).
 - `GET device-events` (Admin, `DeviceHistoryListHandler`, in `AdminRoutesAccessTest`; „Letzte
@@ -2718,7 +2719,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   das Feld.
 - Mail (`DeviceLogNotifier::notice`, Vorlage `MailTemplates::deviceNotice`, Zweck `device_notice`): an
   die Empfänger der Benachrichtigung „Log“, nie an den Auslöser, nach dem Commit, statt der Mail zum
-  Vorgang (eine Mail je Anfrage). Betreff „Log <Stadt>: Hinweis – <Kennung> <Grund>“
+  Vorgang (eine Mail je Anfrage). Betreff „Log <Stadt>: Hinweis – <Nummer> <Grund>“
   (`NoticeKind::subjectReason`). Text: Art, Gerät, Buchung (Wer mit E-Mail in Klammern, Aktionszeit,
   Eingang, Wunsch, Kommentar aus dem Ereignis), anderer Stand, ggf. „alte Buchung nach Rückfrage“.
   Link für Admins auf den Hinweis (`AppUrls::notice`, `protokoll/<id>`); Super-Admins ohne Link,
@@ -2792,12 +2793,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `include_sublocations`, `status`, `q`, `include_retired`, `scan_code`), Sortierung ebenso
   (`DeviceListHandler::sort`: `sort`, `dir`, ungültig 400; Standard Kennung aufsteigend), ohne
   Seitenbegrenzung; `limit`, `offset` werden ignoriert. Spalten
-  (`DeviceCsv::DEVICE_HEADER`): Kennung, Scan-Code (unverändert, auch mit GS/RS/EOT; Formelschutz
-  gilt), Gerätetyp, Standort, Status, Nächste Prüfung, Seriennummer, Hersteller, Modell,
-  Beschaffungsdatum, Notiz. Dateiname
-  `geraete-<kürzel>-<JJJJ-MM-TT>.csv` (heute in Europe/Berlin über `Clock`).
+  (`DeviceCsv::DEVICE_HEADER`): Nummer, Scan-Code (unverändert, auch mit GS/RS/EOT; Formelschutz
+  gilt), Ausrüstungstyp, Standort, Status, Nächste Wartung, Seriennummer, Hersteller, Modell,
+  Beschaffungsdatum, Notiz (bis 06.11.2026 Kennung, Gerätetyp, Nächste Prüfung). Dateiname
+  `ausruestung-<kürzel>-<JJJJ-MM-TT>.csv` (heute in Europe/Berlin über `Clock`; bis 06.11.2026
+  `geraete-…`).
 - Die Geräteliste ist das Format des Imports; Spalten nur gemeinsam mit `ImportColumn` ändern (per
-  Test gleich): Kennung ist der Schlüssel, Gerätetyp über den Namen, Standort über den vollständigen
+  Test gleich): Nummer (Kennung) ist der Schlüssel, Ausrüstungstyp über den Namen, Standort über den vollständigen
   Pfad „HLF 20 / G1“, Status über die deutsche Bezeichnung, Datum `TT.MM.JJJJ`.
 - Historie: alle Ereignisse der Stadt, auch ausgesonderter Geräte. Parameter `from`/`to`
   (`JJJJ-MM-TT`, Kalendertage in Europe/Berlin, beide einschließlich; abgefragt halboffen
@@ -2811,10 +2813,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   fremde IDs → leere Datei. `order=newest` (Standard) bzw. `oldest`, sortiert nach `created_at`,
   dann `id`. Vor dem Download wird gezählt: mehr als 100.000 Einträge (`MAX_ROWS`; im Konstruktor
   nur für Tests änderbar) → 409 `rule_violation` mit `details: {"events": n, "max": 100000}`.
-- Spalten der Historie (`DeviceCsv::EVENT_HEADER`): Aktionszeit, Eingang beim Server, Geräte-Nr. (ID; Kennungen können nach
-  dem Aussondern neu vergeben werden), Kennung und Gerätetyp (aktueller Stand), Ereignis
+- Spalten der Historie (`DeviceCsv::EVENT_HEADER`): Aktionszeit, Eingang beim Server, Ausrüstungs-ID (bis 06.11.2026
+  „Geräte-Nr.“; Nummern können nach dem Aussondern neu vergeben werden), Nummer und Ausrüstungstyp
+  (aktueller Stand), Ereignis
   (`DeviceEvent::label()`), Wer (Anzeigename, anonymisiert „Gelöschter Benutzer #ID“, nie die
-  E-Mail), Standort von/nach (aktueller Pfad), Status von/nach, Prüfdatum alt/neu, Feld (deutsch),
+  E-Mail), Standort von/nach (aktueller Pfad), Status von/nach, Wartungsdatum alt/neu, Feld (deutsch),
   Alter/Neuer Wert (Beschaffungsdatum als `TT.MM.JJJJ`), Kommentar, Übernommen (Ja/Nein), Grund (nicht
   übernommen), Buchungs-Kennung (`client_ref`). Zeitraum und Reihenfolge nach Eingang (`created_at`). Dateiname
   `historie-<kürzel>-<von>-bis-<bis>.csv`.
@@ -2836,7 +2839,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `tests/Unit/Device/Import/`.
 - Hilfen zum Erfassen (KONZEPT.md Entscheidung 32; `Access::Admin`, CSV wie der Export über
   `CsvResponse`, `DeviceImportTemplateHandler`, Code `DeviceImportTemplate`, Tests
-  `DeviceImportTemplateTest`): `GET devices/import/template` → Vorlage `geraete-vorlage-<kürzel>.csv`
+  `DeviceImportTemplateTest`): `GET devices/import/template` → Vorlage `ausruestung-vorlage-<kürzel>.csv`
   mit den Spalten des Imports (`DeviceImportTemplate::header()` = `DeviceCsv::DEVICE_HEADER`, per Test)
   und zwei Beispielzeilen `BEISPIEL-1`/`BEISPIEL-2` (`EXAMPLE_IDENTIFIERS`; aktive Gerätetypen und
   Standorte der Stadt, erster Standort der Ebene 1 bzw. erstes Fach, Prüfdatum heute + 365 Tage,
@@ -2865,7 +2868,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Excel (Kopfzeile = 1, Datensätze statt physischer Zeilen); völlig leere Zeilen (auch `;;;`) werden
   übergangen. Jede Zelle: genau ein führendes `'` entfernen (`CsvFormat::removeFormulaGuard`).
 - Spalten wie im Export (`ImportColumn` = `DeviceCsv::DEVICE_HEADER`), Zuordnung über die Überschrift
-  (Reihenfolge und Groß-/Kleinschreibung egal). Fehler der ganzen Datei → 400 `invalid_request`
+  (Reihenfolge und Groß-/Kleinschreibung egal). Die früheren Überschriften Kennung, Gerätetyp und
+  Nächste Prüfung (`ImportColumn::formerLabel`, vor dem 06.11.2026) gelten weiter, auch gemischt mit
+  den neuen; beide Namen derselben Spalte gelten als doppelt. Fehler der ganzen Datei → 400 `invalid_request`
   (ggf. `details` mit `line`, `columns`, `rows`/`max_rows`, `max_bytes`): unbekannte, doppelte oder
   leere Überschrift, Spalte Kennung fehlt, nicht lesbar (z. B. Anführungszeichen nicht geschlossen),
   Zeile `CsvFormat::ABORTED_LINE` (abgebrochener Export), keine Datenzeile, mehr als 5000 Zeilen
@@ -2945,7 +2950,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Empfänger und Anfrage; ein CSV-Import ergibt EINE Sammelmail (Zusammenfassung, höchstens
   `MAX_IMPORT_LINES` = 50 Zeilen mit Einzelheiten, danach „… und N weitere“; ohne neue oder geänderte
   Geräte keine Mail), ebenso eine Sammelaktion (`bulkChanged`: alle geänderten Geräte der Anfrage, je
-  Gerät „Kennung (Typ)“ und eingerückt Von/Nach; Betreff „12 Geräte – Prüfdatum geändert“ bzw.
+  Gerät „Nummer (Typ)“ und eingerückt Von/Nach; Betreff „12 Ausrüstungen – Wartungsdatum geändert“ bzw.
   „… – umgebucht, Status defekt“, bei verschiedenen Zielstatus „Status geändert“; nur ein geändertes
   Gerät → die gewöhnliche Mail `deviceChanged`; Link für Admins auf die Geräteliste).
 - Betreff „Log <Stadtname>: <Grund>“ (z. B. „MA-01 umgebucht, Status defekt“, „CSV-Import: 2 neu,
@@ -3029,7 +3034,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Web-App-Manifest: `GET /firefighting/<kürzel>/manifest.webmanifest` (`ManifestHandler`, Route
   `manifest.webmanifest` außerhalb von `api/v1`), `application/manifest+json; charset=utf-8`,
   `Revalidate` mit ETag über den Inhalt. Felder: `id`, `start_url`, `scope` = `/firefighting/<kürzel>/`,
-  `name` = „<Stadtname> – Geräteverwaltung“, `short_name` = „FF-Geräte“, `lang` `de`, `dir` `ltr`,
+  `name` = „<Stadtname> – Ausrüstungsverwaltung“, `short_name` = „FF-Ausrüstung“, `lang` `de`, `dir` `ltr`,
   `display` `standalone`, `theme_color` = Akzentfarbe (immer ein Wert), `background_color` `#f3f4f6`,
   `icons` = 192 und 512 px (Logo, sonst Standard-Symbol, versionierte Adressen, `purpose` `any`, kein
   `maskable`, weil ein Logo sonst beschnitten werden kann).
@@ -3046,7 +3051,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     `manifest.webmanifest` setzt die App beim Start nur unter Städten (`linkManifest` in
     `frontend/src/runtime/appearance.ts`; unter `service` gibt es kein Manifest).
   - Nach `GET api/v1/tenant` (`applyTenantAppearance`): `--accent` und
-    `<meta name="theme-color">` = `accent_color`, Titel „<Stadtname> – Geräteverwaltung“ (wie
+    `<meta name="theme-color">` = `accent_color`, Titel „<Stadtname> – Ausrüstungsverwaltung“ (wie
     `NAME_FORMAT`), mit Logo `icon` = `logo_urls["192"]`, `apple-touch-icon` = `logo_urls["180"]`
     (versioniert), ohne Logo das Standard-Symbol wie in `index.html` (auch nach dem Entfernen in
     den Einstellungen); bei einem Fehler (z. B. unbekannte Stadt) bleiben alle Standardwerte.
@@ -3083,6 +3088,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   "Admin-Konsole"). Der abschließende Durchlauf nach `docs/frontend/LIVETEST-ADMIN-KONSOLE.md` lief
   am 31.10.2026 im Browser (Ergebnisse dort und kurz in KONZEPT.md); offen sind nur Punkte für den
   Nutzer (iPhone, schmale Breiten, Handscanner, Mails, Anmelden/Abmelden).
+- Begriffe in der Oberfläche (seit 06.11.2026, Konzept Abschnitt 9, Plan Phase 1 Abschnitt 8): Alles,
+  was Nutzer sehen (App, Mails, Fehlermeldungen der API, CSV), sagt Ausrüstung (mit Zahl
+  „Ausrüstungen“) statt Gerät, Ausrüstungstyp, Ausrüstungsliste, Detailseite, Termine statt
+  Prüffristen, Wartung bzw. Wartungsdatum statt Prüfung bzw. Prüfdatum, Nummer statt Kennung; Name
+  der App „Ausrüstungsverwaltung“. „Gerät“ als Handy/PC, Gerätewart, Gerätehaus, Geräteträger, die
+  Namen der Typen, der Status „in Wartung“, Adressen, Bezeichner im Code, Werte der API und die
+  Kommandozeile bleiben. Dokumentation und Kommentare verwenden weiter die Arbeitsbegriffe.
 - Nicht in Version 1: Mengenartikel, Etiketten mit QR-/Barcodes erzeugen oder drucken,
   Prüfprotokolle.
 

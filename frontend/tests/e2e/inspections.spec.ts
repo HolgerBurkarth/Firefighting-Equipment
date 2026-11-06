@@ -36,7 +36,7 @@ const DEVICES = [
     deviceJson(7, { identifier: 'M7', next_inspection_due: '2026-10-30' }),
 ];
 
-test.describe('Prüffristen (lokal)', () => {
+test.describe('Termine (lokal)', () => {
     test.use({
         api: {
             'GET api/v1/auth/me': ME,
@@ -75,19 +75,19 @@ test.describe('Prüffristen (lokal)', () => {
 
     test('überfällig und in 30 Tagen fällig; Antippen öffnet das Umbuchen', async ({ page }) => {
         await page.goto('/firefighting/test/prueffristen');
-        await expect(page.getByRole('heading', { level: 1, name: 'Prüffristen' })).toBeVisible();
+        await expect(page.getByRole('heading', { level: 1, name: 'Termine' })).toBeVisible();
         const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
-        await expect(nav.getByRole('link', { name: 'Prüffristen' })).toHaveAttribute(
+        await expect(nav.getByRole('link', { name: 'Termine' })).toHaveAttribute(
             'aria-current',
             'page',
         );
 
-        await expect(page.getByTestId('overdue-count')).toHaveText('2 Geräte');
+        await expect(page.getByTestId('overdue-count')).toHaveText('2 Ausrüstungen');
         const overdue = page.getByTestId('overdue-list').getByTestId('device-card');
         await expect(overdue.locator('.device-identifier')).toHaveText(['HRT 5', 'M1']);
         await expect(overdue.getByTestId('inspection-due')).toHaveText([
-            'Prüfung: 01.10.2026 · seit 28 Tagen überfällig',
-            'Prüfung: 28.10.2026 · seit 1 Tag überfällig',
+            'Wartung: 01.10.2026 · seit 28 Tagen überfällig',
+            'Wartung: 28.10.2026 · seit 1 Tag überfällig',
         ]);
         await expect(overdue.first()).toContainText('Funkgerät');
         await expect(overdue.first()).toContainText('LF 10');
@@ -96,12 +96,12 @@ test.describe('Prüffristen (lokal)', () => {
         await expect(
             page.getByRole('heading', { name: /In den nächsten 30 Tagen fällig/ }),
         ).toBeVisible();
-        await expect(page.getByTestId('due-soon-count')).toHaveText('3 Geräte');
+        await expect(page.getByTestId('due-soon-count')).toHaveText('3 Ausrüstungen');
         const soon = page.getByTestId('due-soon-list').getByTestId('device-card');
         await expect(soon.getByTestId('inspection-due')).toHaveText([
-            'Prüfung: 29.10.2026 · heute fällig',
-            'Prüfung: 30.10.2026 · morgen fällig',
-            'Prüfung: 28.11.2026 · in 30 Tagen fällig',
+            'Wartung: 29.10.2026 · heute fällig',
+            'Wartung: 30.10.2026 · morgen fällig',
+            'Wartung: 28.11.2026 · in 30 Tagen fällig',
         ]);
 
         // Überfällig in der Statusfarbe „defekt“, bald fällig in „Wartung“ (nicht nur die Farbe:
@@ -131,7 +131,7 @@ test.describe('Prüffristen (lokal)', () => {
         await expect(page).toHaveURL(/\/prueffristen$/);
     });
 
-    test('nach dem Speichern zurück zu den Prüffristen mit Bestätigung', async ({
+    test('nach dem Speichern zurück zu den Termine mit Bestätigung', async ({
         page,
         apiRequests,
     }) => {
@@ -155,7 +155,7 @@ test.describe('Prüffristen (lokal)', () => {
         expect(
             apiRequests.filter((r) => r.method === 'POST' && r.path === 'api/v1/devices/1/state'),
         ).toHaveLength(1);
-        // Zurück wie der Knopf des Browsers: „Prüffristen“ steht nicht zweimal in der Historie.
+        // Zurück wie der Knopf des Browsers: „Termine“ steht nicht zweimal in der Historie.
         await expect
             .poll(() => page.evaluate(() => window.history.state as unknown))
             .toMatchObject({ forward: '/geraete/1' });
@@ -163,9 +163,9 @@ test.describe('Prüffristen (lokal)', () => {
         // Die Bestätigung gilt nur für diesen Besuch, auch „Suchen“ zeigt sie nicht mehr.
         const nav = page.getByRole('navigation', { name: 'Hauptmenü' });
         await nav.getByRole('link', { name: 'Suchen' }).click();
-        await expect(page.getByRole('searchbox', { name: 'Gerät suchen' })).toBeVisible();
+        await expect(page.getByRole('searchbox', { name: 'Ausrüstung suchen' })).toBeVisible();
         await expect(page.getByTestId('booking-notice')).toBeHidden();
-        await nav.getByRole('link', { name: 'Prüffristen' }).click();
+        await nav.getByRole('link', { name: 'Termine' }).click();
         await expect(page.getByTestId('overdue-count')).toBeVisible();
         await expect(page.getByTestId('booking-notice')).toBeHidden();
     });
@@ -185,20 +185,20 @@ test.describe('Prüffristen (lokal)', () => {
     });
 });
 
-test.describe('Prüffristen ohne fällige Geräte', () => {
+test.describe('Termine ohne fällige Geräte', () => {
     test.use({ api: { 'GET api/v1/auth/me': ME, ...NO_DEVICES } });
 
     test('Hinweise statt Listen', async ({ page }) => {
         await page.goto('/firefighting/test/prueffristen');
-        await expect(page.getByTestId('overdue-empty')).toHaveText('Keine Prüfung überfällig.');
+        await expect(page.getByTestId('overdue-empty')).toHaveText('Keine Wartung überfällig.');
         await expect(page.getByTestId('due-soon-empty')).toHaveText(
-            'In den nächsten 30 Tagen ist keine Prüfung fällig.',
+            'In den nächsten 30 Tagen ist keine Wartung fällig.',
         );
-        await expect(page.getByTestId('overdue-count')).toHaveText('0 Geräte');
+        await expect(page.getByTestId('overdue-count')).toHaveText('0 Ausrüstungen');
     });
 });
 
-test.describe('Prüffristen auf dem Server (mehr als 2000 Geräte)', () => {
+test.describe('Termine auf dem Server (mehr als 2000 Ausrüstungen)', () => {
     test.use({
         api: {
             'GET api/v1/auth/me': ME,
@@ -229,9 +229,9 @@ test.describe('Prüffristen auf dem Server (mehr als 2000 Geräte)', () => {
 
     test('Abschnitte vom Server, Hinweis bei mehr Geräten', async ({ page, apiRequests }) => {
         await page.goto('/firefighting/test/prueffristen');
-        await expect(page.getByTestId('overdue-count')).toHaveText('250 Geräte');
+        await expect(page.getByTestId('overdue-count')).toHaveText('250 Ausrüstungen');
         await expect(page.getByTestId('overdue-list').getByTestId('inspection-due')).toHaveText([
-            'Prüfung: 19.10.2026 · seit 10 Tagen überfällig',
+            'Wartung: 19.10.2026 · seit 10 Tagen überfällig',
         ]);
         await expect(page.getByTestId('overdue-more')).toHaveText('Angezeigt werden die ersten 1.');
         await expect(page.getByTestId('due-soon-empty')).toBeVisible();
@@ -241,7 +241,7 @@ test.describe('Prüffristen auf dem Server (mehr als 2000 Geräte)', () => {
     });
 });
 
-test.describe('Prüffristen: Liste nicht ladbar', () => {
+test.describe('Termine: Liste nicht ladbar', () => {
     let calls = 0;
     test.use({
         api: {
@@ -263,6 +263,6 @@ test.describe('Prüffristen: Liste nicht ladbar', () => {
         await page.goto('/firefighting/test/prueffristen');
         await expect(page.getByRole('alert')).toContainText('database_unavailable');
         await page.getByRole('button', { name: 'Erneut versuchen' }).click();
-        await expect(page.getByTestId('overdue-count')).toHaveText('2 Geräte');
+        await expect(page.getByTestId('overdue-count')).toHaveText('2 Ausrüstungen');
     });
 });

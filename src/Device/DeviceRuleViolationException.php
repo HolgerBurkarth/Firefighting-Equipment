@@ -52,7 +52,7 @@ final class DeviceRuleViolationException extends DeviceException
     {
         $parts = [];
         if ($devices > 0) {
-            $parts[] = $devices === 1 ? '1 Gerät' : sprintf('%d Geräte', $devices);
+            $parts[] = $devices === 1 ? '1 Ausrüstung' : sprintf('%d Ausrüstungen', $devices);
         }
         if ($sublocations > 0) {
             $parts[] = $sublocations === 1 ? '1 aktiver Unterstandort' : sprintf('%d aktive Unterstandorte', $sublocations);
@@ -60,7 +60,7 @@ final class DeviceRuleViolationException extends DeviceException
 
         return new self(
             sprintf(
-                'Der Standort „%s“ ist nicht leer (%s). Bitte zuerst die Geräte umbuchen bzw. die Unterstandorte sperren.',
+                'Der Standort „%s“ ist nicht leer (%s). Bitte zuerst die Ausrüstung umbuchen bzw. die Unterstandorte sperren.',
                 $name->value,
                 implode(', ', $parts),
             ),
@@ -79,7 +79,7 @@ final class DeviceRuleViolationException extends DeviceException
     public static function locationLocked(LocationName $location): self
     {
         return new self(sprintf(
-            'Der Standort „%s“ ist gesperrt und kann keine Geräte aufnehmen.',
+            'Der Standort „%s“ ist gesperrt und kann keine Ausrüstung aufnehmen.',
             $location->value,
         ));
     }
@@ -87,7 +87,7 @@ final class DeviceRuleViolationException extends DeviceException
     public static function deviceTypeInactive(DeviceTypeName $type): self
     {
         return new self(sprintf(
-            'Der Gerätetyp „%s“ ist deaktiviert und kann keinem Gerät zugeordnet werden.',
+            'Der Ausrüstungstyp „%s“ ist deaktiviert und kann keiner Ausrüstung zugeordnet werden.',
             $type->value,
         ));
     }
@@ -95,7 +95,7 @@ final class DeviceRuleViolationException extends DeviceException
     public static function deviceRetired(DeviceIdentifier $identifier): self
     {
         return new self(sprintf(
-            'Das Gerät „%s“ ist ausgesondert; Stammdaten und Prüfdatum lassen sich erst nach der Wiederaufnahme ändern.',
+            'Die Ausrüstung „%s“ ist ausgesondert; Stammdaten und Wartungsdatum lassen sich erst nach der Wiederaufnahme ändern.',
             $identifier->value,
         ));
     }
@@ -103,20 +103,20 @@ final class DeviceRuleViolationException extends DeviceException
     public static function retiredNotMovable(DeviceIdentifier $identifier): self
     {
         return new self(sprintf(
-            'Das Gerät „%s“ ist ausgesondert; Standort und Status lassen sich erst nach der Wiederaufnahme ändern.',
+            'Die Ausrüstung „%s“ ist ausgesondert; Standort und Status lassen sich erst nach der Wiederaufnahme ändern.',
             $identifier->value,
         ));
     }
 
     public static function alreadyRetired(DeviceIdentifier $identifier): self
     {
-        return new self(sprintf('Das Gerät „%s“ ist bereits ausgesondert.', $identifier->value));
+        return new self(sprintf('Die Ausrüstung „%s“ ist bereits ausgesondert.', $identifier->value));
     }
 
     public static function notRetired(DeviceIdentifier $identifier): self
     {
         return new self(sprintf(
-            'Das Gerät „%s“ ist nicht ausgesondert und kann daher nicht wieder aufgenommen werden.',
+            'Die Ausrüstung „%s“ ist nicht ausgesondert und kann daher nicht wieder aufgenommen werden.',
             $identifier->value,
         ));
     }
@@ -132,7 +132,7 @@ final class DeviceRuleViolationException extends DeviceException
     public static function reinstateDeviceTypeInactive(DeviceTypeName $type): self
     {
         return new self(sprintf(
-            'Der Gerätetyp „%s“ ist deaktiviert; bitte beim Wiederaufnehmen einen aktiven Gerätetyp angeben (Feld "device_type_id") oder den Typ wieder aktivieren.',
+            'Der Ausrüstungstyp „%s“ ist deaktiviert; bitte beim Wiederaufnehmen einen aktiven Ausrüstungstyp angeben (Feld "device_type_id") oder den Typ wieder aktivieren.',
             $type->value,
         ));
     }

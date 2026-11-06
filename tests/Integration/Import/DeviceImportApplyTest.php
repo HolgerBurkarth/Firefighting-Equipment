@@ -135,7 +135,7 @@ final class DeviceImportApplyTest extends ImportApiTestCase
 
         self::assertError(409, 'import_outdated', $response);
         self::assertSame(
-            'Seit der Vorschau wurden Geräte, Standorte oder Gerätetypen geändert, oder die Datei ist eine andere. Bitte die Vorschau neu erstellen.',
+            'Seit der Vorschau wurden Ausrüstung, Standorte oder Ausrüstungstypen geändert, oder die Datei ist eine andere. Bitte die Vorschau neu erstellen.',
             self::json($response)['message'],
         );
         self::assertSame(['rows' => 1, 'new' => 0, 'changed' => 1, 'unchanged' => 0, 'skipped' => 0, 'errors' => 0, 'warnings' => 0], self::json($response)['details']['summary']);

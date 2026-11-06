@@ -35,7 +35,7 @@ final class MailTemplates
     private const int LOG_VALUE_LENGTH = 200;
 
     /** "-- " mit Leerzeichen: Trennzeile einer Signatur (Mailprogramme blenden sie ab hier ab). */
-    private const string SIGNATURE = "\n\n-- \nFeuerwehr Geräteverwaltung\n"
+    private const string SIGNATURE = "\n\n-- \nFeuerwehr Ausrüstungsverwaltung\n"
         . "Diese E-Mail wurde automatisch erstellt. Bitte nicht darauf antworten.\n";
 
     /**
@@ -50,8 +50,8 @@ final class MailTemplates
         $text = <<<TXT
             {$greeting}
 
-            für Ihr Konto bei der Feuerwehr Geräteverwaltung ({$area})
-            wurde das Zurücksetzen des Passworts angefordert.
+            für Ihr Konto bei der Feuerwehr Ausrüstungsverwaltung
+            ({$area}) wurde das Zurücksetzen des Passworts angefordert.
 
             Über diesen Link legen Sie ein neues Passwort fest:
 
@@ -90,7 +90,7 @@ final class MailTemplates
         $text = <<<TXT
             {$greeting}
 
-            das Passwort Ihres Kontos bei der Feuerwehr Geräteverwaltung
+            das Passwort Ihres Kontos bei der Feuerwehr Ausrüstungsverwaltung
             ({$area}) wurde am {$when} geändert.{$device}
 
             Bestehende Anmeldungen wurden beendet.
@@ -120,8 +120,8 @@ final class MailTemplates
         $text = <<<TXT
             {$greeting}
 
-            vielen Dank für Ihre Registrierung bei der Feuerwehr Geräteverwaltung
-            ({$area}).
+            vielen Dank für Ihre Registrierung bei der Feuerwehr
+            Ausrüstungsverwaltung ({$area}).
 
             Bitte bestätigen Sie Ihre E-Mail-Adresse über diesen Link:
 
@@ -159,7 +159,7 @@ final class MailTemplates
             {$greeting}
 
             mit Ihrer E-Mail-Adresse wurde soeben eine Registrierung bei der
-            Feuerwehr Geräteverwaltung ({$area}) versucht.
+            Feuerwehr Ausrüstungsverwaltung ({$area}) versucht.
             Für diese Adresse besteht dort bereits ein Konto; es wurde kein neues
             angelegt.
 
@@ -196,7 +196,7 @@ final class MailTemplates
         $text = <<<TXT
             {$greeting}
 
-            bei der Feuerwehr Geräteverwaltung ({$area})
+            bei der Feuerwehr Ausrüstungsverwaltung ({$area})
             hat sich eine neue Person registriert und ihre E-Mail-Adresse bestätigt:
 
             Name: {$name}
@@ -226,7 +226,7 @@ final class MailTemplates
         $text = <<<TXT
             {$greeting}
 
-            Ihr Konto bei der Feuerwehr Geräteverwaltung ({$area})
+            Ihr Konto bei der Feuerwehr Ausrüstungsverwaltung ({$area})
             wurde freigeschaltet. Ihre Rolle: {$role}.
 
             Sie können sich ab sofort anmelden:
@@ -253,11 +253,11 @@ final class MailTemplates
         $text = <<<TXT
             {$greeting}
 
-            Sie wurden als Admin für die Feuerwehr Geräteverwaltung eingeladen:
+            Sie wurden als Admin für die Feuerwehr Ausrüstungsverwaltung eingeladen:
 
             {$area}
 
-            Als Admin verwalten Sie Geräte, Standorte und die Benutzer Ihrer
+            Als Admin verwalten Sie Ausrüstung, Standorte und die Benutzer Ihrer
             Feuerwehr. Über diesen Link legen Sie Ihren Namen und Ihr Passwort fest:
 
             {$link}
@@ -324,7 +324,7 @@ final class MailTemplates
         $text = <<<TXT
             {$greeting}
 
-            Ihre Registrierung bei der Feuerwehr Geräteverwaltung
+            Ihre Registrierung bei der Feuerwehr Ausrüstungsverwaltung
             ({$area}) wurde nicht freigegeben.
             Ihre Angaben wurden gelöscht.
 
@@ -354,7 +354,7 @@ final class MailTemplates
         $area = self::area($tenant);
         $lines = [
             'Vorgang: ' . self::deviceLogAction($events),
-            'Gerät: ' . $device->identifier->value . ' (' . $device->deviceTypeName . ')',
+            'Ausrüstung: ' . $device->identifier->value . ' (' . $device->deviceTypeName . ')',
             'Wer: ' . $first->userName,
             'Wann: ' . self::when($first->createdAt),
         ];
@@ -365,12 +365,12 @@ final class MailTemplates
             $lines[] = 'Kommentar: ' . self::logValue($first->comment);
         }
         $details = implode("\n", $lines);
-        $link = self::logLink('Zum Gerät in der Anwendung:', $url);
+        $link = self::logLink('Zur Ausrüstung in der Anwendung:', $url);
         $footer = self::deviceLogFooter();
         $text = <<<TXT
             {$greeting}
 
-            bei der Feuerwehr Geräteverwaltung ({$area})
+            bei der Feuerwehr Ausrüstungsverwaltung ({$area})
             wurde ein Vorgang protokolliert:
 
             {$details}
@@ -403,7 +403,7 @@ final class MailTemplates
         $area = self::area($tenant);
         $lines = [
             'Vorgang: Sammelaktion (' . $reason . ')',
-            'Geräte: ' . count($changes),
+            'Ausrüstungen: ' . count($changes),
             'Wer: ' . $first->userName,
             'Wann: ' . self::when($first->createdAt),
         ];
@@ -422,12 +422,12 @@ final class MailTemplates
             }
         }
         $deviceText = implode("\n", $deviceLines);
-        $link = self::logLink('Zur Geräteliste in der Anwendung:', $url);
+        $link = self::logLink('Zur Ausrüstungsliste in der Anwendung:', $url);
         $footer = self::deviceLogFooter();
         $text = <<<TXT
             {$greeting}
 
-            bei der Feuerwehr Geräteverwaltung ({$area})
+            bei der Feuerwehr Ausrüstungsverwaltung ({$area})
             wurde eine Sammelaktion protokolliert:
 
             {$details}
@@ -439,7 +439,7 @@ final class MailTemplates
             {$link}{$footer}
             TXT;
 
-        return self::message($recipient, self::logSubject($tenant, sprintf('%d Geräte – %s', count($changes), $reason)), $text);
+        return self::message($recipient, self::logSubject($tenant, sprintf('%d Ausrüstungen – %s', count($changes), $reason)), $text);
     }
 
     /**
@@ -465,7 +465,7 @@ final class MailTemplates
         }
         $lines = [
             'Hinweis: ' . $notice->kind->label(),
-            'Gerät: ' . self::logValue($notice->deviceIdentifier) . ' (' . $notice->deviceTypeName . ')',
+            'Ausrüstung: ' . self::logValue($notice->deviceIdentifier) . ' (' . $notice->deviceTypeName . ')',
             '',
             'Buchung vom Handy:',
             'Wer: ' . self::noticeUser($notice->user),
@@ -495,8 +495,8 @@ final class MailTemplates
         $text = <<<TXT
             {$greeting}
 
-            bei der Feuerwehr Geräteverwaltung ({$area}) gibt es einen
-            neuen Hinweis zu einer Offline-Buchung:
+            bei der Feuerwehr Ausrüstungsverwaltung ({$area})
+            gibt es einen neuen Hinweis zu einer Offline-Buchung:
 
             {$details}
 
@@ -559,12 +559,12 @@ final class MailTemplates
             $rowLines[] = sprintf('… und %d weitere', count($rows) - count($rowLines));
         }
         $rowText = implode("\n", $rowLines);
-        $link = self::logLink('Zur Geräteliste in der Anwendung:', $url);
+        $link = self::logLink('Zur Ausrüstungsliste in der Anwendung:', $url);
         $footer = self::deviceLogFooter();
         $text = <<<TXT
             {$greeting}
 
-            bei der Feuerwehr Geräteverwaltung ({$area})
+            bei der Feuerwehr Ausrüstungsverwaltung ({$area})
             wurde ein CSV-Import übernommen:
 
             {$details}
@@ -592,7 +592,7 @@ final class MailTemplates
         $text = <<<TXT
             Hallo,
 
-            dies ist eine Testmail der Feuerwehr Geräteverwaltung, erzeugt am
+            dies ist eine Testmail der Feuerwehr Ausrüstungsverwaltung, erzeugt am
             {$when} (deutsche Zeit) mit bin/mail-test.php.
 
             Umlaute zur Kontrolle: ä ö ü Ä Ö Ü ß – „Anführungszeichen“ – €
@@ -601,7 +601,7 @@ final class MailTemplates
             Quelltext anzeigen (SPF, DKIM, Return-Path).
             TXT;
 
-        return new MailMessage($to, null, 'Testmail der Feuerwehr Geräteverwaltung (ä ö ü)', $text . self::SIGNATURE);
+        return new MailMessage($to, null, 'Testmail der Feuerwehr Ausrüstungsverwaltung (ä ö ü)', $text . self::SIGNATURE);
     }
 
     /**
@@ -663,7 +663,7 @@ final class MailTemplates
             }
         }
 
-        return $events[0]->type === DeviceEventType::DueChanged ? 'Prüfdatum geändert' : 'Stammdaten geändert';
+        return $events[0]->type === DeviceEventType::DueChanged ? 'Wartungsdatum geändert' : 'Stammdaten geändert';
     }
 
     /**
@@ -693,7 +693,7 @@ final class MailTemplates
             $parts[] = count($statuses) === 1 ? 'Status ' . array_values($statuses)[0]->label() : 'Status geändert';
         }
 
-        return $parts === [] ? 'Prüfdatum geändert' : implode(', ', $parts);
+        return $parts === [] ? 'Wartungsdatum geändert' : implode(', ', $parts);
     }
 
     /**
@@ -713,7 +713,7 @@ final class MailTemplates
                 $lines[] = 'Status: ' . ($event->fromStatus?->label() ?? '–') . ' → ' . $event->toStatus->label();
             }
         } elseif ($event->type === DeviceEventType::DueChanged) {
-            $lines[] = 'Nächste Prüfung: ' . self::logDate($event->fromDue?->value) . ' → ' . self::logDate($event->toDue?->value);
+            $lines[] = 'Nächste Wartung: ' . self::logDate($event->fromDue?->value) . ' → ' . self::logDate($event->toDue?->value);
         } elseif ($event->field !== null) {
             $format = $event->field === DeviceField::ProcuredOn
                 ? self::logDate(...)

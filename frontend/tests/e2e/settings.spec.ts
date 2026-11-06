@@ -414,20 +414,22 @@ test.describe('Einstellungen', () => {
 
     test('Benachrichtigung „Log“ wirkt sofort', async ({ page, apiRequests }) => {
         await page.goto(SETTINGS);
-        const toggle = page.getByRole('checkbox', { name: /Mail bei jeder Änderung an Geräten/ });
+        const toggle = page.getByRole('checkbox', {
+            name: /Mail bei jeder Änderung an der Ausrüstung/,
+        });
         await expect(toggle).toBeEnabled();
         await expect(toggle).not.toBeChecked();
         await expect(page.locator('#notification-hint')).toContainText('an anna@example.org');
 
         await toggle.check();
         await expect(page.getByRole('status').filter({ hasText: 'Gespeichert' })).toHaveText(
-            'Gespeichert: Sie erhalten ab jetzt eine Mail bei jeder Änderung an Geräten.',
+            'Gespeichert: Sie erhalten ab jetzt eine Mail bei jeder Änderung an der Ausrüstung.',
         );
         await page.reload();
         await expect(toggle).toBeChecked();
         await toggle.uncheck();
         await expect(page.getByRole('status').filter({ hasText: 'Gespeichert' })).toHaveText(
-            'Gespeichert: Sie erhalten keine Mails zu Änderungen an Geräten mehr.',
+            'Gespeichert: Sie erhalten keine Mails zu Änderungen an der Ausrüstung mehr.',
         );
         expect(bodies(apiRequests, 'POST api/v1/auth/notifications')).toEqual([
             { device_log: true },
@@ -478,7 +480,9 @@ test.describe('Einstellungen: Fehler des Servers', () => {
         await expect(page.getByLabel(/Farbe als Hex-Wert/)).toHaveValue('#4B3B7A');
         await expect(page.getByRole('button', { name: 'Farbe speichern' })).toBeEnabled();
 
-        const toggle = page.getByRole('checkbox', { name: /Mail bei jeder Änderung an Geräten/ });
+        const toggle = page.getByRole('checkbox', {
+            name: /Mail bei jeder Änderung an der Ausrüstung/,
+        });
         await toggle.click();
         await expect(toggle).not.toBeChecked();
         await expect(page.getByRole('alert')).toHaveCount(2);

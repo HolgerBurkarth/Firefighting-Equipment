@@ -170,7 +170,7 @@ export function shareContent(
 ): ShareContent {
     return {
         title: `Registrierung ${tenantName}`,
-        text: `Registrierung in der Geräteverwaltung (${tenantName}): Link öffnen, Formular ausfüllen und die E-Mail-Adresse bestätigen. Einladungscode ${code}, gültig bis ${dateTimeText(expiresAt)}.`,
+        text: `Registrierung in der Ausrüstungsverwaltung (${tenantName}): Link öffnen, Formular ausfüllen und die E-Mail-Adresse bestätigen. Einladungscode ${code}, gültig bis ${dateTimeText(expiresAt)}.`,
         url: registerLink(code, baseUri),
     };
 }

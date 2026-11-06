@@ -29,7 +29,7 @@ const name = computed(() =>
         />
         <div class="brand-text">
             <p class="brand-name" data-testid="brand-name">{{ name }}</p>
-            <p class="brand-sub">Geräteverwaltung</p>
+            <p class="brand-sub">Ausrüstungsverwaltung</p>
         </div>
     </div>
 </template>

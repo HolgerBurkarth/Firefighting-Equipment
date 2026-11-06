@@ -120,7 +120,7 @@ export function offlineBookingProblem(
     now: Date,
 ): string | null {
     if (syncedAt === null) {
-        return 'Ohne Verbindung kann erst gebucht werden, wenn die Geräte einmal geladen wurden. Bitte mit dem Internet verbinden.';
+        return 'Ohne Verbindung kann erst gebucht werden, wenn die Ausrüstung einmal geladen wurde. Bitte mit dem Internet verbinden.';
     }
     return now.getTime() - Date.parse(syncedAt) > limits.maxAgeDays * DAY_MS
         ? 'Daten zu alt, bitte mit dem Internet verbinden.'

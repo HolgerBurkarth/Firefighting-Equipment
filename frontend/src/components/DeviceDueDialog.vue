@@ -53,7 +53,7 @@ useUnsavedInput(() => unsaved.value);
 
 const currentText = computed(() =>
     props.device.nextInspectionDue === null
-        ? 'Bisher ist kein Prüfdatum festgelegt.'
+        ? 'Bisher ist kein Wartungsdatum festgelegt.'
         : `Bisher: ${germanDate(props.device.nextInspectionDue)}`,
 );
 
@@ -82,8 +82,8 @@ async function submit(): Promise<void> {
             'saved',
             result.data,
             date === null
-                ? `Prüfdatum von ${identifier} entfernt.`
-                : `Nächste Prüfung von ${identifier}: ${germanDate(date)}.`,
+                ? `Wartungsdatum von ${identifier} entfernt.`
+                : `Nächste Wartung von ${identifier}: ${germanDate(date)}.`,
         );
         return;
     }
@@ -104,7 +104,7 @@ async function submit(): Promise<void> {
     <FormDialog
         v-model:open="open"
         :unsaved="unsaved"
-        :title="`Prüfdatum von ${device.identifier}`"
+        :title="`Wartungsdatum von ${device.identifier}`"
         :description="currentText"
         submit-label="Speichern"
         :busy="busy"
@@ -114,10 +114,11 @@ async function submit(): Promise<void> {
         @submit="submit"
     >
         <p v-if="conflict" class="notice notice-info" role="alert" data-testid="due-conflict">
-            Das Gerät wurde inzwischen geändert (siehe oben). Bitte prüfen und erneut speichern.
+            Die Ausrüstung wurde inzwischen geändert (siehe oben). Bitte prüfen und erneut
+            speichern.
         </p>
         <label class="field">
-            <span class="field-label">Nächste Prüfung fällig am</span>
+            <span class="field-label">Nächste Wartung fällig am</span>
             <input
                 v-model="due"
                 class="input"
@@ -129,7 +130,7 @@ async function submit(): Promise<void> {
                 @input="touched = true"
             />
             <span :id="`${id}-hint`" class="field-hint">
-                Leer lassen, um das Prüfdatum zu entfernen.
+                Leer lassen, um das Wartungsdatum zu entfernen.
             </span>
             <p v-if="shownProblem !== null" :id="`${id}-error`" class="field-error">
                 {{ shownProblem }}

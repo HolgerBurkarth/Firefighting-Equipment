@@ -20,8 +20,8 @@ import { horizontalOverflow } from './support/layout';
 import { delegate, deviceTypeServer, locationServer } from './support/masterData';
 
 /**
- * Neues Gerät (`geraete/neu`, KONZEPT.md, "Admin-Konsole – Entscheidungen", 32): Prüfung beim
- * Tippen, „Speichern und nächstes“ (Typ, Standort, Prüfdatum bleiben, Kennung zählt weiter),
+ * Neue Ausrüstung (`geraete/neu`, KONZEPT.md, "Admin-Konsole – Entscheidungen", 32): Prüfung beim
+ * Tippen, „Speichern und nächstes“ (Typ, Standort, Wartungsdatum bleiben, Nummer zählt weiter),
  * „Speichern“ öffnet das Gerätedetail, Scan-Code per Handscanner (Enter speichert nicht) oder
  * Kamera, Ablehnungen des Servers am Feld. Der simulierte Server legt Geräte ab ID 100 an.
  */
@@ -119,31 +119,31 @@ async function choose(page: Page, label: string, option: string): Promise<void> 
 
 async function open(page: Page): Promise<void> {
     await page.goto('/firefighting/test/geraete/neu');
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Neues Gerät');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Neue Ausrüstung');
 }
 
-test.describe('Neues Gerät', () => {
+test.describe('Neue Ausrüstung', () => {
     useServer();
 
-    test('aus der Geräteliste, Fokus auf der Kennung', async ({ page }) => {
+    test('aus der Ausrüstungsliste, Fokus auf der Nummer', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
         await page.goto('/firefighting/test/geraete');
-        await page.getByRole('link', { name: 'Neues Gerät' }).click();
+        await page.getByRole('link', { name: 'Neue Ausrüstung' }).click();
         await expect(page).toHaveURL(/\/geraete\/neu$/);
-        await expect(page.getByLabel('Kennung')).toBeFocused();
+        await expect(page.getByLabel(/^Nummer/)).toBeFocused();
         // Menü: „Geräte“ bleibt hervorgehoben.
         await expect(
             page
                 .getByRole('navigation', { name: 'Hauptmenü' })
-                .getByRole('link', { name: 'Geräte', exact: true }),
+                .getByRole('link', { name: 'Ausrüstung', exact: true }),
         ).toHaveClass(/menu-link-active/);
         await page.getByRole('button', { name: 'Zurück' }).click();
         await expect(page).toHaveURL(/\/geraete$/);
     });
 
-    test('nur aktive Gerätetypen und Standorte zur Auswahl', async ({ page }) => {
+    test('nur aktive Ausrüstungstypen und Standorte zur Auswahl', async ({ page }) => {
         await open(page);
-        await page.getByRole('combobox', { name: 'Gerätetyp' }).click();
+        await page.getByRole('combobox', { name: 'Ausrüstungstyp' }).click();
         await expect(page.getByRole('option')).toHaveText(['Atemschutzgerät', 'Atemschutzmaske']);
         await page.keyboard.press('Escape');
         await page.getByRole('combobox', { name: 'Standort' }).click();
@@ -157,39 +157,41 @@ test.describe('Neues Gerät', () => {
         await open(page);
         await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page.locator('[data-field="identifier"] .field-error')).toHaveText(
-            'Bitte eine Kennung eingeben.',
+            'Bitte eine Nummer eingeben.',
         );
         await expect(page.getByTestId('save-problem')).toContainText(
-            'Nicht gespeichert: Bitte eine Kennung eingeben.',
+            'Nicht gespeichert: Bitte eine Nummer eingeben.',
         );
-        await expect(page.getByTestId('type-problem')).toHaveText('Bitte einen Gerätetyp wählen.');
+        await expect(page.getByTestId('type-problem')).toHaveText(
+            'Bitte einen Ausrüstungstyp wählen.',
+        );
         await expect(page.getByTestId('location-problem')).toHaveText(
             'Bitte einen Standort wählen.',
         );
-        await expect(page.getByLabel('Kennung')).toBeFocused();
-        await page.getByLabel('Kennung').fill('M 24!');
+        await expect(page.getByLabel(/^Nummer/)).toBeFocused();
+        await page.getByLabel(/^Nummer/).fill('M 24!');
         await expect(page.locator('[data-field="identifier"] .field-error')).toContainText(
             'Nur Buchstaben, Ziffern',
         );
         expect(posts(apiRequests)).toEqual([]);
     });
 
-    test('Speichern und nächstes: Typ, Standort und Prüfdatum bleiben, Kennung zählt weiter', async ({
+    test('Speichern und nächstes: Typ, Standort und Wartungsdatum bleiben, Nummer zählt weiter', async ({
         page,
         apiRequests,
     }) => {
         await open(page);
-        await page.getByLabel('Kennung').fill('M24');
-        await choose(page, 'Gerätetyp', 'Atemschutzmaske');
+        await page.getByLabel(/^Nummer/).fill('M24');
+        await choose(page, 'Ausrüstungstyp', 'Atemschutzmaske');
         await choose(page, 'Standort', 'HLF 20 / G1');
         await page.getByRole('radio', { name: 'in Wartung' }).check();
-        await page.getByLabel('Nächste Prüfung (optional)').fill('2027-03-01');
+        await page.getByLabel('Nächste Wartung (optional)').fill('2027-03-01');
         await page.getByLabel('Seriennummer (optional)').fill('SN-24');
         await page.getByLabel('Kommentar für den Verlauf (optional)').fill('Neu beschafft');
         // Enter in einem Feld = „Speichern und nächstes“.
         await page.getByLabel('Seriennummer (optional)').press('Enter');
 
-        await expect(page.getByTestId('created')).toHaveText('✓ M24 angelegt. Gerät öffnen');
+        await expect(page.getByTestId('created')).toHaveText('✓ M24 angelegt. Ausrüstung öffnen');
         expect(posts(apiRequests)).toEqual([
             {
                 identifier: 'M24',
@@ -201,13 +203,13 @@ test.describe('Neues Gerät', () => {
                 comment: 'Neu beschafft',
             },
         ]);
-        await expect(page.getByLabel('Kennung')).toHaveValue('M25');
-        await expect(page.getByLabel('Kennung')).toBeFocused();
-        await expect(page.getByRole('combobox', { name: 'Gerätetyp' })).toHaveText(
+        await expect(page.getByLabel(/^Nummer/)).toHaveValue('M25');
+        await expect(page.getByLabel(/^Nummer/)).toBeFocused();
+        await expect(page.getByRole('combobox', { name: 'Ausrüstungstyp' })).toHaveText(
             /Atemschutzmaske/,
         );
         await expect(page.getByRole('combobox', { name: 'Standort' })).toHaveText(/HLF 20 \/ G1/);
-        await expect(page.getByLabel('Nächste Prüfung (optional)')).toHaveValue('2027-03-01');
+        await expect(page.getByLabel('Nächste Wartung (optional)')).toHaveValue('2027-03-01');
         await expect(page.getByRole('radio', { name: 'einsatzbereit' })).toBeChecked();
         await expect(page.getByLabel('Seriennummer (optional)')).toHaveValue('');
         await expect(page.getByLabel('Kommentar für den Verlauf (optional)')).toHaveValue('');
@@ -221,9 +223,9 @@ test.describe('Neues Gerät', () => {
             status: 'ready',
             next_inspection_due: '2027-03-01',
         });
-        await expect(page.getByLabel('Kennung')).toHaveValue('M26');
+        await expect(page.getByLabel(/^Nummer/)).toHaveValue('M26');
 
-        await expect(page.getByRole('link', { name: 'Gerät öffnen' })).toHaveAttribute(
+        await expect(page.getByRole('link', { name: 'Ausrüstung öffnen' })).toHaveAttribute(
             'href',
             /\/geraete\/101\/details$/,
         );
@@ -231,8 +233,8 @@ test.describe('Neues Gerät', () => {
 
     test('Speichern öffnet das neue Gerät mit Bestätigung', async ({ page }) => {
         await open(page);
-        await page.getByLabel('Kennung').fill('PA 7');
-        await choose(page, 'Gerätetyp', 'Atemschutzgerät');
+        await page.getByLabel(/^Nummer/).fill('PA 7');
+        await choose(page, 'Ausrüstungstyp', 'Atemschutzgerät');
         await choose(page, 'Standort', 'LF 10');
         await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/\/geraete\/100\/details$/);
@@ -248,14 +250,14 @@ test.describe('Neues Gerät', () => {
         apiRequests,
     }) => {
         await open(page);
-        await page.getByLabel('Kennung').fill('M24');
-        await choose(page, 'Gerätetyp', 'Atemschutzmaske');
+        await page.getByLabel(/^Nummer/).fill('M24');
+        await choose(page, 'Ausrüstungstyp', 'Atemschutzmaske');
         await choose(page, 'Standort', 'LF 10');
         const scanCode = page.getByLabel('Scan-Code (optional)');
         // Ohne GS: fill() lässt das Steuerzeichen in Firefox weg (GS prüft der Kamera-Test).
         await scanCode.fill('4006381333931');
         await scanCode.press('Enter');
-        await expect(page.getByLabel('Nächste Prüfung (optional)')).toBeFocused();
+        await expect(page.getByLabel('Nächste Wartung (optional)')).toBeFocused();
         expect(posts(apiRequests)).toEqual([]);
         await page.getByRole('button', { name: 'Speichern und nächstes' }).click();
         await expect(page.getByTestId('created')).toContainText('M24 angelegt.');
@@ -264,7 +266,7 @@ test.describe('Neues Gerät', () => {
     });
 });
 
-test.describe('Neues Gerät: Code per Kamera', () => {
+test.describe('Neue Ausrüstung: Code per Kamera', () => {
     useServer();
 
     test('gelesener GS1-Code steht im Feld, die Eingaben bleiben', async ({
@@ -273,8 +275,8 @@ test.describe('Neues Gerät: Code per Kamera', () => {
     }) => {
         await fakeCamera(page, { kind: 'code', symbol: await barcode(GS1_CODE, 'QRCode') });
         await open(page);
-        await page.getByLabel('Kennung').fill('M24');
-        await choose(page, 'Gerätetyp', 'Atemschutzmaske');
+        await page.getByLabel(/^Nummer/).fill('M24');
+        await choose(page, 'Ausrüstungstyp', 'Atemschutzmaske');
         await choose(page, 'Standort', 'LF 10');
         await page.getByRole('button', { name: 'Mit der Kamera scannen' }).click();
         await expect(page.getByTestId('code-preview')).toHaveText(
@@ -282,7 +284,7 @@ test.describe('Neues Gerät: Code per Kamera', () => {
         );
         await expect(page).toHaveURL(/\/geraete\/neu$/);
         await expect(page.getByLabel('Scan-Code (optional)')).toBeFocused();
-        await expect(page.getByLabel('Kennung')).toHaveValue('M24');
+        await expect(page.getByLabel(/^Nummer/)).toHaveValue('M24');
         expect(await cameraCounts(page)).toEqual(cameraReleased(1));
         await page.getByRole('button', { name: 'Speichern und nächstes' }).click();
         await expect(page.getByTestId('created')).toContainText('M24 angelegt.');
@@ -290,7 +292,7 @@ test.describe('Neues Gerät: Code per Kamera', () => {
     });
 });
 
-test.describe('Neues Gerät: Ablehnungen des Servers', () => {
+test.describe('Neue Ausrüstung: Ablehnungen des Servers', () => {
     test.use({ allowedConsoleError: HTTP_ERROR_CONSOLE });
     useServer((request) => {
         const sent = request.body as Record<string, unknown>;
@@ -299,7 +301,7 @@ test.describe('Neues Gerät: Ablehnungen des Servers', () => {
                 status: 409,
                 body: {
                     error: 'identifier_taken',
-                    message: 'Die Kennung „M1“ ist schon vergeben.',
+                    message: 'Die Nummer „M1“ ist schon vergeben.',
                 },
             };
         }
@@ -322,21 +324,21 @@ test.describe('Neues Gerät: Ablehnungen des Servers', () => {
     });
 
     async function fill(page: Page, identifier: string, location: string): Promise<void> {
-        await page.getByLabel('Kennung').fill(identifier);
-        await choose(page, 'Gerätetyp', 'Atemschutzmaske');
+        await page.getByLabel(/^Nummer/).fill(identifier);
+        await choose(page, 'Ausrüstungstyp', 'Atemschutzmaske');
         await choose(page, 'Standort', location);
     }
 
-    test('Kennung vergeben: Meldung am Feld, Eingaben bleiben', async ({ page }) => {
+    test('Nummer vergeben: Meldung am Feld, Eingaben bleiben', async ({ page }) => {
         await open(page);
         await fill(page, 'M1', 'HLF 20 / G1');
         await page.getByRole('button', { name: 'Speichern und nächstes' }).click();
         await expect(page.locator('.field-error')).toHaveText(
-            'Die Kennung „M1“ ist schon vergeben.',
+            'Die Nummer „M1“ ist schon vergeben.',
         );
-        await expect(page.getByLabel('Kennung')).toHaveAttribute('aria-invalid', 'true');
-        await expect(page.getByLabel('Kennung')).toBeFocused();
-        await page.getByLabel('Kennung').fill('M2');
+        await expect(page.getByLabel(/^Nummer/)).toHaveAttribute('aria-invalid', 'true');
+        await expect(page.getByLabel(/^Nummer/)).toBeFocused();
+        await page.getByLabel(/^Nummer/).fill('M2');
         await expect(page.getByText('ist schon vergeben')).toHaveCount(0);
         await page.getByRole('button', { name: 'Speichern und nächstes' }).click();
         await expect(page.getByTestId('created')).toContainText('M2 angelegt.');
@@ -385,14 +387,16 @@ test.describe('Neues Gerät: Ablehnungen des Servers', () => {
 
     test('Hinweis auch bei Fehlern der Eingabe; Auswahlfeld per Sprung (T10)', async ({ page }) => {
         await open(page);
-        await page.getByLabel('Kennung').fill('M5');
+        await page.getByLabel(/^Nummer/).fill('M5');
         await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         const problem = page.getByTestId('save-problem');
-        await expect(problem).toContainText('Nicht gespeichert: Bitte einen Gerätetyp wählen.');
-        await page.getByLabel('Kennung').focus();
-        await problem.getByRole('button', { name: 'Zum Feld „Gerätetyp“' }).click();
-        await expect(page.getByRole('combobox', { name: 'Gerätetyp' })).toBeFocused();
-        await choose(page, 'Gerätetyp', 'Atemschutzmaske');
+        await expect(problem).toContainText(
+            'Nicht gespeichert: Bitte einen Ausrüstungstyp wählen.',
+        );
+        await page.getByLabel(/^Nummer/).focus();
+        await problem.getByRole('button', { name: 'Zum Feld „Ausrüstungstyp“' }).click();
+        await expect(page.getByRole('combobox', { name: 'Ausrüstungstyp' })).toBeFocused();
+        await choose(page, 'Ausrüstungstyp', 'Atemschutzmaske');
         await expect(problem).toContainText('Nicht gespeichert: Bitte einen Standort wählen.');
         await choose(page, 'Standort', 'HLF 20 / G1');
         await expect(problem).toBeHidden();
@@ -403,20 +407,20 @@ test.describe('Neues Gerät: Ablehnungen des Servers', () => {
         await fill(page, 'M5', 'LF 10');
         await page.getByRole('button', { name: 'Speichern und nächstes' }).click();
         await expect(page.getByText('Der Standort ist gesperrt.')).toBeVisible();
-        await expect(page.getByLabel('Kennung')).toHaveValue('M5');
+        await expect(page.getByLabel(/^Nummer/)).toHaveValue('M5');
     });
 });
 
-test.describe('Neues Gerät am Handy', () => {
+test.describe('Neue Ausrüstung am Handy', () => {
     useServer();
 
-    test('Speichern und nächstes: sofort Fokus auf der Kennung, danach ganz oben (T11)', async ({
+    test('Speichern und nächstes: sofort Fokus auf der Nummer, danach ganz oben (T11)', async ({
         page,
     }) => {
         await page.setViewportSize({ width: 390, height: 700 });
         await open(page);
-        await page.getByLabel('Kennung').fill('M24');
-        await choose(page, 'Gerätetyp', 'Atemschutzmaske');
+        await page.getByLabel(/^Nummer/).fill('M24');
+        await choose(page, 'Ausrüstungstyp', 'Atemschutzmaske');
         await choose(page, 'Standort', 'HLF 20 / G1');
         // Die Anfrage hängt, bis der Test sie freigibt.
         let release = (): void => undefined;
@@ -433,24 +437,24 @@ test.describe('Neues Gerät am Handy', () => {
         await save.scrollIntoViewIfNeeded();
         await save.click();
         // Noch im Antippen (iPhone fokussiert nur dort und öffnet nur dann die Tastatur).
-        await expect(page.getByLabel('Kennung')).toBeFocused();
+        await expect(page.getByLabel(/^Nummer/)).toBeFocused();
         release();
         await expect(page.getByTestId('created')).toContainText('M24 angelegt.');
-        await expect(page.getByLabel('Kennung')).toHaveValue('M25');
-        await expect(page.getByLabel('Kennung')).toBeFocused();
-        // Ganz oben: Bestätigung und Kennung im Bild.
+        await expect(page.getByLabel(/^Nummer/)).toHaveValue('M25');
+        await expect(page.getByLabel(/^Nummer/)).toBeFocused();
+        // Ganz oben: Bestätigung und Nummer im Bild.
         await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
         await expect(page.getByTestId('created')).toBeInViewport();
-        await expect(page.getByLabel('Kennung')).toBeInViewport();
+        await expect(page.getByLabel(/^Nummer/)).toBeInViewport();
     });
 
     test('eine Spalte, kein waagerechter Überstand', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await open(page);
         expect(await horizontalOverflow(page)).toBe(0);
-        const identifier = await page.getByLabel('Kennung').boundingBox();
-        const type = await page.getByRole('combobox', { name: 'Gerätetyp' }).boundingBox();
-        // Gerätetyp steht unter der Kennung, nicht daneben.
+        const identifier = await page.getByLabel(/^Nummer/).boundingBox();
+        const type = await page.getByRole('combobox', { name: 'Ausrüstungstyp' }).boundingBox();
+        // Ausrüstungstyp steht unter der Nummer, nicht daneben.
         expect((type?.y ?? 0) > (identifier?.y ?? 0) + (identifier?.height ?? 0)).toBe(true);
         const save = await page
             .getByRole('button', { name: 'Speichern und nächstes' })

@@ -12,7 +12,7 @@ import { horizontalOverflow } from './support/layout';
 import { delegate, locationServer, type TestLocation } from './support/masterData';
 
 /**
- * HLF 20 (10) mit G1 (11, 6 Geräte), G2 (12, leer) und G3 (13, gesperrt); LF 10 (20, 2 Geräte
+ * HLF 20 (10) mit G1 (11, 6 Ausrüstungen), G2 (12, leer) und G3 (13, gesperrt); LF 10 (20, 2 Ausrüstungen
  * ohne Fach); Lager (30, Raum, 5); Altes Lager (40, Raum, gesperrt) mit Regal (41, gesperrt).
  */
 const TREE: readonly TestLocation[] = [
@@ -62,7 +62,7 @@ function lockStillFull(request: MockRequest): MockResponse | null {
               body: {
                   error: 'rule_violation',
                   message:
-                      'Der Standort „G2“ ist nicht leer (1 Gerät). Bitte zuerst die Geräte umbuchen bzw. die Unterstandorte sperren.',
+                      'Der Standort „G2“ ist nicht leer (1 Ausrüstung). Bitte zuerst die Geräte umbuchen bzw. die Unterstandorte sperren.',
                   details: { devices: 1, sublocations: 0 },
               },
           }
@@ -79,7 +79,7 @@ test.use({
         'GET api/v1/auth/me': { status: 200, body: meBody('admin', 'Thomas Keller') },
         ...ADMIN_OVERVIEW,
         ...delegate(() => server.api),
-        // Die Geräteliste (Ziel eines Standorts) lädt die Gerätetypen für ihren Filter.
+        // Die Ausrüstungsliste (Ziel eines Standorts) lädt die Ausrüstungstypen für ihren Filter.
         'GET api/v1/device-types': { status: 200, body: { device_types: [] } },
     },
 });
@@ -126,11 +126,13 @@ test.describe('Standorte (PC)', () => {
             'Lager',
         ]);
         await expect(node(page, 10).locator('.node-meta').first()).toHaveText(
-            'Fahrzeug · 6 Geräte',
+            'Fahrzeug · 6 Ausrüstungen',
         );
-        await expect(node(page, 11).locator('.node-meta')).toHaveText('6 Geräte');
-        await expect(node(page, 20).locator('.node-meta')).toHaveText('Fahrzeug · 2 Geräte');
-        await expect(node(page, 30).locator('.node-meta')).toHaveText('Raum/Lager · 5 Geräte');
+        await expect(node(page, 11).locator('.node-meta')).toHaveText('6 Ausrüstungen');
+        await expect(node(page, 20).locator('.node-meta')).toHaveText('Fahrzeug · 2 Ausrüstungen');
+        await expect(node(page, 30).locator('.node-meta')).toHaveText(
+            'Raum/Lager · 5 Ausrüstungen',
+        );
         await expect(node(page, 13)).toHaveCount(0);
 
         await page.getByLabel('Gesperrte anzeigen (3)').check();
@@ -157,7 +159,7 @@ test.describe('Standorte (PC)', () => {
         await expect(page.getByText('Kein Standort passt zu „Drehleiter“.')).toBeVisible();
     });
 
-    test('die ganze Zeile öffnet die Geräteliste des Standorts bzw. Fachs, Knöpfe nicht', async ({
+    test('die ganze Zeile öffnet die Ausrüstungsliste des Standorts bzw. Fachs, Knöpfe nicht', async ({
         page,
     }) => {
         await open(page);
@@ -215,7 +217,9 @@ test.describe('Standorte (PC)', () => {
         await form.getByRole('button', { name: 'Anlegen' }).click();
         await expect(form).toBeHidden();
         await expect(page.getByTestId('success-notice')).toHaveText('„Werkstatt“ wurde angelegt.');
-        await expect(node(page, 901).locator('.node-meta')).toHaveText('Raum/Lager · 0 Geräte');
+        await expect(node(page, 901).locator('.node-meta')).toHaveText(
+            'Raum/Lager · 0 Ausrüstungen',
+        );
         const created = apiRequests.filter((request) => request.method === 'POST');
         expect(created.map((request) => request.body)).toEqual([
             { name: 'Werkstatt', kind: 'room' },
@@ -296,7 +300,7 @@ test.describe('Standorte (PC)', () => {
 
         await page.getByRole('button', { name: 'HLF 20 / G1 bearbeiten' }).click();
         await expect(form.getByTestId('lock-blocker')).toHaveText(
-            'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 6 Geräte.',
+            'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 6 Ausrüstungen.',
         );
         await expect(form.getByRole('button', { name: 'G1 sperren' })).toBeDisabled();
         await form.getByRole('button', { name: 'Abbrechen' }).click();
@@ -347,14 +351,16 @@ test.describe('Standorte (PC)', () => {
                 .getByRole('button', { name: 'Sperren' })
                 .click();
             await expect(
-                page.getByText('Der Standort „G2“ ist nicht leer (1 Gerät).', { exact: false }),
+                page.getByText('Der Standort „G2“ ist nicht leer (1 Ausrüstung).', {
+                    exact: false,
+                }),
             ).toBeVisible();
             await expect(node(page, 12).getByText('gesperrt')).toHaveCount(0);
         });
     });
 });
 
-test('Handy: die ganze Zeile öffnet die Geräteliste des Fachs', async ({ page }) => {
+test('Handy: die ganze Zeile öffnet die Ausrüstungsliste des Fachs', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await open(page);
     await node(page, 12).locator('.node-meta').click();

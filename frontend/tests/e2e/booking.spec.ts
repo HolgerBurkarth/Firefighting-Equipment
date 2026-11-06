@@ -61,7 +61,7 @@ function stateRequests(requests: readonly MockRequest[]): Record<string, unknown
 /** Über „Suchen“ öffnen (wie im Alltag): Danach führt Speichern zurück. */
 async function openFromSearch(page: Page): Promise<void> {
     await page.goto('/firefighting/test/suchen');
-    await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('M1');
+    await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('M1');
     await page.getByTestId('device-card').first().click();
     await expect(
         page.getByRole('heading', { level: 1, name: 'M1 · Atemschutzmaske' }),
@@ -139,7 +139,7 @@ test.describe('Umbuchen und Status', () => {
             .poll(() => page.evaluate(() => window.history.state as unknown))
             .toMatchObject({ forward: '/geraete/1' });
         // Die Bestätigung verschwindet mit der nächsten Eingabe.
-        await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('x');
+        await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('x');
         await expect(page.getByTestId('booking-notice')).toBeHidden();
     });
 
@@ -275,7 +275,7 @@ test.describe('Konflikt', () => {
                     status: 409,
                     body: {
                         error: 'version_conflict',
-                        message: 'Das Gerät wurde inzwischen geändert.',
+                        message: 'Die Ausrüstung wurde inzwischen geändert.',
                         details: {
                             device: deviceJson(1, {
                                 version: 2,
@@ -306,7 +306,7 @@ test.describe('Konflikt', () => {
         await page.getByRole('button', { name: 'Speichern' }).click();
 
         await expect(page.getByTestId('booking-conflict')).toContainText(
-            'Das Gerät wurde inzwischen geändert.',
+            'Die Ausrüstung wurde inzwischen geändert.',
         );
         await expect(page.getByText('Jetzt: HLF 20 / G1 · in Wartung')).toBeVisible();
         await expect(page).toHaveURL(/\/geraete\/1$/);
@@ -355,7 +355,7 @@ test.describe('Keine Verbindung beim Speichern', () => {
         page,
         apiRequests,
     }) => {
-        // Direkt geöffnet (z. B. Link), die Geräteliste war nie geladen: keine Warteschlange.
+        // Direkt geöffnet (z. B. Link), die Ausrüstungsliste war nie geladen: keine Warteschlange.
         await page.goto('/firefighting/test/geraete/1');
         await expect(
             page.getByRole('heading', { level: 1, name: 'M1 · Atemschutzmaske' }),
@@ -446,14 +446,14 @@ test.describe('Besondere Geräte', () => {
     test('ausgesondert: kein Formular', async ({ page }) => {
         await page.goto('/firefighting/test/geraete/4');
         await expect(page.getByTestId('device-retired')).toHaveText(
-            'Dieses Gerät ist ausgesondert und kann nicht umgebucht werden.',
+            'Diese Ausrüstung ist ausgesondert und kann nicht umgebucht werden.',
         );
         await expect(page.getByRole('button', { name: 'Speichern' })).toHaveCount(0);
     });
 
     test('unbekannt: Hinweis', async ({ page }) => {
         await page.goto('/firefighting/test/geraete/5');
-        await expect(page.getByText('Dieses Gerät gibt es nicht (mehr).')).toBeVisible();
+        await expect(page.getByText('Diese Ausrüstung gibt es nicht (mehr).')).toBeVisible();
         await expect(page.getByRole('button', { name: 'Speichern' })).toHaveCount(0);
     });
 });

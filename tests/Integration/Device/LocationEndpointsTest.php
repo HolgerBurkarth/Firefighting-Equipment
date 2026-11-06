@@ -294,7 +294,7 @@ final class LocationEndpointsTest extends AuthTestCase
         self::assertError(409, 'rule_violation', $response);
         $json = self::json($response);
         self::assertSame(
-            'Der Standort „HLF 20“ ist nicht leer (2 Geräte, 2 aktive Unterstandorte). Bitte zuerst die Geräte umbuchen bzw. die Unterstandorte sperren.',
+            'Der Standort „HLF 20“ ist nicht leer (2 Ausrüstungen, 2 aktive Unterstandorte). Bitte zuerst die Ausrüstung umbuchen bzw. die Unterstandorte sperren.',
             $json['message'],
         );
         self::assertSame(['devices' => 2, 'sublocations' => 2], $json['details']);

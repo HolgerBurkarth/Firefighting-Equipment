@@ -47,8 +47,8 @@ final class DeviceBookingJson
             $result->outcome === BookingOutcome::Unchanged => 'Keine Änderung: ' . $current,
             $result->reason === BookingReason::Overwritten => 'Übernommen. Ein zwischenzeitlich gebuchter, älterer Stand wurde überschrieben; die Admins wurden informiert. ' . $state,
             $result->outcome === BookingOutcome::Applied => 'Übernommen. ' . $state,
-            $result->reason === BookingReason::Older => 'Nur in der Historie: Das Gerät wurde nach Ihrer Buchung bereits anders gebucht. ' . $current,
-            $result->reason === BookingReason::Retired => 'Nicht übernommen: Das Gerät wurde inzwischen ausgesondert. Ihre Buchung steht nur in der Historie. ' . $current,
+            $result->reason === BookingReason::Older => 'Nur in der Historie: Die Ausrüstung wurde nach Ihrer Buchung bereits anders gebucht. ' . $current,
+            $result->reason === BookingReason::Retired => 'Nicht übernommen: Die Ausrüstung wurde inzwischen ausgesondert. Ihre Buchung steht nur in der Historie. ' . $current,
             $result->reason === BookingReason::LocationLocked => 'Nicht übernommen: Der Ziel-Standort ist inzwischen gesperrt. Ihre Buchung steht nur in der Historie. ' . $current,
             default => throw new \LogicException('Ergebnis ohne Grund.'),
         };

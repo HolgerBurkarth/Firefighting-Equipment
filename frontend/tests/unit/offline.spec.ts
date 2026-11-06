@@ -107,7 +107,7 @@ describe('gespeicherte Sitzung (Offline-Modus, Entscheidung 50)', () => {
         expect(storage.getItem(KEY)).toBeNull();
     });
 
-    it('merkt sich die Rechte der Rolle mit Kennung (offline gelten sie, Schritt 1.7b)', () => {
+    it('merkt sich die Rechte der Rolle mit Nummer (offline gelten sie, Schritt 1.7b)', () => {
         const json = meBody('user', permissionsJson({ devices: 'write' }, ['device.edit'], true));
         const parsed = parseAuthState(json);
         expect(parsed).not.toBeNull();
@@ -299,7 +299,7 @@ describe('Schnellstart mit gespeicherter Sitzung (Plan Phase 1, Schritt 1.7d)', 
         expect((await result)?.permissions?.version).toBe(RIGHTS['version']);
     });
 
-    it('Anmelden während der Prüfung: die ältere Antwort ändert nichts mehr', async () => {
+    it('Anmelden während der Wartung: die ältere Antwort ändert nichts mehr', async () => {
         storage.setItem(KEY, JSON.stringify(meBody('user', RIGHTS)));
         const me = held();
         await ensureSession({ fetchFn: me.fetchFn });

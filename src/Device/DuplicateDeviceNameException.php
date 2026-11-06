@@ -12,7 +12,7 @@ final class DuplicateDeviceNameException extends DeviceException
 {
     public static function deviceType(DeviceTypeName $name): self
     {
-        return new self(sprintf('Es gibt bereits einen Gerätetyp „%s“.', $name->value));
+        return new self(sprintf('Es gibt bereits einen Ausrüstungstyp „%s“.', $name->value));
     }
 
     /**

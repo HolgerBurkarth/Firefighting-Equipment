@@ -121,7 +121,7 @@ interface Setup {
     firedTimers: number;
     online: boolean;
     now: number;
-    /** Kennung, die der Server liefert (build.json); null = nicht lesbar. */
+    /** Nummer, die der Server liefert (build.json); null = nicht lesbar. */
     served: string | null;
     buildFetches: number;
 }
@@ -146,7 +146,7 @@ function bareEnv(
     };
 }
 
-/** Offene Promises (Prüfung der Build-Kennung) abarbeiten. */
+/** Offene Promises (Prüfung der Build-Nummer) abarbeiten. */
 async function flush(): Promise<void> {
     for (let i = 0; i < 20; i += 1) {
         await Promise.resolve();
@@ -283,7 +283,7 @@ describe('AppUpdater: neue Version erkennen', () => {
         worker.setState('installed');
         await flush();
         expect(s.updater.ready.value).toBe(false);
-        // Entschieden hat die Build-Kennung (gleich): beim Seitenwechsel kein Aktualisieren.
+        // Entschieden hat die Build-Nummer (gleich): beim Seitenwechsel kein Aktualisieren.
         expect(s.buildFetches).toBe(1);
         expect(await s.updater.applyNow('https://x/a')).toBe(false);
         expect(s.registration.updates).toBe(0);
@@ -328,7 +328,7 @@ describe('AppUpdater: neue Version erkennen', () => {
         expect(s.navigated).toEqual(['https://x/a']);
     });
 
-    it('Seite ohne Kontrolle (Strg+F5) von neuer Version übernommen → bereit (Build-Kennung)', async () => {
+    it('Seite ohne Kontrolle (Strg+F5) von neuer Version übernommen → bereit (Build-Nummer)', async () => {
         const s = setup({ controller: null });
         s.served = NEW_BUILD;
         s.container.controller = { scriptURL: 'sw.js' };
@@ -344,7 +344,7 @@ describe('AppUpdater: neue Version erkennen', () => {
     });
 
     it('erste Übernahme, Antwort von build.json erst nach dem Deploy: neue Version trotzdem holen', async () => {
-        // Die übernehmende Version ist die eigene; die Kennung kam aber schon vom neuen Build.
+        // Die übernehmende Version ist die eigene; die Nummer kam aber schon vom neuen Build.
         const s = setup({ controller: null });
         s.served = NEW_BUILD;
         s.container.controller = { scriptURL: 'sw.js' };
@@ -357,7 +357,7 @@ describe('AppUpdater: neue Version erkennen', () => {
         expect(s.navigated).toEqual(['https://x/a']);
     });
 
-    it('Seite ohne Kontrolle: neue Version installiert → Build-Kennung entscheidet', async () => {
+    it('Seite ohne Kontrolle: neue Version installiert → Build-Nummer entscheidet', async () => {
         const s = setup({ controller: null });
         s.served = NEW_BUILD;
         installNewVersion(s);
@@ -408,7 +408,7 @@ describe('AppUpdater: prüfen', () => {
         expect(s.registration.updates).toBe(1);
     });
 
-    it('offline: keine Prüfung', async () => {
+    it('offline: keine Wartung', async () => {
         const s = setup();
         s.online = false;
         await s.updater.check();
@@ -421,34 +421,34 @@ describe('AppUpdater: prüfen', () => {
         await expect(s.updater.check()).resolves.toBeUndefined();
     });
 
-    it('ohne Registrierung (kein Service Worker): nur die Build-Kennung', async () => {
+    it('ohne Registrierung (kein Service Worker): nur die Build-Nummer', async () => {
         const updater = new AppUpdater(bareEnv(new FakeContainer(null), NEW_BUILD));
         await updater.check();
         expect(updater.ready.value).toBe(true);
     });
 
-    it('gleiche Build-Kennung beim Server: kein Update', async () => {
+    it('gleiche Build-Nummer beim Server: kein Update', async () => {
         const s = setup();
         await s.updater.check();
         expect(s.buildFetches).toBe(1);
         expect(s.updater.ready.value).toBe(false);
     });
 
-    it('andere Build-Kennung beim Server: Update, auch ohne Zustandswechsel des Service Workers', async () => {
+    it('andere Build-Nummer beim Server: Update, auch ohne Zustandswechsel des Service Workers', async () => {
         const s = setup();
         s.served = NEW_BUILD;
         await s.updater.check();
         expect(s.updater.ready.value).toBe(true);
     });
 
-    it('Build-Kennung nicht lesbar (Fehler, alte Version ohne build.json): kein Update', async () => {
+    it('Build-Nummer nicht lesbar (Fehler, alte Version ohne build.json): kein Update', async () => {
         const s = setup();
         s.served = null;
         await s.updater.check();
         expect(s.updater.ready.value).toBe(false);
     });
 
-    it('offline: auch keine Abfrage der Build-Kennung', async () => {
+    it('offline: auch keine Abfrage der Build-Nummer', async () => {
         const s = setup();
         s.online = false;
         s.served = NEW_BUILD;
@@ -702,7 +702,7 @@ describe('AppUpdater: update() mit laufender Prüfung zusammengelegt', () => {
         expect(s.registration.updates).toBe(1);
     });
 
-    it('gleiche Kennung beim Server: kein erneutes Fragen', async () => {
+    it('gleiche Nummer beim Server: kein erneutes Fragen', async () => {
         const s = setup();
         await s.updater.check();
         expect(await runTimers(s)).toEqual([]);
@@ -1095,7 +1095,7 @@ describe('AppUpdater: Seite ohne Kontrolle in der aktuellen Version', () => {
         expect(s.updater.ready.value).toBe(true);
     });
 
-    it('Build-Kennung nicht lesbar: nicht aktivieren', async () => {
+    it('Build-Nummer nicht lesbar: nicht aktivieren', async () => {
         const worker = new FakeWorker('installed');
         const s = setup({
             controller: null,
@@ -1408,7 +1408,7 @@ describe('AppUpdater: Antworten der API verlangen ein Update', () => {
         expect(s.registration.updates).toBe(1);
     });
 
-    it('offline: keine Prüfung, Hinweis trotzdem', async () => {
+    it('offline: keine Wartung, Hinweis trotzdem', async () => {
         const s = setup();
         s.online = false;
         await s.updater.reportOutdated('client_outdated', url);

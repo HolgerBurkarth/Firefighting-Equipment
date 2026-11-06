@@ -30,7 +30,7 @@ function previewJson(overrides: Record<string, unknown> = {}): Record<string, un
         encoding: 'utf-8',
         delimiter: ';',
         delimiter_label: 'Semikolon',
-        columns: ['Kennung', 'Gerätetyp', 'Standort'],
+        columns: ['Nummer', 'Ausrüstungstyp', 'Standort'],
         summary: SUMMARY,
         unknown: { device_types: [], locations: ['HLF20'] },
         suggestions: {
@@ -45,12 +45,12 @@ function previewJson(overrides: Record<string, unknown> = {}): Record<string, un
                 result_label: 'Neu',
                 device: null,
                 changes: [
-                    { field: 'identifier', label: 'Kennung', old: null, new: 'M1' },
+                    { field: 'identifier', label: 'Nummer', old: null, new: 'M1' },
                     { field: 'location', label: 'Standort', old: null, new: 'HLF 20 / G1' },
                     { field: 'note', label: 'Notiz', old: null, new: null },
                 ],
                 messages: [],
-                warnings: ['Die Kennung „M1“ …'],
+                warnings: ['Die Nummer „M1“ …'],
             },
             {
                 line: 3,
@@ -86,7 +86,7 @@ describe('parseImportPreview', () => {
             token: TOKEN,
             encoding: 'utf-8',
             delimiterLabel: 'Semikolon',
-            columns: ['Kennung', 'Gerätetyp', 'Standort'],
+            columns: ['Nummer', 'Ausrüstungstyp', 'Standort'],
             summary: SUMMARY,
             unknown: { deviceTypes: [], locations: ['HLF20'] },
             suggestions: {
@@ -172,7 +172,7 @@ describe('Aufrufe', () => {
 
     it('Vorlage und gültige Werte als Download', async () => {
         const csv = { 'Content-Type': 'text/csv; charset=utf-8' };
-        const template = respond(200, 'Kennung\r\n', {
+        const template = respond(200, 'Nummer\r\n', {
             ...csv,
             'Content-Disposition': 'attachment; filename="geraete-vorlage-test.csv"',
         });
@@ -191,8 +191,8 @@ describe('Hilfen der Seite', () => {
         const bytes = new Uint8Array(100_000).map((_, i) => i % 256);
         const encoded = toBase64(bytes);
         expect(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))).toEqual(bytes);
-        expect(toBase64(new TextEncoder().encode('Gerätetyp;M1'))).toBe(
-            Buffer.from('Gerätetyp;M1').toString('base64'),
+        expect(toBase64(new TextEncoder().encode('Ausrüstungstyp;M1'))).toBe(
+            Buffer.from('Ausrüstungstyp;M1').toString('base64'),
         );
         expect(toBase64(new Uint8Array())).toBe('');
     });
@@ -238,14 +238,14 @@ describe('Hilfen der Seite', () => {
         expect(encodingLabel('windows-1252')).toBe('Windows-1252 (in UTF-8 umgewandelt)');
     });
 
-    it('changeLines: neu ohne Kennung, sonst alt → neu, leer = „leer“', () => {
+    it('changeLines: neu ohne Nummer, sonst alt → neu, leer = „leer“', () => {
         expect(changeLines(rowAt(0))).toEqual(['Standort: HLF 20 / G1', 'Notiz: leer']);
         expect(changeLines(rowAt(1))).toEqual(['Status: einsatzbereit → defekt']);
         expect(
             changeLines({
                 ...rowAt(1),
-                changes: [{ field: 'identifier', label: 'Kennung', old: 'm2', new: 'M2' }],
+                changes: [{ field: 'identifier', label: 'Nummer', old: 'm2', new: 'M2' }],
             }),
-        ).toEqual(['Kennung: m2 → M2']);
+        ).toEqual(['Nummer: m2 → M2']);
     });
 });

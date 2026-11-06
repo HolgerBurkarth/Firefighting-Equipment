@@ -49,7 +49,7 @@ final class DeviceRetireTest extends DeviceApiTestCase
         $response = $this->api('POST', 'devices/' . $id . '/retire', ['version' => 1]);
 
         self::assertError(409, 'rule_violation', $response);
-        self::assertSame('Das Gerät „MA-01“ ist bereits ausgesondert.', self::json($response)['message']);
+        self::assertSame('Die Ausrüstung „MA-01“ ist bereits ausgesondert.', self::json($response)['message']);
         self::assertSame($before, $this->deviceSnapshot());
     }
 

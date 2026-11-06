@@ -115,7 +115,7 @@ test.describe('Offline-Modus: Grundlage', () => {
         await page.reload();
     }
 
-    test('ohne Verbindung: Sitzung bleibt, Suche, Gerät und Prüffristen aus der Kopie', async ({
+    test('ohne Verbindung: Sitzung bleibt, Suche, Gerät und Termine aus der Kopie', async ({
         page,
     }) => {
         await goOfflineAndReload(page);
@@ -149,8 +149,8 @@ test.describe('Offline-Modus: Grundlage', () => {
         await expect(
             page.getByRole('heading', { level: 1, name: 'Standort wählen' }),
         ).toBeVisible();
-        await expect(page.getByRole('button', { name: 'LF 10 2 Geräte' })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Lager 5 Geräte' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'LF 10 2 Ausrüstungen' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Lager 5 Ausrüstungen' })).toBeVisible();
     });
 
     test('Verbindung wieder da: Streifen weg, Daten frisch', async ({ page }) => {

@@ -227,7 +227,7 @@ test.describe('Protokoll: Hinweise', () => {
         await expect(page.getByTestId('notice-count')).toHaveText('3 Hinweise');
     });
 
-    test('Hinweis: Erklärung, Buchung, anderer Stand, Gerät jetzt und Rückfrage per Mail', async ({
+    test('Hinweis: Erklärung, Buchung, anderer Stand, Ausrüstung jetzt und Rückfrage per Mail', async ({
         page,
     }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
@@ -449,7 +449,7 @@ const MASTER_DATA = {
     ]).api,
 };
 
-const CSV = '﻿Aktionszeit;Kennung\r\n30.10.2026 08:15;M1\r\n';
+const CSV = '﻿Aktionszeit;Nummer\r\n30.10.2026 08:15;M1\r\n';
 
 test.describe('Protokoll: Verlauf exportieren', () => {
     useServer();
@@ -471,7 +471,7 @@ test.describe('Protokoll: Verlauf exportieren', () => {
         },
     });
 
-    test('Zeitraum, Gerätetyp, Standort mit Fächern und Reihenfolge', async ({
+    test('Zeitraum, Ausrüstungstyp, Standort mit Fächern und Reihenfolge', async ({
         page,
         apiRequests,
     }) => {
@@ -488,7 +488,7 @@ test.describe('Protokoll: Verlauf exportieren', () => {
 
         await page.getByRole('button', { name: 'Letzte 30 Tage' }).click();
         await expect(page.getByLabel('Von')).toHaveValue(localDay(-29));
-        await page.getByRole('combobox', { name: 'Gerätetyp' }).click();
+        await page.getByRole('combobox', { name: 'Ausrüstungstyp' }).click();
         await page.getByRole('option', { name: 'Funkgerät', exact: true }).click();
         await page.getByRole('combobox', { name: 'Standort (mit Fächern)' }).click();
         await page.getByRole('option', { name: 'HLF 20', exact: true }).click();

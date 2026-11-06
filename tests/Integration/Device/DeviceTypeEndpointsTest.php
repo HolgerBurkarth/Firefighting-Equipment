@@ -108,7 +108,7 @@ final class DeviceTypeEndpointsTest extends AuthTestCase
         $response = $this->post('device-types', ['name' => $name]);
 
         self::assertError(409, 'name_taken', $response);
-        self::assertSame(sprintf('Es gibt bereits einen Gerätetyp „%s“.', $name), self::json($response)['message']);
+        self::assertSame(sprintf('Es gibt bereits einen Ausrüstungstyp „%s“.', $name), self::json($response)['message']);
         self::assertSame(1, $this->countRows('fe_device_types'));
     }
 

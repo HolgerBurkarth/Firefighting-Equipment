@@ -85,14 +85,14 @@ describe('lockBlocker', () => {
 
     it('nennt Geräte direkt dort und aktive Fächer', () => {
         expect(lockBlocker(sub(11, 'G1', 3))).toBe(
-            'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 3 Geräte.',
+            'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 3 Ausrüstungen.',
         );
         expect(
             lockBlocker(
                 location(10, 'HLF 20', [sub(11, 'G1'), sub(12, 'G2', 4)], { deviceCount: 1 }),
             ),
         ).toBe(
-            'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 1 Gerät und 2 aktive Fächer.',
+            'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 1 Ausrüstung und 2 aktive Fächer.',
         );
     });
 
@@ -101,10 +101,10 @@ describe('lockBlocker', () => {
             'Sperren geht nur, wenn der Standort leer ist. Hier liegt noch 1 aktives Fach.',
         );
         expect(lockBlocker(sub(11, 'G1', 1))).toBe(
-            'Sperren geht nur, wenn der Standort leer ist. Hier liegt noch 1 Gerät.',
+            'Sperren geht nur, wenn der Standort leer ist. Hier liegt noch 1 Ausrüstung.',
         );
         expect(lockBlocker(location(10, 'HLF 20', [sub(11, 'G1')], { deviceCount: 1 }))).toBe(
-            'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 1 Gerät und 1 aktives Fach.',
+            'Sperren geht nur, wenn der Standort leer ist. Hier liegen noch 1 Ausrüstung und 1 aktives Fach.',
         );
     });
 });

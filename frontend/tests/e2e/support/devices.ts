@@ -65,7 +65,7 @@ export function devicesEndpoint(
     };
 }
 
-/** Leere Geräteliste für Tests, die „Suchen“ nur durchlaufen (die Seite lädt immer die Liste). */
+/** Leere Ausrüstungsliste für Tests, die „Suchen“ nur durchlaufen (die Seite lädt immer die Liste). */
 export const NO_DEVICES = { 'GET api/v1/devices': devicesEndpoint([]) } as const;
 
 /** GET api/v1/devices/{id} für die Umbuchen-Ansicht (Antwort mit allen Feldern, hier die der Liste). */
@@ -126,7 +126,7 @@ export function locationJson(
 }
 
 /**
- * Standortbaum der Tests: HLF 20 (10) mit G1 (11, 6 Geräte) und G2 (12, 3), LF 10 (20, ohne
+ * Standortbaum der Tests: HLF 20 (10) mit G1 (11, 6 Ausrüstungen) und G2 (12, 3), LF 10 (20, ohne
  * Fächer, 2), Lager (30, Raum, 5).
  */
 export const LOCATIONS = {

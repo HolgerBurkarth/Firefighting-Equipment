@@ -253,7 +253,7 @@ async function fulfillApi(
             status: 200,
             contentType: 'application/manifest+json; charset=utf-8',
             json: {
-                name: 'Feuerwehr Test – Geräteverwaltung',
+                name: 'Feuerwehr Test – Ausrüstungsverwaltung',
                 start_url: '.',
                 display: 'standalone',
             },

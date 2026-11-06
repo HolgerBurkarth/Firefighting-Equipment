@@ -56,7 +56,7 @@ final class MailTemplatesTest extends TestCase
         self::assertStringContainsString("\n" . self::LINK . "\n", $mail->text, 'Link in eigener Zeile');
         self::assertStringContainsString('(Feuerwehr Immendingen)', $mail->text);
         self::assertStringContainsString('1 Stunde gültig', $mail->text);
-        self::assertStringContainsString("\n-- \nFeuerwehr Geräteverwaltung\n", $mail->text);
+        self::assertStringContainsString("\n-- \nFeuerwehr Ausrüstungsverwaltung\n", $mail->text);
         self::assertTextRules($mail, self::LINK);
     }
 
@@ -247,8 +247,8 @@ angelegt.", $mail->text);
 
         self::assertSame('Log Feuerwehr Immendingen: MA-01 wieder aufgenommen', $mail->subject);
         self::assertStringContainsString(
-            "Vorgang: Wieder aufgenommen\nGerät: MA-01 (Atemschutzmaske)\nWer: Kommandant\nWann: 01.07.2026 um 10:30 Uhr\n"
-            . "Kennung: MA-1 → MA-01\nStatus: ausgesondert → einsatzbereit\nKommentar: Zurück aus der Werkstatt\n",
+            "Vorgang: Wieder aufgenommen\nAusrüstung: MA-01 (Atemschutzmaske)\nWer: Kommandant\nWann: 01.07.2026 um 10:30 Uhr\n"
+            . "Nummer: MA-1 → MA-01\nStatus: ausgesondert → einsatzbereit\nKommentar: Zurück aus der Werkstatt\n",
             $mail->text,
         );
         self::assertStringContainsString('Benachrichtigung „Log“', $mail->text);
@@ -312,7 +312,7 @@ angelegt.", $mail->text);
 
         self::assertSame('Log Feuerwehr Immendingen: Hinweis – MA-01 nur Historie', $mail->subject);
         self::assertStringContainsString(
-            "Hinweis: Nur Historie (neuerer Stand vorhanden)\nGerät: MA-01 (Atemschutzmaske)\n\n"
+            "Hinweis: Nur Historie (neuerer Stand vorhanden)\nAusrüstung: MA-01 (Atemschutzmaske)\n\n"
             . "Buchung vom Handy:\nWer: Gerätewart (geraetewart@example.org)\nAktionszeit: 01.07.2026 um 08:00 Uhr\n"
             . "Eingang: 02.07.2026 um 10:30 Uhr\nGewünscht: Status defekt\n\n"
             . "Stand beim Eingang:\nWer: –\nAktionszeit: 01.07.2026 um 09:15 Uhr\nStand: HLF 20 / G1, einsatzbereit\n\n"
@@ -330,7 +330,7 @@ angelegt.", $mail->text);
 
         $mail = MailTemplates::deviceLog(self::user(), self::tenant(), self::device(), [$event], $link);
 
-        self::assertStringContainsString("\nStatus: einsatzbereit → defekt\n\nZum Gerät in der Anwendung:\n\n{$link}\n\nSie erhalten", $mail->text);
+        self::assertStringContainsString("\nStatus: einsatzbereit → defekt\n\nZur Ausrüstung in der Anwendung:\n\n{$link}\n\nSie erhalten", $mail->text);
         self::assertTextRules($mail, $link);
 
         $withoutLink = MailTemplates::deviceLog(self::user(), self::tenant(), self::device(), [$event], null);
@@ -351,20 +351,20 @@ angelegt.", $mail->text);
 
         $mail = MailTemplates::deviceBulkLog(self::user(), self::tenant(), $changes, self::URL);
 
-        self::assertSame('Log Feuerwehr Immendingen: 2 Geräte – Status in Wartung', $mail->subject);
+        self::assertSame('Log Feuerwehr Immendingen: 2 Ausrüstungen – Status in Wartung', $mail->subject);
         self::assertStringContainsString(
-            "Vorgang: Sammelaktion (Status in Wartung)\nGeräte: 2\nWer: Kommandant\nWann: 01.07.2026 um 10:30 Uhr\nKommentar: Prüfung\n\n"
+            "Vorgang: Sammelaktion (Status in Wartung)\nAusrüstungen: 2\nWer: Kommandant\nWann: 01.07.2026 um 10:30 Uhr\nKommentar: Prüfung\n\n"
             . "Einzelheiten:\n\nMA-01 (Atemschutzmaske)\n  Status: einsatzbereit → in Wartung\nMA-02 (Atemschutzmaske)\n  Status: defekt → in Wartung\n",
             $mail->text,
         );
         self::assertTextRules($mail, self::URL);
 
         $mixed = [$changes[0], [$second, [self::event(DeviceEventType::StateChanged, $at, fromStatus: DeviceStatus::Ready, toStatus: DeviceStatus::Defective)]]];
-        self::assertSame('Log Feuerwehr Immendingen: 2 Geräte – Status geändert', MailTemplates::deviceBulkLog(self::user(), self::tenant(), $mixed, null)->subject);
+        self::assertSame('Log Feuerwehr Immendingen: 2 Ausrüstungen – Status geändert', MailTemplates::deviceBulkLog(self::user(), self::tenant(), $mixed, null)->subject);
         $due = new DeviceEvent(1, DeviceEventType::DueChanged, 9, 'Kommandant', null, null, null, null, null, DeviceDate::fromString('2027-03-01', 'Datum'), null, null, null, null, $at);
         $dueMail = MailTemplates::deviceBulkLog(self::user(), self::tenant(), [[self::device(), [$due]], [$second, [$due]]], null);
-        self::assertSame('Log Feuerwehr Immendingen: 2 Geräte – Prüfdatum geändert', $dueMail->subject);
-        self::assertStringContainsString("MA-02 (Atemschutzmaske)\n  Nächste Prüfung: – → 01.03.2027\n", $dueMail->text);
+        self::assertSame('Log Feuerwehr Immendingen: 2 Ausrüstungen – Wartungsdatum geändert', $dueMail->subject);
+        self::assertStringContainsString("MA-02 (Atemschutzmaske)\n  Nächste Wartung: – → 01.03.2027\n", $dueMail->text);
         self::assertStringNotContainsString('Kommentar:', $dueMail->text);
         self::assertTextRules($dueMail);
     }

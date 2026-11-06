@@ -11,6 +11,6 @@ final class DeviceNotFoundException extends DeviceException
 {
     public static function forId(int $id): self
     {
-        return new self(sprintf('Kein Gerät mit der ID %d gefunden.', $id));
+        return new self(sprintf('Keine Ausrüstung mit der ID %d gefunden.', $id));
     }
 }

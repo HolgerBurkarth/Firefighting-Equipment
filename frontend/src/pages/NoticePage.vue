@@ -326,7 +326,7 @@ onMounted(() => {
                 aria-labelledby="now-heading"
                 data-testid="device-now"
             >
-                <h2 id="now-heading">Gerät jetzt</h2>
+                <h2 id="now-heading">Ausrüstung jetzt</h2>
                 <template v-if="device !== null">
                     <span class="now-location">{{ device.location.path }}</span>
                     <StatusBadge :status="device.status" :label="device.statusLabel" />
@@ -338,7 +338,8 @@ onMounted(() => {
                         Umbuchen / Status ändern
                     </RouterLink>
                     <p v-else-if="device.status === 'retired'" class="hint">
-                        Das Gerät ist ausgesondert; im Gerätedetail lässt es sich wieder aufnehmen.
+                        Die Ausrüstung ist ausgesondert; auf der Detailseite lässt sie sich wieder
+                        aufnehmen.
                     </p>
                 </template>
                 <ErrorNotice v-else-if="deviceError !== null" :error="deviceError" />

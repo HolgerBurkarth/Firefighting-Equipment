@@ -350,7 +350,7 @@ onMounted(() => {
                         class="node-name"
                         data-row-link
                         :to="{ name: 'devices', query: { standort: String(group.location.id) } }"
-                        :title="`Geräte in ${group.location.name}`"
+                        :title="`Ausrüstung in ${group.location.name}`"
                         >{{ group.location.name }}</RouterLink
                     ><span v-else class="node-name">{{ group.location.name }}</span>
                     <span class="node-meta">
@@ -429,7 +429,7 @@ onMounted(() => {
                             class="node-name"
                             data-row-link
                             :to="{ name: 'devices', query: { standort: String(child.id) } }"
-                            :title="`Geräte in ${group.location.name} / ${child.name}`"
+                            :title="`Ausrüstung in ${group.location.name} / ${child.name}`"
                             >{{ child.name }}</RouterLink
                         ><span v-else class="node-name">{{ child.name }}</span>
                         <span class="node-meta">{{ deviceCountText(child.deviceCount) }}</span>

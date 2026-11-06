@@ -151,7 +151,7 @@ test.describe('Passwort zurücksetzen', () => {
             });
         }
 
-        test('Live-Prüfung: Länge und Name der Stadt, Absenden erst danach', async ({
+        test('Live-Wartung: Länge und Name der Stadt, Absenden erst danach', async ({
             page,
             apiRequests,
         }) => {

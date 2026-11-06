@@ -187,7 +187,7 @@ export function locationServer(
     return { api, tree: () => tree };
 }
 
-/** Gerätetyp wie DeviceTypeJson in PHP. */
+/** Ausrüstungstyp wie DeviceTypeJson in PHP. */
 export function deviceTypeJson(
     id: number,
     name: string,
@@ -204,7 +204,7 @@ export function deviceTypeJson(
     };
 }
 
-/** Gerätetyp in einem Test (Name, Gerätezahl, aktiv). */
+/** Ausrüstungstyp in einem Test (Name, Gerätezahl, aktiv). */
 export interface TestDeviceType {
     readonly id: number;
     readonly name: string;
@@ -213,7 +213,7 @@ export interface TestDeviceType {
 }
 
 /**
- * Simulierter Server für die Gerätetypen (GET mit deaktivierten, POST anlegen, umbenennen,
+ * Simulierter Server für die Ausrüstungstypen (GET mit deaktivierten, POST anlegen, umbenennen,
  * deaktivieren, aktivieren). `respond` ersetzt die Antwort einer ändernden Anfrage.
  */
 export function deviceTypeServer(
@@ -246,7 +246,7 @@ export function deviceTypeServer(
         );
         const changed = types.find((type) => type.id === id);
         if (changed === undefined) {
-            throw new Error(`Gerätetyp ${String(id)} fehlt`);
+            throw new Error(`Ausrüstungstyp ${String(id)} fehlt`);
         }
         return { status: 200, body: { device_type: json(changed) } };
     };

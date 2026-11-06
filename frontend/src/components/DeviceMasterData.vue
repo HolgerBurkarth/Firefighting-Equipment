@@ -12,12 +12,12 @@ const props = defineProps<{
 
 /** Stammdaten; leere Felder als „–“, Trennzeichen eines Scan-Codes sichtbar ([GS]). */
 const entries = computed<{ label: string; value: string | null; multiline?: boolean }[]>(() => [
-    { label: 'Kennung', value: props.device.identifier },
+    { label: 'Nummer', value: props.device.identifier },
     {
         label: 'Scan-Code',
         value: props.device.scanCode === null ? null : scanCodeDisplay(props.device.scanCode),
     },
-    { label: 'Gerätetyp', value: props.device.deviceType.name },
+    { label: 'Ausrüstungstyp', value: props.device.deviceType.name },
     { label: 'Seriennummer', value: props.device.serialNumber },
     { label: 'Hersteller', value: props.device.manufacturer },
     { label: 'Modell', value: props.device.model },

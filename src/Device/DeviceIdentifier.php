@@ -35,18 +35,18 @@ final readonly class DeviceIdentifier
     public static function fromString(string $value): self
     {
         if (!mb_check_encoding($value, 'UTF-8')) {
-            throw new InvalidDeviceValueException('Die Kennung ist kein gültiger UTF-8-Text.');
+            throw new InvalidDeviceValueException('Die Nummer ist kein gültiger UTF-8-Text.');
         }
 
         $value = (string) preg_replace('/ {2,}/', ' ', trim(strtr($value, self::DECOMPOSED_UMLAUTS)));
         if ($value === '') {
-            throw new InvalidDeviceValueException('Die Kennung darf nicht leer sein.');
+            throw new InvalidDeviceValueException('Die Nummer darf nicht leer sein.');
         }
 
         $length = mb_strlen($value);
         if ($length > self::MAX_LENGTH) {
             throw new InvalidDeviceValueException(sprintf(
-                'Die Kennung darf höchstens %d Zeichen lang sein (angegeben: %d).',
+                'Die Nummer darf höchstens %d Zeichen lang sein (angegeben: %d).',
                 self::MAX_LENGTH,
                 $length,
             ));
@@ -54,13 +54,13 @@ final readonly class DeviceIdentifier
 
         if (preg_match('/\p{M}/u', $value) === 1) {
             throw new InvalidDeviceValueException(
-                'Die Kennung enthält kombinierende Zeichen (z. B. einen einzeln eingegebenen Akzent). Bitte den Buchstaben direkt eingeben.',
+                'Die Nummer enthält kombinierende Zeichen (z. B. einen einzeln eingegebenen Akzent). Bitte den Buchstaben direkt eingeben.',
             );
         }
 
         if (preg_match('~^[\p{L}0-9./-]+( [\p{L}0-9./-]+)*\z~u', $value) !== 1) {
             throw new InvalidDeviceValueException(
-                'Die Kennung darf nur Buchstaben, Ziffern, Leerzeichen, Bindestrich (-), Schrägstrich (/) und Punkt (.) enthalten.',
+                'Die Nummer darf nur Buchstaben, Ziffern, Leerzeichen, Bindestrich (-), Schrägstrich (/) und Punkt (.) enthalten.',
             );
         }
 

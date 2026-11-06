@@ -36,7 +36,7 @@ onBeforeUnmount(() => {
                 <img class="poster-logo" :src="logoUrl" alt="" width="512" height="512" />
                 <div>
                     <p class="poster-name" data-testid="poster-name">{{ tenantName }}</p>
-                    <p class="poster-app">Geräteverwaltung</p>
+                    <p class="poster-app">Ausrüstungsverwaltung</p>
                 </div>
             </header>
 

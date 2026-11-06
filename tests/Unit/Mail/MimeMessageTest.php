@@ -25,7 +25,7 @@ final class MimeMessageTest extends TestCase
 
         self::assertSame('"Erika Musterfrau" <erika@example.org>', $mime->to);
         self::assertSame([
-            'From' => '=?UTF-8?B?' . base64_encode('Feuerwehr Geräteverwaltung') . '?= <feuerwehr-app@prodad.de>',
+            'From' => '=?UTF-8?B?' . base64_encode('Feuerwehr Ausrüstungsverwaltung') . '?= <feuerwehr-app@prodad.de>',
             'Date' => 'Sun, 25 Oct 2026 13:04:05 +0000',
             'Message-ID' => self::MESSAGE_ID,
             'MIME-Version' => '1.0',
@@ -126,7 +126,7 @@ final class MimeMessageTest extends TestCase
 
         self::assertSame(
             "To: erika@example.org\r\nSubject: Betreff\r\n"
-            . "From: =?UTF-8?B?RmV1ZXJ3ZWhyIEdlcsOkdGV2ZXJ3YWx0dW5n?=\r\n <feuerwehr-app@prodad.de>\r\n"
+            . "From: =?UTF-8?B?RmV1ZXJ3ZWhyIEF1c3LDvHN0dW5nc3ZlcndhbHR1bmc=?=\r\n <feuerwehr-app@prodad.de>\r\n"
             . "Date: Sun, 25 Oct 2026 13:04:05 +0000\r\nMessage-ID: " . self::MESSAGE_ID . "\r\n"
             . "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n"
             . "Content-Transfer-Encoding: quoted-printable\r\nAuto-Submitted: auto-generated\r\n\r\nText\r\n",

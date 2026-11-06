@@ -55,7 +55,7 @@ async function submit(): Promise<void> {
         emit(
             'saved',
             result.data,
-            `${result.data.identifier} ist ausgesondert. Kennung und Scan-Code sind wieder frei.`,
+            `${result.data.identifier} ist ausgesondert. Nummer und Scan-Code sind wieder frei.`,
         );
         return;
     }
@@ -77,7 +77,7 @@ async function submit(): Promise<void> {
         v-model:open="open"
         :unsaved="unsaved"
         :title="`${device.identifier} (${device.deviceType.name}) aussondern?`"
-        description="Das Gerät verschwindet aus Suche, Prüffristen und Gerätezahlen und lässt sich nicht mehr umbuchen. Kennung und Scan-Code werden frei. Der Verlauf bleibt; über „Ausgesonderte anzeigen“ in der Geräteliste können Sie es wieder aufnehmen."
+        description="Die Ausrüstung verschwindet aus Suche, Terminen und Zählern und lässt sich nicht mehr umbuchen. Nummer und Scan-Code werden frei. Der Verlauf bleibt; über „Ausgesonderte anzeigen“ in der Ausrüstungsliste können Sie sie wieder aufnehmen."
         :submit-label="`${device.identifier} aussondern`"
         variant="danger"
         :busy="busy"
@@ -86,7 +86,7 @@ async function submit(): Promise<void> {
         @submit="submit"
     >
         <p v-if="conflict" class="notice notice-info" role="alert" data-testid="retire-conflict">
-            Das Gerät wurde inzwischen geändert (siehe oben). Bitte prüfen Sie, ob Sie es noch
+            Die Ausrüstung wurde inzwischen geändert (siehe oben). Bitte prüfen Sie, ob Sie sie noch
             aussondern möchten.
         </p>
         <label class="field">

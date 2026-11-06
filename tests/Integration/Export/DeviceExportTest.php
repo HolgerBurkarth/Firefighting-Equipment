@@ -32,12 +32,12 @@ final class DeviceExportTest extends ExportApiTestCase
         self::assertSame(200, $response->statusCode(), $body);
         self::assertInstanceOf(CsvResponse::class, $response);
         self::assertSame('text/csv; charset=utf-8', $response->headers()['Content-Type']);
-        self::assertSame('attachment; filename="geraete-immendingen-2026-06-15.csv"', $response->headers()['Content-Disposition']);
+        self::assertSame('attachment; filename="ausruestung-immendingen-2026-06-15.csv"', $response->headers()['Content-Disposition']);
         self::assertSame('no-store', $response->headers()['Cache-Control']);
         self::assertSame('nosniff', $response->headers()['X-Content-Type-Options']);
         self::assertSame('2', $response->headers()['X-Api-Version']);
         self::assertSame(
-            "\xEF\xBB\xBFKennung;Scan-Code;Gerätetyp;Standort;Status;Nächste Prüfung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n",
+            "\xEF\xBB\xBFNummer;Scan-Code;Ausrüstungstyp;Standort;Status;Nächste Wartung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n",
             $body,
         );
     }
@@ -48,7 +48,7 @@ final class DeviceExportTest extends ExportApiTestCase
 
         [$response] = $this->download('devices/export');
 
-        self::assertSame('attachment; filename="geraete-immendingen-2026-06-16.csv"', $response->headers()['Content-Disposition']);
+        self::assertSame('attachment; filename="ausruestung-immendingen-2026-06-16.csv"', $response->headers()['Content-Disposition']);
     }
 
     public function testAllColumnsWithQuotingLineBreaksAndUmlauts(): void
@@ -68,7 +68,7 @@ final class DeviceExportTest extends ExportApiTestCase
         [, $body] = $this->download('devices/export');
 
         self::assertSame(
-            "\xEF\xBB\xBFKennung;Scan-Code;Gerätetyp;Standort;Status;Nächste Prüfung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n"
+            "\xEF\xBB\xBFNummer;Scan-Code;Ausrüstungstyp;Standort;Status;Nächste Wartung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n"
             . "MA-01;0104006381333931\x1D10AB 7;Atemschutzmaske;HLF 20 / G1;in Wartung;01.03.2027;\"S;1\";Dräger;\"FPS \"\"7000\"\"\";01.05.2024;\"Ventil prüfen\nGröße M\"\r\n"
             . "Wärmebild 1;;Atemschutzmaske;Lager;einsatzbereit;;;;;;\r\n",
             $body,
@@ -161,7 +161,7 @@ final class DeviceExportTest extends ExportApiTestCase
         $response = $this->sendAny('GET', self::url('tuttlingen', 'devices/export'), cookie: $this->loginCookie('tuttlingen', 'user@example.org'));
         $rows = array_slice(self::parse(self::responseBody($response)), 1);
         self::assertSame(['MA-02'], self::column($rows, 0));
-        self::assertSame('attachment; filename="geraete-tuttlingen-2026-06-15.csv"', $response->headers()['Content-Disposition']);
+        self::assertSame('attachment; filename="ausruestung-tuttlingen-2026-06-15.csv"', $response->headers()['Content-Disposition']);
     }
 
     public function testInvalidParametersAreJsonErrors(): void

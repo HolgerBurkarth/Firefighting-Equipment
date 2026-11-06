@@ -20,7 +20,7 @@ import {
 /** 29.10.2026 14:30 in Berlin (Winterzeit; Zeitzone in playwright.config.ts). */
 const NOW = new Date('2026-10-29T13:30:00Z');
 
-/** M1 mit allen Stammdaten, Prüfdatum überfällig. */
+/** M1 mit allen Stammdaten, Wartungsdatum überfällig. */
 const M1 = deviceJson(1, {
     scan_code: '010400638133393110L42\u001d21ABC',
     serial_number: 'SN-4711',
@@ -50,7 +50,7 @@ const EVENTS = [
     }),
     eventJson(3, {
         type: 'due_changed',
-        type_label: 'Prüfdatum geändert',
+        type_label: 'Wartungsdatum geändert',
         occurred_at: '2026-10-12T08:00:00Z',
         location: null,
         inspection_due: { from: null, to: '2026-10-01' },
@@ -89,7 +89,7 @@ function common(events: readonly Record<string, unknown>[]) {
 
 async function openDevice(page: Page): Promise<void> {
     await page.goto('/firefighting/test/suchen');
-    await page.getByRole('searchbox', { name: 'Gerät suchen' }).fill('M1');
+    await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill('M1');
     await page.getByTestId('device-card').first().click();
     await expect(
         page.getByRole('heading', { level: 1, name: 'M1 · Atemschutzmaske' }),
@@ -126,12 +126,12 @@ test.describe('Details und Verlauf', () => {
         const state = page.getByTestId('details-state');
         await expect(state).toContainText('HLF 20 / G1');
         await expect(state).toContainText('✓ einsatzbereit');
-        await expect(state).toContainText('Nächste Prüfung: 01.10.2026 · überfällig');
+        await expect(state).toContainText('Nächste Wartung: 01.10.2026 · überfällig');
 
         await expect(page.getByTestId('master-data').locator('.master-row')).toHaveText([
-            /Kennung\s*M1/,
+            /Nummer\s*M1/,
             /Scan-Code\s*010400638133393110L42\[GS\]21ABC/,
-            /Gerätetyp\s*Atemschutzmaske/,
+            /Ausrüstungstyp\s*Atemschutzmaske/,
             /Seriennummer\s*SN-4711/,
             /Hersteller\s*Dräger/,
             /Modell\s*FPS 7000/,
@@ -157,7 +157,7 @@ test.describe('Details und Verlauf', () => {
         await expect(entries.nth(1)).toContainText(/Eingang beim Server:\s*heute 08:15/);
         await expect(entries.nth(1)).toHaveClass(/history-not-applied/);
         await expect(entries.nth(2)).toContainText('12.10.2026, 10:00');
-        await expect(entries.nth(2)).toContainText(/Prüfdatum:\s*keins → 01\.10\.2026/);
+        await expect(entries.nth(2)).toContainText(/Wartungsdatum:\s*keins → 01\.10\.2026/);
         await expect(entries.nth(3)).toContainText(
             /Scan-Code:\s*leer → 010400638133393110L42\[GS\]21ABC/,
         );

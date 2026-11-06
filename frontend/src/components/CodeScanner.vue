@@ -22,7 +22,7 @@ withDefaults(
         /** Hinweis, solange der gelesene Code verarbeitet wird. */
         detectedText?: string;
     }>(),
-    { detectedText: 'Code erkannt – Gerät wird gesucht …' },
+    { detectedText: 'Code erkannt – Ausrüstung wird gesucht …' },
 );
 const emit = defineEmits<{
     detected: [code: string];

@@ -5,7 +5,7 @@ test.describe('Grundgerüst', () => {
         await page.goto('/firefighting/test/anmelden');
         await expect(page.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible();
         await expect(page.getByTestId('app-title')).toHaveText('Feuerwehr Test');
-        await expect(page).toHaveTitle('Feuerwehr Test – Geräteverwaltung');
+        await expect(page).toHaveTitle('Feuerwehr Test – Ausrüstungsverwaltung');
         expect(await page.evaluate(() => document.baseURI)).toMatch(/\/firefighting\/test\/$/);
         expect(apiCalls).toContain('api/v1/tenant');
     });

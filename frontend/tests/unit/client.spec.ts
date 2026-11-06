@@ -130,7 +130,7 @@ describe('parseRetryAfter', () => {
 
 describe('apiDownload', () => {
     it('lädt die Datei mit X-Client-Api und dem Namen aus Content-Disposition', async () => {
-        const { fetch, requests } = respond(200, '﻿Kennung;Gerätetyp\r\nM1;Maske\r\n', {
+        const { fetch, requests } = respond(200, '﻿Nummer;Ausrüstungstyp\r\nM1;Maske\r\n', {
             'Content-Type': 'text/csv; charset=utf-8',
             'Content-Disposition': 'attachment; filename="geraete-test-2026-10-30.csv"',
         });

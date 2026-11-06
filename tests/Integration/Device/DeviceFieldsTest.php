@@ -106,7 +106,7 @@ final class DeviceFieldsTest extends DeviceApiTestCase
         self::assertError(409, 'version_conflict', $response);
         $json = self::json($response);
         self::assertSame(
-            'Das Gerät „MA-01“ wurde inzwischen geändert (aktuelle Version 2). Bitte die Daten neu laden und die Änderung erneut vornehmen.',
+            'Die Ausrüstung „MA-01“ wurde inzwischen geändert (aktuelle Version 2). Bitte die Daten neu laden und die Änderung erneut vornehmen.',
             $json['message'],
         );
         self::assertSame(self::json($this->api('GET', 'devices/' . $device['id']))['device'], $json['details']['device']);
@@ -123,7 +123,7 @@ final class DeviceFieldsTest extends DeviceApiTestCase
 
         self::assertError(409, 'rule_violation', $response);
         self::assertSame(
-            'Das Gerät „MA-01“ ist ausgesondert; Stammdaten und Prüfdatum lassen sich erst nach der Wiederaufnahme ändern.',
+            'Die Ausrüstung „MA-01“ ist ausgesondert; Stammdaten und Wartungsdatum lassen sich erst nach der Wiederaufnahme ändern.',
             self::json($response)['message'],
         );
         self::assertSame($before, $this->deviceSnapshot());
@@ -152,7 +152,7 @@ final class DeviceFieldsTest extends DeviceApiTestCase
         self::assertError(409, 'rule_violation', $this->api('POST', 'devices/' . $device['id'] . '/fields', ['version' => 1, 'device_type_id' => $inactive]));
         $foreign = $this->api('POST', 'devices/' . $device['id'] . '/fields', ['version' => 1, 'device_type_id' => $this->otherTypeId]);
         self::assertError(400, 'invalid_request', $foreign);
-        self::assertSame('Der Gerätetyp wurde nicht gefunden.', self::json($foreign)['message']);
+        self::assertSame('Der Ausrüstungstyp wurde nicht gefunden.', self::json($foreign)['message']);
         self::assertSame($before, $this->deviceSnapshot());
     }
 
@@ -175,11 +175,11 @@ final class DeviceFieldsTest extends DeviceApiTestCase
         yield 'Version fehlt' => [['model' => 'X'], 'Das Feld "version" muss eine ganze Zahl'];
         yield 'Version als Text' => [['version' => '1', 'model' => 'X'], 'Das Feld "version" muss eine ganze Zahl'];
         yield 'keine Felder' => [['version' => 1, 'comment' => 'nur Kommentar'], 'Keine Stammdaten zum Ändern angegeben'];
-        yield 'Kennung leeren' => [['version' => 1, 'identifier' => null], 'Das Feld "identifier" fehlt'];
+        yield 'Nummer leeren' => [['version' => 1, 'identifier' => null], 'Das Feld "identifier" fehlt'];
         yield 'Typ leeren' => [['version' => 1, 'device_type_id' => null], 'Das Feld "device_type_id" muss eine ganze Zahl'];
         yield 'Status' => [['version' => 1, 'status' => 'defective'], 'Das Feld "status" ist hier nicht vorgesehen'];
         yield 'Standort' => [['version' => 1, 'location_id' => 1], 'Das Feld "location_id" ist hier nicht vorgesehen'];
-        yield 'Prüfdatum' => [['version' => 1, 'next_inspection_due' => '2027-01-01'], 'Das Feld "next_inspection_due" ist hier nicht vorgesehen'];
+        yield 'Wartungsdatum' => [['version' => 1, 'next_inspection_due' => '2027-01-01'], 'Das Feld "next_inspection_due" ist hier nicht vorgesehen'];
         yield 'Datum ungültig' => [['version' => 1, 'procured_on' => '2027-02-30'], 'Das Beschaffungsdatum muss ein gültiges Datum'];
         yield 'Modell mehrzeilig' => [['version' => 1, 'model' => "a\nb"], 'Das Modell darf keine Steuerzeichen'];
     }

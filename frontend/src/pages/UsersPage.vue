@@ -456,7 +456,7 @@ const confirmTexts = computed(() => {
         case 'delete':
             return {
                 title: `${label} löschen?`,
-                description: `E-Mail, Namen und Anmeldungen werden entfernt. Im Verlauf der Geräte steht danach „Gelöschter Benutzer #${String(user?.id ?? '')}“. Das lässt sich nicht rückgängig machen.`,
+                description: `E-Mail, Namen und Anmeldungen werden entfernt. Im Verlauf der Ausrüstung steht danach „Gelöschter Benutzer #${String(user?.id ?? '')}“. Das lässt sich nicht rückgängig machen.`,
                 confirm: 'Löschen',
             };
     }
@@ -874,7 +874,7 @@ onMounted(() => {
                 {{ shownNameError }}
             </p>
             <p v-else :id="`${id}-name-hint`" class="field-hint">
-                So erscheint die Person in der App und im Verlauf der Geräte.
+                So erscheint die Person in der App und im Verlauf der Ausrüstung.
             </p>
         </label>
         <fieldset class="roles" :disabled="mode === 'edit' && isOwn">

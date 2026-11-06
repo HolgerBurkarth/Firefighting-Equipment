@@ -176,7 +176,7 @@ describe('Aktionen des Admins', () => {
     it('version_conflict: aktueller Stand mit allen Feldern', async () => {
         const { fetch } = respond(409, {
             error: 'version_conflict',
-            message: 'Das Gerät wurde inzwischen geändert.',
+            message: 'Die Ausrüstung wurde inzwischen geändert.',
             details: { device: fullJson(5, { version: 9 }) },
         });
         const result = await postDeviceFields(5, { version: 2, changes: { note: 'x' } }, fetch);

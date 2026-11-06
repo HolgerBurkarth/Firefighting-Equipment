@@ -54,9 +54,9 @@ const OVERVIEW = adminOverview({
 const MENU_LABELS = [
     'Dashboard',
     'Suchen',
-    'Geräte',
+    'Ausrüstung',
     'Standorte',
-    'Gerätetypen',
+    'Ausrüstungstypen',
     /^Benutzer\s*2$/,
     /^Protokoll\s*1$/,
     'Einstellungen',
@@ -193,7 +193,9 @@ test.describe('Dashboard', () => {
     test('Kacheln aus device-summary und den Freischaltungen', async ({ page, apiRequests }) => {
         await page.goto('/firefighting/test/dashboard');
         await expect(page.getByTestId('tile-readiness')).toContainText('42 von 45');
-        await expect(page.getByTestId('tile-readiness')).toContainText('Geräte einsatzbereit');
+        await expect(page.getByTestId('tile-readiness')).toContainText(
+            'Ausrüstungen einsatzbereit',
+        );
         await expect(
             page.getByRole('progressbar', { name: 'Anteil einsatzbereit' }),
         ).toHaveAttribute('value', '93');
@@ -281,7 +283,7 @@ test.describe('Dashboard', () => {
                 ...OVERVIEW,
                 ...deviceDetail(deviceJson(5)),
                 'GET api/v1/devices/5/events': eventsEndpoint([]),
-                // Das Gerätedetail lädt die Gerätetypen (für „Bearbeiten“).
+                // Das Gerätedetail lädt die Ausrüstungstypen (für „Bearbeiten“).
                 'GET api/v1/device-types': { status: 200, body: { device_types: [] } },
             },
         });
@@ -304,11 +306,11 @@ test.describe('Dashboard', () => {
         });
     });
 
-    test('Kachel „Prüffristen“ führt zu den Prüffristen', async ({ page }) => {
+    test('Kachel „Termine“ führt zu den Termine', async ({ page }) => {
         await page.goto('/firefighting/test/dashboard');
         await page.getByTestId('tile-inspection').click();
         await expect(page).toHaveURL(/\/firefighting\/test\/prueffristen$/);
-        await expect(page.getByRole('heading', { level: 1, name: 'Prüffristen' })).toBeVisible();
+        await expect(page.getByRole('heading', { level: 1, name: 'Termine' })).toBeVisible();
     });
 });
 
@@ -318,9 +320,11 @@ test.describe('Dashboard ohne Daten', () => {
     test('leere Listen mit Hinweis', async ({ page }) => {
         await page.goto('/firefighting/test/dashboard');
         await expect(page.getByTestId('tile-readiness')).toContainText('0 von 0');
-        await expect(page.getByTestId('tile-readiness')).toContainText('Noch keine Geräte erfasst');
+        await expect(page.getByTestId('tile-readiness')).toContainText(
+            'Noch keine Ausrüstung erfasst',
+        );
         await expect(page.getByTestId('tile-open')).toContainText('Nichts zu erledigen');
-        await expect(page.getByText('Alle Geräte sind einsatzbereit.')).toBeVisible();
+        await expect(page.getByText('Alle Ausrüstungen sind einsatzbereit.')).toBeVisible();
         await expect(page.getByText('Noch keine Einträge.')).toBeVisible();
     });
 });

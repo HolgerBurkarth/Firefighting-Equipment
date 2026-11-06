@@ -68,7 +68,7 @@ test.describe('Einladung annehmen', () => {
             expect(urls.filter((url) => url.includes(TOKEN))).toEqual([]);
         });
 
-        test('Pflichtfeld Name und Live-Prüfung: keine Anfrage', async ({ page, apiRequests }) => {
+        test('Pflichtfeld Name und Live-Wartung: keine Anfrage', async ({ page, apiRequests }) => {
             await page.goto(PAGE);
             await submit(page);
             await expect(page.getByText('Bitte geben Sie Ihren Namen ein.')).toBeVisible();

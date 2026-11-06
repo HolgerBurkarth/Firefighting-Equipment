@@ -9,7 +9,7 @@ import {
 } from '../../src/api/deviceTypes';
 import { respond } from './support/fetch';
 
-/** Gerätetyp wie DeviceTypeJson in PHP. */
+/** Ausrüstungstyp wie DeviceTypeJson in PHP. */
 function typeJson(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     return {
         id: 3,
@@ -23,7 +23,7 @@ function typeJson(overrides: Record<string, unknown> = {}): Record<string, unkno
 }
 
 describe('parseDeviceTypeList', () => {
-    it('liest Gerätetypen', () => {
+    it('liest Ausrüstungstypen', () => {
         expect(
             parseDeviceTypeList({ device_types: [typeJson(), typeJson({ id: 4, active: false })] }),
         ).toEqual([
@@ -49,7 +49,7 @@ describe('parseDeviceTypeList', () => {
 });
 
 describe('Anfragen', () => {
-    it('fragt alle Gerätetypen samt deaktivierten', async () => {
+    it('fragt alle Ausrüstungstypen samt deaktivierten', async () => {
         const { fetch, requests } = respond(200, { device_types: [typeJson()] });
         const result = await fetchAllDeviceTypes(fetch);
         expect(result.ok).toBe(true);
@@ -86,7 +86,7 @@ describe('Anfragen', () => {
     it('meldet name_taken', async () => {
         const { fetch } = respond(409, {
             error: 'name_taken',
-            message: 'Es gibt bereits einen Gerätetyp „Funkgerät“.',
+            message: 'Es gibt bereits einen Ausrüstungstyp „Funkgerät“.',
         });
         const result = await createDeviceType('funkgerät', fetch);
         expect(!result.ok && result.error.code).toBe('name_taken');

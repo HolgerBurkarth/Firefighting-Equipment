@@ -109,7 +109,7 @@ async function onLogout(): Promise<void> {
                     {{ service ? 'Service' : (tenantState.tenant?.name ?? 'Feuerwehr') }}
                 </span>
                 <span class="menu-brand-sub">{{
-                    service ? 'Super-Admin' : 'Geräteverwaltung'
+                    service ? 'Super-Admin' : 'Ausrüstungsverwaltung'
                 }}</span>
             </div>
         </div>

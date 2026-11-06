@@ -36,7 +36,7 @@ function length(value: string): number {
 export function identifierProblem(value: string): string | null {
     const text = identifierText(value);
     if (text === '') {
-        return 'Bitte eine Kennung eingeben.';
+        return 'Bitte eine Nummer eingeben.';
     }
     if (length(text) > IDENTIFIER_MAX_LENGTH) {
         return `Höchstens ${String(IDENTIFIER_MAX_LENGTH)} Zeichen (jetzt ${String(length(text))}).`;
@@ -284,11 +284,11 @@ export function reinstateRequest(
  * (`Feld "identifier"`, `mit null entfernen`), daher eigene Texte für die Oberfläche.
  */
 export function reinstateIdentifierTaken(identifier: string): string {
-    return `Die Kennung „${identifierText(identifier)}“ ist inzwischen an ein anderes Gerät vergeben. Bitte geben Sie eine andere Kennung ein.`;
+    return `Die Nummer „${identifierText(identifier)}“ ist inzwischen an eine andere Ausrüstung vergeben. Bitte geben Sie eine andere Nummer ein.`;
 }
 
 export const REINSTATE_SCAN_CODE_TAKEN =
-    'Dieser Scan-Code ist inzwischen einem anderen Gerät zugeordnet. Entfernen Sie das Häkchen, um das Gerät ohne Scan-Code wieder aufzunehmen.';
+    'Dieser Scan-Code ist inzwischen einer anderen Ausrüstung zugeordnet. Entfernen Sie das Häkchen, um die Ausrüstung ohne Scan-Code wieder aufzunehmen.';
 
 /**
  * Eingaben auf „Neues Gerät“ (`geraete/neu`, KONZEPT.md, "Admin-Konsole – Entscheidungen", 32).
@@ -318,12 +318,12 @@ export type NewDeviceField = keyof NewDeviceForm;
  * den Knöpfen („Zum Feld „Scan-Code““, T10).
  */
 export const NEW_DEVICE_FIELD_LABELS: Readonly<Record<NewDeviceField, string>> = {
-    identifier: 'Kennung',
-    deviceTypeId: 'Gerätetyp',
+    identifier: 'Nummer',
+    deviceTypeId: 'Ausrüstungstyp',
     locationId: 'Standort',
     status: 'Status',
     scanCode: 'Scan-Code',
-    nextInspectionDue: 'Nächste Prüfung',
+    nextInspectionDue: 'Nächste Wartung',
     serialNumber: 'Seriennummer',
     manufacturer: 'Hersteller',
     model: 'Modell',
@@ -358,7 +358,7 @@ export function newDeviceProblems(form: NewDeviceForm): Partial<Record<NewDevice
     const problems: Partial<Record<NewDeviceField, string>> = {};
     const checks: [NewDeviceField, string | null][] = [
         ['identifier', identifierProblem(form.identifier)],
-        ['deviceTypeId', form.deviceTypeId === null ? 'Bitte einen Gerätetyp wählen.' : null],
+        ['deviceTypeId', form.deviceTypeId === null ? 'Bitte einen Ausrüstungstyp wählen.' : null],
         ['locationId', form.locationId === null ? 'Bitte einen Standort wählen.' : null],
         ['scanCode', trimCode(form.scanCode) === '' ? null : scanCodeProblem(form.scanCode)],
         ['nextInspectionDue', dateProblem(form.nextInspectionDue)],
@@ -379,7 +379,7 @@ export function newDeviceProblems(form: NewDeviceForm): Partial<Record<NewDevice
 /** Body von POST devices; nur aufrufen, wenn `newDeviceProblems` leer ist. */
 export function newDeviceRequest(form: NewDeviceForm): NewDeviceRequest {
     if (form.deviceTypeId === null || form.locationId === null) {
-        throw new Error('Gerätetyp und Standort fehlen.');
+        throw new Error('Ausrüstungstyp und Standort fehlen.');
     }
     const scanCode = trimCode(form.scanCode);
     const optional = {

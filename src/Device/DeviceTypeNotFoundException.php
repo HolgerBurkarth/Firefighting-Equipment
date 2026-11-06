@@ -11,6 +11,6 @@ final class DeviceTypeNotFoundException extends DeviceException
 {
     public static function forId(int $id): self
     {
-        return new self(sprintf('Kein Gerätetyp mit der ID %d gefunden.', $id));
+        return new self(sprintf('Kein Ausrüstungstyp mit der ID %d gefunden.', $id));
     }
 }

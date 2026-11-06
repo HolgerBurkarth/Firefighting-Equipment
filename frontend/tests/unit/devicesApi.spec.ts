@@ -63,10 +63,10 @@ describe('parseDeviceListItem', () => {
     it.each([
         ['id 0', { id: 0 }],
         ['id als Text', { id: '5' }],
-        ['Kennung fehlt', { identifier: undefined }],
+        ['Nummer fehlt', { identifier: undefined }],
         ['unbekannter Status', { status: 'broken' }],
         ['Standort ohne Pfad', { location: { id: 11, name: 'G1' } }],
-        ['Gerätetyp fehlt', { device_type: null }],
+        ['Ausrüstungstyp fehlt', { device_type: null }],
         ['Version 0', { version: 0 }],
         ['Seriennummer fehlt', { serial_number: undefined }],
         ['Hersteller als Zahl', { manufacturer: 5 }],

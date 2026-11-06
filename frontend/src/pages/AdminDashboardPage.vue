@@ -141,7 +141,7 @@ onMounted(() => {
                 class="tile tile-maintenance"
                 data-testid="tile-inspection"
             >
-                <span class="tile-label">Prüffristen</span>
+                <span class="tile-label">Termine</span>
                 <span class="tile-value tile-value-maintenance">{{ tiles.inspection.value }}</span>
                 <span class="tile-detail">{{ tiles.inspection.detail }}</span>
             </component>
@@ -172,7 +172,7 @@ onMounted(() => {
             >
                 <h2 id="not-ready-title">Nicht einsatzbereit</h2>
                 <p v-if="overview.notReady.devices.length === 0" class="hint">
-                    Alle Geräte sind einsatzbereit.
+                    Alle Ausrüstungen sind einsatzbereit.
                 </p>
                 <ul v-else class="rows" data-testid="not-ready-list">
                     <li v-for="device in overview.notReady.devices" :key="device.id">

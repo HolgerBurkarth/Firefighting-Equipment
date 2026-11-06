@@ -36,12 +36,12 @@ export const ADMIN_MENU: readonly AdminMenuEntry[] = [
     { route: 'search', label: 'Suchen', icon: 'search' },
     {
         route: 'devices',
-        label: 'Geräte',
+        label: 'Ausrüstung',
         icon: 'devices',
         sections: ['device-details', 'device-new', 'device-import'],
     },
     { route: 'locations', label: 'Standorte', icon: 'location' },
-    { route: 'device-types', label: 'Gerätetypen', icon: 'tag' },
+    { route: 'device-types', label: 'Ausrüstungstypen', icon: 'tag' },
     { route: 'users', label: 'Benutzer', icon: 'account', badge: 'pendingUsers' },
     {
         route: 'notices',

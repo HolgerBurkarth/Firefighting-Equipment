@@ -59,5 +59,5 @@ export function inspectionText(entry: InspectionEntry, overdue: boolean): string
     } else {
         when = `in ${String(days)} Tagen fällig`;
     }
-    return `Prüfung: ${date} · ${when}`;
+    return `Wartung: ${date} · ${when}`;
 }

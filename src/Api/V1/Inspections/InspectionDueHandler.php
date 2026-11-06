@@ -82,8 +82,8 @@ final readonly class InspectionDueHandler implements RequestHandler
         $days = $device->nextInspectionDue === null ? null : $window->daysUntil($device->nextInspectionDue);
 
         return [...DeviceJson::summary($device), ...match ($section) {
-            InspectionSection::Overdue => ['days_overdue' => -($days ?? throw new \LogicException('Prüfdatum fehlt.'))],
-            InspectionSection::DueSoon => ['days_until_due' => $days ?? throw new \LogicException('Prüfdatum fehlt.')],
+            InspectionSection::Overdue => ['days_overdue' => -($days ?? throw new \LogicException('Wartungsdatum fehlt.'))],
+            InspectionSection::DueSoon => ['days_until_due' => $days ?? throw new \LogicException('Wartungsdatum fehlt.')],
             InspectionSection::WithoutDate => [],
         }];
     }

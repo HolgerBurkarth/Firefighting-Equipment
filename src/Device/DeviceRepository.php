@@ -126,7 +126,7 @@ final readonly class DeviceRepository
             throw new \InvalidArgumentException('limit muss positiv sein.');
         }
         if ($filter->statuses !== [] || $filter->includeRetired || $filter->search !== null || $filter->scanCode !== null) {
-            throw new \InvalidArgumentException('Die Prüffristen filtern nur nach Gerätetyp und Standort.');
+            throw new \InvalidArgumentException('Die Termine filtern nur nach Ausrüstungstyp und Standort.');
         }
 
         [$where, $params] = $this->where($filter);
@@ -802,7 +802,7 @@ final readonly class DeviceRepository
         $stmt->execute([$typeId, $tenant->id]);
         $type = $stmt->fetch();
         if (!is_array($type) || !$this->visibility->allowsDeviceType($typeId)) {
-            throw new InvalidDeviceValueException('Der Gerätetyp wurde nicht gefunden.');
+            throw new InvalidDeviceValueException('Der Ausrüstungstyp wurde nicht gefunden.');
         }
 
         return [(string) $type['name'], (int) $type['active'] === 1];
