@@ -61,6 +61,24 @@ Weiterhin nur nach Rückfrage („❓ RÜCKFRAGE“):
 - Die Rollentabelle für Immendingen (Abschnitt 6) bleibt ein Vorschlag; echte Städte werden nicht
   angefasst.
 
+### Entscheidungen zu Schritt 1.8 (Holger, 06.11.2026)
+
+Beantwortet die beiden Rückfragen oben (`ClientApi::MIN` und Rollen für Immendingen):
+
+- **Reihenfolge**: zuerst `ClientApi::MIN` = 2 live, danach die Rollen für Immendingen.
+- **`ClientApi::MIN` = 2**: ein eigener kleiner Schritt **1.8a** vor den Rollen für Immendingen,
+  mit Tests, CLAUDE.md, `UEBERGABE-BACKEND.md` und einem Deploy außerhalb eines Dienstabends. Apps
+  ohne `X-Client-Api` (vor Phase 0) bleiben davon unberührt.
+- **Rollen für Immendingen (1.8b)**: wie die Tabelle in Abschnitt 6, also *Admin* und *Benutzer*
+  (bestehen schon) plus *Gerätewart* und *Geräteträger*, „Sieht nur …“ jeweils alle. Der Agent liefert
+  eine genaue Liste zum Anlegen (je Rolle Name, Kurzbeschreibung, jede Ansicht mit Stufe, jede
+  Aktion). **Holger legt die Rollen selbst als Super-Admin an.** Der Agent ändert in Immendingen
+  nichts und prüft dort nur lesend. Konten werden vorerst keine zugewiesen.
+- In Phase 1 unterscheidet sich *Geräteträger* von *Benutzer* nur durch die fehlenden Termine; die
+  eigenen Rechte (Benutzt melden, Tauschen, Einmalgeräte) kommen mit Phase 2.
+- **CI**: `install-deps` mit eigener Zeitgrenze und Wiederholung über einen anderen Mirror
+  (`scripts/install-browser-deps.sh`); Job `deploy` unverändert.
+
 ### Schritt 1.7d „Schnellstart“ (Wunsch Holger 05.11.2026, nach 1.7c, vor 1.8)
 
 Erst umsetzen, wenn 1.7c live ist (der Sofortstart braucht die gespeicherte `permissions.version`).
@@ -88,6 +106,14 @@ gedrosselt (`--slow`) 1,84 s; weiterer Start mit Service Worker 0,49 s (0,45–0
 Starts): `tenant`, `auth/me` und `build.json` gleichzeitig ab rund 0,07–0,1 s, fertig nach 0,32–0,6 s;
 erst danach die Seite (`SearchPage`) und `devices` (Beginn 0,37–0,65 s, Antwort 0,83–0,89 s). Die
 Geräte stehen also erst nach rund 0,9 s, obwohl Sitzung und Offline-Kopie auf dem Gerät liegen.
+
+**Nachher mit Messskript** (05.11.2026, Build `9de6683e1f98`, gleiche Messung): erster Besuch 1,66 s
+(1,49–1,84 s), gedrosselt 1,63 s; weiterer Start mit Service Worker 0,08 s (0,07–0,09 s), gedrosselt
+0,08 s. Angemeldet als *Admin* auf `suchen` (Claude in Chrome, zwei Starts): Marke `ff:first-page`
+nach 0,09–0,10 s, `ff:search-data` (Geräte aus der Offline-Kopie) nach 0,10 s; `auth/me` (Antwort
+0,46–0,47 s) und `devices` (0,52–0,54 s) laufen im Hintergrund. Ziel erreicht: „Suchen“ mit Daten
+unter 1 s (vorher rund 0,9 s, jetzt 0,1 s); erster Besuch etwas schneller (1,86 → 1,66 s), dort
+bestimmen die Antworten von STRATO die Zeit.
 
 **Ziele**
 
@@ -618,7 +644,9 @@ Klasse` (wird eine Rolle strenger, gilt die kürzere Höchstdauer sofort).
 ## 6. Rollen für Immendingen (nur Vorschlag)
 
 Nichts davon wird angelegt, bevor Holger es freigibt; Agenten testen nur in `test`. Vorschlag nach
-Konzept Abschnitt 1 und Mockup (Spalte „Phase 2+“: kommt mit der jeweiligen Phase dazu):
+Konzept Abschnitt 1 und Mockup (Spalte „Phase 2+“: kommt mit der jeweiligen Phase dazu). Freigegeben
+am 06.11.2026 (Gerätewart und Geräteträger); Holger legt die Rollen nach Schritt 1.8a selbst an,
+ohne Konten zuzuweisen (siehe „Entscheidungen zu Schritt 1.8“).
 
 | Bereich / Aktion | Admin | Gerätewart | Geräteträger | Benutzer (Standard) |
 | --- | --- | --- | --- | --- |
@@ -703,7 +731,7 @@ Offen dazu: F14 (Adressen wie `geraete`, `prueffristen` und Spalten der CSV).
 | 1.6 | Admin: `GET roles`, Rolle zuweisen (einzeln, mehrere), Freischalten und Einladungscodes mit Rolle | mittel | live in `test` |
 | 1.7 | App auf Rechte umstellen (Menü, Wächter, Handy-Leiste, Knöpfe, Offline-Kopie mit `permissions.version`), `X-Client-Api` 2 mit `MIN` 1 (Variante B); Aktion `csv.export` für die Exporte (F2, *Benutzer* dann 403). Geteilt in 1.7a/b/c (siehe oben) | mittel | je Teil live in `test`, Handy (Holger) nach 1.7c |
 | 1.7d | „Schnellstart“: Start ohne Warten auf die Update-Prüfung, Angemeldete sofort mit Sitzung und Offline-Kopie, Zielseite parallel zu `tenant`/`auth/me`, Startbild, Messung vorher/nachher (siehe „Entscheidungen“). Erst nach 1.7c | mittel | live in `test` mit Messung, Handy (Holger) |
-| 1.8 | Live-Test aller Rollen in `test` (LIVETEST-Datei), Entscheidung über `ClientApi::MIN` = 2, Rollen für Immendingen nur nach Freigabe durch Holger | klein | – |
+| 1.8 | Live-Test aller Rollen in `test` (LIVETEST-Datei), Entscheidung über `ClientApi::MIN` = 2, Rollen für Immendingen nur nach Freigabe durch Holger. Entschieden 06.11.2026 (siehe „Entscheidungen zu Schritt 1.8“): **1.8a** `ClientApi::MIN` = 2, **1.8b** Liste der Rollen für Immendingen, angelegt von Holger, vom Agenten nur lesend geprüft | klein | 1.8a live vor 1.8b |
 | 1.9 | „Konto wechseln“ (Kontoliste auf dem Gerät, Menü und Profil, siehe „Entscheidungen“) | mittel | live in `test` (zweite Stadt nur lokal/im Test) |
 
 Reihenfolge: 1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 → 1.7 (a → b → c → d) → 1.8 → 1.9. 1.5/1.6 können neue Rollen erst
