@@ -118,6 +118,9 @@ test.describe('Konto wechseln in der Admin-Konsole', () => {
         await trigger.click();
         const popover = page.getByTestId('account-switch');
         await expect(popover.getByRole('heading', { name: 'Konto wechseln' })).toBeVisible();
+        // Eigener Hintergrund (live 06.11.2026: ohne war das Popover durchsichtig).
+        await expect(popover).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(popover).toHaveCSS('z-index', '50');
         const list = popover.getByTestId('account-list');
         await expect(list.getByRole('button')).toHaveText([
             /Feuerwehr Test\s*Anna · Admin\s*aktuell/,
