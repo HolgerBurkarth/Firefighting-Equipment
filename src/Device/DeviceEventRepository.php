@@ -28,7 +28,7 @@ final readonly class DeviceEventRepository
         . ' e.from_location_id, fl.name AS from_name, fp.name AS from_parent,'
         . ' e.to_location_id, tl.name AS to_name, tp.name AS to_parent,'
         . ' e.from_status, e.to_status, e.from_due, e.to_due, e.field, e.old_value, e.new_value, e.comment, e.created_at,'
-        . ' e.occurred_at, e.applied, e.not_applied_reason, b.client_ref';
+        . ' e.occurred_at, e.applied, e.not_applied_reason, e.channel, b.client_ref';
 
     private const string JOINS = ' FROM fe_device_events e'
         . ' JOIN fe_users u ON u.id = e.user_id AND u.tenant_id = e.tenant_id'
@@ -252,6 +252,7 @@ final readonly class DeviceEventRepository
             (int) $row['applied'] === 1,
             $row['not_applied_reason'] === null ? null : NotAppliedReason::from((string) $row['not_applied_reason']),
             $row['client_ref'] === null ? null : (string) $row['client_ref'],
+            EventChannel::from((string) $row['channel']),
         );
     }
 

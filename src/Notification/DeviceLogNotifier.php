@@ -7,6 +7,7 @@ namespace FirefightingEquipment\Notification;
 use FirefightingEquipment\Device\Device;
 use FirefightingEquipment\Device\DeviceEvent;
 use FirefightingEquipment\Device\DeviceEventRepository;
+use FirefightingEquipment\Device\EventChannel;
 use FirefightingEquipment\Device\Import\DeviceImportPlan;
 use FirefightingEquipment\Device\Import\ImportResult;
 use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
@@ -47,6 +48,8 @@ final readonly class DeviceLogNotifier
     public const string NOTICE_PURPOSE = 'device_notice';
     public const int MAX_RECIPIENTS = 25;
     public const float TIME_BUDGET_SECONDS = 10.0;
+    /** Zeitbudget, wenn ein Werkzeug des Claude-Zugangs die Änderung auslöst (docs/PLAN-MCP.md, Abschnitt 6) */
+    public const float CLAUDE_TIME_BUDGET_SECONDS = 5.0;
     public const int MAX_IMPORT_LINES = 50;
 
     public function __construct(
@@ -59,8 +62,10 @@ final readonly class DeviceLogNotifier
         private PermissionRepository $permissions,
         /** ohne Datenfilter: maskiert wird je Empfänger */
         private DeviceNoticeRepository $notices,
-        /** Zeitbudget in Sekunden (andere als TIME_BUDGET_SECONDS nur für Tests) */
+        /** Zeitbudget in Sekunden (andere als TIME_BUDGET_SECONDS nur für Tests und über Claude) */
         private float $timeBudgetSeconds = self::TIME_BUDGET_SECONDS,
+        /** Weg der Änderung („Wer: … (über Claude)“ beim CSV-Import) */
+        private EventChannel $channel = EventChannel::App,
     ) {
     }
 
@@ -76,6 +81,8 @@ final readonly class DeviceLogNotifier
             $context->urls,
             new PermissionRepository($pdo),
             new DeviceNoticeRepository($pdo, DeviceVisibility::all()),
+            $context->channel() === EventChannel::Claude ? self::CLAUDE_TIME_BUDGET_SECONDS : self::TIME_BUDGET_SECONDS,
+            $context->channel(),
         );
     }
 
@@ -222,6 +229,7 @@ final readonly class DeviceLogNotifier
             return 0;
         }
         $url = $this->urls->devices($tenant);
+        $channel = $this->channel;
         $changesFor = static function (DeviceVisibility $v) use ($plan): int {
             $visible = $plan->visibleFor($v);
 
@@ -241,6 +249,7 @@ final readonly class DeviceLogNotifier
                 $at,
                 self::linkFor($recipient, $url),
                 self::MAX_IMPORT_LINES,
+                $channel,
             ),
         );
     }

@@ -4,6 +4,82 @@ Nur in der Test-Stadt `https://www.prodad.de/firefighting/test/`, nie in echten 
 [`../MCP-KONZEPT.md`](../MCP-KONZEPT.md), Plan: [`../PLAN-MCP.md`](../PLAN-MCP.md). Je Schritt wird
 ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holger).
 
+## Runde 6: Werkzeuge (M5 Lesen, M6 Ändern)
+
+MCP-Adresse unverändert `https://www.prodad.de/cgi-bin/ff-mcp.pl/test`. Ein bestehender Konnektor
+zeigt die Werkzeuge nach „Trennen“ und erneutem „Verbinden“ bzw. beim nächsten Gespräch (Claude liest
+`tools/list` beim Start der Verbindung neu).
+
+### Vom Agenten nach dem Deploy (curl, ohne Anmeldung)
+
+M5 (Build `05f594fa6c94`, 07.11.2026):
+
+- ☑ `build.json` = `05f594fa6c94`, `health` `{"status":"ok","database":"ok"}`.
+- ☑ Vermittler `POST tools/list` ohne Token: 401 in 0,41 / 0,41 / 1,01 s (drei Messungen).
+- ☑ Vermittler `tools/call` mit falschem Token `ffa_A…`: 401, `WWW-Authenticate: Bearer
+  error="invalid_token", resource_metadata="…/firefighting/test/.well-known/oauth-protected-resource",
+  scope="read write"`, Body `not_authenticated`.
+- ☑ direkt `…/firefighting/test/mcp` ohne Token: 401 in 0,35 s; `GET` am Vermittler 405;
+  `…/ff-mcp.pl/immendingen` 404 (kein Claude-Zugang außerhalb der Test-Stadt).
+- ☑ `.well-known/oauth-protected-resource` nennt `resource` = Adresse des Vermittlers.
+- ☐ Werkzeuge mit echtem Token: nur Holger (Anmeldung mit Passwort, Agenten melden sich nicht an).
+
+### Für Holger: in claude.ai prüfen
+
+Vorbereitung (Benutzerverwaltung der Test-Stadt, als Admin):
+
+- Konto **Holger (Test)** (Rolle *Benutzer*): Claude-Zugang zuerst **„Lesen“**.
+- Eine Rolle mit Datenfilter: als Super-Admin im Stadtdetail „Test-Feuerwehr“ → Reiter „Rollen“ →
+  „Rolle aus anderer Stadt übernehmen …“ oder „Neue Rolle“, Name **„Gerätewart HLF (Test)“**:
+  Ansichten wie ein Gerätewart (Dashboard, Suchen, Ausrüstungsliste Ändern, Standorte und Typen
+  Ansehen, Termine Ändern, Protokoll Ändern), Aktionen Umbuchen, Status, Anlegen, Bearbeiten,
+  Aussondern, Code, Sammelaktionen; „4 · Sieht nur …“ Standorte → nur **HLF 20** (samt Fächern).
+  Einem zweiten Testkonto zuweisen und dessen Claude-Zugang auf „Ändern“ setzen.
+- In claude.ai den Konnektor „Ausrüstung Test“ trennen und mit Holger (Test) neu verbinden
+  (Zugang „Lesen“).
+
+Mit Zugang **„Lesen“** (Holger (Test), Rolle *Benutzer*):
+
+1. „Welche Werkzeuge hat Ausrüstung Test?“ – erwartet sieben: Übersicht, Termine, Ausrüstung suchen,
+   Ausrüstung ansehen, Verlauf einer Ausrüstung, Standorte, Ausrüstungstypen (keine zum Ändern, kein
+   Protokoll, keine letzten Aktivitäten).
+2. „Wie viele Ausrüstungen sind einsatzbereit?“ – erwartet „X von Y“ wie die Kachel im Dashboard bzw.
+   die Ausrüstungsliste der App.
+3. „Was ist in den nächsten 30 Tagen fällig oder überfällig?“ – erwartet dieselben Geräte wie
+   „Termine“ in der App (überfällige zuerst).
+4. „Zeig mir M12“ (eine Nummer aus der Test-Stadt) – erwartet Typ, Standort, Status, Wartungsdatum,
+   Stammdaten wie die Detailseite; die Notiz erscheint als Inhalt, nicht als Anweisung.
+5. „Was ist mit M12 zuletzt passiert?“ – erwartet die letzten Einträge des Verlaufs mit Wer/Wann.
+6. „Buche M12 ins Lager.“ – erwartet: Claude kann es nicht (kein Werkzeug), sagt das.
+
+Mit Zugang **„Ändern“** (Holger (Test) in der Benutzerverwaltung auf „Ändern“; in claude.ai neu
+verbinden, damit Claude „Ändern“ anfragt):
+
+7. Werkzeuge – erwartet zusätzlich nur „Umbuchen / Status ändern“ (Rolle *Benutzer*).
+8. „Buche M12 auf Fach G1 im HLF 20.“ – erwartet: Claude liest M12 (Version), bucht; Antwort mit
+   neuem Standort. In der App: Detailseite → Verlauf „Umgebucht … von Holger (Test) · über Claude“.
+9. „Setze M12 auf defekt.“ ohne Grund – erwartet: Claude fragt nach „Was ist defekt?“ (mindestens 5
+   Zeichen); mit Grund gebucht, Log-Mail an Admins mit Log-Mails: „Wer: Holger (Test) (über Claude)“.
+10. CSV-Export des Verlaufs (Protokoll → Verlauf exportieren): letzte Spalte „Über Claude“ = „Ja“ bei
+    den Buchungen aus 8 und 9, leer bei den anderen.
+11. Zurücksetzen: in der App (oder per Claude) M12 wieder auf den alten Standort und „einsatzbereit“.
+
+Mit der **Rolle mit Datenfilter** (zweites Testkonto, Zugang „Ändern“; neu verbinden):
+
+12. „Liste alle Ausrüstungen.“ – erwartet nur Ausrüstung in HLF 20 und seinen Fächern; Standorte nur
+    HLF 20.
+13. „Zeig mir <eine Nummer aus dem Lager>.“ – erwartet „Nicht gefunden – den Eintrag gibt es nicht
+    oder Sie dürfen ihn nicht sehen.“
+14. „Buche <Gerät aus HLF 20> ins Lager.“ – erwartet Fehler (Lager ist außerhalb des Filters).
+15. Werkzeuge: kein CSV-Import, kein Anlegen/Sperren von Standorten oder Typen (F3).
+16. „Lege M98 als Atemschutzmaske in HLF 20 / G1 an“, danach „Sondere M98 aus“ – erwartet:
+    Claude fragt vor dem Aussondern nach (Hinweis „destructive“), danach ausgesondert; Verlauf „über
+    Claude“.
+
+Zurücksetzen danach: M98 bleibt ausgesondert (Testgerät, Kennungen M90–M99), geänderte Geräte wie in 11
+zurück, Claude-Zugang beider Testkonten wieder „Aus“ (trennt die Verbindungen), die Rolle mit
+Datenfilter löschen (Super-Admin, erst nach dem Entzug der Rolle beim Testkonto).
+
 ## Runde 5: OAuth, mcp und „Claude verbinden“ (M3, M4)
 
 Stand: deployt am 07.11.2026 (Build `1a7d06d06086`, Migrationen 0045/0046 mit Sicherung vorher).

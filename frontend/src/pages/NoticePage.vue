@@ -371,7 +371,8 @@ onMounted(() => {
                 <li v-for="entry in notice.history" :key="entry.id" class="history-entry">
                     <span class="history-head">
                         <strong>{{ entry.actionLabel }}</strong>
-                        · {{ eventTimeText(entry.at, now) }} · von {{ entry.user.name }}
+                        · {{ eventTimeText(entry.at, now) }} · von {{ entry.user.name
+                        }}<template v-if="entry.viaClaude"> · über Claude</template>
                     </span>
                     <p v-if="entry.note !== null" class="history-note">{{ entry.note }}</p>
                 </li>

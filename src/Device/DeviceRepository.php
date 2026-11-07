@@ -70,8 +70,15 @@ final readonly class DeviceRepository
      * @param DeviceEventRecorder|null $recorder erhält die IDs der Ereignisse der letzten erfolgreichen
      *                                           Änderung (für die Benachrichtigung „Log“)
      */
-    public function __construct(private \PDO $pdo, private DeviceVisibility $visibility, private ?DeviceEventRecorder $recorder = null)
-    {
+    /**
+     * @param EventChannel $channel Weg der Änderungen für den Verlauf (Claude: „über Claude“)
+     */
+    public function __construct(
+        private \PDO $pdo,
+        private DeviceVisibility $visibility,
+        private ?DeviceEventRecorder $recorder = null,
+        private EventChannel $channel = EventChannel::App,
+    ) {
     }
 
     /**
@@ -314,7 +321,7 @@ final readonly class DeviceRepository
             }
             $id = (int) $this->pdo->lastInsertId();
 
-            new DeviceEventWriter($this->pdo, recorder: $this->recorder)->created($tenant, $id, $userId, $device->locationId, $device->status, $comment);
+            new DeviceEventWriter($this->pdo, recorder: $this->recorder, channel: $this->channel)->created($tenant, $id, $userId, $device->locationId, $device->status, $comment);
 
             return $id;
         }, $tenant);
@@ -376,7 +383,7 @@ final readonly class DeviceRepository
                 };
             }
 
-            $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder);
+            $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder, channel: $this->channel);
             foreach ($changed as $field => [$old, $new]) {
                 $events->fieldChanged($tenant, $id, $userId, DeviceField::from($field), $old, $new, $comment);
             }
@@ -406,7 +413,7 @@ final readonly class DeviceRepository
 
             $this->pdo->prepare('UPDATE fe_devices SET next_inspection_due = ?, version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?')
                 ->execute([$due?->value, $id, $tenant->id]);
-            new DeviceEventWriter($this->pdo, recorder: $this->recorder)->dueChanged($tenant, $id, $userId, $current->nextInspectionDue, $due, $comment);
+            new DeviceEventWriter($this->pdo, recorder: $this->recorder, channel: $this->channel)->dueChanged($tenant, $id, $userId, $current->nextInspectionDue, $due, $comment);
 
             return $id;
         }, $tenant);
@@ -528,7 +535,7 @@ final readonly class DeviceRepository
      */
     private function offline(Tenant $tenant, int $userId, Device $current, int $expectedVersion, DeviceStateChange $change, ?string $comment, ActionTime $occurredAt): array
     {
-        $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder);
+        $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder, channel: $this->channel);
         $notApplied = function (NotAppliedReason $reason) use ($tenant, $userId, $current, $change, $comment, $occurredAt, $events): array {
             $events->stateNotApplied($tenant, $current->id, $userId, $change->locationId, $change->status, $reason, $occurredAt, $comment);
             $outcome = $reason === NotAppliedReason::Older ? BookingOutcome::HistoryOnly : BookingOutcome::NotApplied;
@@ -703,7 +710,7 @@ final readonly class DeviceRepository
             . ' state_version = version + 1, version = version + 1, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?')
             ->execute([$locationId, $status->value, ...array_column($fields, 2), $occurredAt?->sql(), $current->id, $tenant->id]);
 
-        $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder);
+        $events = new DeviceEventWriter($this->pdo, recorder: $this->recorder, channel: $this->channel);
         foreach ($fields as $field => [$old, $new]) {
             $events->fieldChanged($tenant, $current->id, $userId, DeviceField::from($field), $old, $new, $comment);
         }

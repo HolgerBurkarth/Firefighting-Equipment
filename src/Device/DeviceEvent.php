@@ -40,6 +40,7 @@ final readonly class DeviceEvent
         public ?NotAppliedReason $notAppliedReason = null,
         /** Kennung der Buchung vom Handy (client_ref), falls mitgesendet */
         public ?string $clientRef = null,
+        public EventChannel $channel = EventChannel::App,
     ) {
     }
 
@@ -72,6 +73,7 @@ final readonly class DeviceEvent
             $this->applied,
             $this->notAppliedReason,
             $this->clientRef,
+            $this->channel,
         );
     }
 

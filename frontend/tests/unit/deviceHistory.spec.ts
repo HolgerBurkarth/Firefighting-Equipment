@@ -107,6 +107,7 @@ describe('parseDeviceEvent', () => {
             applied: true,
             notAppliedLabel: null,
             userName: 'Anna',
+            viaClaude: false,
             comment: 'gereinigt',
             location: {
                 from: { id: 11, name: 'G1', path: 'HLF 20 / G1' },
@@ -116,6 +117,12 @@ describe('parseDeviceEvent', () => {
             inspectionDue: null,
             field: null,
         });
+    });
+
+    it('„über Claude“ aus channel (fehlt das Feld: App)', () => {
+        expect(event(1, { channel: 'claude' }).viaClaude).toBe(true);
+        expect(event(1, { channel: 'app' }).viaClaude).toBe(false);
+        expect(event(1).viaClaude).toBe(false);
     });
 
     it.each([

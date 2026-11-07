@@ -52,7 +52,7 @@ final readonly class DeviceStateHandler implements RequestHandler
         $deviceId = $context->param('id');
         $pdo = $context->db->get();
         $recorder = new DeviceEventRecorder();
-        $booker = new DeviceBooker($tenant, new DeviceRepository($pdo, $context->visibility(), $recorder), new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo, $context->visibility()));
+        $booker = new DeviceBooker($tenant, new DeviceRepository($pdo, $context->visibility(), $recorder, $context->channel()), new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo, $context->visibility()));
 
         try {
             $version = DeviceFields::version($context);

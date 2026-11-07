@@ -106,13 +106,13 @@ final class DeviceEventListTest extends DeviceApiTestCase
         foreach ($expected as $i => $entry) {
             $actual = $events[$i];
             self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $actual['created_at']);
-            // Serveraktionen: Aktionszeit = Eingang, übernommen, ohne Buchungs-Kennung.
-            self::assertSame([$actual['created_at'], $actual['created_at'], true, null, null, null], [
+            // Serveraktionen: Aktionszeit = Eingang, übernommen, ohne Buchungs-Kennung, über die App.
+            self::assertSame([$actual['created_at'], $actual['created_at'], true, null, null, null, 'app'], [
                 $actual['occurred_at'], $actual['received_at'], $actual['applied'],
-                $actual['not_applied_reason'], $actual['not_applied_label'], $actual['client_ref'],
+                $actual['not_applied_reason'], $actual['not_applied_label'], $actual['client_ref'], $actual['channel'],
             ]);
             unset($actual['id'], $actual['created_at'], $actual['occurred_at'], $actual['received_at'], $actual['applied'],
-                $actual['not_applied_reason'], $actual['not_applied_label'], $actual['client_ref']);
+                $actual['not_applied_reason'], $actual['not_applied_label'], $actual['client_ref'], $actual['channel']);
             self::assertSame($entry, $actual, sprintf('Eintrag %d', $i));
         }
     }

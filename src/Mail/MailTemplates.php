@@ -7,6 +7,7 @@ namespace FirefightingEquipment\Mail;
 use FirefightingEquipment\Claude\ClaudeAccess;
 use FirefightingEquipment\Device\Device;
 use FirefightingEquipment\Device\DeviceEvent;
+use FirefightingEquipment\Device\EventChannel;
 use FirefightingEquipment\Device\DeviceEventType;
 use FirefightingEquipment\Device\DeviceField;
 use FirefightingEquipment\Device\DeviceStatus;
@@ -402,7 +403,7 @@ final class MailTemplates
         $lines = [
             'Vorgang: ' . self::deviceLogAction($events),
             'Ausrüstung: ' . $device->identifier->value . ' (' . $device->deviceTypeName . ')',
-            'Wer: ' . $first->userName,
+            'Wer: ' . $first->userName . $first->channel->suffix(),
             'Wann: ' . self::when($first->createdAt),
         ];
         foreach ($events as $event) {
@@ -451,7 +452,7 @@ final class MailTemplates
         $lines = [
             'Vorgang: Sammelaktion (' . $reason . ')',
             'Ausrüstungen: ' . count($changes),
-            'Wer: ' . $first->userName,
+            'Wer: ' . $first->userName . $first->channel->suffix(),
             'Wann: ' . self::when($first->createdAt),
         ];
         if ($first->comment !== null) {
@@ -572,6 +573,7 @@ final class MailTemplates
         \DateTimeImmutable $at,
         ?string $url,
         int $maxLines = 50,
+        EventChannel $channel = EventChannel::App,
     ): MailMessage {
         $new = $plan->count(ImportResult::New);
         $changed = $plan->count(ImportResult::Changed);
@@ -580,7 +582,7 @@ final class MailTemplates
         $lines = [
             'Vorgang: CSV-Import',
             sprintf('Ergebnis: %d neu, %d geändert, %d unverändert, %d übersprungen', $new, $changed, $plan->count(ImportResult::Unchanged), $plan->count(ImportResult::Skipped)),
-            'Wer: ' . $actor->label(),
+            'Wer: ' . $actor->label() . $channel->suffix(),
             'Wann: ' . self::when($at),
         ];
         if ($comment !== null) {

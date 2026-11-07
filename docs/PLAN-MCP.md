@@ -3,8 +3,8 @@
 Stand: 07.11.2026 (Runde 3; freigegeben von Holger am 07.11.2026 samt O2–O14 und der Aufteilung
 in Runden; O1 gelöst: Claude findet die Metadaten, siehe Abschnitt 1).
 
-Stand des Baus: M1 und M2 live (Runde 4), M3 und M4 live in Runde 5 (Abschnitte 9a, 9b), M5 in
-Runde 6 (Abschnitt 9c).
+Stand des Baus: M1 und M2 live (Runde 4), M3 und M4 live in Runde 5 (Abschnitte 9a, 9b), M5 und
+M6 in Runde 6 (Abschnitt 9c); offen M7 (vollständiger Live-Test durch Holger, Doku).
 
 Abweichungen beim Bau: Die Spalte der Registrierung heißt in `fe_oauth_codes` und
 `fe_claude_connections` `oauth_client_id` (nicht `client_ref`, das in `CLAUDE.md` schon die Kennung
@@ -441,6 +441,27 @@ der Auftrag:
   Export mit Zeitraum bleibt Werkzeugen verschlossen).
 - `get_equipment` findet per `number` nur die genaue Nummer (ohne Groß-/Kleinschreibung, wie
   `identifier_key`, nur nicht ausgesonderte) und per `scan_code` genau; sonst `not_found`.
+
+- **M6 Schreibwerkzeuge** (21, `WriteTools::all()`): nur mit Zugang „Ändern“ und den Rechten der
+  Rolle (die Routen prüfen samt Feldregeln; `update_equipment` erscheint nur mit `device.edit`,
+  `assign_code` nur mit `device.code`, `ToolDefinition::$requires`). Ändernde Werkzeuge an einer
+  Ausrüstung verlangen `version`; veraltet → `version_conflict` mit dem aktuellen Stand.
+  `book_equipment` prüft wie die App den Kommentar bei defekt (mindestens 5 Zeichen) und sendet eine
+  Buchungs-Kennung aus Verbindung und Inhalt (`ToolApi::stableRef`, UUID v4): ein zweiter gleicher
+  Aufruf bucht nicht doppelt (`idempotentHint`). `destructiveHint` bei allem, was Werte leert oder
+  überschreibt bzw. aus dem Betrieb nimmt (aussondern, Import übernehmen, Standort sperren, Typ
+  deaktivieren, Stammdaten, Code, Wartungsdatum); nicht bei Umbuchen, Anlegen, Umbenennen,
+  Entsperren, Wiederaufnehmen und Hinweisen. CSV-Import: `preview_import` (readOnlyHint, die Datei als
+  Text) und getrennt `apply_import` mit dem Kennzeichen. Body von `mcp` bis 3 MiB (der Vermittler
+  lässt 1 MiB durch, also Dateien bis rund 700 KB).
+- **„über Claude“**: Spalte `channel` in `fe_device_events` (0047) und `fe_device_notice_actions`
+  (0048), reine Erweiterungen mit Standard `app`. Abweichung von Abschnitt 6: `DeviceRepository`,
+  `DeviceEventWriter`, `DeviceImport` und `DeviceNoticeRepository::change` nehmen den Kanal als
+  optionalen Parameter (Standard `app`) statt als Pflicht; abgesichert durch je einen Test pro
+  Schreibwerkzeug, dass der Verlauf `claude` trägt (`McpWriteToolsTest`). Kein Vermerk an Standorten
+  und Typen (sie haben keinen Verlauf).
+- **Kein Werkzeug** für Benutzer, Einladungscodes, Rollen, Einstellungen der Stadt, eigene
+  Einstellungen und `service` (`ToolRoutesTest`).
 
 ## 10. Offene Fragen (mit Vorschlag)
 

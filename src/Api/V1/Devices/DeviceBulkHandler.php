@@ -57,7 +57,7 @@ final readonly class DeviceBulkHandler implements RequestHandler
         $user = $context->auth()->user;
         $pdo = $context->db->get();
         $recorder = new DeviceEventRecorder();
-        $devices = new DeviceRepository($pdo, $context->visibility(), $recorder);
+        $devices = new DeviceRepository($pdo, $context->visibility(), $recorder, $context->channel());
         $booker = new DeviceBooker($tenant, $devices, new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo, $context->visibility()));
 
         $entries = $this->entries($context);

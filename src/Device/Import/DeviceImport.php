@@ -6,6 +6,7 @@ namespace FirefightingEquipment\Device\Import;
 
 use FirefightingEquipment\Device\DeviceEventWriter;
 use FirefightingEquipment\Device\DeviceField;
+use FirefightingEquipment\Device\EventChannel;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -42,7 +43,10 @@ final readonly class DeviceImport
         'note' => 'note',
     ];
 
-    public function __construct(private \PDO $pdo)
+    /**
+     * @param EventChannel $channel Weg der Änderungen für den Verlauf (Claude: „über Claude“)
+     */
+    public function __construct(private \PDO $pdo, private EventChannel $channel = EventChannel::App)
     {
     }
 
@@ -87,7 +91,7 @@ final readonly class DeviceImport
 
     private function write(Tenant $tenant, int $userId, DeviceImportPlan $plan, ?string $comment): void
     {
-        $events = new DeviceEventWriter($this->pdo, buffered: true);
+        $events = new DeviceEventWriter($this->pdo, buffered: true, channel: $this->channel);
 
         $created = array_values(array_filter($plan->rows, static fn (ImportRowPlan $row): bool => $row->result === ImportResult::New));
         $ids = $this->insertDevices($tenant, $created);

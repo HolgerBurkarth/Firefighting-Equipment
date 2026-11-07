@@ -45,6 +45,8 @@ export interface DeviceEventEntry {
     readonly notAppliedLabel: string | null;
     /** Anzeigename (anonymisiert „Gelöschter Benutzer #ID“). */
     readonly userName: string;
+    /** Über ein Werkzeug des Claude-Zugangs (`channel` `claude`; fehlt das Feld: App). */
+    readonly viaClaude: boolean;
     readonly comment: string | null;
     readonly location: {
         readonly from: EventLocation | null;
@@ -165,6 +167,7 @@ export function parseDeviceEvent(json: unknown): DeviceEventEntry | null {
         applied,
         notAppliedLabel,
         userName,
+        viaClaude: json['channel'] === 'claude',
         comment,
         location,
         status,

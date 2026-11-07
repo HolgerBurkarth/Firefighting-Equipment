@@ -67,7 +67,7 @@ final readonly class DeviceImportHandler implements RequestHandler
             }
 
             $file = DeviceImportFile::parse($bytes);
-            $import = new DeviceImport($context->db->get());
+            $import = new DeviceImport($context->db->get(), $context->channel());
             if ($token === null) {
                 return new JsonResponse(DeviceImportJson::preview($file, $import->preview($tenant, $file)));
             }

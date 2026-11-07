@@ -23,7 +23,7 @@ final class DeviceEventWriter
     private const array COLUMNS = [
         'tenant_id', 'device_id', 'event_type', 'user_id', 'from_location_id', 'to_location_id', 'from_status',
         'to_status', 'from_due', 'to_due', 'field', 'old_value', 'new_value', 'comment', 'occurred_at', 'applied',
-        'not_applied_reason',
+        'not_applied_reason', 'channel',
     ];
 
     /** @var list<list<int|string|null>> */
@@ -31,11 +31,13 @@ final class DeviceEventWriter
 
     /**
      * @param DeviceEventRecorder|null $recorder erhält im ungepufferten Betrieb die ID jedes Ereignisses
+     * @param EventChannel             $channel  Weg der Änderung (App oder Claude, „über Claude“)
      */
     public function __construct(
         private readonly \PDO $pdo,
         private readonly bool $buffered = false,
         private readonly ?DeviceEventRecorder $recorder = null,
+        private readonly EventChannel $channel = EventChannel::App,
     ) {
     }
 
@@ -157,6 +159,7 @@ final class DeviceEventWriter
             'applied' => 1,
             ...$values,
             'comment' => $comment,
+            'channel' => $this->channel->value,
         ];
         $row = array_map(static fn (string $column): int|string|null => $values[$column] ?? null, self::COLUMNS);
 

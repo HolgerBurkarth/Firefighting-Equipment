@@ -34,7 +34,7 @@ final readonly class ToolRegistry
 
     public static function standard(): self
     {
-        return new self(ReadTools::all());
+        return new self([...ReadTools::all(), ...WriteTools::all()]);
     }
 
     /**
@@ -70,6 +70,7 @@ final readonly class ToolRegistry
     {
         [$method, $pattern] = explode(' ', $tool->primaryRoute(), 2);
 
-        return ToolApi::requirementOf($router, $method, $pattern)->allows($permissions, []);
+        return ToolApi::requirementOf($router, $method, $pattern)->allows($permissions, [])
+            && ($tool->requires?->allows($permissions, []) ?? true);
     }
 }

@@ -6,6 +6,7 @@ namespace FirefightingEquipment\Device\Notice;
 
 use FirefightingEquipment\Device\DeviceEventLocation;
 use FirefightingEquipment\Device\DeviceStatus;
+use FirefightingEquipment\Device\EventChannel;
 use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tenant\Tenant;
 
@@ -149,7 +150,7 @@ final readonly class DeviceNoticeRepository
      *
      * @throws NoticeNotFoundException
      */
-    public function change(Tenant $tenant, int $id, int $userId, NoticeChange $change, ?string $note): DeviceNotice
+    public function change(Tenant $tenant, int $id, int $userId, NoticeChange $change, ?string $note, EventChannel $channel = EventChannel::App): DeviceNotice
     {
         if ($this->pdo->inTransaction()) {
             throw new \LogicException('DeviceNoticeRepository startet eine eigene Transaktion; keine offene Transaktion erlaubt.');
@@ -174,9 +175,9 @@ final readonly class DeviceNoticeRepository
                 $this->pdo->prepare('UPDATE fe_device_notices SET status = ?, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?')
                     ->execute([$change->status()->value, $id, $tenant->id]);
                 $this->pdo->prepare(
-                    'INSERT INTO fe_device_notice_actions (tenant_id, notice_id, action, user_id, note, created_at)'
-                    . ' VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())',
-                )->execute([$tenant->id, $id, $change->value, $userId, $note]);
+                    'INSERT INTO fe_device_notice_actions (tenant_id, notice_id, action, user_id, note, channel, created_at)'
+                    . ' VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
+                )->execute([$tenant->id, $id, $change->value, $userId, $note, $channel->value]);
             }
             $this->pdo->commit();
         } catch (\Throwable $e) {
@@ -201,7 +202,7 @@ final readonly class DeviceNoticeRepository
         }
         $ids = array_map(static fn (array $row): int => (int) $row['id'], $rows);
         $stmt = $this->pdo->prepare(sprintf(
-            'SELECT a.id, a.notice_id, a.action, a.note, a.created_at,'
+            'SELECT a.id, a.notice_id, a.action, a.note, a.channel, a.created_at,'
             . ' u.id AS u_id, u.status AS u_status, u.display_name AS u_display_name, u.name AS u_name, u.email AS u_email'
             . ' FROM fe_device_notice_actions a JOIN fe_users u ON u.id = a.user_id AND u.tenant_id = a.tenant_id'
             . ' WHERE a.tenant_id = ? AND a.notice_id IN (%s) ORDER BY a.id',
@@ -216,6 +217,7 @@ final readonly class DeviceNoticeRepository
                 NoticeUser::fromRow($row, 'u_') ?? throw new \LogicException('Konto fehlt.'),
                 $row['note'] === null ? null : (string) $row['note'],
                 self::utc((string) $row['created_at']),
+                EventChannel::from((string) $row['channel']),
             );
         }
 

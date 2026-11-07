@@ -54,6 +54,7 @@ const EVENTS = [
         occurred_at: '2026-10-12T08:00:00Z',
         location: null,
         inspection_due: { from: null, to: '2026-10-01' },
+        channel: 'claude',
     }),
     eventJson(2, {
         type: 'field_changed',
@@ -145,6 +146,7 @@ test.describe('Details und Verlauf', () => {
         await expect(entries.nth(0)).toContainText('Umgebucht und Status geändert');
         await expect(entries.nth(0)).toContainText('heute 13:00');
         await expect(entries.nth(0)).toContainText('von Anna Muster');
+        await expect(entries.nth(0)).not.toContainText('über Claude');
         await expect(entries.nth(0)).toContainText(/Standort:\s*HLF 20 \/ G1 → LF 10/);
         await expect(entries.nth(0)).toContainText(/Status:\s*einsatzbereit → defekt/);
         await expect(entries.nth(0)).toContainText('„Ausatemventil undicht“');
@@ -157,6 +159,7 @@ test.describe('Details und Verlauf', () => {
         await expect(entries.nth(1)).toContainText(/Eingang beim Server:\s*heute 08:15/);
         await expect(entries.nth(1)).toHaveClass(/history-not-applied/);
         await expect(entries.nth(2)).toContainText('12.10.2026, 10:00');
+        await expect(entries.nth(2)).toContainText('von Anna Muster · über Claude');
         await expect(entries.nth(2)).toContainText(/Wartungsdatum:\s*keins → 01\.10\.2026/);
         await expect(entries.nth(3)).toContainText(
             /Scan-Code:\s*leer → 010400638133393110L42\[GS\]21ABC/,
