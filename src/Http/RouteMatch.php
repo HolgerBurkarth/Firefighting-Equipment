@@ -8,7 +8,7 @@ use FirefightingEquipment\Permission\Requirement;
 
 /**
  * Ergebnis von Router::match: Handler, Zugriffsstufe bzw. Rechte, Werte der Platzhalter und
- * Body-Grenze.
+ * Body-Grenze und -Format.
  */
 final readonly class RouteMatch
 {
@@ -21,6 +21,7 @@ final readonly class RouteMatch
         public array $params = [],
         /** Höchstgröße des Bodys in Byte (RequestGuard) */
         public int $maxBodyBytes = Request::MAX_BODY_BYTES,
+        public BodyFormat $bodyFormat = BodyFormat::Json,
     ) {
     }
 }

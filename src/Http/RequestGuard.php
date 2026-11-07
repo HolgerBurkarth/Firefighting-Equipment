@@ -8,6 +8,8 @@ namespace FirefightingEquipment\Http;
  * Prüft ändernde Anfragen (alles außer GET, HEAD, OPTIONS) als Schutz gegen CSRF und liest den
  * JSON-Body: Content-Type muss application/json sein (Formulare anderer Seiten können das nicht
  * senden), ein vorhandener Origin muss erlaubt sein, der Body muss ein JSON-Objekt sein (auch {}).
+ * Einzige Ausnahme: öffentliche Routen mit BodyFormat::Form (oauth/token, oauth/revoke) nehmen
+ * genau application/x-www-form-urlencoded; Origin und Größe werden ebenso geprüft.
  */
 final readonly class RequestGuard
 {
@@ -30,14 +32,15 @@ final readonly class RequestGuard
      *
      * @throws HttpException 415 unsupported_media_type, 403 origin_not_allowed, 400 invalid_request
      */
-    public function check(Request $request, int $maxBodyBytes = Request::MAX_BODY_BYTES): array
+    public function check(Request $request, int $maxBodyBytes = Request::MAX_BODY_BYTES, BodyFormat $format = BodyFormat::Json): array
     {
         if (!$request->isMutating()) {
             return [];
         }
 
-        if (!self::isJson($request->header('Content-Type'))) {
-            throw HttpException::unsupportedMediaType();
+        $contentType = $request->header('Content-Type');
+        if (!($format === BodyFormat::Form ? self::isForm($contentType) : self::isJson($contentType))) {
+            throw HttpException::unsupportedMediaType($format === BodyFormat::Form ? 'application/x-www-form-urlencoded' : 'application/json');
         }
 
         $origin = $request->header('Origin');
@@ -51,6 +54,10 @@ final readonly class RequestGuard
                 'Der Inhalt der Anfrage ist zu groß (höchstens %d Byte).',
                 $maxBodyBytes,
             ));
+        }
+
+        if ($format === BodyFormat::Form) {
+            return self::parseForm($body);
         }
 
         if (!str_starts_with(ltrim($body, " \t\r\n"), '{')) {
@@ -70,16 +77,60 @@ final readonly class RequestGuard
     }
 
     /**
+     * Formular (BodyFormat::Form): Paare name=wert, getrennt durch &, kodiert wie
+     * application/x-www-form-urlencoded (+ = Leerzeichen). Jeder Name höchstens einmal (OAuth 2.1,
+     * Abschnitt 3.2), Namen und Werte gültiges UTF-8 ohne Klammern im Namen (keine Listen).
+     *
+     * @return array<string, string>
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    private static function parseForm(string $body): array
+    {
+        $values = [];
+        foreach (explode('&', $body) as $pair) {
+            if ($pair === '') {
+                continue;
+            }
+            [$name, $value] = array_pad(explode('=', $pair, 2), 2, '');
+            $name = urldecode($name);
+            $value = urldecode($value);
+            if ($name === '' || str_contains($name, '[') || !mb_check_encoding($name, 'UTF-8') || !mb_check_encoding($value, 'UTF-8')) {
+                throw HttpException::invalidRequest('Das Formular ist ungültig.');
+            }
+            if (array_key_exists($name, $values)) {
+                throw HttpException::invalidRequest(sprintf('Der Parameter "%s" ist doppelt.', $name));
+            }
+            $values[$name] = $value;
+        }
+
+        return $values;
+    }
+
+    /**
      * application/json, optional mit charset=utf-8; Groß-/Kleinschreibung egal.
      */
     private static function isJson(?string $contentType): bool
+    {
+        return self::hasType($contentType, 'application/json');
+    }
+
+    /**
+     * application/x-www-form-urlencoded, optional mit charset=utf-8 (nie multipart/form-data).
+     */
+    private static function isForm(?string $contentType): bool
+    {
+        return self::hasType($contentType, 'application/x-www-form-urlencoded');
+    }
+
+    private static function hasType(?string $contentType, string $type): bool
     {
         if ($contentType === null) {
             return false;
         }
 
         $parts = array_map(static fn (string $p): string => strtolower(trim($p)), explode(';', $contentType));
-        if (array_shift($parts) !== 'application/json') {
+        if (array_shift($parts) !== $type) {
             return false;
         }
         foreach ($parts as $param) {

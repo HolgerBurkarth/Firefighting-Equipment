@@ -8,6 +8,42 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-07 – „OAuth-Server und mcp für den Claude-Zugang, Vorklärung entfernt (Runde 5, M3)“
+
+`docs/PLAN-MCP.md`, Schritt M3 und Abschnitt 9a (Festlegungen dieser Runde). Nur in der Test-Stadt;
+in anderen Städten gibt es die Routen nicht (404 `not_found`), unter `service` ebenso.
+
+- Entfernt: die Vorklärung (`McpProbeHandler`, `McpProbeTrace`, `GET api/v1/mcp-probe`, der
+  JSON-Platzhalter `GET claude-verbinden`; die Adresse liefert jetzt die App).
+- Migrationen `0045` (Bremse `oauth_register`) und `0046` (`fe_claude_connections.code_hash`), nur
+  Erweiterungen.
+- Metadaten: `GET .well-known/oauth-protected-resource`, `GET .well-known/openid-configuration`,
+  `GET .well-known/oauth-authorization-server` (gleiches Dokument, jetzt mit `revocation_endpoint` und
+  `authorization_response_iss_parameter_supported`), `GET .well-known/jwks.json`.
+- `POST oauth/register` (RFC 7591): speichert die Registrierung; nur erlaubte Rücksprung-Adressen,
+  nur öffentliche Clients; Fehler im OAuth-Format; Bremse 20 je IP-Präfix und Stunde (429).
+- Neu, für die Seite „Claude verbinden“ (M4): `POST api/v1/oauth/authorize/check {params}` und
+  `POST api/v1/oauth/authorize {params, decision: preview|allow|deny, email?, password?}`; Antworten
+  und Fehler siehe `CLAUDE.md`. Neuer Fehlercode `claude_access_missing` (403). Kein Rücksprung, wenn
+  Client oder Adresse nicht exakt registriert sind; sonst 400 mit `details {redirect_url}`.
+- Neu: `POST oauth/token` (Formular statt JSON; Code einlösen mit PKCE S256, Refresh mit Rotation und
+  60 s Ausnahme für das vorige Token) und `POST oauth/revoke` (RFC 7009). Fehler im OAuth-Format
+  (`{"error", "error_description"}`).
+- `POST mcp` jetzt mit Anmeldung (`Access::Claude`, `Authorization: Bearer`): `initialize`, `ping`,
+  leeres `tools/list`; Benachrichtigungen 202 ohne Body. Ohne bzw. mit ungültigem Token 401 mit
+  `WWW-Authenticate` wie bisher (bei gesendetem Token zusätzlich `error="invalid_token"`).
+- Neu (Profil, O5): `GET auth/claude-connections` und `DELETE auth/claude-connections/{id} {}`
+  (`Access::Authenticated`, nur unter Städten).
+- Mail „Neue Claude-Verbindung“ an das Konto nach dem Einlösen eines Codes.
+
+Warum: Claude verbindet sich als die Person mit ihrer Rolle und höchstens ihrem Claude-Zugang
+(`docs/MCP-KONZEPT.md`, Abschnitte 4–7); Werkzeuge folgen mit M5.
+
+Tests: `OAuthAuthorizeTest`, `OAuthTokenTest`, `McpEndpointTest` (neu, `tests/Integration/Claude/`),
+`OAuthRulesTest`, `RequestGuardFormTest` (neu), `RouterTest`, `TenantRoutePermissionsTest`;
+`McpProbeTest` entfällt. `CLAUDE.md` "HTTP und REST-API" und "Claude-Zugang (MCP, im Aufbau)",
+Schritt M3.
+
 ## 2026-11-07 – „Claude-Zugang im Backend: Zugang setzen, Verbindungen trennen (Runde 4, M1)“
 
 `docs/PLAN-MCP.md`, Schritt M1 (`docs/MCP-KONZEPT.md`, Abschnitt 2, F12). Noch keine Verbindung möglich

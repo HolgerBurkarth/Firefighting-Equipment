@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Tests\Unit\Http;
 
 use FirefightingEquipment\Http\Access;
+use FirefightingEquipment\Http\BodyFormat;
 use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\Request;
@@ -274,6 +275,30 @@ final class RouterTest extends TestCase
         self::assertSame(Access::SuperAdmin, $router->match('GET', 'api/v1/tenants')->access);
     }
 
+    public function testClaudeAccessOnlyUnderTenant(): void
+    {
+        $router = Router::forTenant()->add('POST', 'mcp', Access::Claude, self::handler());
+        self::assertSame(Access::Claude, $router->match('POST', 'mcp')->access);
+
+        $this->expectException(\LogicException::class);
+        Router::forService()->add('POST', 'mcp', Access::Claude, self::handler());
+    }
+
+    public function testBodyFormatIsJsonOrFormForPublicRoutes(): void
+    {
+        $router = Router::forTenant()
+            ->add('POST', 'oauth/token', Access::Public, self::handler(), bodyFormat: BodyFormat::Form)
+            ->add('POST', 'oauth/register', Access::Public, self::handler());
+
+        self::assertSame(BodyFormat::Form, $router->match('POST', 'oauth/token')->bodyFormat);
+        self::assertSame(BodyFormat::Json, $router->match('POST', 'oauth/register')->bodyFormat);
+
+        // Ein Formular fremder Seiten trüge das Cookie mit: nur bei öffentlichen Routen.
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Formular nur bei öffentlichen Routen: api/v1/items');
+        Router::forTenant()->add('POST', 'api/v1/items', Access::Authenticated, self::handler(), bodyFormat: BodyFormat::Form);
+    }
+
     public function testAccessAllowsRoles(): void
     {
         foreach (UserRole::cases() as $role) {
@@ -283,6 +308,10 @@ final class RouterTest extends TestCase
         self::assertTrue(Access::SuperAdmin->allows(UserRole::SuperAdmin));
         self::assertFalse(Access::SuperAdmin->allows(UserRole::Admin));
         self::assertFalse(Access::SuperAdmin->allows(UserRole::User));
+        // Claude-Verbindungen prüft Application über ClaudeSessions, nie über die Rolle.
+        foreach (UserRole::cases() as $role) {
+            self::assertFalse(Access::Claude->allows($role));
+        }
     }
 
     private static function edit(): Requirement

@@ -9,12 +9,19 @@ ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holge
 Nach dem Deploy in der Test-Stadt (Agent im Browser, als Admin der Test-Stadt; Holger am iPhone
 und als Super-Admin):
 
-- ☐ Benutzerverwaltung → ein Konto ohne Admin → „Bearbeiten“: Abschnitt „Claude-Zugang“ mit
-  Aus/Lesen/Ändern; „Lesen“ speichern → grüne Meldung „Claude-Zugang von … : Lesen.“, Chip
-  „Claude: Lesen“ in der Spalte „Rolle“. Danach zurück auf „Aus“ (Chip weg).
-- ☐ Eigenes Konto und andere Admins: Auswahl gesperrt mit Hinweis („Den eigenen Claude-Zugang …“
-  bzw. „Für Admins setzt den Claude-Zugang der Super-Admin.“).
-- ☐ In Immendingen (nur ansehen, nichts ändern): kein Abschnitt „Claude-Zugang“, kein Chip.
+Vom Agenten geprüft am 07.11.2026 (Build `4681b1e6d623`, Migrationen 0041–0044 auf dem Server
+gelaufen, Chrome als Admin der Test-Stadt; die App hat sich beim ersten Seitenwechsel selbst auf die
+neue Version aktualisiert):
+
+- ☑ Benutzerverwaltung → „Holger Test 1“ (Benutzer) → „Bearbeiten“: Abschnitt „Claude-Zugang“ mit
+  Aus (gewählt)/Lesen/Ändern; „Lesen“ gespeichert → „Claude-Zugang von Holger Test 1: Lesen.“, Chip
+  „Claude: Lesen“. Zurück auf „Aus“ → „Holger Test 1 hat keinen Claude-Zugang mehr; bestehende
+  Verbindungen sind getrennt.“, Chip weg (Ausgangsstand wiederhergestellt).
+- ☑ Eigenes Konto (Holger Burkarth) und anderer Admin (Phil Burkarth): Auswahl gesperrt mit Hinweis
+  „Den eigenen Claude-Zugang kann man nicht ändern.“ bzw. „Für Admins setzt den Claude-Zugang der
+  Super-Admin.“.
+- ☑ `GET tenant`: `claude_available` in `test` true, in Immendingen false (per curl; in Immendingen
+  nichts geändert).
 - ☐ Super-Admin, Stadtdetail „Test“, Reiter „Admins und Benutzer“: „Claude-Zugang …“ nur bei aktiven
   Admins; setzen und wieder auf „Aus“. (Holger)
 - ☐ „Claude-Verbindungen trennen …“ erscheint erst mit einer Verbindung (ab M3/M4 möglich).

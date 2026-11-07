@@ -8,6 +8,7 @@ use FirefightingEquipment\Api\V1\Appearance\AccentColorHandler;
 use FirefightingEquipment\Api\V1\Appearance\ImageHandler;
 use FirefightingEquipment\Api\V1\Appearance\ManifestHandler;
 use FirefightingEquipment\Api\V1\Appearance\TenantLogoHandler;
+use FirefightingEquipment\Api\V1\Auth\ClaudeConnectionsHandler;
 use FirefightingEquipment\Api\V1\Auth\EmailResendHandler;
 use FirefightingEquipment\Api\V1\Auth\EmailVerifyHandler;
 use FirefightingEquipment\Api\V1\Auth\InvitationAcceptHandler;
@@ -46,11 +47,15 @@ use FirefightingEquipment\Api\V1\Invitation\InvitationCodeRevokeHandler;
 use FirefightingEquipment\Api\V1\Locations\LocationAction;
 use FirefightingEquipment\Api\V1\Locations\LocationActionHandler;
 use FirefightingEquipment\Api\V1\Locations\LocationListHandler;
-use FirefightingEquipment\Api\V1\McpProbe\McpProbeHandler;
-use FirefightingEquipment\Api\V1\McpProbe\McpProbeStep;
+use FirefightingEquipment\Api\V1\Mcp\McpHandler;
 use FirefightingEquipment\Api\V1\Notices\NoticeAction;
 use FirefightingEquipment\Api\V1\Notices\NoticeActionHandler;
 use FirefightingEquipment\Api\V1\Notices\NoticeListHandler;
+use FirefightingEquipment\Api\V1\OAuth\AuthorizeHandler;
+use FirefightingEquipment\Api\V1\OAuth\ClientRegistrationHandler;
+use FirefightingEquipment\Api\V1\OAuth\OAuthMetadataDocument;
+use FirefightingEquipment\Api\V1\OAuth\OAuthMetadataHandler;
+use FirefightingEquipment\Api\V1\OAuth\TokenHandler;
 use FirefightingEquipment\Api\V1\Offline\ClientConfigHandler;
 use FirefightingEquipment\Api\V1\Roles\PermissionCatalogHandler;
 use FirefightingEquipment\Api\V1\Roles\RoleAction;
@@ -71,7 +76,6 @@ use FirefightingEquipment\Api\V1\Users\UserAction;
 use FirefightingEquipment\Api\V1\Users\UserActionHandler;
 use FirefightingEquipment\Api\V1\Users\UserBulkRoleHandler;
 use FirefightingEquipment\Api\V1\Users\UserListHandler;
-use FirefightingEquipment\Mcp\Probe\McpProbeTrace;
 use FirefightingEquipment\Offline\OfflineSettings;
 use FirefightingEquipment\Permission\Action;
 use FirefightingEquipment\Permission\Area;
@@ -136,15 +140,11 @@ final class Routes
      *                                              (null = Systemzeit, andere nur für Tests)
      * @param OfflineSettings|null $offline         Zeitlimits der Offline-Buchungen (null =
      *                                              Standardwerte; Anwendung: aus der Konfiguration)
-     * @param McpProbeTrace|null   $probeTrace      Protokoll der Vorklärung zum Claude-Zugang
-     *                                              (null = var/mcp-probe, andere nur für Tests)
      */
-    public static function tenant(?MinimumDuration $neutralDuration = null, ?Clock $clock = null, ?OfflineSettings $offline = null, ?McpProbeTrace $probeTrace = null): Router
+    public static function tenant(?MinimumDuration $neutralDuration = null, ?Clock $clock = null, ?OfflineSettings $offline = null): Router
     {
         $clock ??= new SystemClock();
         $offline ??= new OfflineSettings();
-        $probeTrace ??= McpProbeTrace::inProject();
-        $probe = static fn (McpProbeStep $step): McpProbeHandler => new McpProbeHandler($step, $probeTrace, $clock);
 
         $read = static fn (Area $area): Requirement => Requirement::area($area, AreaLevel::Read);
         $write = static fn (Area $area): Requirement => Requirement::area($area, AreaLevel::Write);
@@ -237,15 +237,20 @@ final class Routes
             ->add('GET', 'api/v1/notices/{id}', $read(Area::Log), new NoticeActionHandler(NoticeAction::Show))
             ->add('POST', 'api/v1/notices/{id}/resolve', $write(Area::Log), new NoticeActionHandler(NoticeAction::Resolve))
             ->add('POST', 'api/v1/notices/{id}/reopen', $write(Area::Log), new NoticeActionHandler(NoticeAction::Reopen))
-            // Vorklärung zum Claude-Zugang (docs/PLAN-MCP.md, Runde 3): nur in der Test-Stadt, sonst 404.
-            ->add('POST', 'mcp', Access::Public, $probe(McpProbeStep::Mcp))
-            ->add('GET', '.well-known/oauth-protected-resource', Access::Public, $probe(McpProbeStep::ProtectedResource))
-            ->add('GET', '.well-known/openid-configuration', Access::Public, $probe(McpProbeStep::OpenIdConfiguration))
-            ->add('GET', '.well-known/oauth-authorization-server', Access::Public, $probe(McpProbeStep::OAuthAuthorizationServer))
-            ->add('GET', '.well-known/jwks.json', Access::Public, $probe(McpProbeStep::Jwks))
-            ->add('POST', 'oauth/register', Access::Public, $probe(McpProbeStep::Register))
-            ->add('GET', 'claude-verbinden', Access::Public, $probe(McpProbeStep::Authorize))
-            ->add('GET', 'api/v1/mcp-probe', $write(Area::Settings), $probe(McpProbeStep::Trace));
+            // Eigene Claude-Verbindungen (Profil, O5).
+            ->add('GET', 'api/v1/auth/claude-connections', Access::Authenticated, new ClaudeConnectionsHandler())
+            ->add('DELETE', 'api/v1/auth/claude-connections/{id}', Access::Authenticated, new ClaudeConnectionsHandler(delete: true))
+            // Claude-Zugang (docs/PLAN-MCP.md): nur in Städten mit Claude-Zugang, sonst 404.
+            ->add('POST', 'mcp', Access::Claude, new McpHandler())
+            ->add('GET', '.well-known/oauth-protected-resource', Access::Public, new OAuthMetadataHandler(OAuthMetadataDocument::ProtectedResource))
+            ->add('GET', '.well-known/openid-configuration', Access::Public, new OAuthMetadataHandler(OAuthMetadataDocument::AuthorizationServer))
+            ->add('GET', '.well-known/oauth-authorization-server', Access::Public, new OAuthMetadataHandler(OAuthMetadataDocument::AuthorizationServer))
+            ->add('GET', '.well-known/jwks.json', Access::Public, new OAuthMetadataHandler(OAuthMetadataDocument::Jwks))
+            ->add('POST', 'oauth/register', Access::Public, new ClientRegistrationHandler())
+            ->add('POST', 'oauth/token', Access::Public, new TokenHandler(), bodyFormat: BodyFormat::Form)
+            ->add('POST', 'oauth/revoke', Access::Public, new TokenHandler(revoke: true), bodyFormat: BodyFormat::Form)
+            ->add('POST', 'api/v1/oauth/authorize/check', Access::Public, new AuthorizeHandler(checkOnly: true))
+            ->add('POST', 'api/v1/oauth/authorize', Access::Public, new AuthorizeHandler(checkOnly: false));
     }
 
     /** Anmeldung, Sitzungen und Passwort; unter service und unter jeder Stadt gleich. */

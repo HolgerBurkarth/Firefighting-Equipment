@@ -178,8 +178,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   - REST-API: `/firefighting/<stadt>/api/v1/...`
   - Web-App-Manifest: `/firefighting/<stadt>/manifest.webmanifest` (Route außerhalb von
     `api/v1`, siehe "Erscheinungsbild (API)")
-  - Vorklärung zum Claude-Zugang (seit 07.11.2026, nur Test-Stadt): `mcp`, `.well-known/…`,
-    `oauth/register`, `claude-verbinden` außerhalb von `api/v1`, siehe "Claude-Zugang (MCP)"
+  - Claude-Zugang (seit 07.11.2026, nur Test-Stadt): `mcp`, `.well-known/…`, `oauth/register`,
+    `oauth/token`, `oauth/revoke` außerhalb von `api/v1`, siehe "Claude-Zugang (MCP)"
   - Super-Admin: `/firefighting/service/`
   - Alle anderen GET-Adressen unter `/firefighting/<bereich>/` liefern das Frontend (App-Seite
     oder Datei aus dem Build, siehe "Frontend" und "Frontend ausliefern").
@@ -205,7 +205,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (404/405; keine Route, Methode `GET` und Pfad nicht `api`, `api/…`, `.well-known` bzw. `.well-known/…` → Frontend, ohne Datenbank
   und Sitzung, siehe "Frontend ausliefern") → ändernde Anfrage prüfen (`RequestGuard`, ohne Datenbank; 415/403/400) → Version
   der App prüfen (`X-Client-Api` unter `ClientApi::MIN` → 409 `client_outdated`, ohne Datenbank) → erst dann
-  die Stadt laden → Sitzung und Zugriffsstufe prüfen (nur bei nicht öffentlichen Routen; 401/403)
+  die Stadt laden → Sitzung und Zugriffsstufe prüfen (nur bei nicht öffentlichen Routen; 401/403;
+  bei `Access::Claude` statt der Sitzung die Claude-Verbindung, siehe "Claude-Zugang (MCP)")
   → Handler. Unbekannte Adressen und abgelehnte ändernde Anfragen verbinden sich so nie mit der
   Datenbank.
 - Bereich `service` (`AppPath::SERVICE_SCOPE`): Super-Admin, keine Stadt, eigene Routen.
@@ -218,10 +219,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   haben Vorrang vor Platzhaltern. Falsche Methode → 405 mit `Allow` (sortiert). `HEAD` wird nicht
   wie `GET` behandelt. Alle Routen stehen in `Routes::service()` und `Routes::tenant()`.
 - Zugriffsregeln: Jede Route deklariert ihre Stufe (`Access`): `Public`, `Authenticated`,
-  `SuperAdmin` (nur unter `service`) oder unter einer Stadt die nötigen Rechte
+  `SuperAdmin` (nur unter `service`), `Claude` (nur `POST mcp` unter einer Stadt: Zugriffstoken statt
+  Cookie, siehe "Claude-Zugang (MCP)") oder unter einer Stadt die nötigen Rechte
   (`Permission\Requirement`, seit Schritt 1.3a, siehe "Rollen und Rechte"; `Authenticated` unter
-  einer Stadt nur für `auth/me`, `auth/sessions…`, `auth/password` und `client-config`, per Test);
-  eine falsche Kombination (`SuperAdmin` unter einer Stadt, `Requirement` unter `service`) wirft
+  einer Stadt nur für `auth/me`, `auth/sessions…`, `auth/password`, `auth/claude-connections…` und
+  `client-config`, per Test);
+  eine falsche Kombination (`SuperAdmin` oder ein Formular bei nicht öffentlichen Routen unter einer
+  Stadt, `Requirement` oder `Claude` unter `service`) wirft
   beim Anlegen eine `LogicException`. Geprüft wird zentral in `Application`, nie im Handler: keine
   oder ungültige Sitzung → 401 `not_authenticated` (ein mitgesendetes ungültiges Cookie wird
   gelöscht), Rolle bzw. Rechte reichen nicht → 403 `forbidden`. Bei `Public` wird keine Sitzung
@@ -255,7 +259,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `POST tenant/appearance` bleiben bei 16 KiB). `Request`
   liest bis zu 3 MiB, größere Bodys werden nicht gelesen. Kein anderer Content-Type und kein
   `multipart/form-data` (Formulare fremder Seiten könnten es senden): Dateien kommen als Base64 im
-  JSON.
+  JSON. Einzige Ausnahme (seit 07.11.2026, OAuth 2.1 verlangt sie): `POST oauth/token` und `POST
+  oauth/revoke` deklarieren `BodyFormat::Form` (`Router::add(…, bodyFormat:)`, nur bei
+  `Access::Public`, sonst `LogicException`): genau `application/x-www-form-urlencoded` (optional
+  `charset=utf-8`, sonst 415), nur einfache Werte, jeder Name höchstens einmal, UTF-8 (sonst 400),
+  16 KiB, `Origin` wie oben. Unbedenklich, weil diese Routen kein Cookie lesen.
 - Stadt-Kürzel (gemeinsame Prüfung Frontend/Backend, README "Stadt-Kürzel"): regulärer Ausdruck
   `^[a-z0-9]+(-[a-z0-9]+)*$` (Kleinbuchstaben `a-z`, Ziffern, Bindestrich nicht am Anfang/Ende und
   nicht doppelt), 1 bis höchstens 50 Zeichen, reserviert `service` (auch in anderer Schreibweise),
@@ -279,7 +287,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   der Vorschau geändert, Vorschau neu erstellen), `client_ref_conflict` 409 (Buchung: `client_ref`
   schon für eine andere Buchung verwendet), `stale_action` 409 (Offline-Buchung zu alt, ohne
   `confirmed_stale`), `client_outdated` 409 (App-Version unter `ClientApi::MIN`, `details
-  {min_client_api}`), `unsupported_media_type` 415, `weak_password` 422, `clock_implausible` 422
+  {min_client_api}`), `claude_access_missing` 403 („Claude verbinden“: Anmeldung richtig, aber kein
+  Claude-Zugang), `unsupported_media_type` 415, `weak_password` 422, `clock_implausible` 422
   (Aktionszeit einer Offline-Buchung zu weit in der Zukunft), `too_many_attempts` 429 (mit
   `Retry-After`), `database_unavailable` 503, `frontend_unavailable` 503 (Build des Frontends fehlt, siehe
   "Frontend ausliefern"), `internal_error` 500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
@@ -291,9 +300,12 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   details)`), `{"contrast": 4.47, "min_contrast": 4.5}` bei einer zu hellen Akzentfarbe.
   Fehler ohne Angaben haben kein Feld `details` (alle bisherigen unverändert). Nie Interna,
   Zugangsdaten oder personenbezogene Daten in `details`.
-- Einzige Ausnahme vom Fehlerformat: `GET api/v1/health` liefert `{"status":"ok","database":"ok"}`
+- Ausnahmen vom Fehlerformat: `GET api/v1/health` liefert `{"status":"ok","database":"ok"}`
   (200) bzw. `{"status":"error","database":"error"}` (503). Unter einer Stadt gilt vorher die
-  Stadtprüfung (403/404/503 im Fehlerformat).
+  Stadtprüfung (403/404/503 im Fehlerformat). Und (seit 07.11.2026) `oauth/register`, `oauth/token`,
+  `oauth/revoke` mit dem Format von OAuth `{"error":"invalid_grant","error_description":"…"}`
+  (`OAuthError`, Codes dort, nie Token, Code oder Verifier), sowie JSON-RPC-Fehler an `mcp`; Fehler
+  von `RequestGuard`, Stadt und Bremse bleiben im Fehlerformat der App.
 - Unerwartete Fehler → 500 `internal_error` mit allgemeiner Meldung. Details nur über
   `ErrorReporter` ins `error_log`: maskiert (`DatabaseError`), ohne Stack-Trace (enthält
   Argumente wie Zugangsdaten). Nie Details oder Zugangsdaten in die Antwort.
@@ -303,7 +315,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   CSV-Downloads (`CsvResponse`, siehe "CSV-Export (API)") mit `text/csv; charset=utf-8` und
   `Content-Disposition: attachment`, ebenfalls `no-store`, `nosniff` und `X-Api-Version`; ihre
   Fehler kommen weiterhin als JSON. Und zwischenspeicherbare öffentliche Dateien
-  (`CacheableResponse`, siehe "Erscheinungsbild (API)" und "Frontend ausliefern").
+  (`CacheableResponse`, siehe "Erscheinungsbild (API)" und "Frontend ausliefern"). Und
+  `EmptyResponse` (nur 202 an `mcp` für Benachrichtigungen): ohne Body und ohne `Content-Type`, sonst
+  dieselben Header.
 - Ausnahmen von `Cache-Control: no-store` (eng begrenzt): NUR `CacheableResponse`, NUR für die drei
   öffentlichen Routen `GET api/v1/tenant/logo/{size}`, `GET api/v1/app-icon/{size}` (auch unter
   `service`) und `GET manifest.webmanifest` sowie die Auslieferung des Frontends (`FrontendHandler`; alles ohne
@@ -363,7 +377,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     (Unit und Browser, Mail-Link mit `client_outdated` bzw. `X-Api-Version: 2`),
     `bookingQueue.spec.ts`, `session.spec.ts`.
 - Antworten implementieren `Http\Response` (`statusCode()`, `headers()`, `send()`): `JsonResponse`
-  (Regelfall), `CsvResponse` oder `CacheableResponse`. `Application` erzeugt nur JSON vorab
+  (Regelfall), `CsvResponse`, `CacheableResponse` oder `EmptyResponse`. `Application` erzeugt nur JSON vorab
   (Kodierfehler → 500); ein CSV-Download wird erst beim Senden geschrieben.
 
 ## Frontend ausliefern
@@ -2289,8 +2303,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `docs/frontend/LIVETEST-MCP.md`. Ergebnis der Vorklärung (O1, 07.11.2026): Claude findet die
   Metadaten unter `<issuer>/.well-known/openid-configuration` ohne Änderung der Webroot.
 - Nur in der Test-Stadt (`ClaudeAvailability::for`, `SLUG` = `TestCityData::SLUG`, fest im Code; T17
-  Datenschutz): sonst lehnen die Routen mit 409 `rule_violation` ab; `GET tenant` und `TenantJson`
-  melden `claude_available`.
+  Datenschutz): sonst lehnen die Routen zum Setzen und Trennen mit 409 `rule_violation` ab, die
+  Routen von OAuth, Metadaten und `mcp` gibt es nicht (404 `not_found`, `ClaudeTenant::of` bzw. in
+  `Application` vor der Anmeldung); `GET tenant` und `TenantJson` melden `claude_available`.
 - Schritt M1 (Backend, Runde 4): `fe_users.claude_access` (Migration `0041`, `ClaudeAccess` in
   `src/Claude/`: `off`/`read`/`write`, Bezeichnungen Aus/Lesen/Ändern; CHECK nie bei Super-Admins und
   gelöschten Konten), Tabellen `fe_oauth_clients` (`0042`), `fe_oauth_codes` (`0043`, Codes höchstens 10
@@ -2308,7 +2323,6 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   unter `service` `POST tenants/{id}/users/{user}/claude-access`, `…/claude-connections/end`
   (`TenantUserClaudeHandler`); `UserJson` mit `claude_access`, `claude_access_label`,
   `claude_connections {count, last_used_at}`. Tests `tests/Integration/Claude/ClaudeAccessTest.php`.
-  Migration `0047` (Bremse `oauth_register`) kommt erst mit ihrer Nutzung in M3.
 - Schritt M2 (Frontend, Runde 4): `ClaudeAccess`, `CLAUDE_ACCESS_VALUES`, `CLAUDE_ACCESS_LABELS` (per
   Test gleich `ClaudeAccess.php`) und `claudeConnections` in `AdminUser` (`src/api/users.ts`, fehlt das
   Feld: „aus“, keine Verbindung), `setUserClaudeAccess`/`endUserClaudeConnections` bzw. unter
@@ -2327,25 +2341,86 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Admins, „Claude-Verbindungen trennen …“ bei jedem Konto mit Verbindungen; beides nur mit
   `claudeAvailable`. Tests `tests/unit/claudeAccess.spec.ts`, Browser `users.spec.ts` und
   `superAdmin.spec.ts` (Beschreibung „Claude-Zugang“).
-- Vorklärung (Plan Abschnitt 1, bis M3): `McpProbeHandler` (`src/Api/V1/McpProbe/`, Schritte
-  `McpProbeStep`) und `McpProbeTrace` (`src/Mcp/Probe/`), Routen in `Routes::tenant()`, alle
-  öffentlich außer dem Protokoll: `POST mcp` (401 `not_authenticated` mit `WWW-Authenticate: Bearer
-  resource_metadata="…/.well-known/oauth-protected-resource", scope="read write"`; `GET mcp` 405),
-  `GET .well-known/oauth-protected-resource` (RFC 9728), `GET .well-known/openid-configuration` und
-  `GET .well-known/oauth-authorization-server` (gleiche Metadaten, Issuer
-  `<base_url>/firefighting/<kürzel>` ohne `/`), `GET .well-known/jwks.json` (`{"keys":[]}`), `POST
-  oauth/register` (201 mit `probe-…`, speichert nichts), `GET claude-verbinden` (JSON-Platzhalter der
-  Anmeldeseite mit Prüfungen), `GET api/v1/mcp-probe` (`settings` Ändern, Protokoll). Nur in der
-  Test-Stadt (`McpProbeHandler::SLUG` = `TestCityData::SLUG`, fest im Code), sonst 404 `not_found` ohne
-  Eintrag. Antworten als `JsonResponse` (`no-store`). Rücksprung-Adressen
-  (`isAllowedRedirectUri`): genau `https://claude.ai/api/mcp/auth_callback` und
-  `https://claude.com/api/mcp/auth_callback`, Loopback `http://localhost[:port]/callback` bzw.
-  `http://127.0.0.1[:port]/callback`.
-- Protokoll: `var/mcp-probe/<kürzel>.json` (in `.gitignore`), höchstens 50 Einträge `{at, step,
-  details}`, nur druckbares ASCII bis 200 Zeichen je Wert (`McpProbeTrace::clean`), nie Body, IP,
-  `state`, `code_challenge` oder User-Agent des Browsers; Fehler beim Schreiben nur als
-  `mcp_probe_trace_failed` im Protokoll. Tests `tests/Integration/McpProbe/McpProbeTest.php`. Wird mit
-  Schritt M3 entfernt bzw. ersetzt.
+- Schritt M3 (Backend, Runde 5; Plan Abschnitte 5, 6 und 9a; ersetzt die Vorklärung, `api/v1/mcp-probe`
+  und `var/mcp-probe/` entfallen). OAuth-Server ohne Bibliothek in `src/OAuth/`, Endpunkte in
+  `src/Api/V1/OAuth/`, Verbindungen in `src/Claude/`, MCP in `src/Mcp/` und `src/Api/V1/Mcp/`:
+  - Migrationen `0045` (Bremse `oauth_register` in `fe_auth_attempts`, ohne E-Mail) und `0046`
+    (`fe_claude_connections.code_hash`, UNIQUE: Hash des Codes, aus dem die Verbindung entstand).
+  - Geheimnisse (`OAuthSecret`, `OAuthSecretKind`): Präfix `ffa_` (Zugriffstoken, 1 Stunde), `ffr_`
+    (Refresh-Token), `ffc_` (Code, `AuthorizationCodeRepository::LIFETIME_SECONDS` = 300) und 32
+    Zufallsbytes base64url; gespeichert nur SHA-256; Klartext nur in der Antwort an Claude bzw. im
+    Rücksprung, nie in Tabellen, Protokoll, Mails, Fehlermeldungen oder `details` (per Test).
+  - Metadaten (`OAuthUrls`, `OAuthMetadataHandler`): `GET .well-known/oauth-protected-resource` (RFC
+    9728, `resource` = `<issuer>/mcp`), `GET .well-known/openid-configuration` und `GET
+    .well-known/oauth-authorization-server` (gleiches Dokument; Issuer `<base_url>/firefighting/<kürzel>`
+    ohne `/`, `authorization_endpoint` = Seite `claude-verbinden` der App, `revocation_endpoint`,
+    nur S256, nur `none`, `authorization_response_iss_parameter_supported`), `GET .well-known/jwks.json`
+    (`{"keys":[]}`).
+  - Rücksprung-Adressen (`RedirectUriRules`): genau `https://claude.ai/api/mcp/auth_callback`,
+    `https://claude.com/api/mcp/auth_callback`, `http://localhost[:port]/callback`,
+    `http://127.0.0.1[:port]/callback` (Port 1–65535 ohne führende Null). Eine Anfrage muss eine
+    registrierte Adresse Byte für Byte nennen (`OAuthClient::allowsRedirectUri`; keine Präfixe, kein
+    anderer Port).
+  - `POST oauth/register` (`ClientRegistrationHandler`, `ClientRegistration`, `OAuthClientRepository`,
+    RFC 7591): 1–5 erlaubte Adressen, nur `token_endpoint_auth_method` `none`, Grants
+    `authorization_code`/`refresh_token`, `response_types` `code` (sonst 400 `invalid_redirect_uri`
+    bzw. `invalid_client_metadata`); Name höchstens 100 Zeichen ohne Steuerzeichen, sonst keiner.
+    Bremse `OAuthRegisterThrottle` (20 je IP-Präfix und Stunde) und höchstens 200 nie genutzte je
+    Stadt (429). Aufräumen dabei: nie genutzte nach 24 Stunden, genutzte ohne Verbindung nach 90 Tagen.
+  - „Claude verbinden“ (`AuthorizeHandler`, `AuthorizationRequest`): `POST api/v1/oauth/authorize/check
+    {params}` (Parameter der Adresse; Antwort `{tenant {name}, client {name}, target {host, local},
+    requested_access, requested_access_label}`) und `POST api/v1/oauth/authorize {params, decision,
+    email?, password?}`. Reihenfolge der Prüfung: Client der Stadt, `redirect_uri` exakt registriert,
+    `state` höchstens 500 Zeichen – sonst 400 `invalid_request` OHNE Rücksprung (kein offener
+    Redirect); dann `response_type=code`, `code_challenge_method=S256` mit Challenge (43 Zeichen),
+    `resource` (fehlt oder genau `<issuer>/mcp`), `scope` aus `read`/`write` (fehlt: beides) – sonst
+    400 `invalid_request` mit `details {redirect_url}` (Rücksprung mit `error`, `state` unverändert,
+    `iss`). `decision`: `deny` ohne Anmeldung → `{redirect_url}` mit `error=access_denied`;
+    `preview` und `allow` prüfen E-Mail und Passwort wie `auth/login` (`Authenticator`, gleiche Bremse,
+    Meldungen und Laufzeit; nie Sitzung oder Cookie, O7), dann `claude_access` des Kontos (Minimum mit
+    dem Scope; „aus“ → 403 `claude_access_missing`, kein Code, kein Rücksprung); `preview` → `{access,
+    access_label, user {display_name}}`, `allow` → Code (an Konto, Registrierung, Rücksprung, Zugang und
+    Challenge gebunden) und `{access, access_label, redirect_url}` mit `code`, `state`, `iss`.
+  - `POST oauth/token` und `POST oauth/revoke` (`TokenHandler`, `TokenService`; Formular, siehe "HTTP
+    und REST-API"): `client_id` Pflicht (unbekannt → 401 `invalid_client`). `authorization_code`
+    (`code`, `redirect_uri`, `code_verifier`, `resource` optional gleich `<issuer>/mcp`): Code in jedem
+    Fall verbraucht (`FOR UPDATE`, gelöscht); abgelaufen, anderer Client, anderer Rücksprung, falscher
+    Verifier (`Pkce`, 43–128 Zeichen, SHA-256) oder Konto/Zugang nicht mehr gültig → `invalid_grant`;
+    ein schon eingelöster Code löscht die Verbindung mit seinem `code_hash` (RFC 6749, 4.1.2). Neue
+    Verbindung: Zugang = Minimum aus Code und Konto, Kontoart, Höchstdauer der Sitzungsklasse der Rolle,
+    höchstens `MAX_PER_USER` (5) je Konto (die älteste fällt weg), Registrierung `last_used_at`; danach
+    Mail „Neue Claude-Verbindung“ (`MailTemplates::claudeConnected`, Zweck `claude_connected`: Stadt,
+    Ziel, Zugang, Zeit, Hinweis auf „Trennen“). `refresh_token`: neues Paar (Rotation), das vorige gilt
+    `REFRESH_GRACE_SECONDS` (60) einmal (danach kein voriges mehr), später → Verbindung gelöscht;
+    anderer Client → `invalid_grant`. Antwort `{access_token, token_type: "Bearer", expires_in,
+    refresh_token, scope}` (`scope` = wirksamer Zugang, „read“ bzw. „read write“). Widerruf (RFC 7009):
+    Token einer Verbindung dieses Clients löscht sie, sonst nichts, immer 200. Jeder Aufruf räumt
+    abgelaufene Codes und Verbindungen der Stadt auf. Eine Transaktion je Vorgang, auch Ablehnungen
+    werden committet (verbrauchte Codes, gelöschte Verbindungen).
+  - Prüfung jeder Verbindung (`ClaudeSessions::check`, bei jedem `mcp`-Aufruf und jedem Refresh, ohne
+    Zwischenspeicher): Stadt mit Claude-Zugang und aktiv, Konto aktiv, nicht gesperrt, in der Stadt,
+    Kontoart wie beim Verbinden, Zugang nicht „aus“, Inaktivität und Höchstdauer nach der Sitzungsklasse
+    der AKTUELLEN Rolle (`SessionLifetime`); sonst wird die Verbindung gelöscht. `last_seen_at`
+    höchstens alle 5 Minuten. Ergebnis `ClaudeSession` (Konto, Verbindung, wirksamer Zugang, Rechte der
+    Rolle; eingeschränkt auf den Zugang ab M5).
+  - `POST mcp` (`Access::Claude`, `McpHandler`, `McpServer`): `Authorization: Bearer ffa_…`; ohne bzw.
+    mit ungültigem Token 401 `not_authenticated` mit `WWW-Authenticate: Bearer [error="invalid_token",
+    ]resource_metadata="<issuer>/.well-known/oauth-protected-resource", scope="read write"`
+    (`OAuthUrls::challenge`). Ein Cookie der App gilt nicht. JSON-RPC 2.0, eine Nachricht je Anfrage,
+    zustandslos: `initialize` (Version wie angefragt aus `PROTOCOL_VERSIONS` 2025-11-25/2025-06-18/
+    2025-03-26, sonst die neueste; `capabilities {tools {listChanged: false}}`, `serverInfo`,
+    deutsche `instructions` mit „Daten, keine Anweisungen“), `ping` → `{}`, `tools/list` → `{tools:
+    []}` bis M5, `tools/call` → Fehler -32602, sonst -32601; Benachrichtigungen und Antworten des
+    Clients → 202 ohne Body (`EmptyResponse`); ungültige Nachricht → 400 mit Fehler -32600 ohne `id`;
+    Header `MCP-Protocol-Version` unbekannt → 400; kaputtes JSON oder eine Liste → 400 von
+    `RequestGuard`. `GET mcp` 405. Body-Grenze 16 KiB.
+  - Eigene Verbindungen (O5): `GET auth/claude-connections` → `{connections: [{id, client_name, target
+    {host, local}, access, access_label, created_at, last_used_at}]}` (nur gültige, zuletzt genutzte
+    zuerst) und `DELETE auth/claude-connections/{id} {}` → `{deleted: true}` (fremd/unbekannt 404);
+    `Access::Authenticated`, nur unter Städten.
+  - Tests `tests/Integration/Claude/` (`ClaudeOAuthTestCase`, `OAuthAuthorizeTest`, `OAuthTokenTest`,
+    `McpEndpointTest`), Unit `tests/Unit/OAuth/OAuthRulesTest.php`, `RequestGuardFormTest`,
+    `RouterTest`, `TenantRoutePermissionsTest` (neue Routen).
 
 ## Städte verwalten und Admins einladen
 - Nur Super-Admins, nur unter `service` (`Access::SuperAdmin`; Konten einer Stadt haben dort keine

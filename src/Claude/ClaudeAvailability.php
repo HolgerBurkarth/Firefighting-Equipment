@@ -9,8 +9,8 @@ use FirefightingEquipment\Tenant\Tenant;
 
 /**
  * Den Claude-Zugang gibt es bis zur Klärung des Datenschutzes nur in der Test-Stadt
- * (docs/MCP-KONZEPT.md, Abschnitt 8; TODO-SPAETER.md, T17). Fest im Code wie
- * McpProbeHandler::SLUG; es gibt keine Einstellung, die weitere Städte freigibt.
+ * (docs/MCP-KONZEPT.md, Abschnitt 8; TODO-SPAETER.md, T17). Fest im Code; es gibt keine
+ * Einstellung, die weitere Städte freigibt.
  */
 final class ClaudeAvailability
 {

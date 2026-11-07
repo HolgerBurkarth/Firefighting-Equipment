@@ -3,6 +3,8 @@
 Stand: 07.11.2026 (Runde 3; freigegeben von Holger am 07.11.2026 samt O2–O14 und der Aufteilung
 in Runden; O1 gelöst: Claude findet die Metadaten, siehe Abschnitt 1).
 
+Stand des Baus: M1 und M2 live (Runde 4), M3 gebaut in Runde 5 (Abschnitt 9a).
+
 Abweichungen beim Bau: Die Spalte der Registrierung heißt in `fe_oauth_codes` und
 `fe_claude_connections` `oauth_client_id` (nicht `client_ref`, das in `CLAUDE.md` schon die Kennung
 einer Buchung ist). Migration `0047` kommt mit ihrer Nutzung in M3 (statt M1). Bis T17 gibt es den
@@ -305,6 +307,57 @@ Vorschlag Runden: 4 = M1 + M2, 5 = M3 + M4, 6 = M5, 7 = M6 + M7.
 - Claude ändert sein Verhalten (Callback-Adresse, Spezifikation, CIMD statt DCR): Metadaten und
   Regeln an einer Stelle, Live-Test je Runde.
 - Antwortzeiten auf STRATO (Argon2id beim Verbinden, Log-Mails): Zeitbudget 5 s, Messung im Live-Test.
+
+## 9a. Bau Runde 5 (M3, M4): Festlegungen
+
+Auftrag Holger vom 07.11.2026 (Runde 5). Wo der Auftrag strenger ist als die Abschnitte oben, gilt
+der Auftrag:
+
+- **Rücksprung-Adressen exakt** (auch Loopback): Die `redirect_uri` einer Anfrage muss Byte für Byte
+  einer registrierten gleichen, keine Präfixe und – anders als Abschnitt 5 – auch kein anderer Port
+  bei Loopback. Nimmt Claude Code einen anderen Port als bei der Registrierung, registriert es sich
+  neu (sonst Fehlerseite ohne Rücksprung, Live-Test).
+- **Nie ein offener Redirect**: Zurückgesprungen wird nur zu einer exakt registrierten Adresse eines
+  bekannten Clients der Stadt; falscher Client oder falsche Adresse → Fehler auf der Seite, kein
+  Rücksprung (auch nicht mit Fehler). `state` geht unverändert zurück (bis 500 Zeichen, sonst
+  Fehler ohne Rücksprung).
+- **Code**: 32 Zufallsbytes mit Präfix `ffc_`, 5 Minuten (CHECK höchstens 10), nur einmal: das
+  Einlösen löscht die Zeile in jedem Fall (auch bei falschem Verifier). Gebunden an Registrierung,
+  `redirect_uri`, Konto, Zugang (Scope) und `code_challenge` (S256). Damit ein **zweites Einlösen**
+  die daraus entstandene Verbindung findet, merkt sich die Verbindung den Hash ihres Codes
+  (Migration `0046`, `fe_claude_connections.code_hash`, UNIQUE): unbekannter Code mit Verbindung →
+  Verbindung gelöscht, `invalid_grant`.
+- **Migrationen** (Nummern verschoben, lückenlos): `0045` Bremse `oauth_register` (statt 0047),
+  `0046` `code_hash` an der Verbindung; „über Claude“ (Abschnitt 3: 0045/0046) bekommt in M6 die
+  nächsten freien Nummern.
+- **Refresh (O4)**: Das vorige Refresh-Token gilt nach einer Rotation noch 60 s einmal (neues Paar;
+  das zuletzt ausgegebene Paar und das vorige gelten danach nicht mehr, `previous_refresh_hash` wird
+  leer). Später oder ein zweites Mal → Verbindung gelöscht, `invalid_grant`.
+- **„Claude verbinden“ in zwei Schritten** (O7): `POST api/v1/oauth/authorize {params, decision,
+  email, password}` mit `decision` = `preview` (Anmeldung prüfen, gewährten Zugang zeigen, kein Code),
+  `allow` (Anmeldung erneut prüfen, Code, `redirect_url`), `deny` (ohne Anmeldung, `redirect_url` mit
+  `error=access_denied`, `state`, `iss`). Ohne Zugang 403 `claude_access_missing` und kein Rücksprung.
+  `POST api/v1/oauth/authorize/check {params}`: prüft nur, liefert Stadt, Name des Clients, Hostname des
+  Ziels und den angefragten Zugang; Fehler mit Rücksprung als 400 `invalid_request` mit `details
+  {redirect_url}` (die Seite bietet „Zurück zu Claude“ an).
+- **Profil (O5)**: `GET api/v1/auth/claude-connections` und `DELETE
+  api/v1/auth/claude-connections/{id} {}` (eigene Verbindungen; `Access::Authenticated`, nur unter
+  Städten). Die App zeigt sie in „Angemeldete Geräte“ (Profil und Einstellungen) mit „Trennen“.
+- **Mail (O6)** „Neue Claude-Verbindung“ nach dem Einlösen des Codes an das Konto (Stadt, Ziel,
+  Zugang, Zeit, Hinweis auf „Trennen“ unter „Angemeldete Geräte“; nie Token oder Code).
+- **`mcp`**: `Access::Claude` (neu); in Städten ohne Claude-Zugang 404 vor der Anmeldung. Jeder Aufruf
+  liest Verbindung, Konto (aktiv, nicht gesperrt, Stadt, Kontoart wie beim Verbinden), Zugang (nicht
+  „aus“) und Rechte der Rolle neu, ohne Zwischenspeicher; Inaktivität und Höchstdauer nach der
+  Sitzungsklasse der aktuellen Rolle. 401 mit `WWW-Authenticate` (`error="invalid_token"`, wenn ein
+  Token gesendet wurde). Body-Grenze vorerst 16 KiB (3 MiB erst mit dem Import-Werkzeug, M6).
+  Benachrichtigungen und Antworten des Clients → 202 ohne Body (`EmptyResponse`). `tools/list` leer,
+  `tools/call` → JSON-RPC-Fehler -32602.
+- **Metadaten**: `.well-known/oauth-authorization-server` bleibt als gleiches Dokument (Clients nach
+  RFC 8414, z. B. ältere SDKs); `api/v1/mcp-probe`, `var/mcp-probe/` und der Platzhalter
+  `claude-verbinden` entfallen (ab M4 die Seite der App).
+- **Fehler des Token-Endpunkts** im OAuth-Format (`OAuthError`, `JsonResponse` mit `error` und
+  `error_description`, ohne Token, Code oder Verifier). Bremse `oauth_register`: 20 je IP-Präfix und
+  Stunde (429 im Fehlerformat der App mit `Retry-After`).
 
 ## 10. Offene Fragen (mit Vorschlag)
 
