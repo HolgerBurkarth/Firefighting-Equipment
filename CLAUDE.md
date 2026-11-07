@@ -2433,6 +2433,12 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   - Tests `tests/Integration/Claude/` (`ClaudeOAuthTestCase`, `OAuthAuthorizeTest`, `OAuthTokenTest`,
     `McpEndpointTest`), Unit `tests/Unit/OAuth/OAuthRulesTest.php`, `RequestGuardFormTest`,
     `RouterTest`, `TenantRoutePermissionsTest` (neue Routen).
+  - VORÜBERGEHEND (Live-Test Runde 5, 07.11.2026, wird danach entfernt): `GET api/v1/auth-probe`
+    (`AuthProbeHandler`, `AuthProbe`, `Access::Public`, nur Test-Stadt wie `ClaudeTenant`, sonst 404):
+    `{sapi, gateway_interface, server, env}` mit den NAMEN aller Variablen aus `$_SERVER` bzw.
+    `getenv()`, die „AUTH“ enthalten, je nur ob der Wert nicht leer ist; nie Werte, nichts
+    protokolliert oder gespeichert. Zeigt, unter welchem Namen `Authorization` auf STRATO ankommt.
+    Tests `AuthProbeTest` (Unit), `AuthProbeEndpointTest`.
 - Schritt M4 (Frontend, Runde 5): Seite „Claude verbinden“ (`ClaudeConnectPage`, `claude-verbinden`,
   Route `claude-connect`, `public`, nur unter Städten, Name wie `OAuthUrls::AUTHORIZE_PAGE`; kommt
   immer vom Server, nie aus dem Rückfall des Service Workers). API in `src/api/claude.ts`:
