@@ -1549,16 +1549,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Projektordner (`.htaccess`) und `config/` (`config/.htaccess`) sind per `.htaccess`
   gesperrt, `public/` ist freigegeben (`public/.htaccess`). Diese Dateien nur nach
   Rückfrage ändern; die Freigabe in `public/.htaccess` nie entfernen.
-- Einzige weitere Regel in `public/.htaccess` (seit 07.11.2026, Freigabe Holger; `CGIPassAuth On`
-  wirkte live nicht und ist wieder entfernt): in `<IfModule mod_rewrite.c>` `RewriteEngine On`,
-  `RewriteCond %{HTTP:Authorization} .` und `RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},
-  E=FF_AUTH_SEEN:1]` (ohne Ersetzung, also keine Weiterleitung; `FF_AUTH_SEEN` vorübergehend für den
-  Live-Test, nur der Wert 1, nie das Token). Grund: Apache gibt den Header `Authorization` an PHP als
-  CGI (STRATO) weder als `HTTP_AUTHORIZATION` noch als `REDIRECT_HTTP_AUTHORIZATION` weiter, auch
-  nicht mit `SetEnvIf`, `RewriteRule` oder `CGIPassAuth` (live 07.11.2026); Claude sendet das Zugriffstoken
-  als Bearer an `mcp` (`Request::fromServer`). Die Variable gilt nur für die Anfrage und wird nirgends
-  protokolliert. `PublicHtaccessTest` prüft Freigabe und genau diese Regel.
-  Liefert der Server nach einer Änderung an dieser Datei 500, sofort zurücknehmen und deployen.
+- `public/.htaccess` enthält nur die Freigabe (`PublicHtaccessTest` prüft genau das). In Runde 5
+  (07.11.2026) wirkten dort weder `SetEnvIf` noch `RewriteRule [E=HTTP_AUTHORIZATION:…]` noch
+  `CGIPassAuth On`: Apache gibt den Header `Authorization` an PHP (FastCGI auf STRATO) nie weiter,
+  auch nicht als `REDIRECT_HTTP_AUTHORIZATION`. Die Regeln sind wieder entfernt; das Zugriffstoken für
+  Claude kommt über den Vermittler im cgi-bin (siehe "Vermittler für Claude (cgi-bin)"). Keine neuen
+  Versuche in dieser Datei. Liefert der Server nach einer Änderung an dieser Datei 500, sofort
+  zurücknehmen und deployen.
 - Nur Dateien in `public/` sind von außen erreichbar; dort nichts Geheimes ablegen.
 
 ## Vermittler für Claude (cgi-bin)
@@ -2465,9 +2462,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     mit ungültigem Token 401 `not_authenticated` mit `WWW-Authenticate: Bearer [error="invalid_token",
     ]resource_metadata="<issuer>/.well-known/oauth-protected-resource", scope="read write"`
     (`OAuthUrls::challenge`; das Dokument bleibt in der App, der Vermittler leitet nur an `mcp`
-    weiter). Ein Cookie der App gilt nicht. Den Header liest `Request::fromServer`
-    aus `HTTP_AUTHORIZATION`, sonst aus `REDIRECT_HTTP_AUTHORIZATION` (STRATO, PHP als CGI: Apache
-    gibt `Authorization` sonst nicht weiter; live 07.11.2026). JSON-RPC 2.0, eine Nachricht je Anfrage,
+    weiter). Ein Cookie der App gilt nicht. JSON-RPC 2.0, eine Nachricht je Anfrage,
     zustandslos: `initialize` (Version wie angefragt aus `PROTOCOL_VERSIONS` 2025-11-25/2025-06-18/
     2025-03-26, sonst die neueste; `capabilities {tools {listChanged: false}}`, `serverInfo`,
     deutsche `instructions` mit „Daten, keine Anweisungen“), `ping` → `{}`, `tools/list` → `{tools:
@@ -2482,12 +2477,6 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   - Tests `tests/Integration/Claude/` (`ClaudeOAuthTestCase`, `OAuthAuthorizeTest`, `OAuthTokenTest`,
     `McpEndpointTest`), Unit `tests/Unit/OAuth/OAuthRulesTest.php`, `RequestGuardFormTest`,
     `RouterTest`, `TenantRoutePermissionsTest` (neue Routen).
-  - VORÜBERGEHEND (Live-Test Runde 5, 07.11.2026, wird danach entfernt): `GET api/v1/auth-probe`
-    (`AuthProbeHandler`, `AuthProbe`, `Access::Public`, nur Test-Stadt wie `ClaudeTenant`, sonst 404):
-    `{sapi, gateway_interface, server, env}` mit den NAMEN aller Variablen aus `$_SERVER` bzw.
-    `getenv()`, die „AUTH“ enthalten, je nur ob der Wert nicht leer ist; nie Werte, nichts
-    protokolliert oder gespeichert. Zeigt, unter welchem Namen `Authorization` auf STRATO ankommt.
-    Tests `AuthProbeTest` (Unit), `AuthProbeEndpointTest`.
 - Schritt M4 (Frontend, Runde 5): Seite „Claude verbinden“ (`ClaudeConnectPage`, `claude-verbinden`,
   Route `claude-connect`, `public`, nur unter Städten, Name wie `OAuthUrls::AUTHORIZE_PAGE`; kommt
   immer vom Server, nie aus dem Rückfall des Service Workers). API in `src/api/claude.ts`:

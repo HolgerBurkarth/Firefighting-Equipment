@@ -8,6 +8,14 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-07 – „Aufräumen: public/.htaccess wie vor Runde 5, auth-probe entfernt (Runde 5)“
+
+- Entfernt: die vorübergehende Prüf-Route `GET api/v1/auth-probe` (jetzt 404 `not_found`) und das Lesen von `REDIRECT_HTTP_AUTHORIZATION` (gehörte zur Rewrite-Regel).
+  `public/.htaccess` enthält wieder nur die Freigabe. Grund: Das Token kommt über den Vermittler im
+  cgi-bin als `X-FF-Authorization` (Eintrag darunter).
+- Tests: `PublicHtaccessTest` (nur die Freigabe), `TenantRoutePermissionsTest`, `RequestTest`.
+  `CLAUDE.md`: "Server und .htaccess", "Claude-Zugang (MCP, im Aufbau)", Schritt M3.
+
 ## 2026-11-07 – „mcp liest X-FF-Authorization, Ressource ist die Adresse des Vermittlers (Runde 5)“
 
 - `POST mcp` nimmt das Zugriffstoken aus `Authorization` oder gleichwertig aus

@@ -6,13 +6,3 @@
     Order allow,deny
     Allow from all
 </IfModule>
-
-# Authorization an PHP weitergeben: Apache reicht den Header an PHP als CGI (STRATO) nicht weiter,
-# Claude sendet das Zugriffstoken aber als "Authorization: Bearer" an mcp. FF_AUTH_SEEN ist nur 1
-# (Header bei Apache angekommen), nie das Token. Nur als Variablen der Anfrage, nichts wird
-# protokolliert. Ohne Ersetzung ("-"), also keine Weiterleitung.
-<IfModule mod_rewrite.c>
-    RewriteEngine On
-    RewriteCond %{HTTP:Authorization} .
-    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},E=FF_AUTH_SEEN:1]
-</IfModule>

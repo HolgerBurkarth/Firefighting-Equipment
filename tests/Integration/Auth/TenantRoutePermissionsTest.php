@@ -132,8 +132,6 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'POST oauth/revoke' => ['public', 'public'],
         'POST api/v1/oauth/authorize/check' => ['public', 'public'],
         'POST api/v1/oauth/authorize' => ['public', 'public'],
-        // Vorübergehend (Live-Test Runde 5, AuthProbeTest).
-        'GET api/v1/auth-probe' => ['public', 'public'],
     ];
 
     /** Routen, die jedes angemeldete Konto ohne Rechteprüfung aufrufen darf (Plan, Abschnitt 3). */
