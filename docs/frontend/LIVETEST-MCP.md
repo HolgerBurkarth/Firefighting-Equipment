@@ -28,6 +28,12 @@ Geprüft am 07.11.2026, Build `1a7d06d06086`:
   `error="invalid_token"`; health, Test-Stadt und Immendingen (Startseite, `api/v1/tenant`) ☑ 200,
   kein 500. Vermutlich ist `mod_setenvif` nicht geladen (dann überspringt `<IfModule>` die Regel
   still), oder der Header erreicht Apache gar nicht. Nächster Schritt: Rückfrage an Holger.
+  Mit `RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]` statt `SetEnvIf` (Build
+  `d50363bd1376`, freigegeben von Holger) ebenfalls ☒: 401 ohne `error="invalid_token"`; health,
+  Test-Stadt (Startseite, `geraete/12`, `api/v1/tenant`) und Immendingen (Startseite,
+  `api/v1/tenant`) ☑ 200, kein 500. Drei Versuche gescheitert (Code, `SetEnvIf`, `RewriteRule`),
+  angehalten; Ursache auf dem Server noch unklar (Header erreicht Apache nicht, oder STRATO entfernt
+  die Variable vor PHP).
 - ☑ `GET …/test/api/v1/mcp-probe` → 404; `POST …/immendingen/mcp` und
   `…/immendingen/.well-known/openid-configuration` → 404.
 - ☑ Zusätzlich per curl: `POST oauth/register` mit claude.ai-Rücksprung → 201, mit fremder Adresse →

@@ -8,6 +8,16 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-07 – „Vorübergehende Prüf-Route auth-probe für Authorization (Runde 5, Live-Test)“
+
+- Neu, VORÜBERGEHEND: `GET api/v1/auth-probe` (öffentlich, nur Test-Stadt, sonst 404) → `{sapi,
+  gateway_interface, server: {NAME: bool}, env: {NAME: bool}}`: Namen der Variablen mit „AUTH“ aus
+  `$_SERVER` und `getenv()` und ob der Wert nicht leer ist, nie Werte. Grund: `Authorization` kommt
+  auf STRATO trotz `SetEnvIf` und `RewriteRule [E=…]` nicht als `HTTP_AUTHORIZATION` an; die Route
+  zeigt, ob und unter welchem Namen. Wird nach dem Live-Test wieder entfernt.
+- Tests: `AuthProbeTest`, `AuthProbeEndpointTest`, `TenantRoutePermissionsTest`. `CLAUDE.md`:
+  "Claude-Zugang (MCP, im Aufbau)", Schritt M3.
+
 ## 2026-11-07 – „Authorization per RewriteRule statt SetEnvIf an PHP geben (Runde 5, Live-Test)“
 
 - Live wirkte `SetEnvIf` nicht (vermutlich `mod_setenvif` nicht geladen). `public/.htaccess` setzt
