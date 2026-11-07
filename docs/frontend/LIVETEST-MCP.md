@@ -39,6 +39,14 @@ Geprüft am 07.11.2026, Build `1a7d06d06086`:
   "CGI/1.1","server":[],"env":[]}`: keine einzige Variable mit „AUTH“ bei PHP (auch kein
   `PHP_AUTH_USER`), trotz `RewriteRule [E=HTTP_AUTHORIZATION:…]`. `…/immendingen/api/v1/auth-probe`
   → 404 ☑. Nächster Schritt: Rückfrage an Holger (`CGIPassAuth` oder STRATO-Support).
+  Mit `CGIPassAuth On` und `E=FF_AUTH_SEEN:1` in der Rewrite-Regel (Build `16692f71c6c7`, freigegeben
+  von Holger): health, Test-Stadt und Immendingen (Startseite, `api/v1/tenant`, nur lesend) ☑ 200,
+  kein 500 (die Direktive ist also erlaubt). `auth-probe` mit Bearer, mit `curl -u` und ohne Header
+  weiterhin `{"sapi":"cgi-fcgi","gateway_interface":"CGI/1.1","server":[],"env":[]}` ☒: auch
+  `FF_AUTH_SEEN` (bzw. `REDIRECT_FF_AUTH_SEEN`) fehlt. Entweder erreicht der Header Apache nicht
+  (ein vorgeschalteter Proxy entfernt ihn, die `RewriteCond` greift nie), oder Variablen aus der
+  `.htaccess` kommen bei PHP gar nicht an. `CGIPassAuth` wieder entfernt, Rückfrage an Holger
+  (STRATO-Support).
 - ☑ `GET …/test/api/v1/mcp-probe` → 404; `POST …/immendingen/mcp` und
   `…/immendingen/.well-known/openid-configuration` → 404.
 - ☑ Zusätzlich per curl: `POST oauth/register` mit claude.ai-Rücksprung → 201, mit fremder Adresse →
