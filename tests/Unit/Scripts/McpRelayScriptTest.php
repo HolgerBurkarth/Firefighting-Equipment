@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tests\Unit\Scripts;
 
+use FirefightingEquipment\Http\AllowedOrigins;
+use FirefightingEquipment\Http\AppPath;
+use FirefightingEquipment\OAuth\OAuthUrls;
 use FirefightingEquipment\Tests\Support\Bash;
 use FirefightingEquipment\Tests\Support\Perl;
 use FirefightingEquipment\Tests\Support\TempDirectory;
@@ -131,7 +134,10 @@ final class McpRelayScriptTest extends TestCase
         $script = (string) file_get_contents(self::SCRIPT);
         self::assertStringStartsWith("#!/usr/bin/perl\n", $script);
         self::assertStringNotContainsString("\r", $script, 'LF wie auf dem Server (.gitattributes)');
-        self::assertStringContainsString("my \$TARGET = 'https://www.prodad.de/firefighting/%s/mcp';", $script);
+        // Gleich mit der App: Ziel, Adresse des Vermittlers (Ressource) und Header des Tokens.
+        self::assertStringContainsString("my \$TARGET = '" . AllowedOrigins::DEFAULT . AppPath::PREFIX . "/%s/mcp';", $script);
+        self::assertSame('/cgi-bin/' . basename(self::SCRIPT), OAuthUrls::RELAY_PATH);
+        self::assertStringContainsString("['HTTP_AUTHORIZATION', '" . OAuthUrls::RELAY_AUTHORIZATION_HEADER . "'],", $script);
 
         self::assertSame(['CGIPassAuth On'], $this->directives((string) file_get_contents(self::HTACCESS)));
     }

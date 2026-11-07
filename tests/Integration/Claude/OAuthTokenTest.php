@@ -180,6 +180,7 @@ final class OAuthTokenTest extends ClaudeOAuthTestCase
         yield 'unbekannter Client' => [['grant_type' => 'refresh_token', 'refresh_token' => 'ffr_x', 'client_id' => 'unbekannt'], 401, 'invalid_client'];
         yield 'ohne Client' => [['grant_type' => 'refresh_token', 'refresh_token' => 'ffr_x'], 400, 'invalid_request'];
         yield 'fremde Ressource' => [['grant_type' => 'authorization_code', 'resource' => 'https://evil.example/mcp'], 400, 'invalid_target'];
+        yield 'frühere Adresse mcp' => [['grant_type' => 'authorization_code', 'resource' => self::ISSUER . '/mcp'], 400, 'invalid_target'];
         yield 'unbekannter Scope' => [['grant_type' => 'refresh_token', 'scope' => 'admin'], 400, 'invalid_scope'];
         yield 'Refresh-Token kein Format' => [['grant_type' => 'refresh_token', 'refresh_token' => 'abc', 'client_id' => '{client}'], 400, 'invalid_grant'];
         yield 'Code ohne Verifier' => [['grant_type' => 'authorization_code', 'code' => 'ffc_x', 'redirect_uri' => self::CALLBACK, 'client_id' => '{client}'], 400, 'invalid_request'];

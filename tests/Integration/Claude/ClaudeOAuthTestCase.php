@@ -18,7 +18,8 @@ abstract class ClaudeOAuthTestCase extends AuthTestCase
     protected const string CITY = 'test';
     protected const string AREA = '/firefighting/test/';
     protected const string ISSUER = self::BASE_URL . '/firefighting/test';
-    protected const string RESOURCE = self::ISSUER . '/mcp';
+    /** Adresse des Vermittlers im cgi-bin (OAuthUrls::RELAY_PATH). */
+    protected const string RESOURCE = self::BASE_URL . '/cgi-bin/ff-mcp.pl/test';
     protected const string CALLBACK = 'https://claude.ai/api/mcp/auth_callback';
     protected const string EMAIL = 'erika@example.org';
     /** Beispiel aus RFC 7636, Anhang B */

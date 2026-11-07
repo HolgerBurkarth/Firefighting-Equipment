@@ -179,7 +179,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   - Web-App-Manifest: `/firefighting/<stadt>/manifest.webmanifest` (Route außerhalb von
     `api/v1`, siehe "Erscheinungsbild (API)")
   - Claude-Zugang (seit 07.11.2026, nur Test-Stadt): `mcp`, `.well-known/…`, `oauth/register`,
-    `oauth/token`, `oauth/revoke` außerhalb von `api/v1`, siehe "Claude-Zugang (MCP)"
+    `oauth/token`, `oauth/revoke` außerhalb von `api/v1`, siehe "Claude-Zugang (MCP)"; Claude ruft
+    `mcp` über den Vermittler `https://www.prodad.de/cgi-bin/ff-mcp.pl/<stadt>` auf (außerhalb des
+    Projektordners, siehe "Vermittler für Claude (cgi-bin)")
   - Super-Admin: `/firefighting/service/`
   - Alle anderen GET-Adressen unter `/firefighting/<bereich>/` liefern das Frontend (App-Seite
     oder Datei aus dem Build, siehe "Frontend" und "Frontend ausliefern").
@@ -2402,7 +2404,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     Zufallsbytes base64url; gespeichert nur SHA-256; Klartext nur in der Antwort an Claude bzw. im
     Rücksprung, nie in Tabellen, Protokoll, Mails, Fehlermeldungen oder `details` (per Test).
   - Metadaten (`OAuthUrls`, `OAuthMetadataHandler`): `GET .well-known/oauth-protected-resource` (RFC
-    9728, `resource` = `<issuer>/mcp`), `GET .well-known/openid-configuration` und `GET
+    9728, `resource` = MCP-Adresse des Vermittlers `<base_url>/cgi-bin/ff-mcp.pl/<kürzel>`,
+    `OAuthUrls::resource`, seit 07.11.2026, siehe "Vermittler für Claude (cgi-bin)"; vorher
+    `<issuer>/mcp`), `GET .well-known/openid-configuration` und `GET
     .well-known/oauth-authorization-server` (gleiches Dokument; Issuer `<base_url>/firefighting/<kürzel>`
     ohne `/`, `authorization_endpoint` = Seite `claude-verbinden` der App, `revocation_endpoint`,
     nur S256, nur `none`, `authorization_response_iss_parameter_supported`), `GET .well-known/jwks.json`
@@ -2424,7 +2428,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     email?, password?}`. Reihenfolge der Prüfung: Client der Stadt, `redirect_uri` exakt registriert,
     `state` höchstens 500 Zeichen – sonst 400 `invalid_request` OHNE Rücksprung (kein offener
     Redirect); dann `response_type=code`, `code_challenge_method=S256` mit Challenge (43 Zeichen),
-    `resource` (fehlt oder genau `<issuer>/mcp`), `scope` aus `read`/`write` (fehlt: beides) – sonst
+    `resource` (fehlt oder genau die MCP-Adresse des Vermittlers), `scope` aus `read`/`write` (fehlt: beides) – sonst
     400 `invalid_request` mit `details {redirect_url}` (Rücksprung mit `error`, `state` unverändert,
     `iss`). `decision`: `deny` ohne Anmeldung → `{redirect_url}` mit `error=access_denied`;
     `preview` und `allow` prüfen E-Mail und Passwort wie `auth/login` (`Authenticator`, gleiche Bremse,
@@ -2434,7 +2438,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     Challenge gebunden) und `{access, access_label, redirect_url}` mit `code`, `state`, `iss`.
   - `POST oauth/token` und `POST oauth/revoke` (`TokenHandler`, `TokenService`; Formular, siehe "HTTP
     und REST-API"): `client_id` Pflicht (unbekannt → 401 `invalid_client`). `authorization_code`
-    (`code`, `redirect_uri`, `code_verifier`, `resource` optional gleich `<issuer>/mcp`): Code in jedem
+    (`code`, `redirect_uri`, `code_verifier`, `resource` optional gleich der MCP-Adresse): Code in jedem
     Fall verbraucht (`FOR UPDATE`, gelöscht); abgelaufen, anderer Client, anderer Rücksprung, falscher
     Verifier (`Pkce`, 43–128 Zeichen, SHA-256) oder Konto/Zugang nicht mehr gültig → `invalid_grant`;
     ein schon eingelöster Code löscht die Verbindung mit seinem `code_hash` (RFC 6749, 4.1.2). Neue
@@ -2454,10 +2458,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     der AKTUELLEN Rolle (`SessionLifetime`); sonst wird die Verbindung gelöscht. `last_seen_at`
     höchstens alle 5 Minuten. Ergebnis `ClaudeSession` (Konto, Verbindung, wirksamer Zugang, Rechte der
     Rolle; eingeschränkt auf den Zugang ab M5).
-  - `POST mcp` (`Access::Claude`, `McpHandler`, `McpServer`): `Authorization: Bearer ffa_…`; ohne bzw.
+  - `POST mcp` (`Access::Claude`, `McpHandler`, `McpServer`): `Authorization: Bearer ffa_…` oder
+    gleichwertig `X-FF-Authorization: Bearer ffa_…` (`OAuthUrls::RELAY_AUTHORIZATION_HEADER`; so gibt
+    der Vermittler im cgi-bin den Header weiter, das Token ist der Nachweis; ein nicht leerer
+    `Authorization` hat Vorrang); ohne bzw.
     mit ungültigem Token 401 `not_authenticated` mit `WWW-Authenticate: Bearer [error="invalid_token",
     ]resource_metadata="<issuer>/.well-known/oauth-protected-resource", scope="read write"`
-    (`OAuthUrls::challenge`). Ein Cookie der App gilt nicht. Den Header liest `Request::fromServer`
+    (`OAuthUrls::challenge`; das Dokument bleibt in der App, der Vermittler leitet nur an `mcp`
+    weiter). Ein Cookie der App gilt nicht. Den Header liest `Request::fromServer`
     aus `HTTP_AUTHORIZATION`, sonst aus `REDIRECT_HTTP_AUTHORIZATION` (STRATO, PHP als CGI: Apache
     gibt `Authorization` sonst nicht weiter; live 07.11.2026). JSON-RPC 2.0, eine Nachricht je Anfrage,
     zustandslos: `initialize` (Version wie angefragt aus `PROTOCOL_VERSIONS` 2025-11-25/2025-06-18/

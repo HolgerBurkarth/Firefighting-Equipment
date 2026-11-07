@@ -248,7 +248,8 @@ final class OAuthAuthorizeTest extends ClaudeOAuthTestCase
         yield 'PKCE plain' => [['code_challenge_method' => 'plain'], 'invalid_request'];
         yield 'Challenge zu kurz' => [['code_challenge' => 'abc'], 'invalid_request'];
         yield 'fremde Ressource' => [['resource' => 'https://evil.example/mcp'], 'invalid_target'];
-        yield 'Ressource anderer Stadt' => [['resource' => self::BASE_URL . '/firefighting/immendingen/mcp'], 'invalid_target'];
+        yield 'Ressource anderer Stadt' => [['resource' => self::BASE_URL . '/cgi-bin/ff-mcp.pl/immendingen'], 'invalid_target'];
+        yield 'frühere Adresse mcp' => [['resource' => self::ISSUER . '/mcp'], 'invalid_target'];
         yield 'unbekannter Scope' => [['scope' => 'read admin'], 'invalid_scope'];
         yield 'leerer Scope' => [['scope' => ' '], 'invalid_scope'];
     }
