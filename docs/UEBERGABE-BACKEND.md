@@ -8,6 +8,14 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-07 – „Authorization per RewriteRule statt SetEnvIf an PHP geben (Runde 5, Live-Test)“
+
+- Live wirkte `SetEnvIf` nicht (vermutlich `mod_setenvif` nicht geladen). `public/.htaccess` setzt
+  `HTTP_AUTHORIZATION` jetzt in `<IfModule mod_rewrite.c>` per `RewriteCond %{HTTP:Authorization} .`
+  und `RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]` (Freigabe Holger 07.11.2026);
+  `SetEnvIf` ist entfernt. Keine Änderung an Routen oder Antworten.
+- Tests: `PublicHtaccessTest`. `CLAUDE.md`: "Server und .htaccess".
+
 ## 2026-11-07 – „Authorization per SetEnvIf in public/.htaccess an PHP geben (Runde 5, Live-Test)“
 
 - `POST mcp`: Auch `REDIRECT_HTTP_AUTHORIZATION` setzt STRATO nicht. `public/.htaccess` gibt den

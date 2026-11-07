@@ -23,7 +23,11 @@ Geprüft am 07.11.2026, Build `1a7d06d06086`:
   aus REDIRECT_HTTP_AUTHORIZATION lesen (Runde 5, Live-Test)“. Live mit Build `c05001794be8`
   weiterhin ☒: STRATO setzt auch `REDIRECT_HTTP_AUTHORIZATION` nicht. Nötig ist eine Regel in
   `public/.htaccess` (Rückfrage an Holger, 07.11.2026); bis dahin sind die Punkte für Holger ab
-  Schritt 3 („Verbinden“) nicht sinnvoll.
+  Schritt 3 („Verbinden“) nicht sinnvoll. Mit `SetEnvIf Authorization "(.+)"
+  HTTP_AUTHORIZATION=$1` (Build `bc86550f60e1`, freigegeben von Holger) weiterhin ☒: 401 ohne
+  `error="invalid_token"`; health, Test-Stadt und Immendingen (Startseite, `api/v1/tenant`) ☑ 200,
+  kein 500. Vermutlich ist `mod_setenvif` nicht geladen (dann überspringt `<IfModule>` die Regel
+  still), oder der Header erreicht Apache gar nicht. Nächster Schritt: Rückfrage an Holger.
 - ☑ `GET …/test/api/v1/mcp-probe` → 404; `POST …/immendingen/mcp` und
   `…/immendingen/.well-known/openid-configuration` → 404.
 - ☑ Zusätzlich per curl: `POST oauth/register` mit claude.ai-Rücksprung → 201, mit fremder Adresse →

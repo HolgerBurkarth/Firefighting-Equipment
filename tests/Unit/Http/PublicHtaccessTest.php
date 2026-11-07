@@ -19,8 +19,10 @@ final class PublicHtaccessTest extends TestCase
     private const string GRANT = "<IfModule mod_authz_core.c>\n    Require all granted\n</IfModule>\n"
         . "<IfModule !mod_authz_core.c>\n    Order allow,deny\n    Allow from all\n</IfModule>\n";
 
-    private const string AUTHORIZATION = "<IfModule mod_setenvif.c>\n"
-        . "    SetEnvIf Authorization \"(.+)\" HTTP_AUTHORIZATION=\$1\n"
+    private const string AUTHORIZATION = "<IfModule mod_rewrite.c>\n"
+        . "    RewriteEngine On\n"
+        . "    RewriteCond %{HTTP:Authorization} .\n"
+        . "    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\n"
         . "</IfModule>\n";
 
     public function testGrantIsKept(): void
@@ -44,8 +46,10 @@ final class PublicHtaccessTest extends TestCase
             'Order allow,deny',
             'Allow from all',
             '</IfModule>',
-            '<IfModule mod_setenvif.c>',
-            'SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1',
+            '<IfModule mod_rewrite.c>',
+            'RewriteEngine On',
+            'RewriteCond %{HTTP:Authorization} .',
+            'RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]',
             '</IfModule>',
         ], $directives);
     }
