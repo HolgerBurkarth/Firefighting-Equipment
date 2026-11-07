@@ -117,7 +117,7 @@ final class McpEndpointTest extends ClaudeOAuthTestCase
         self::assertSame(McpServer::PROTOCOL_VERSIONS[0], $unknown['protocolVersion']);
     }
 
-    public function testPingAndEmptyToolList(): void
+    public function testPingToolListAndUnknownTool(): void
     {
         $tokens = $this->connect();
 
@@ -127,9 +127,9 @@ final class McpEndpointTest extends ClaudeOAuthTestCase
         self::assertSame('application/json; charset=utf-8', $ping->headers()['Content-Type']);
         self::assertSame('no-store', $ping->headers()['Cache-Control']);
 
-        self::assertSame(['tools' => []], self::body($this->mcp($tokens['access_token'], self::request('tools/list')))['result']);
+        self::assertContains('search_equipment', array_column(self::body($this->mcp($tokens['access_token'], self::request('tools/list')))['result']['tools'], 'name'));
 
-        $call = self::body($this->mcp($tokens['access_token'], self::request('tools/call', ['name' => 'search_equipment', 'arguments' => []])));
+        $call = self::body($this->mcp($tokens['access_token'], self::request('tools/call', ['name' => 'delete_everything', 'arguments' => []])));
         self::assertSame(McpServer::INVALID_PARAMS, $call['error']['code']);
         self::assertSame(-32601, self::body($this->mcp($tokens['access_token'], self::request('resources/list')))['error']['code']);
     }

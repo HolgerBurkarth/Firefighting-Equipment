@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Permission;
 
+use FirefightingEquipment\Claude\ClaudeAccess;
 use FirefightingEquipment\Role\Role;
 use FirefightingEquipment\Role\SystemRole;
 
@@ -18,6 +19,9 @@ use FirefightingEquipment\Role\SystemRole;
  */
 final readonly class Permissions
 {
+    /** Bereiche, die es über Claude nie gibt (Benutzer, Einladungscodes, Einstellungen der Stadt). */
+    private const array NEVER_FOR_CLAUDE = [Area::Users->value, Area::Settings->value];
+
     /**
      * @param array<string, AreaLevel> $areas    Bereich (Wert von Area) → Stufe
      * @param list<Action>             $actions
@@ -134,6 +138,28 @@ final readonly class Permissions
         }
 
         return new self($this->all, $this->areas, $this->actions, $visibility, $roleId . ':' . $roleVersion, $roleName);
+    }
+
+    /**
+     * Wirksame Rechte über eine Claude-Verbindung (docs/MCP-KONZEPT.md, Abschnitt 2): die wirksamen
+     * Rechte der Rolle (samt F3 und Datenfilter) ohne Benutzer, Einstellungen und Log-Mails; mit
+     * Zugang „Lesen“ alle Bereiche höchstens Ansehen und keine Aktionen. Auch für die Rolle Admin
+     * ausdrücklich aufgezählt (nie alle Rechte, auch keine künftigen).
+     */
+    public function forClaude(ClaudeAccess $access): self
+    {
+        $areas = [];
+        foreach ($this->areas() as $area => $level) {
+            if (in_array($area, self::NEVER_FOR_CLAUDE, true) || $access === ClaudeAccess::Off) {
+                continue;
+            }
+            $areas[$area] = $access === ClaudeAccess::Write ? $level : AreaLevel::Read;
+        }
+        $actions = $access === ClaudeAccess::Write
+            ? array_values(array_filter($this->actions(), static fn (Action $a): bool => $a !== Action::MailLog))
+            : [];
+
+        return new self(false, $areas, $actions, $this->visibility, $this->revision, $this->roleName);
     }
 
     /** Name der Rolle, aus der die Rechte stammen (Liste „Konto wechseln“); null ohne Rolle. */

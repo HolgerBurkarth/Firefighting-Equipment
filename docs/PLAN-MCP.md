@@ -3,7 +3,8 @@
 Stand: 07.11.2026 (Runde 3; freigegeben von Holger am 07.11.2026 samt O2–O14 und der Aufteilung
 in Runden; O1 gelöst: Claude findet die Metadaten, siehe Abschnitt 1).
 
-Stand des Baus: M1 und M2 live (Runde 4), M3 und M4 gebaut in Runde 5 (Abschnitt 9a).
+Stand des Baus: M1 und M2 live (Runde 4), M3 und M4 live in Runde 5 (Abschnitte 9a, 9b), M5 in
+Runde 6 (Abschnitt 9c).
 
 Abweichungen beim Bau: Die Spalte der Registrierung heißt in `fe_oauth_codes` und
 `fe_claude_connections` `oauth_client_id` (nicht `client_ref`, das in `CLAUDE.md` schon die Kennung
@@ -421,6 +422,25 @@ Auftrag Holger vom 07.11.2026:
 - **Ablauf**: je Teil ein Commit (Plan, Vermittler, App, Aufräumen), ein Push, CI, Deploy; dann lädt
   Holger `ff-mcp.pl` und `.htaccess` hoch (Rechte 755 bzw. 644), danach prüft der Agent live: 401 mit
   `WWW-Authenticate` über den Vermittler, mit falschem Token `error="invalid_token"`.
+
+## 9c. Bau Runde 6 (M5, M6): Festlegungen
+
+Auftrag Holger vom 07.11.2026 (Runde 6). Wo der Auftrag strenger ist als die Abschnitte oben, gilt
+der Auftrag:
+
+- **M5 Lesewerkzeuge**: `tools/list` nur, was das Konto wirksam darf (Rolle ∩ Zugang, Datenfilter);
+  jeder Aufruf über die vorhandene REST-Route mit deren Erfordernis (`ToolApi`), Test, dass jedes
+  Werkzeug nur erlaubte Routen nutzt (`ToolRoutesTest`). Matrix: Admin, Benutzer, Rolle mit
+  Datenfilter je Lesen/Ändern, dazu Zugang „Aus“ und gesperrtes Konto (`McpToolMatrixTest`).
+- **Antworten** kompakt und strukturiert (`structuredContent` und Text), Begriffe wie in der App,
+  Listen höchstens 50 je Aufruf (Abweichung von Abschnitt 6: dort Standard 50, höchstens 200) mit
+  Hinweis auf weitere und auf Filter; Freitexte (Notiz, Kommentar, Namen) in `free_text_fields`
+  genannt und im Text als Daten gekennzeichnet. Kein `outputSchema` (optional in der Spezifikation;
+  ein falsches Schema ließe Clients die Antwort verwerfen).
+- `list_city_history` ohne Zeitraum: `GET device-events` kennt keinen; älter über `offset` (der
+  Export mit Zeitraum bleibt Werkzeugen verschlossen).
+- `get_equipment` findet per `number` nur die genaue Nummer (ohne Groß-/Kleinschreibung, wie
+  `identifier_key`, nur nicht ausgesonderte) und per `scan_code` genau; sonst `not_found`.
 
 ## 10. Offene Fragen (mit Vorschlag)
 

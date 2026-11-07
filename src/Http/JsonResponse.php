@@ -48,6 +48,16 @@ final readonly class JsonResponse implements Response
         return new self($data, $statusCode, $headers);
     }
 
+    /**
+     * Inhalt der Antwort (für die Werkzeuge des Claude-Zugangs, die die Handler der API aufrufen).
+     *
+     * @return array<array-key, mixed>
+     */
+    public function data(): array
+    {
+        return $this->data;
+    }
+
     public function statusCode(): int
     {
         return $this->statusCode;
