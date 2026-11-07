@@ -6,21 +6,33 @@ ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holge
 
 ## Runde 5: OAuth, mcp und „Claude verbinden“ (M3, M4)
 
-Stand: gebaut (Commits „OAuth-Server und mcp für den Claude-Zugang, Vorklärung entfernt (Runde 5,
-M3)“ und „Seite „Claude verbinden“ und Claude-Verbindungen im Profil (Runde 5, M4)“). Deploy erst
-nach Holgers Durchsicht von M3; die Punkte unten sind bis dahin offen.
+Stand: deployt am 07.11.2026 (Build `1a7d06d06086`, Migrationen 0045/0046 mit Sicherung vorher).
 
 ### Vom Agenten nach dem Deploy (curl und Chrome, nur Test-Stadt)
 
-- ☐ `GET …/test/.well-known/openid-configuration`: `revocation_endpoint`, `token_endpoint`
-  `…/test/oauth/token`, `authorization_endpoint` `…/test/claude-verbinden`.
-- ☐ `POST …/test/mcp` ohne Token → 401 mit `WWW-Authenticate`, mit falschem Token zusätzlich
-  `error="invalid_token"`; `GET …/test/mcp` → 405.
-- ☐ `GET …/test/api/v1/mcp-probe` → 404 (Vorklärung entfernt); `…/immendingen/mcp` und
+Geprüft am 07.11.2026, Build `1a7d06d06086`:
+
+- ☑ `GET …/test/.well-known/openid-configuration` (und `oauth-authorization-server`, gleiches
+  Dokument): `revocation_endpoint`, `token_endpoint` `…/test/oauth/token`, `authorization_endpoint`
+  `…/test/claude-verbinden`; `oauth-protected-resource` mit `resource` `…/test/mcp`; `jwks.json`
+  `{"keys":[]}`.
+- ☒ `POST …/test/mcp` ohne Token → 401 mit `WWW-Authenticate` ☑, `GET …/test/mcp` → 405 mit `Allow:
+  POST` ☑; aber mit falschem Token (auch mit gültigem Format `ffa_` + 43 Zeichen) fehlt
+  `error="invalid_token"`: Der Header `Authorization` kommt auf STRATO nicht bei PHP an (PHP als CGI).
+  Damit könnte Claude `mcp` nie mit dem Zugriffstoken aufrufen. Korrektur: Commit „Authorization auch
+  aus REDIRECT_HTTP_AUTHORIZATION lesen (Runde 5, Live-Test)“; Ergebnis siehe unten.
+- ☑ `GET …/test/api/v1/mcp-probe` → 404; `POST …/immendingen/mcp` und
   `…/immendingen/.well-known/openid-configuration` → 404.
-- ☐ `claude-verbinden?client_id=unbekannt` im Browser: „Diese Anwendung ist bei der Stadt nicht
-  registriert …“, kein Knopf „Zurück zu Claude“, kein Formular.
-- ☐ Profil bzw. Einstellungen → „Angemeldete Geräte“ ohne Verbindung unverändert.
+- ☑ Zusätzlich per curl: `POST oauth/register` mit claude.ai-Rücksprung → 201, mit fremder Adresse →
+  400 `invalid_redirect_uri`; `POST api/v1/oauth/authorize/check` → 200 (Stadt „Test-Feuerwehr“, Ziel
+  `claude.ai`, angefragt „Ändern“), mit nicht registrierter Adresse → 400 „Die Rücksprung-Adresse ist
+  für diese Anwendung nicht registriert.“ ohne `redirect_url`; `POST oauth/token` mit falschem Code →
+  400 `invalid_grant`; `POST oauth/revoke` → 200.
+- ☑ `claude-verbinden?client_id=unbekannt` im Browser: „Diese Anwendung ist bei der Stadt nicht
+  registriert. Bitte die Verbindung in Claude neu starten.“, kein Knopf „Zurück zu Claude“, kein
+  Formular, keine Konsolenfehler.
+- ☑ Einstellungen → „Angemeldete Geräte“ ohne Verbindung unverändert (nur Sitzungen, keine
+  Claude-Einträge, keine Konsolenfehler).
 
 ### Für Holger: claude.ai verbinden
 

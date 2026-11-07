@@ -2408,7 +2408,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   - `POST mcp` (`Access::Claude`, `McpHandler`, `McpServer`): `Authorization: Bearer ffa_…`; ohne bzw.
     mit ungültigem Token 401 `not_authenticated` mit `WWW-Authenticate: Bearer [error="invalid_token",
     ]resource_metadata="<issuer>/.well-known/oauth-protected-resource", scope="read write"`
-    (`OAuthUrls::challenge`). Ein Cookie der App gilt nicht. JSON-RPC 2.0, eine Nachricht je Anfrage,
+    (`OAuthUrls::challenge`). Ein Cookie der App gilt nicht. Den Header liest `Request::fromServer`
+    aus `HTTP_AUTHORIZATION`, sonst aus `REDIRECT_HTTP_AUTHORIZATION` (STRATO, PHP als CGI: Apache
+    gibt `Authorization` sonst nicht weiter; live 07.11.2026). JSON-RPC 2.0, eine Nachricht je Anfrage,
     zustandslos: `initialize` (Version wie angefragt aus `PROTOCOL_VERSIONS` 2025-11-25/2025-06-18/
     2025-03-26, sonst die neueste; `capabilities {tools {listChanged: false}}`, `serverInfo`,
     deutsche `instructions` mit „Daten, keine Anweisungen“), `ping` → `{}`, `tools/list` → `{tools:
