@@ -1547,6 +1547,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Projektordner (`.htaccess`) und `config/` (`config/.htaccess`) sind per `.htaccess`
   gesperrt, `public/` ist freigegeben (`public/.htaccess`). Diese Dateien nur nach
   Rückfrage ändern; die Freigabe in `public/.htaccess` nie entfernen.
+- Einzige weitere Regel in `public/.htaccess` (seit 07.11.2026, Freigabe Holger):
+  `SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1` in `<IfModule mod_setenvif.c>`. Grund: Apache
+  gibt den Header `Authorization` an PHP als CGI (STRATO) weder als `HTTP_AUTHORIZATION` noch als
+  `REDIRECT_HTTP_AUTHORIZATION` weiter (live 07.11.2026); Claude sendet das Zugriffstoken als Bearer
+  an `mcp` (`Request::fromServer`). Die Variable gilt nur für die Anfrage und wird nirgends
+  protokolliert. `PublicHtaccessTest` prüft Freigabe und genau diese Regel. Liefert der Server nach
+  einer Änderung an dieser Datei 500, sofort zurücknehmen und deployen.
 - Nur Dateien in `public/` sind von außen erreichbar; dort nichts Geheimes ablegen.
 
 ## Datenbank

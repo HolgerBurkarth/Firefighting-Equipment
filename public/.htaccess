@@ -6,3 +6,10 @@
     Order allow,deny
     Allow from all
 </IfModule>
+
+# Authorization an PHP weitergeben: Apache reicht den Header an PHP als CGI (STRATO) nicht weiter,
+# Claude sendet das Zugriffstoken aber als "Authorization: Bearer" an mcp. Nur als Variable der
+# Anfrage, nichts wird protokolliert.
+<IfModule mod_setenvif.c>
+    SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1
+</IfModule>
