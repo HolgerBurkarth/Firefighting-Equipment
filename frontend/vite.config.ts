@@ -5,6 +5,7 @@ import { appBase } from './build/appBase.ts';
 import { buildId, buildInfo } from './build/buildInfo.ts';
 import { compressBuild } from './build/compress.ts';
 import { sanitizeFileName } from './build/fileNames.ts';
+import { NAVIGATE_FALLBACK_DENYLIST } from './build/navigateFallback.ts';
 
 /** PHP-Entwicklungsserver: php -S localhost:8000 public/index.php (im Hauptordner). */
 const PHP_DEV_SERVER = 'http://localhost:8000';
@@ -31,7 +32,7 @@ export default defineConfig({
                 // offline (KONZEPT.md, "Offline-Modus – Entscheidungen", 56).
                 globPatterns: ['**/*.{js,css,html,woff2,wasm}'],
                 navigateFallback: 'index.html',
-                navigateFallbackDenylist: [/\/api\//, /\/manifest\.webmanifest$/],
+                navigateFallbackDenylist: [...NAVIGATE_FALLBACK_DENYLIST],
                 cleanupOutdatedCaches: true,
                 // Eine neue Version wartet, bis die App sie aktiviert (SKIP_WAITING aus
                 // src/runtime/appUpdate.ts): nie mitten in einer Eingabe, alte Teile der laufenden
