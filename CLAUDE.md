@@ -470,7 +470,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Aufbau: `index.html` (mit Platzhalter für `<base href>`), `src/main.ts`, `src/App.vue`,
   `src/router/` (Pfade relativ zum Basispfad, deutsche Adressen wie `anmelden`, Wächter, `back.ts`), `src/pages/`,
   `src/components/`, `src/api/` (Zugriffe auf die REST-API, Antworten geprüft; alle über
-  `client.ts`; `permissions.ts` Rechte der Rolle aus `auth/me`; `appearance.ts`, `devices.ts`, `deviceBulk.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
+  `client.ts`; `permissions.ts` Rechte der Rolle aus `auth/me`; `claude.ts` Claude verbinden und eigene
+  Claude-Verbindungen; `appearance.ts`, `devices.ts`, `deviceBulk.ts`, `deviceEvents.ts`, `deviceImport.ts`, `deviceSummary.ts`,
   `deviceTypes.ts`, `inspections.ts`, `invitationCodes.ts`, `locations.ts`, `notices.ts`, `tenants.ts`, `users.ts`), `src/data/` (Datenschicht für Geräte, Standorte,
   Gerätetypen, Benutzer, Hinweise und das Dashboard; unter `service` `service.ts`),
   `src/auth/` (Sitzung, Fehlermeldungen, Weiterleitung), `src/runtime/` (`tenantState.ts` geladene
@@ -1468,7 +1469,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`tests/e2e/fixtures.ts`) mit denselben Bereichen wie die Routen in PHP (unter `service` nur
   `api/v1/app-icon/…`), eine Datenbank wird nicht gebraucht. Ohne eigene Angabe antworten unter
   Städten `GET api/v1/client-config` (`DEFAULT_CLIENT_CONFIG`, 7/7 Tage) und `GET api/v1/locations`
-  (keine Standorte), weil jede vollständige Synchronisierung beide liest; sie stehen nicht in
+  (keine Standorte), weil jede vollständige Synchronisierung beide liest, sowie `GET
+  api/v1/auth/claude-connections` (keine Verbindungen, „Angemeldete Geräte“); sie stehen nicht in
   `apiRequests`. Weitere Routen je Test über die
   Option `api` (`"METHODE pfad"` → Antwort, Funktion je Anfrage oder `'abort'` für einen
   Netzwerkfehler; Antwort ohne JSON über `text` und `contentType`; gesendete Bodys in `apiRequests`); Hilfen `meBody(role)`, `NOT_AUTHENTICATED`,
@@ -2421,6 +2423,29 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   - Tests `tests/Integration/Claude/` (`ClaudeOAuthTestCase`, `OAuthAuthorizeTest`, `OAuthTokenTest`,
     `McpEndpointTest`), Unit `tests/Unit/OAuth/OAuthRulesTest.php`, `RequestGuardFormTest`,
     `RouterTest`, `TenantRoutePermissionsTest` (neue Routen).
+- Schritt M4 (Frontend, Runde 5): Seite „Claude verbinden“ (`ClaudeConnectPage`, `claude-verbinden`,
+  Route `claude-connect`, `public`, nur unter Städten, Name wie `OAuthUrls::AUTHORIZE_PAGE`; kommt
+  immer vom Server, nie aus dem Rückfall des Service Workers). API in `src/api/claude.ts`:
+  `authorizeParams` (Parameter der Adresse unverändert, je Name der erste), `checkAuthorization`,
+  `authorizeClaude` (`preview`/`allow` mit E-Mail und Passwort unverändert, `deny` ohne),
+  `safeRedirect` (zusätzlich zum Server: nur ein Rücksprung, der mit `<redirect_uri der Anfrage>?`
+  beginnt und dessen `redirect_uri` eine erlaubte Adresse wie `RedirectUriRules` ist; sonst kein
+  Rücksprung). Ablauf: Prüfen beim Öffnen (Fehler ohne Rücksprung: Meldung und „Bitte starten Sie die
+  Verbindung in Claude neu.“; mit `details.redirect_url`: „Zurück zu Claude“), dann Karte mit Stadt,
+  Ziel (`targetText`: „claude.ai“ bzw. „Claude Code auf diesem Rechner (localhost)“) und angefragtem
+  Zugang samt Erklärung (`ACCESS_EXPLANATIONS`), Formular E-Mail und Passwort („Anmelden und
+  fortfahren“ = `preview`, Countdown bei 429, falsches Passwort leert das Feld), danach „Claude bekommt
+  Zugang: Lesen“ mit „Verbinden“ (`allow`, dann `location.assign` des geprüften Rücksprungs) und
+  „Mit anderem Konto anmelden“; „Ablehnen“ jederzeit (`deny`, `error=access_denied`).
+  `claude_access_missing` zeigt nur den Hinweis (kein Verbinden). Ungespeichert (`useUnsavedInput`) =
+  E-Mail oder Passwort eingegeben, nicht beim Rücksprung. Eigene Verbindungen (O5) in `SessionList`
+  („Angemeldete Geräte“, Profil und Einstellungen, nicht unter `service`): `fetchClaudeConnections`
+  zusammen mit den Sitzungen, je Verbindung `connectionLabel` („Claude (claude.ai)“ bzw. „Claude Code
+  (localhost)“), Chip „Claude: Lesen“, `claudeConnectionTimeText` („Zuletzt genutzt vor 5 Min. ·
+  verbunden 01.11.2026“) und „Trennen“ (`endClaudeConnection`, 404 gilt als erledigt). Tests Browser
+  `claudeConnect.spec.ts` (Rücksprung zu claude.ai bzw. localhost per `page.route` abgefangen),
+  `serviceWorker.spec.ts` (Seite mit installiertem Service Worker, `fromServiceWorker()` false), Unit
+  `claudeConnect.spec.ts`.
 
 ## Städte verwalten und Admins einladen
 - Nur Super-Admins, nur unter `service` (`Access::SuperAdmin`; Konten einer Stadt haben dort keine

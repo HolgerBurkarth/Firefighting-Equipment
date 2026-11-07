@@ -246,6 +246,10 @@ async function fulfillApi(
         await route.fulfill({ status: 200, json: DEFAULT_CLIENT_CONFIG });
     } else if (method === 'GET' && path === 'api/v1/locations' && !isService) {
         await route.fulfill({ status: 200, json: { locations: [] } });
+    } else if (method === 'GET' && path === 'api/v1/auth/claude-connections' && !isService) {
+        // „Angemeldete Geräte“ (Profil, Einstellungen) liest neben den Sitzungen die eigenen
+        // Claude-Verbindungen; ohne eigene Angabe keine (claudeConnect.spec.ts prüft sie).
+        await route.fulfill({ status: 200, json: { connections: [] } });
     } else if (/^api\/v1\/app-icon\/(512|192|180)$/.test(path)) {
         await route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
     } else if (/^api\/v1\/tenant\/logo\/(512|192|180)$/.test(path) && !isService) {

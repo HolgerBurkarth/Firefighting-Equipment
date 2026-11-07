@@ -220,3 +220,14 @@ export function claudeAccessBlocker(user: AdminUser, ownId: number | null): stri
 function userSearchKey(user: AdminUser): string {
     return searchKey([user.displayName, user.name, user.email].filter((v) => v !== null).join(' '));
 }
+
+/**
+ * Zeiten einer eigenen Claude-Verbindung in „Angemeldete Geräte“, z. B. „Zuletzt genutzt vor
+ * 5 Min. · verbunden 12.10.2026“.
+ */
+export function claudeConnectionTimeText(
+    connection: { readonly createdAt: string; readonly lastUsedAt: string },
+    now: Date = new Date(),
+): string {
+    return `Zuletzt genutzt ${changeTimeText(connection.lastUsedAt, now)} · verbunden ${changeTimeText(connection.createdAt, now)}`;
+}

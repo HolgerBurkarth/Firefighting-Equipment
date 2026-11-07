@@ -3,7 +3,7 @@
 Stand: 07.11.2026 (Runde 3; freigegeben von Holger am 07.11.2026 samt O2–O14 und der Aufteilung
 in Runden; O1 gelöst: Claude findet die Metadaten, siehe Abschnitt 1).
 
-Stand des Baus: M1 und M2 live (Runde 4), M3 gebaut in Runde 5 (Abschnitt 9a).
+Stand des Baus: M1 und M2 live (Runde 4), M3 und M4 gebaut in Runde 5 (Abschnitt 9a).
 
 Abweichungen beim Bau: Die Spalte der Registrierung heißt in `fe_oauth_codes` und
 `fe_claude_connections` `oauth_client_id` (nicht `client_ref`, das in `CLAUDE.md` schon die Kennung

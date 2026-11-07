@@ -159,6 +159,14 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { public: true },
         });
         routes.push({
+            // Name wie OAuthUrls::AUTHORIZE_PAGE (authorization_endpoint des Claude-Zugangs); immer
+            // vom Server, nie aus dem Rückfall des Service Workers (navigateFallback.ts).
+            path: '/claude-verbinden',
+            name: 'claude-connect',
+            component: () => import('../pages/ClaudeConnectPage.vue'),
+            meta: { public: true },
+        });
+        routes.push({
             path: '/suchen',
             name: 'search',
             component: () => import('../pages/SearchPage.vue'),
