@@ -79,5 +79,10 @@ Auswertung (vom Agenten nach Holgers erstem Versuch, Protokoll `api/v1/mcp-probe
   Behoben mit Commit „Service Worker: Adressen des Claude-Zugangs immer vom Server (Runde 4,
   Aufgabe 0)“. Der Eintrag `authorize` um 07:18:14 mit nur dem Parameter `x` (User-Agent
   `curl/8.5.0`) ist eine Prüfung per curl, nicht Claude.
+- ☑ Nach dem Deploy (Build `751d3207c2f2`, 07.11.2026, Chrome mit installiertem Service Worker der
+  Test-Stadt, Agent): Solange der alte Service Worker aktiv ist (der neue wartet), zeigt
+  `claude-verbinden?…` noch die App („Seite wird geladen …“); die App lädt dabei selbst die neue
+  Version, danach erscheint dieselbe Adresse als JSON vom Server. Nach dem Update mit aktivem
+  neuem Service Worker: `claude-verbinden?…` sofort `application/json` vom Server.
 - ☐ Wiederholung durch Holger nach dem Deploy: Der Browser erreicht `claude-verbinden` mit PKCE
   S256, `resource` = MCP-Adresse, erlaubtem Rücksprung (`authorize`, alle sechs `checks` true).
