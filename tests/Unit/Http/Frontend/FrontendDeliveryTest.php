@@ -310,6 +310,10 @@ final class FrontendDeliveryTest extends TestCase
         yield 'GET api' => ['GET', '/firefighting/test/api', 404, 'not_found'];
         yield 'GET api/' => ['GET', '/firefighting/test/api/', 404, 'not_found'];
         yield 'GET api/v2' => ['GET', '/firefighting/service/api/v2/health', 404, 'not_found'];
+        // Unter .well-known/ ebenso (RFC 8615; Claude sucht dort nach OAuth-Metadaten).
+        yield 'GET .well-known ohne Endung' => ['GET', '/firefighting/test/.well-known/change-password', 404, 'not_found'];
+        yield 'GET .well-known' => ['GET', '/firefighting/test/.well-known', 404, 'not_found'];
+        yield 'GET .well-known unter service' => ['GET', '/firefighting/service/.well-known/openid-configuration', 404, 'not_found'];
         // Vorhandene Routen unverändert.
         yield 'POST auf GET-Route' => ['POST', '/firefighting/service/api/v1/health', 405, 'method_not_allowed'];
         yield 'HEAD auf GET-Route' => ['HEAD', '/firefighting/test/api/v1/tenant', 405, 'method_not_allowed'];

@@ -34,10 +34,16 @@ final readonly class FrontendHandler
     {
     }
 
-    /** Nur GET und nur außerhalb von api/ (dort bleibt es bei 404 im Fehlerformat). */
+    /** Bereiche ohne App-Seite: dort bleibt es bei 404 im Fehlerformat. */
+    private const array NOT_FRONTEND = ['api', '.well-known'];
+
+    /**
+     * Nur GET und nur außerhalb von api/ und .well-known/ (RFC 8615: unbekannte Dokumente dort sind
+     * 404, nie HTML; z. B. sucht Claude dort nach OAuth-Metadaten).
+     */
     public static function handles(string $method, string $rest): bool
     {
-        return $method === 'GET' && $rest !== 'api' && !str_starts_with($rest, 'api/');
+        return $method === 'GET' && !in_array(strtok($rest, '/'), self::NOT_FRONTEND, true);
     }
 
     /**

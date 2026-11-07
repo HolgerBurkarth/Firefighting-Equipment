@@ -116,6 +116,15 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'GET api/v1/notices/{id}' => ['admin', 'log:read'],
         'POST api/v1/notices/{id}/resolve' => ['admin', 'log:write'],
         'POST api/v1/notices/{id}/reopen' => ['admin', 'log:write'],
+        // Vorklärung zum Claude-Zugang (nur Test-Stadt, sonst 404; McpProbeTest).
+        'POST mcp' => ['public', 'public'],
+        'GET .well-known/oauth-protected-resource' => ['public', 'public'],
+        'GET .well-known/openid-configuration' => ['public', 'public'],
+        'GET .well-known/oauth-authorization-server' => ['public', 'public'],
+        'GET .well-known/jwks.json' => ['public', 'public'],
+        'POST oauth/register' => ['public', 'public'],
+        'GET claude-verbinden' => ['public', 'public'],
+        'GET api/v1/mcp-probe' => ['admin', 'settings:write'],
     ];
 
     /** Routen, die jedes angemeldete Konto ohne Rechteprüfung aufrufen darf (Plan, Abschnitt 3). */
