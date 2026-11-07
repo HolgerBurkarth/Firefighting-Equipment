@@ -10,9 +10,33 @@ Frage: Findet Claude die OAuth-Metadaten unter `/firefighting/test/` (Issuer
 `https://www.prodad.de/firefighting/test`, Dokument unter
 `…/firefighting/test/.well-known/openid-configuration`), ohne die `.htaccess` des Webspace?
 
-### Vom Agenten geprüft (curl gegen den Server)
+### Vom Agenten geprüft (07.11.2026, Build `9a26dd0b30f4`, curl gegen den Server)
 
-Ergebnisse nach dem Deploy unten eingetragen.
+- ☑ Deploy endet mit „Deployment erfolgreich“, `build.json` = `9a26dd0b30f4`, `health` =
+  `{"status":"ok","database":"ok"}`.
+- ☑ Das Routing für `.well-known` unter `/firefighting/test/` funktioniert auf STRATO ohne Änderung
+  der Webroot: `GET .well-known/oauth-protected-resource`, `.well-known/openid-configuration`,
+  `.well-known/oauth-authorization-server` und `.well-known/jwks.json` liefern 200
+  `application/json; charset=utf-8` mit den erwarteten Inhalten (`resource` =
+  `https://www.prodad.de/firefighting/test/mcp`, Issuer `https://www.prodad.de/firefighting/test`,
+  `code_challenge_methods_supported` `["S256"]`).
+- ☑ `POST mcp` → 401 mit `WWW-Authenticate: Bearer
+  resource_metadata="https://www.prodad.de/firefighting/test/.well-known/oauth-protected-resource",
+  scope="read write"`; `GET mcp` → 405.
+- ☑ `POST oauth/register` → 201 mit `probe-…`; `GET claude-verbinden?…` → JSON mit allen `checks`
+  `true` (mit einer nachgebauten Anfrage).
+- ☑ Nur Test-Stadt: `immendingen/.well-known/openid-configuration` und `POST immendingen/mcp` → 404;
+  unter `service` 404; unbekannte `.well-known/…` (z. B. `change-password`) → 404 JSON statt App-Seite.
+- ☑ Webroot unberührt: `https://www.prodad.de/.well-known/oauth-authorization-server/firefighting/test`,
+  `…/openid-configuration/firefighting/test` und `…/oauth-protected-resource/firefighting/test/mcp`
+  liefern die 404-Seite der Hauptseite (Varianten 1 und 2 der Spezifikation schlagen also fehl,
+  Claude muss Variante 3 nehmen).
+- ☑ Sperren der internen Ordner unverändert: `apps/firefighting-equipment/config/…`, `composer.json`,
+  `.git/config` und `apps/_backup/` → 302 (Sperre der `.htaccess`), `…/var/mcp-probe/test.json` → 403.
+  (`/firefighting/test/.git/config` liefert wie bisher die App-Seite, keine Datei.)
+- ☑ `GET api/v1/mcp-probe` ohne Anmeldung 401; im Browser als Admin der Test-Stadt 200 mit den
+  Abrufen von eben (User-Agent `curl/…` bzw. `agent-probe-curl` = Abrufe des Agenten).
+- ☐ Ob **Claude selbst** die Variante findet, kann nur der Versuch von Holger zeigen (unten).
 
 ### Für Holger: Konnektor in claude.ai hinzufügen
 
@@ -39,12 +63,21 @@ Ergebnisse nach dem Deploy unten eingetragen.
    `…/claude-verbinden?…` mit `redirect_uri` `http://localhost:<port>/callback`, alle `checks` `true`.
    Danach `claude mcp remove ausruestung-test`.
 
-Auswertung (vom Agenten nach Holgers Versuch):
+Auswertung (vom Agenten nach Holgers erstem Versuch, Protokoll `api/v1/mcp-probe` gelesen am
+07.11.2026, 07:30 UTC; Abrufe von Claude mit User-Agent `python-httpx/0.28.1`):
 
-- ☐ Claude ruft `POST mcp` auf und folgt `resource_metadata` (Protokoll: `mcp` mit Status 401, dann
-  `protected-resource`).
-- ☐ Claude findet die Metadaten über `openid-configuration` (Protokoll: Schritt
-  `openid-configuration`; ob auch `oauth-authorization-server` abgerufen wurde, notieren).
-- ☐ Claude registriert sich (`register`, `redirect_uris_allowed` true, `client_name`).
-- ☐ Der Browser erreicht `claude-verbinden` mit PKCE S256, `resource` = MCP-Adresse, erlaubtem
-  Rücksprung (`authorize`, alle `checks` true).
+- ☑ Claude ruft `POST mcp` auf (`initialize`, Protokollversion `2025-11-25`, ohne Token → 401) und
+  folgt `resource_metadata` (`protected-resource` 200); zwei Durchläufe, 07:16:15 und 07:17:12 UTC.
+- ☑ Claude findet die Metadaten über `openid-configuration` (Variante 3, 200).
+  `oauth-authorization-server` hat Claude NICHT abgerufen (O1: nicht nötig).
+- ☑ Claude registriert sich (07:17:15, 201): `client_name` „Claude“, `redirect_uris`
+  `["https://claude.ai/api/mcp/auth_callback"]` (erlaubt), `grant_types`
+  `authorization_code`/`refresh_token`, `response_types` `code`, `token_endpoint_auth_method`
+  `none`, `scope` `read write`.
+- ☒ Der Browser hat `claude-verbinden` beim Server nicht erreicht (kein Schritt `authorize` von
+  Claude): Der installierte Service Worker der Test-Stadt lieferte die App („Seite nicht gefunden“).
+  Behoben mit Commit „Service Worker: Adressen des Claude-Zugangs immer vom Server (Runde 4,
+  Aufgabe 0)“. Der Eintrag `authorize` um 07:18:14 mit nur dem Parameter `x` (User-Agent
+  `curl/8.5.0`) ist eine Prüfung per curl, nicht Claude.
+- ☐ Wiederholung durch Holger nach dem Deploy: Der Browser erreicht `claude-verbinden` mit PKCE
+  S256, `resource` = MCP-Adresse, erlaubtem Rücksprung (`authorize`, alle sechs `checks` true).

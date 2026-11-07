@@ -1256,8 +1256,12 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   ä/ö/ü zusammensetzen, Kleinschreibung, ß = ss; keine allgemeine NFC-Normalisierung (das Backend
   hat ohne intl keine). Länge in Unicode-Zeichen (`Array.from`), nicht UTF-16-Einheiten.
 - Service Worker `sw.js` (Workbox, `generateSW`), registriert aus dem Bundle (kein Inline-Skript),
-  Scope `/firefighting/<bereich>/`, Rückfall auf `index.html` außer `api/` und
-  `manifest.webmanifest`. Das Manifest liefert PHP (`manifest: false` im Plugin). Vorab geladen
+  Scope `/firefighting/<bereich>/`, Rückfall auf `index.html` außer `api/`,
+  `manifest.webmanifest` und den Adressen des Claude-Zugangs `mcp`, `oauth/…`, `.well-known/…`,
+  `claude-verbinden` (seit 07.11.2026; Liste `NAVIGATE_FALLBACK_DENYLIST` in
+  `frontend/build/navigateFallback.ts`, geprüft gegen Pfad samt Query-String; sonst zeigte Claudes
+  Anmeldefenster bei installiertem Service Worker die App; Tests `navigateFallback.spec.ts`,
+  `serviceWorker.spec.ts` in allen fünf Profilen). Das Manifest liefert PHP (`manifest: false` im Plugin). Vorab geladen
   (`globPatterns`) werden `js`, `css`, `html`, `woff2` und `wasm` (Lesemodul des Scanners, offline).
 - Startbild (Plan Phase 1, Schritt 1.7d „Schnellstart“, Mockup
   `docs/aenderungskonzept/mockups/Startbild.dc.html`): in `index.html` außerhalb von `#app`
