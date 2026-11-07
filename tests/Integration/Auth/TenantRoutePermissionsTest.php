@@ -75,6 +75,9 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'POST api/v1/users/{id}/unlock' => ['admin', 'users:write'],
         'POST api/v1/users/{id}/role' => ['admin', 'users:write'],
         'POST api/v1/users/{id}/display-name' => ['admin', 'users:write'],
+        // Neu seit Schritt M1 (Claude-Zugang); F12 (nur die Rolle Admin) prüft UserAdministration.
+        'POST api/v1/users/{id}/claude-access' => ['admin', 'users:write'],
+        'POST api/v1/users/{id}/claude-connections/end' => ['admin', 'users:write'],
         'POST api/v1/users/bulk/role' => ['admin', 'users:write'],
         'GET api/v1/roles' => ['admin', 'users:read'],
         'GET api/v1/device-types' => ['authenticated', 'device_types:read | search:read | devices:read'],

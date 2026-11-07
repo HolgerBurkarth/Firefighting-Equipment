@@ -91,7 +91,7 @@ final class ApplicationTest extends DomainTestCase
         self::assertSame(200, $response->statusCode());
         self::assertSame(
             '{"slug":"immendingen","name":"Feuerwehr Immendingen – Süd","accent_color":"#b71c1c",'
-            . '"accent_color_is_default":true,"logo_url":null,"logo_urls":null}',
+            . '"accent_color_is_default":true,"logo_url":null,"logo_urls":null,"claude_available":false}',
             $response->body(),
         );
         self::assertSame('no-store', $response->headers()['Cache-Control']);

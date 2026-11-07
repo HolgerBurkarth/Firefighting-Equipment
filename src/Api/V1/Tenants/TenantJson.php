@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Api\V1\Tenants;
 
 use FirefightingEquipment\Api\V1\Auth\AuthJson;
+use FirefightingEquipment\Claude\ClaudeAvailability;
 use FirefightingEquipment\Tenant\TenantSummary;
 
 /**
@@ -24,6 +25,7 @@ final class TenantJson
             'slug' => $tenant->slug->value,
             'name' => $tenant->name->value,
             'active' => $tenant->active,
+            'claude_available' => ClaudeAvailability::for($tenant),
             'created_at' => AuthJson::time($tenant->createdAt),
             'updated_at' => AuthJson::time($tenant->updatedAt),
             'counts' => [

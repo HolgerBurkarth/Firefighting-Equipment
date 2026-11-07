@@ -75,6 +75,9 @@ final class UserAdministrationTest extends AuthTestCase
             'email_verified_at' => '2026-01-01T12:00:00Z',
             'created_at' => $locked['created_at'],
             'invitation_code' => null,
+            'claude_access' => 'off',
+            'claude_access_label' => 'Aus',
+            'claude_connections' => ['count' => 0, 'last_used_at' => null],
         ], $locked);
     }
 

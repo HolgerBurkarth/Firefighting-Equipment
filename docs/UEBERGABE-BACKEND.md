@@ -8,6 +8,35 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-07 – „Claude-Zugang im Backend: Zugang setzen, Verbindungen trennen (Runde 4, M1)“
+
+`docs/PLAN-MCP.md`, Schritt M1 (`docs/MCP-KONZEPT.md`, Abschnitt 2, F12). Noch keine Verbindung möglich
+(OAuth und MCP folgen mit M3); nur in der Test-Stadt (`ClaudeAvailability`, fest im Code).
+
+- Migrationen `0041`–`0044` (nur Erweiterungen): `fe_users.claude_access` (`off`/`read`/`write`,
+  Standard `off`, CHECK: nie bei Super-Admins und gelöschten Konten), Tabellen `fe_oauth_clients`,
+  `fe_oauth_codes`, `fe_claude_connections`.
+- Neue Routen unter Städten (`users` Ändern, zusätzlich F12 im Code): `POST users/{id}/claude-access
+  {access}` und `POST users/{id}/claude-connections/end {}`; Antwort `{"user": …}`. Nur die Rolle
+  *Admin*, nur Konten ohne *Admin*, nie das eigene Konto, Lesen/Ändern nur für aktive Konten, nur in
+  der Test-Stadt; sonst 409 `rule_violation`. `access` ungültig → 400 (vor 404).
+- Neue Routen unter `service` (`Access::SuperAdmin`): `POST tenants/{id}/users/{user}/claude-access
+  {access}` (nur Konten mit *Admin*) und `POST tenants/{id}/users/{user}/claude-connections/end {}`
+  (jedes Konto der Stadt); Antwort `{"user": …}`, Konto einer anderen Stadt 404.
+- `UserJson` (Benutzerverwaltung, Konten im Stadtdetail): zusätzlich `claude_access`,
+  `claude_access_label` (Aus/Lesen/Ändern) und `claude_connections {count, last_used_at}`.
+- `GET tenant` (auch die Antworten der Routen zum Erscheinungsbild) und `TenantJson` des Super-Admins:
+  zusätzlich `claude_available` (bisher nur in der Test-Stadt `true`).
+- Verbindungen und offene Codes enden auf allen Wegen, die die Sitzungen eines Kontos beenden
+  (`UserRepository::endSessions`: sperren, Passwort setzen und zurücksetzen, anonymisieren, Wechsel zu
+  oder von *Admin*) sowie beim Sperren der Stadt; ein Wechsel zu oder von *Admin* und das Anonymisieren
+  setzen den Zugang auf `off`. Andere Rollenwechsel und „Ändern“ → „Lesen“ lassen die Verbindungen
+  bestehen.
+
+Tests: `ClaudeAccessTest` (neu), `TenantRoutePermissionsTest`, `AdminRoutesAccessTest`,
+`SuperAdminRoutesAccessTest` (neue Routen), `UserAdministrationTest`, `TenantAdministrationTest`,
+`AppearanceApiTest`, `ApplicationTest` (neue Felder). `CLAUDE.md` "Claude-Zugang (MCP, im Aufbau)".
+
 ## 2026-11-07 – „MCP-Vorklärung: OAuth-Metadaten und Platzhalter unter /firefighting/test/ (Runde 3)“
 
 Vorklärung zum Claude-Zugang (`docs/PLAN-MCP.md`, Abschnitt 1). Nur in der Test-Stadt, in allen anderen

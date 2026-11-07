@@ -7,6 +7,8 @@ namespace FirefightingEquipment\User;
 use FirefightingEquipment\Auth\OneTimeToken;
 use FirefightingEquipment\Auth\TokenPurpose;
 use FirefightingEquipment\Auth\UserTokenRepository;
+use FirefightingEquipment\Claude\ClaudeAccess;
+use FirefightingEquipment\Claude\ClaudeConnectionRepository;
 use FirefightingEquipment\Invitation\InvitationCodeNotUsableException;
 use FirefightingEquipment\Invitation\InvitationCodeRepository;
 use FirefightingEquipment\Invitation\InvitationCodeValue;
@@ -54,7 +56,8 @@ final readonly class UserRepository
     private const string SYSTEM_ROLE_ID_OF_TENANT = 'SELECT r.id FROM fe_roles r WHERE r.tenant_id = ? AND r.system_key = ?';
 
     private const string COLUMNS = 'id, tenant_id, role, status, email, name, display_name, email_verified_at,'
-        . ' locked_at, deleted_at, created_at, updated_at, protected, notify_device_log, role_id, invitation_code_id';
+        . ' locked_at, deleted_at, created_at, updated_at, protected, notify_device_log, role_id, invitation_code_id,'
+        . ' claude_access';
 
     public function __construct(private \PDO $pdo)
     {
@@ -350,7 +353,15 @@ final readonly class UserRepository
             }
 
             $notify = $user->notifyDeviceLog && Permissions::fromRole($role)->can(Action::MailLog);
-            $this->updateRole($user->id, $role, 'notify_device_log = ?', [$notify ? '1' : '0']);
+            // Wechsel zu oder von Admin: Claude-Zugang aus (docs/MCP-KONZEPT.md, Abschnitt 2); die
+            // Verbindungen enden mit den Sitzungen.
+            $claude = $kind !== $user->role ? ClaudeAccess::Off : $user->claudeAccess;
+            $this->updateRole(
+                $user->id,
+                $role,
+                'notify_device_log = ?, claude_access = ?',
+                [$notify ? '1' : '0', $claude->value],
+            );
             if ($kind !== $user->role) {
                 $this->endSessions($user->id);
             }
@@ -654,6 +665,67 @@ final readonly class UserRepository
             $this->update($user->id, 'protected = 0');
 
             return true;
+        });
+    }
+
+    /**
+     * Setzt den Claude-Zugang (docs/MCP-KONZEPT.md, Abschnitt 2). Nie für Super-Admins und gelöschte
+     * Konten; Lesen bzw. Ändern nur für aktive Konten (gesperrte behalten den Wert, gelten aber als
+     * ohne Zugang). „Aus“ löscht alle Claude-Verbindungen und Codes des Kontos; „Ändern“ → „Lesen“
+     * lässt sie bestehen (wirkt ab dem nächsten Aufruf). Wer den Zugang setzen darf (F12), prüft
+     * $authorize im gesperrten Stand.
+     *
+     * @param (\Closure(User): void)|null $authorize
+     *
+     * @return bool ob sich etwas geändert hat
+     *
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException
+     */
+    public function setClaudeAccess(int $id, ClaudeAccess $access, ?\Closure $authorize = null): bool
+    {
+        return $this->transaction($id, function (User $user) use ($access, $authorize): bool {
+            if ($user->role === UserRole::SuperAdmin) {
+                throw UserRuleViolationException::claudeAccessSuperAdmin();
+            }
+            self::assertNotDeleted($user);
+            self::authorize($user, $authorize);
+            if ($access !== ClaudeAccess::Off && $user->status !== UserStatus::Active) {
+                throw UserRuleViolationException::claudeAccessNotActive($user->id);
+            }
+            if ($user->claudeAccess === $access) {
+                return false;
+            }
+
+            $this->update($user->id, 'claude_access = ?', [$access->value]);
+            if ($access === ClaudeAccess::Off) {
+                new ClaudeConnectionRepository($this->pdo)->deleteForUser($user->id);
+            }
+
+            return true;
+        });
+    }
+
+    /**
+     * „Claude-Verbindungen trennen“: löscht alle Verbindungen und offenen Codes des Kontos; der Zugang
+     * bleibt (eine neue Verbindung ist möglich). Wiederholbar.
+     *
+     * @param (\Closure(User): void)|null $authorize
+     *
+     * @return int Anzahl der beendeten Verbindungen
+     *
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException Super-Admin
+     */
+    public function endClaudeConnections(int $id, ?\Closure $authorize = null): int
+    {
+        return $this->transaction($id, function (User $user) use ($authorize): int {
+            if ($user->role === UserRole::SuperAdmin) {
+                throw UserRuleViolationException::claudeAccessSuperAdmin();
+            }
+            self::authorize($user, $authorize);
+
+            return new ClaudeConnectionRepository($this->pdo)->deleteForUser($user->id);
         });
     }
 
@@ -984,7 +1056,7 @@ final readonly class UserRepository
         $this->update(
             $id,
             "status = 'deleted', email = NULL, email_verified_at = NULL, password_hash = NULL, name = NULL,"
-            . ' display_name = NULL, notify_device_log = 0, deleted_at = UTC_TIMESTAMP()',
+            . " display_name = NULL, notify_device_log = 0, claude_access = 'off', deleted_at = UTC_TIMESTAMP()",
         );
     }
 
@@ -1006,9 +1078,15 @@ final readonly class UserRepository
         return new AdminInvitation($tenant, $user, $token);
     }
 
+    /**
+     * Beendet alle Sitzungen des Kontos und mit ihnen seine Claude-Verbindungen und offenen Codes der
+     * Anmeldung über „Claude verbinden“ (docs/PLAN-MCP.md, Abschnitt 2, Punkt 4: jeder Weg, der die
+     * Sitzungen beendet, beendet auch die Verbindungen).
+     */
     private function endSessions(int $userId): void
     {
         $this->pdo->prepare('DELETE FROM fe_sessions WHERE user_id = ?')->execute([$userId]);
+        new ClaudeConnectionRepository($this->pdo)->deleteForUser($userId);
     }
 
     /**
@@ -1080,6 +1158,7 @@ final readonly class UserRepository
             (int) $row['notify_device_log'] === 1,
             $row['role_id'] === null ? null : (int) $row['role_id'],
             $row['invitation_code_id'] === null ? null : (int) $row['invitation_code_id'],
+            ClaudeAccess::from((string) $row['claude_access']),
         );
     }
 

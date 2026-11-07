@@ -22,7 +22,10 @@ use PHPUnit\Framework\Attributes\DataProvider;
 final class SuperAdminRoutesAccessTest extends AuthTestCase
 {
     /**
-     * @return iterable<string, array{string, string, array<string, mixed>|null}>
+     * Methode, Pfad, Body und optional die Antworten, mit denen der Super-Admin durchkommt (Standard
+     * 200/201).
+     *
+     * @return iterable<string, array{0: string, 1: string, 2: array<string, mixed>|null, 3?: list<int>}>
      */
     public static function superAdminRoutes(): iterable
     {
@@ -36,6 +39,10 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
         yield 'Admin einladen' => ['POST', 'tenants/{tenant}/admins', ['email' => 'zweiter@example.org']];
         yield 'Benutzer ansehen' => ['GET', 'tenants/{tenant}/users', null];
         yield 'Einladung erneut senden' => ['POST', 'tenants/{tenant}/users/{user}/resend-invitation', []];
+        // Kommt durch, lehnt in Immendingen aber fachlich ab (Claude-Zugang nur in der Test-Stadt,
+        // ClaudeAvailability); die Wirkung prüft ClaudeAccessTest.
+        yield 'Claude-Zugang setzen' => ['POST', 'tenants/{tenant}/users/{user}/claude-access', ['access' => 'read'], [409]];
+        yield 'Claude-Verbindungen trennen' => ['POST', 'tenants/{tenant}/users/{user}/claude-connections/end', [], [409]];
         yield 'Rechte-Katalog' => ['GET', 'permission-catalog', null];
         yield 'Rollen auflisten' => ['GET', 'tenants/{tenant}/roles', null];
         yield 'Rolle anlegen' => ['POST', 'tenants/{tenant}/roles', ['name' => 'Live', 'areas' => ['search' => 'read'], 'actions' => [], 'locations' => null, 'device_types' => null]];
@@ -52,9 +59,10 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
 
     /**
      * @param array<string, mixed>|null $body
+     * @param list<int>                 $passes
      */
     #[DataProvider('superAdminRoutes')]
-    public function testOnlySuperAdmin(string $method, string $path, ?array $body): void
+    public function testOnlySuperAdmin(string $method, string $path, ?array $body, array $passes = [200, 201]): void
     {
         $this->account('immendingen', 'admin@example.org', ['role' => 'admin']);
         $this->account('immendingen', 'user@example.org');
@@ -83,7 +91,7 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
         self::assertSame([], $this->mailer->sent);
 
         $response = $this->send($method, $url, $body, $this->loginCookie(null, 'chef@example.org'));
-        self::assertContains($response->statusCode(), [200, 201], $response->body());
+        self::assertContains($response->statusCode(), $passes, $response->body());
     }
 
     /**

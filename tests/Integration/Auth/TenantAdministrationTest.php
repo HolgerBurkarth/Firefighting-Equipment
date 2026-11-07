@@ -71,6 +71,7 @@ final class TenantAdministrationTest extends AuthTestCase
             'slug' => 'immendingen',
             'name' => 'Feuerwehr immendingen',
             'active' => true,
+            'claude_available' => false,
             'created_at' => $tenants[0]['created_at'],
             'updated_at' => $tenants[0]['updated_at'],
             'counts' => ['users_active' => 2, 'admins_active' => 1, 'admins_invited' => 1],

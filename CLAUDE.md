@@ -2282,10 +2282,33 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Rollen behalten `filter_locations = 1` und sehen danach nichts, bis neu ausgewählt wird (siehe
   "Gerätedaten zurücksetzen").
 
-## Claude-Zugang (MCP, in Planung)
-- Konzept `docs/MCP-KONZEPT.md`, Plan `docs/PLAN-MCP.md` (Runde 3, 07.11.2026, noch nicht
-  freigegeben; gebaut wird ab Runde 4), Live-Tests `docs/frontend/LIVETEST-MCP.md`.
-- Bisher nur die Vorklärung (Plan Abschnitt 1): `McpProbeHandler` (`src/Api/V1/McpProbe/`, Schritte
+## Claude-Zugang (MCP, im Aufbau)
+- Konzept `docs/MCP-KONZEPT.md`, Plan `docs/PLAN-MCP.md` (freigegeben von Holger am 07.11.2026 samt
+  O2–O14; Runden 4 = M1 + M2, 5 = M3 + M4, 6 = M5, 7 = M6 + M7), Live-Tests
+  `docs/frontend/LIVETEST-MCP.md`. Ergebnis der Vorklärung (O1, 07.11.2026): Claude findet die
+  Metadaten unter `<issuer>/.well-known/openid-configuration` ohne Änderung der Webroot.
+- Nur in der Test-Stadt (`ClaudeAvailability::for`, `SLUG` = `TestCityData::SLUG`, fest im Code; T17
+  Datenschutz): sonst lehnen die Routen mit 409 `rule_violation` ab; `GET tenant` und `TenantJson`
+  melden `claude_available`.
+- Schritt M1 (Backend, Runde 4): `fe_users.claude_access` (Migration `0041`, `ClaudeAccess` in
+  `src/Claude/`: `off`/`read`/`write`, Bezeichnungen Aus/Lesen/Ändern; CHECK nie bei Super-Admins und
+  gelöschten Konten), Tabellen `fe_oauth_clients` (`0042`), `fe_oauth_codes` (`0043`, Codes höchstens 10
+  Minuten, CASCADE nur von der Registrierung), `fe_claude_connections` (`0044`, Tokens nur als SHA-256,
+  höchstens 90 Tage; Spalte der Registrierung `oauth_client_id`, im Plan noch `client_ref`).
+  `ClaudeConnectionRepository` (`deleteForUser`, `deleteForTenant`, `summariesForTenant`).
+  `UserRepository::setClaudeAccess` (Lesen/Ändern nur für aktive Konten, „Aus“ löscht Verbindungen und
+  Codes) und `endClaudeConnections`; `endSessions` löscht zusätzlich Verbindungen und Codes (also bei
+  sperren, Passwort setzen und zurücksetzen, anonymisieren, Wechsel zu oder von *Admin*), ebenso
+  `TenantRepository::setActive(…, false)` für die ganze Stadt. Wechsel zu oder von *Admin* und
+  Anonymisieren setzen `claude_access` auf `off`. F12 in `UserAdministration` (nur die Rolle *Admin*,
+  `Permissions::isAll`, nur Konten ohne *Admin*, nie das eigene) und `TenantAdministration`
+  (Super-Admin: Zugang nur für Konten mit *Admin*, trennen bei jedem Konto). Routen `POST
+  users/{id}/claude-access {access}`, `POST users/{id}/claude-connections/end {}` (`users` Ändern) und
+  unter `service` `POST tenants/{id}/users/{user}/claude-access`, `…/claude-connections/end`
+  (`TenantUserClaudeHandler`); `UserJson` mit `claude_access`, `claude_access_label`,
+  `claude_connections {count, last_used_at}`. Tests `tests/Integration/Claude/ClaudeAccessTest.php`.
+  Migration `0047` (Bremse `oauth_register`) kommt erst mit ihrer Nutzung in M3.
+- Vorklärung (Plan Abschnitt 1, bis M3): `McpProbeHandler` (`src/Api/V1/McpProbe/`, Schritte
   `McpProbeStep`) und `McpProbeTrace` (`src/Mcp/Probe/`), Routen in `Routes::tenant()`, alle
   öffentlich außer dem Protokoll: `POST mcp` (401 `not_authenticated` mit `WWW-Authenticate: Bearer
   resource_metadata="…/.well-known/oauth-protected-resource", scope="read write"`; `GET mcp` 405),

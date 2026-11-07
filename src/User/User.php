@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\User;
 
+use FirefightingEquipment\Claude\ClaudeAccess;
+
 /**
  * Ein Benutzerkonto. Interner Schlüssel ist die ID. Der Passwort-Hash ist bewusst nicht enthalten.
  */
@@ -37,6 +39,7 @@ final readonly class User
         public ?int $roleId = null,
         /** Einladungscode der Registrierung; null ohne (z. B. eingeladene Admins) */
         public ?int $invitationCodeId = null,
+        public ClaudeAccess $claudeAccess = ClaudeAccess::Off,
     ) {
     }
 
