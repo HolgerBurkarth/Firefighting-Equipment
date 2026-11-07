@@ -35,8 +35,8 @@ hatte die ersten fünf Punkte schon geprüft):
   24 Stunden aufgeräumt) und `api/v1/oauth/authorize/check` mit `resource` = Adresse des
   Vermittlers → 200; mit der alten Adresse `…/firefighting/test/mcp` → 400 mit Rücksprung
   `error=invalid_target`.
-- ☐ Ein echtes Zugriffstoken über den Vermittler (`initialize`, `tools/list`) prüft erst Holgers
-  Verbindung (unten), der Agent gibt keine Passwörter ein.
+- ☑ Ein echtes Zugriffstoken über den Vermittler (`initialize`, `tools/list`): bestätigt durch
+  Holgers Verbindungen mit claude.ai und Claude Code (unten).
 
 ### Vom Agenten nach dem Deploy (curl und Chrome, nur Test-Stadt)
 
@@ -94,6 +94,9 @@ Geprüft am 07.11.2026, Build `1a7d06d06086`:
 
 ### Für Holger: claude.ai verbinden
 
+Ergebnis (Holger, 07.11.2026, über `https://www.prodad.de/cgi-bin/ff-mcp.pl/test`): ☑ alle
+Schritte 1–10 wie erwartet („alles funktioniert“).
+
 Vorbereitung: In der Benutzerverwaltung der Test-Stadt einem Testkonto, dessen Passwort Sie kennen
 (z. B. „Holger Test 1“), den Claude-Zugang „Lesen“ geben. Einen alten Konnektor „Ausrüstung Test“ in
 claude.ai vorher entfernen (Einstellungen → Konnektoren → „…“ → „Entfernen“).
@@ -135,6 +138,8 @@ claude.ai vorher entfernen (Einstellungen → Konnektoren → „…“ → „E
 
 ### Für Holger: Claude Code verbinden
 
+Ergebnis (Holger, 07.11.2026): ☑ alle Schritte wie erwartet.
+
 1. Terminal: `claude mcp add --transport http ausruestung-test https://www.prodad.de/cgi-bin/ff-mcp.pl/test`
    (einen alten Eintrag vorher mit `claude mcp remove ausruestung-test` entfernen).
 2. In Claude Code `/mcp` → `ausruestung-test` → „Authenticate“.
@@ -171,7 +176,8 @@ neue Version aktualisiert):
   nichts geändert).
 - ☐ Super-Admin, Stadtdetail „Test“, Reiter „Admins und Benutzer“: „Claude-Zugang …“ nur bei aktiven
   Admins; setzen und wieder auf „Aus“. (Holger)
-- ☐ „Claude-Verbindungen trennen …“ erscheint erst mit einer Verbindung (ab M3/M4 möglich).
+- ☑ „Claude-Verbindungen trennen …“ erscheint erst mit einer Verbindung (Holger, Runde 5,
+  claude.ai Schritte 6 und 10).
 - ☐ Am Handy: Chip in der Karte ohne waagerechten Überstand. (Holger)
 
 ## Vorklärung (Runde 3, 07.11.2026)
