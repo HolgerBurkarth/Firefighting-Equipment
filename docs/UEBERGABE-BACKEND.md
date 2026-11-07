@@ -8,6 +8,15 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-07 – „Authorization per SetEnvIf in public/.htaccess an PHP geben (Runde 5, Live-Test)“
+
+- `POST mcp`: Auch `REDIRECT_HTTP_AUTHORIZATION` setzt STRATO nicht. `public/.htaccess` gibt den
+  Header jetzt per `SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1` (in `<IfModule
+  mod_setenvif.c>`, Freigabe Holger 07.11.2026) als Variable an PHP; `Request::fromServer` liest sie
+  wie bisher. Keine Änderung an Routen oder Antworten.
+- Tests: `PublicHtaccessTest` (Freigabe unverändert, genau diese Regel). `CLAUDE.md`: "Server und
+  .htaccess".
+
 ## 2026-11-07 – „Authorization auch aus REDIRECT_HTTP_AUTHORIZATION lesen (Runde 5, Live-Test)“
 
 - `POST mcp`: Live auf STRATO kam der Header `Authorization` nicht bei PHP an (PHP als CGI; auch
