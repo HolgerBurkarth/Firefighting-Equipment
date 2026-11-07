@@ -8,6 +8,15 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-07 – „Authorization auch aus REDIRECT_HTTP_AUTHORIZATION lesen (Runde 5, Live-Test)“
+
+- `POST mcp`: Live auf STRATO kam der Header `Authorization` nicht bei PHP an (PHP als CGI; auch
+  ein Token mit gültigem Format ergab 401 ohne `error="invalid_token"`). `Request::fromServer` liest
+  ihn jetzt zusätzlich aus `REDIRECT_HTTP_AUTHORIZATION`, wenn `HTTP_AUTHORIZATION` fehlt (Name nach
+  der internen Weiterleitung per `RewriteRule`). Sonst keine Änderung an Routen oder Antworten.
+- Tests: `RequestTest::testAuthorizationAfterInternalRedirectIsRead`. `CLAUDE.md`: "Claude-Zugang
+  (MCP, im Aufbau)", Schritt M3, `POST mcp`.
+
 ## 2026-11-07 – „OAuth-Server und mcp für den Claude-Zugang, Vorklärung entfernt (Runde 5, M3)“
 
 `docs/PLAN-MCP.md`, Schritt M3 und Abschnitt 9a (Festlegungen dieser Runde). Nur in der Test-Stadt;

@@ -39,6 +39,21 @@ final class RequestTest extends TestCase
         self::assertFalse($request->isMutating());
     }
 
+    public function testAuthorizationAfterInternalRedirectIsRead(): void
+    {
+        $read = static fn (array $server): ?string => Request::fromServer($server, [], static fn () => false)
+            ->header('Authorization');
+
+        self::assertSame('Bearer ffa_x', $read(['REDIRECT_HTTP_AUTHORIZATION' => 'Bearer ffa_x']));
+        self::assertSame('Bearer direkt', $read([
+            'HTTP_AUTHORIZATION' => 'Bearer direkt',
+            'REDIRECT_HTTP_AUTHORIZATION' => 'Bearer ffa_x',
+        ]));
+        self::assertNull($read(['REDIRECT_HTTP_AUTHORIZATION' => '']));
+        self::assertNull($read(['REDIRECT_HTTP_AUTHORIZATION' => ['x']]));
+        self::assertNull($read([]));
+    }
+
     public function testDefaultsWithoutServerValues(): void
     {
         $request = Request::fromServer([], [], static fn () => false);

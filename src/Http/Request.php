@@ -63,6 +63,13 @@ final readonly class Request
                 $headers[strtolower(str_replace('_', '-', $key))] = $value;
             }
         }
+        // Apache gibt Authorization an PHP als CGI (STRATO) nicht als HTTP_AUTHORIZATION weiter; nach
+        // der internen Weiterleitung per RewriteRule kann er als REDIRECT_HTTP_AUTHORIZATION ankommen
+        // (Claude sendet das Zugriffstoken als Bearer an mcp).
+        $redirected = self::string($server, 'REDIRECT_HTTP_AUTHORIZATION');
+        if (!isset($headers['authorization']) && $redirected !== null && $redirected !== '') {
+            $headers['authorization'] = $redirected;
+        }
 
         $body = null;
         $tooLarge = false;
