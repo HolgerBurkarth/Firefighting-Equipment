@@ -931,6 +931,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Erfolg als `success-notice`. Browser-Tests `tests/e2e/users.spec.ts` (zustandsbehafteter Server je
   Test über `delegate`; `GET roles` = `assignableRolesJson` in `tests/e2e/support/admin.ts`, auch
   in `adminOverview`); Unit-Tests `users.spec.ts`, `assignableRoles.spec.ts`, `router.spec.ts`.
+  Claude-Zugang im Fenster „Bearbeiten“ siehe "Claude-Zugang (MCP, im Aufbau)", Schritt M2.
 - Einladungscodes (KONZEPT.md Entscheidung 30; API siehe "Einladung, Registrierung und
   E-Mail-Bestätigung"; Rolle seit Schritt 1.6b: im Fenster „Rolle nach der Freischaltung“ als
   Radioknöpfe ohne *Admin* (`codeRoles`, vorgewählt *Benutzer*, `defaultRole`; Hinweis aus dem
@@ -2308,6 +2309,24 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`TenantUserClaudeHandler`); `UserJson` mit `claude_access`, `claude_access_label`,
   `claude_connections {count, last_used_at}`. Tests `tests/Integration/Claude/ClaudeAccessTest.php`.
   Migration `0047` (Bremse `oauth_register`) kommt erst mit ihrer Nutzung in M3.
+- Schritt M2 (Frontend, Runde 4): `ClaudeAccess`, `CLAUDE_ACCESS_VALUES`, `CLAUDE_ACCESS_LABELS` (per
+  Test gleich `ClaudeAccess.php`) und `claudeConnections` in `AdminUser` (`src/api/users.ts`, fehlt das
+  Feld: „aus“, keine Verbindung), `setUserClaudeAccess`/`endUserClaudeConnections` bzw. unter
+  `service` `setTenantUserClaudeAccess`/`endTenantUserClaudeConnections` (`src/api/tenants.ts`),
+  `claudeAvailable` in `TenantInfo` und `ManagedTenant` (fehlt = nein). Datenschicht `setClaudeAccess`,
+  `endClaudeConnections` (`src/data/index.ts`, danach wie jede Änderung an Konten) bzw.
+  `setClaudeAccessOfAdmin`, `endClaudeConnectionsOf` (`src/data/service.ts`); Texte `claudeChip`
+  („Claude: Lesen“/„Claude: Ändern“), `claudeConnectionText` („verbunden · zuletzt genutzt vor 5
+  Min.“, „2 Verbindungen · …“) und `claudeAccessBlocker` (eigenes Konto, Admins, nicht aktive) in
+  `src/data/users.ts`. Benutzerverwaltung: Chip und Verbindungen in der Spalte „Rolle“; im Fenster
+  „Bearbeiten“ die Radiogruppe „Claude-Zugang“ (nur mit `claudeAvailable` der Stadt und Kontoart
+  `admin` der Sitzung; gesperrt mit Hinweis aus `claudeAccessBlocker`; gesendet nach Name und Rolle,
+  nur geändert; zählt als ungespeicherte Eingabe) und abseits „Claude-Verbindungen trennen …“
+  (`ConfirmDialog`, nur mit Verbindungen). Stadtdetail des Super-Admins, Reiter „Admins und
+  Benutzer“: Chip und Verbindungen je Konto, „Claude-Zugang …“ (`FormDialog`) nur bei aktiven
+  Admins, „Claude-Verbindungen trennen …“ bei jedem Konto mit Verbindungen; beides nur mit
+  `claudeAvailable`. Tests `tests/unit/claudeAccess.spec.ts`, Browser `users.spec.ts` und
+  `superAdmin.spec.ts` (Beschreibung „Claude-Zugang“).
 - Vorklärung (Plan Abschnitt 1, bis M3): `McpProbeHandler` (`src/Api/V1/McpProbe/`, Schritte
   `McpProbeStep`) und `McpProbeTrace` (`src/Mcp/Probe/`), Routen in `Routes::tenant()`, alle
   öffentlich außer dem Protokoll: `POST mcp` (401 `not_authenticated` mit `WWW-Authenticate: Bearer

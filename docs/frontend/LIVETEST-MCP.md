@@ -4,6 +4,22 @@ Nur in der Test-Stadt `https://www.prodad.de/firefighting/test/`, nie in echten 
 [`../MCP-KONZEPT.md`](../MCP-KONZEPT.md), Plan: [`../PLAN-MCP.md`](../PLAN-MCP.md). Je Schritt wird
 ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holger).
 
+## Runde 4: Claude-Zugang setzen und trennen (M1, M2)
+
+Nach dem Deploy in der Test-Stadt (Agent im Browser, als Admin der Test-Stadt; Holger am iPhone
+und als Super-Admin):
+
+- ☐ Benutzerverwaltung → ein Konto ohne Admin → „Bearbeiten“: Abschnitt „Claude-Zugang“ mit
+  Aus/Lesen/Ändern; „Lesen“ speichern → grüne Meldung „Claude-Zugang von … : Lesen.“, Chip
+  „Claude: Lesen“ in der Spalte „Rolle“. Danach zurück auf „Aus“ (Chip weg).
+- ☐ Eigenes Konto und andere Admins: Auswahl gesperrt mit Hinweis („Den eigenen Claude-Zugang …“
+  bzw. „Für Admins setzt den Claude-Zugang der Super-Admin.“).
+- ☐ In Immendingen (nur ansehen, nichts ändern): kein Abschnitt „Claude-Zugang“, kein Chip.
+- ☐ Super-Admin, Stadtdetail „Test“, Reiter „Admins und Benutzer“: „Claude-Zugang …“ nur bei aktiven
+  Admins; setzen und wieder auf „Aus“. (Holger)
+- ☐ „Claude-Verbindungen trennen …“ erscheint erst mit einer Verbindung (ab M3/M4 möglich).
+- ☐ Am Handy: Chip in der Karte ohne waagerechten Überstand. (Holger)
+
 ## Vorklärung (Runde 3, 07.11.2026)
 
 Frage: Findet Claude die OAuth-Metadaten unter `/firefighting/test/` (Issuer

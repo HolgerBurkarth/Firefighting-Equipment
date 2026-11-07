@@ -14,6 +14,7 @@ const TENANT: TenantInfo = {
     name: 'Feuerwehr Test',
     accentColor: '#1d3557',
     logoUrls: null,
+    claudeAvailable: false,
 };
 
 const LOGO_URLS = {

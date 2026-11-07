@@ -253,6 +253,26 @@ export function serviceServer(): ServiceServer {
             return find(request) === undefined ? notFound : { status: 200, body: { users: list } };
         };
     }
+    // Claude-Zugang (docs/PLAN-MCP.md, Schritt M2) wie TenantUserClaudeHandler; welche Konten den
+    // Knopf haben, entscheidet die Seite.
+    const noConnections = { count: 0, last_used_at: null };
+    for (const [tenantId, list] of users) {
+        for (const user of list) {
+            const base = `api/v1/tenants/${String(tenantId)}/users/${String(user['id'])}`;
+            server.handlers[`POST ${base}/claude-access`] = (request) => {
+                const access = (request.body as { access: string }).access;
+                user['claude_access'] = access;
+                if (access === 'off') {
+                    user['claude_connections'] = noConnections;
+                }
+                return { status: 200, body: { user } };
+            };
+            server.handlers[`POST ${base}/claude-connections/end`] = () => {
+                user['claude_connections'] = noConnections;
+                return { status: 200, body: { user } };
+            };
+        }
+    }
     // Stadtdetail: lesen, umbenennen, sperren/entsperren, Admin einladen, erneut senden.
     const update = (request: MockRequest, change: Record<string, unknown>): MockResponse => {
         const tenant = find(request);
