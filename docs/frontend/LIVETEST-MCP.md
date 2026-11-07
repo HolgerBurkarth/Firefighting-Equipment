@@ -84,5 +84,10 @@ Auswertung (vom Agenten nach Holgers erstem Versuch, Protokoll `api/v1/mcp-probe
   `claude-verbinden?…` noch die App („Seite wird geladen …“); die App lädt dabei selbst die neue
   Version, danach erscheint dieselbe Adresse als JSON vom Server. Nach dem Update mit aktivem
   neuem Service Worker: `claude-verbinden?…` sofort `application/json` vom Server.
-- ☐ Wiederholung durch Holger nach dem Deploy: Der Browser erreicht `claude-verbinden` mit PKCE
-  S256, `resource` = MCP-Adresse, erlaubtem Rücksprung (`authorize`, alle sechs `checks` true).
+- ☑ Wiederholung durch Holger nach dem Deploy (07.11.2026, 08:15 UTC, claude.ai): Ablauf `mcp` 401
+  → `protected-resource` → `openid-configuration` → `register` (201, „Claude“) → `authorize`
+  innerhalb von 3 s. Der Browser zeigte das JSON der Vorklärung mit allen sechs `checks` `true`;
+  Claude sendete `response_type`, `client_id`, `redirect_uri`
+  (`https://claude.ai/api/mcp/auth_callback`), `code_challenge`, `code_challenge_method` `S256`,
+  `state`, `scope` `read write` und `resource` `https://www.prodad.de/firefighting/test/mcp`.
+  **Ergebnis O1: Claude findet die Metadaten unter `/firefighting/test/` ohne Änderung der Webroot.**
