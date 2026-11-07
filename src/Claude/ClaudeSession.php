@@ -19,8 +19,17 @@ final readonly class ClaudeSession
         public ClaudeConnection $connection,
         /** nie Off */
         public ClaudeAccess $access,
-        /** Rechte der Rolle (samt Datenfilter); die Werkzeuge schränken sie ab Schritt M5 auf den Zugang ein */
+        /** Rechte der Rolle (samt Datenfilter); wirksam sind effectivePermissions() */
         public Permissions $permissions,
     ) {
+    }
+
+    /**
+     * Rechte der Rolle ∩ Zugang, ohne Benutzer, Einstellungen und Log-Mails (Permissions::forClaude);
+     * damit prüfen die Werkzeuge jede Route (docs/PLAN-MCP.md, Abschnitt 6).
+     */
+    public function effectivePermissions(): Permissions
+    {
+        return $this->permissions->forClaude($this->access);
     }
 }

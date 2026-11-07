@@ -8,6 +8,21 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-07 – „Claude-Zugang: Lesewerkzeuge über die REST-Routen (Runde 6, M5)“
+
+- `POST mcp`: `tools/list` liefert jetzt die Lesewerkzeuge, die das Konto wirksam darf (Rolle ∩
+  Claude-Zugang, ohne `users`, `settings`, `mail.log`; `Permissions::forClaude`):
+  `get_overview`, `list_due`, `search_equipment`, `get_equipment`, `get_equipment_history`,
+  `list_locations`, `list_equipment_types`, `list_city_history`, `list_notices`, `get_notice`.
+  `tools/call` ruft über `ToolApi` die vorhandenen GET-Routen auf (derselbe Router, deren
+  `Requirement`, derselbe Datenfilter); Antwort `{content: [{type: text, text}], structuredContent,
+  isError}`, Fehler der Routen als `isError` mit `{error, message, details?}`. REST-Routen selbst
+  unverändert; neu nur `JsonResponse::data()` und `AuthSession::$claude`/`viaClaude()` (intern).
+- Grund: Schritt M5 (`docs/PLAN-MCP.md`).
+- Tests: `McpToolMatrixTest` (Admin, Benutzer, Datenfilter × Lesen/Ändern, Zugang aus, gesperrt),
+  `McpReadToolsTest`, `McpEndpointTest`, Unit `ToolRoutesTest`, `PermissionsForClaudeTest`.
+  `CLAUDE.md`: "Claude-Zugang (MCP, im Aufbau)", Schritt M5.
+
 ## 2026-11-07 – „Aufräumen: public/.htaccess wie vor Runde 5, auth-probe entfernt (Runde 5)“
 
 - Entfernt: die vorübergehende Prüf-Route `GET api/v1/auth-probe` (jetzt 404 `not_found`) und das Lesen von `REDIRECT_HTTP_AUTHORIZATION` (gehörte zur Rewrite-Regel).

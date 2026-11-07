@@ -76,6 +76,7 @@ use FirefightingEquipment\Api\V1\Users\UserAction;
 use FirefightingEquipment\Api\V1\Users\UserActionHandler;
 use FirefightingEquipment\Api\V1\Users\UserBulkRoleHandler;
 use FirefightingEquipment\Api\V1\Users\UserListHandler;
+use FirefightingEquipment\Mcp\Tool\ToolRegistry;
 use FirefightingEquipment\Offline\OfflineSettings;
 use FirefightingEquipment\Permission\Action;
 use FirefightingEquipment\Permission\Area;
@@ -167,7 +168,7 @@ final class Routes
             ->withFieldRule('location_id', Action::BookMove, 'devices')
             ->withFieldRule('status', Action::BookStatus, 'devices');
 
-        return self::auth(Router::forTenant(), $neutralDuration)
+        $router = self::auth(Router::forTenant(), $neutralDuration)
             ->add('GET', 'api/v1/health', Access::Public, new HealthHandler())
             ->add('GET', 'api/v1/tenant', Access::Public, new TenantHandler())
             ->add('POST', 'api/v1/tenant/appearance', $write(Area::Settings), new AccentColorHandler())
@@ -241,7 +242,6 @@ final class Routes
             ->add('GET', 'api/v1/auth/claude-connections', Access::Authenticated, new ClaudeConnectionsHandler())
             ->add('DELETE', 'api/v1/auth/claude-connections/{id}', Access::Authenticated, new ClaudeConnectionsHandler(delete: true))
             // Claude-Zugang (docs/PLAN-MCP.md): nur in Städten mit Claude-Zugang, sonst 404.
-            ->add('POST', 'mcp', Access::Claude, new McpHandler())
             ->add('GET', '.well-known/oauth-protected-resource', Access::Public, new OAuthMetadataHandler(OAuthMetadataDocument::ProtectedResource))
             ->add('GET', '.well-known/openid-configuration', Access::Public, new OAuthMetadataHandler(OAuthMetadataDocument::AuthorizationServer))
             ->add('GET', '.well-known/oauth-authorization-server', Access::Public, new OAuthMetadataHandler(OAuthMetadataDocument::AuthorizationServer))
@@ -251,6 +251,9 @@ final class Routes
             ->add('POST', 'oauth/revoke', Access::Public, new TokenHandler(revoke: true), bodyFormat: BodyFormat::Form)
             ->add('POST', 'api/v1/oauth/authorize/check', Access::Public, new AuthorizeHandler(checkOnly: true))
             ->add('POST', 'api/v1/oauth/authorize', Access::Public, new AuthorizeHandler(checkOnly: false));
+
+        // Die Werkzeuge rufen die Routen dieses Routers auf (gleiche Erfordernisse wie in der App).
+        return $router->add('POST', 'mcp', Access::Claude, new McpHandler($router, ToolRegistry::standard()));
     }
 
     /** Anmeldung, Sitzungen und Passwort; unter service und unter jeder Stadt gleich. */
