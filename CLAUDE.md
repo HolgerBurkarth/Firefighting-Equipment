@@ -1547,16 +1547,15 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Projektordner (`.htaccess`) und `config/` (`config/.htaccess`) sind per `.htaccess`
   gesperrt, `public/` ist freigegeben (`public/.htaccess`). Diese Dateien nur nach
   Rückfrage ändern; die Freigabe in `public/.htaccess` nie entfernen.
-- Einzige weitere Regeln in `public/.htaccess` (seit 07.11.2026, Freigabe Holger): `CGIPassAuth On`
-  (bei PHP als FastCGI gibt Apache `Authorization` nur damit weiter; braucht `AllowOverride
-  AuthConfig`) und in `<IfModule mod_rewrite.c>` `RewriteEngine On`, `RewriteCond
-  %{HTTP:Authorization} .` und `RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},
+- Einzige weitere Regel in `public/.htaccess` (seit 07.11.2026, Freigabe Holger; `CGIPassAuth On`
+  wirkte live nicht und ist wieder entfernt): in `<IfModule mod_rewrite.c>` `RewriteEngine On`,
+  `RewriteCond %{HTTP:Authorization} .` und `RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},
   E=FF_AUTH_SEEN:1]` (ohne Ersetzung, also keine Weiterleitung; `FF_AUTH_SEEN` vorübergehend für den
   Live-Test, nur der Wert 1, nie das Token). Grund: Apache gibt den Header `Authorization` an PHP als
   CGI (STRATO) weder als `HTTP_AUTHORIZATION` noch als `REDIRECT_HTTP_AUTHORIZATION` weiter, auch
-  nicht mit `SetEnvIf` oder `RewriteRule` allein (live 07.11.2026); Claude sendet das Zugriffstoken
+  nicht mit `SetEnvIf`, `RewriteRule` oder `CGIPassAuth` (live 07.11.2026); Claude sendet das Zugriffstoken
   als Bearer an `mcp` (`Request::fromServer`). Die Variable gilt nur für die Anfrage und wird nirgends
-  protokolliert. `PublicHtaccessTest` prüft Freigabe und genau diese Regeln.
+  protokolliert. `PublicHtaccessTest` prüft Freigabe und genau diese Regel.
   Liefert der Server nach einer Änderung an dieser Datei 500, sofort zurücknehmen und deployen.
 - Nur Dateien in `public/` sind von außen erreichbar; dort nichts Geheimes ablegen.
 
