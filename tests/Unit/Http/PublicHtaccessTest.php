@@ -50,16 +50,12 @@ final class PublicHtaccessTest extends TestCase
         ], $directives);
     }
 
-    public function testLineEndingsAreLf(): void
-    {
-        self::assertStringNotContainsString("\r", $this->content());
-    }
-
+    /** Zeilenenden wie im Arbeitsbaum (unter Windows CRLF), verglichen wird mit LF. */
     private function content(): string
     {
         $content = file_get_contents(self::FILE);
         self::assertIsString($content);
 
-        return $content;
+        return str_replace("\r\n", "\n", $content);
     }
 }
