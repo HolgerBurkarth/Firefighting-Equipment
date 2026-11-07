@@ -8,6 +8,25 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-07 – „MCP-Vorklärung: OAuth-Metadaten und Platzhalter unter /firefighting/test/ (Runde 3)“
+
+Vorklärung zum Claude-Zugang (`docs/PLAN-MCP.md`, Abschnitt 1). Nur in der Test-Stadt, in allen anderen
+Städten 404 `not_found`; wird mit Schritt M3 entfernt bzw. durch die echten Endpunkte ersetzt.
+
+- Neue öffentliche Routen unter `/firefighting/test/` (außerhalb von `api/v1`): `POST mcp` (401
+  `not_authenticated` mit `WWW-Authenticate: Bearer resource_metadata="…", scope="read write"`; `GET mcp`
+  405), `GET .well-known/oauth-protected-resource`, `GET .well-known/openid-configuration`, `GET
+  .well-known/oauth-authorization-server`, `GET .well-known/jwks.json`, `POST oauth/register` (201,
+  speichert nichts), `GET claude-verbinden` (JSON-Platzhalter). Dazu `GET api/v1/mcp-probe` (`settings`
+  Ändern): Protokoll der letzten 50 Abrufe dieser Routen.
+- Unbekannte Adressen unter `.well-known/` liefern 404 `not_found` statt der App-Seite.
+- Grund: Prüfen, ob Claude die OAuth-Metadaten unter `/firefighting/<stadt>/` findet, ohne die
+  `.htaccess` des Webspace zu ändern.
+
+Tests: `McpProbeTest`, `TenantRoutePermissionsTest` (neue Routen), `FrontendDeliveryTest`
+(`.well-known`). `CLAUDE.md` "Aufbau und URLs", "HTTP und REST-API" (Reihenfolge), "Frontend
+ausliefern", "Claude-Zugang (MCP, in Planung)".
+
 ## 2026-11-06 – „Konto wechseln: Liste der Konten in mehreren Städten (Runde 1, Aufgabe 2, Schritt 1.9)“
 
 Plan Phase 1, Schritt 1.9 (Konzept E14).

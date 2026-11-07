@@ -176,8 +176,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     Zugangsdaten stehen in `config/config.local.php` (nicht im Repository).
 - URL-Schema: `https://www.prodad.de/firefighting/<stadt>/`
   - REST-API: `/firefighting/<stadt>/api/v1/...`
-  - Web-App-Manifest: `/firefighting/<stadt>/manifest.webmanifest` (einzige Route außerhalb von
+  - Web-App-Manifest: `/firefighting/<stadt>/manifest.webmanifest` (Route außerhalb von
     `api/v1`, siehe "Erscheinungsbild (API)")
+  - Vorklärung zum Claude-Zugang (seit 07.11.2026, nur Test-Stadt): `mcp`, `.well-known/…`,
+    `oauth/register`, `claude-verbinden` außerhalb von `api/v1`, siehe "Claude-Zugang (MCP)"
   - Super-Admin: `/firefighting/service/`
   - Alle anderen GET-Adressen unter `/firefighting/<bereich>/` liefern das Frontend (App-Seite
     oder Datei aus dem Build, siehe "Frontend" und "Frontend ausliefern").
@@ -200,7 +202,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   abschließender `/` toleriert; leere Segmente, fehlendes Präfix oder ein Bereich außerhalb
   `[a-z0-9-]+` → 404. Der Pfad wird nicht URL-dekodiert.
 - Reihenfolge in `Application::handle` (nicht ändern): Adresse zerlegen → Route suchen
-  (404/405; keine Route, Methode `GET` und Pfad nicht `api` bzw. `api/…` → Frontend, ohne Datenbank
+  (404/405; keine Route, Methode `GET` und Pfad nicht `api`, `api/…`, `.well-known` bzw. `.well-known/…` → Frontend, ohne Datenbank
   und Sitzung, siehe "Frontend ausliefern") → ändernde Anfrage prüfen (`RequestGuard`, ohne Datenbank; 415/403/400) → Version
   der App prüfen (`X-Client-Api` unter `ClientApi::MIN` → 409 `client_outdated`, ohne Datenbank) → erst dann
   die Stadt laden → Sitzung und Zugriffsstufe prüfen (nur bei nicht öffentlichen Routen; 401/403)
@@ -372,7 +374,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Routern) bleiben unbekannte Pfade 404. `.htaccess` und `public/index.php` brauchen dafür nichts:
   Die Regel in `htdocs/.htaccess` schickt schon alles unter `/firefighting/<bereich>/` an PHP.
 - Fallback nur, wenn der Router 404 `not_found` meldet, die Methode genau `GET` ist und der Pfad nicht
-  `api` oder `api/…` ist (`FrontendHandler::handles`). Alle anderen Methoden (auch `HEAD`), API-Pfade
+  `api` oder `api/…` ist und nicht `.well-known` oder `.well-known/…` (`FrontendHandler::handles`,
+  `NOT_FRONTEND`; RFC 8615, seit 07.11.2026: Claude sucht dort OAuth-Metadaten, HTML wäre falsch). Alle anderen Methoden (auch `HEAD`), API-Pfade
   und vorhandene Routen (405) verhalten sich wie vorher (per Test, `FrontendDeliveryTest`). Keine
   Datenbank, keine Sitzung, kein Cookie: Ob die Stadt existiert, fragt die App über `api/v1/tenant`;
   ein ungültiges Kürzel (`TenantSlug`, ohne Datenbank) → 404.
@@ -2274,6 +2277,29 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`fe_role_locations`) der Rollen der Stadt (sonst verhinderte der Fremdschlüssel das Löschen); die
   Rollen behalten `filter_locations = 1` und sehen danach nichts, bis neu ausgewählt wird (siehe
   "Gerätedaten zurücksetzen").
+
+## Claude-Zugang (MCP, in Planung)
+- Konzept `docs/MCP-KONZEPT.md`, Plan `docs/PLAN-MCP.md` (Runde 3, 07.11.2026, noch nicht
+  freigegeben; gebaut wird ab Runde 4), Live-Tests `docs/frontend/LIVETEST-MCP.md`.
+- Bisher nur die Vorklärung (Plan Abschnitt 1): `McpProbeHandler` (`src/Api/V1/McpProbe/`, Schritte
+  `McpProbeStep`) und `McpProbeTrace` (`src/Mcp/Probe/`), Routen in `Routes::tenant()`, alle
+  öffentlich außer dem Protokoll: `POST mcp` (401 `not_authenticated` mit `WWW-Authenticate: Bearer
+  resource_metadata="…/.well-known/oauth-protected-resource", scope="read write"`; `GET mcp` 405),
+  `GET .well-known/oauth-protected-resource` (RFC 9728), `GET .well-known/openid-configuration` und
+  `GET .well-known/oauth-authorization-server` (gleiche Metadaten, Issuer
+  `<base_url>/firefighting/<kürzel>` ohne `/`), `GET .well-known/jwks.json` (`{"keys":[]}`), `POST
+  oauth/register` (201 mit `probe-…`, speichert nichts), `GET claude-verbinden` (JSON-Platzhalter der
+  Anmeldeseite mit Prüfungen), `GET api/v1/mcp-probe` (`settings` Ändern, Protokoll). Nur in der
+  Test-Stadt (`McpProbeHandler::SLUG` = `TestCityData::SLUG`, fest im Code), sonst 404 `not_found` ohne
+  Eintrag. Antworten als `JsonResponse` (`no-store`). Rücksprung-Adressen
+  (`isAllowedRedirectUri`): genau `https://claude.ai/api/mcp/auth_callback` und
+  `https://claude.com/api/mcp/auth_callback`, Loopback `http://localhost[:port]/callback` bzw.
+  `http://127.0.0.1[:port]/callback`.
+- Protokoll: `var/mcp-probe/<kürzel>.json` (in `.gitignore`), höchstens 50 Einträge `{at, step,
+  details}`, nur druckbares ASCII bis 200 Zeichen je Wert (`McpProbeTrace::clean`), nie Body, IP,
+  `state`, `code_challenge` oder User-Agent des Browsers; Fehler beim Schreiben nur als
+  `mcp_probe_trace_failed` im Protokoll. Tests `tests/Integration/McpProbe/McpProbeTest.php`. Wird mit
+  Schritt M3 entfernt bzw. ersetzt.
 
 ## Städte verwalten und Admins einladen
 - Nur Super-Admins, nur unter `service` (`Access::SuperAdmin`; Konten einer Stadt haben dort keine

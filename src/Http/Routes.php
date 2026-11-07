@@ -46,6 +46,8 @@ use FirefightingEquipment\Api\V1\Invitation\InvitationCodeRevokeHandler;
 use FirefightingEquipment\Api\V1\Locations\LocationAction;
 use FirefightingEquipment\Api\V1\Locations\LocationActionHandler;
 use FirefightingEquipment\Api\V1\Locations\LocationListHandler;
+use FirefightingEquipment\Api\V1\McpProbe\McpProbeHandler;
+use FirefightingEquipment\Api\V1\McpProbe\McpProbeStep;
 use FirefightingEquipment\Api\V1\Notices\NoticeAction;
 use FirefightingEquipment\Api\V1\Notices\NoticeActionHandler;
 use FirefightingEquipment\Api\V1\Notices\NoticeListHandler;
@@ -68,6 +70,7 @@ use FirefightingEquipment\Api\V1\Users\UserAction;
 use FirefightingEquipment\Api\V1\Users\UserActionHandler;
 use FirefightingEquipment\Api\V1\Users\UserBulkRoleHandler;
 use FirefightingEquipment\Api\V1\Users\UserListHandler;
+use FirefightingEquipment\Mcp\Probe\McpProbeTrace;
 use FirefightingEquipment\Offline\OfflineSettings;
 use FirefightingEquipment\Permission\Action;
 use FirefightingEquipment\Permission\Area;
@@ -130,11 +133,15 @@ final class Routes
      *                                              (null = Systemzeit, andere nur für Tests)
      * @param OfflineSettings|null $offline         Zeitlimits der Offline-Buchungen (null =
      *                                              Standardwerte; Anwendung: aus der Konfiguration)
+     * @param McpProbeTrace|null   $probeTrace      Protokoll der Vorklärung zum Claude-Zugang
+     *                                              (null = var/mcp-probe, andere nur für Tests)
      */
-    public static function tenant(?MinimumDuration $neutralDuration = null, ?Clock $clock = null, ?OfflineSettings $offline = null): Router
+    public static function tenant(?MinimumDuration $neutralDuration = null, ?Clock $clock = null, ?OfflineSettings $offline = null, ?McpProbeTrace $probeTrace = null): Router
     {
         $clock ??= new SystemClock();
         $offline ??= new OfflineSettings();
+        $probeTrace ??= McpProbeTrace::inProject();
+        $probe = static fn (McpProbeStep $step): McpProbeHandler => new McpProbeHandler($step, $probeTrace, $clock);
 
         $read = static fn (Area $area): Requirement => Requirement::area($area, AreaLevel::Read);
         $write = static fn (Area $area): Requirement => Requirement::area($area, AreaLevel::Write);
@@ -223,7 +230,16 @@ final class Routes
             ->add('GET', 'api/v1/notices', $read(Area::Log), new NoticeListHandler())
             ->add('GET', 'api/v1/notices/{id}', $read(Area::Log), new NoticeActionHandler(NoticeAction::Show))
             ->add('POST', 'api/v1/notices/{id}/resolve', $write(Area::Log), new NoticeActionHandler(NoticeAction::Resolve))
-            ->add('POST', 'api/v1/notices/{id}/reopen', $write(Area::Log), new NoticeActionHandler(NoticeAction::Reopen));
+            ->add('POST', 'api/v1/notices/{id}/reopen', $write(Area::Log), new NoticeActionHandler(NoticeAction::Reopen))
+            // Vorklärung zum Claude-Zugang (docs/PLAN-MCP.md, Runde 3): nur in der Test-Stadt, sonst 404.
+            ->add('POST', 'mcp', Access::Public, $probe(McpProbeStep::Mcp))
+            ->add('GET', '.well-known/oauth-protected-resource', Access::Public, $probe(McpProbeStep::ProtectedResource))
+            ->add('GET', '.well-known/openid-configuration', Access::Public, $probe(McpProbeStep::OpenIdConfiguration))
+            ->add('GET', '.well-known/oauth-authorization-server', Access::Public, $probe(McpProbeStep::OAuthAuthorizationServer))
+            ->add('GET', '.well-known/jwks.json', Access::Public, $probe(McpProbeStep::Jwks))
+            ->add('POST', 'oauth/register', Access::Public, $probe(McpProbeStep::Register))
+            ->add('GET', 'claude-verbinden', Access::Public, $probe(McpProbeStep::Authorize))
+            ->add('GET', 'api/v1/mcp-probe', $write(Area::Settings), $probe(McpProbeStep::Trace));
     }
 
     /** Anmeldung, Sitzungen und Passwort; unter service und unter jeder Stadt gleich. */
