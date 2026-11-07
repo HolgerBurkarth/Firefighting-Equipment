@@ -8,8 +8,9 @@ use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
 /**
- * public/.htaccess: die Freigabe bleibt, dazu genau die Regel, die Authorization an PHP weitergibt
- * (STRATO, PHP als CGI). Weitere Regeln nur nach Rückfrage (CLAUDE.md "Server und .htaccess").
+ * public/.htaccess: die Freigabe bleibt, dazu genau CGIPassAuth und die Regel, die Authorization an
+ * PHP weitergibt (STRATO, PHP als FastCGI); FF_AUTH_SEEN nur mit dem festen Wert 1. Weitere Regeln
+ * nur nach Rückfrage (CLAUDE.md "Server und .htaccess").
  */
 #[CoversNothing]
 final class PublicHtaccessTest extends TestCase
@@ -19,10 +20,12 @@ final class PublicHtaccessTest extends TestCase
     private const string GRANT = "<IfModule mod_authz_core.c>\n    Require all granted\n</IfModule>\n"
         . "<IfModule !mod_authz_core.c>\n    Order allow,deny\n    Allow from all\n</IfModule>\n";
 
-    private const string AUTHORIZATION = "<IfModule mod_rewrite.c>\n"
+    private const string AUTHORIZATION = "CGIPassAuth On\n";
+
+    private const string REWRITE = "<IfModule mod_rewrite.c>\n"
         . "    RewriteEngine On\n"
         . "    RewriteCond %{HTTP:Authorization} .\n"
-        . "    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\n"
+        . "    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},E=FF_AUTH_SEEN:1]\n"
         . "</IfModule>\n";
 
     public function testGrantIsKept(): void
@@ -38,6 +41,7 @@ final class PublicHtaccessTest extends TestCase
         ));
 
         self::assertStringContainsString(self::AUTHORIZATION, $this->content());
+        self::assertStringContainsString(self::REWRITE, $this->content());
         self::assertSame([
             '<IfModule mod_authz_core.c>',
             'Require all granted',
@@ -46,10 +50,11 @@ final class PublicHtaccessTest extends TestCase
             'Order allow,deny',
             'Allow from all',
             '</IfModule>',
+            'CGIPassAuth On',
             '<IfModule mod_rewrite.c>',
             'RewriteEngine On',
             'RewriteCond %{HTTP:Authorization} .',
-            'RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]',
+            'RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},E=FF_AUTH_SEEN:1]',
             '</IfModule>',
         ], $directives);
     }
