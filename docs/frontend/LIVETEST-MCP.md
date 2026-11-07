@@ -10,9 +10,33 @@ Frage: Findet Claude die OAuth-Metadaten unter `/firefighting/test/` (Issuer
 `https://www.prodad.de/firefighting/test`, Dokument unter
 `…/firefighting/test/.well-known/openid-configuration`), ohne die `.htaccess` des Webspace?
 
-### Vom Agenten geprüft (curl gegen den Server)
+### Vom Agenten geprüft (07.11.2026, Build `9a26dd0b30f4`, curl gegen den Server)
 
-Ergebnisse nach dem Deploy unten eingetragen.
+- ☑ Deploy endet mit „Deployment erfolgreich“, `build.json` = `9a26dd0b30f4`, `health` =
+  `{"status":"ok","database":"ok"}`.
+- ☑ Das Routing für `.well-known` unter `/firefighting/test/` funktioniert auf STRATO ohne Änderung
+  der Webroot: `GET .well-known/oauth-protected-resource`, `.well-known/openid-configuration`,
+  `.well-known/oauth-authorization-server` und `.well-known/jwks.json` liefern 200
+  `application/json; charset=utf-8` mit den erwarteten Inhalten (`resource` =
+  `https://www.prodad.de/firefighting/test/mcp`, Issuer `https://www.prodad.de/firefighting/test`,
+  `code_challenge_methods_supported` `["S256"]`).
+- ☑ `POST mcp` → 401 mit `WWW-Authenticate: Bearer
+  resource_metadata="https://www.prodad.de/firefighting/test/.well-known/oauth-protected-resource",
+  scope="read write"`; `GET mcp` → 405.
+- ☑ `POST oauth/register` → 201 mit `probe-…`; `GET claude-verbinden?…` → JSON mit allen `checks`
+  `true` (mit einer nachgebauten Anfrage).
+- ☑ Nur Test-Stadt: `immendingen/.well-known/openid-configuration` und `POST immendingen/mcp` → 404;
+  unter `service` 404; unbekannte `.well-known/…` (z. B. `change-password`) → 404 JSON statt App-Seite.
+- ☑ Webroot unberührt: `https://www.prodad.de/.well-known/oauth-authorization-server/firefighting/test`,
+  `…/openid-configuration/firefighting/test` und `…/oauth-protected-resource/firefighting/test/mcp`
+  liefern die 404-Seite der Hauptseite (Varianten 1 und 2 der Spezifikation schlagen also fehl,
+  Claude muss Variante 3 nehmen).
+- ☑ Sperren der internen Ordner unverändert: `apps/firefighting-equipment/config/…`, `composer.json`,
+  `.git/config` und `apps/_backup/` → 302 (Sperre der `.htaccess`), `…/var/mcp-probe/test.json` → 403.
+  (`/firefighting/test/.git/config` liefert wie bisher die App-Seite, keine Datei.)
+- ☑ `GET api/v1/mcp-probe` ohne Anmeldung 401; im Browser als Admin der Test-Stadt 200 mit den
+  Abrufen von eben (User-Agent `curl/…` bzw. `agent-probe-curl` = Abrufe des Agenten).
+- ☐ Ob **Claude selbst** die Variante findet, kann nur der Versuch von Holger zeigen (unten).
 
 ### Für Holger: Konnektor in claude.ai hinzufügen
 
