@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Api\V1\Users;
 
+use FirefightingEquipment\Claude\ClaudeAccess;
 use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\RequestContext;
@@ -33,6 +34,9 @@ use FirefightingEquipment\User\UserRuleViolationException;
  * Schutzregeln F5 in UserAdministration): 409 rule_violation. Ungültige Felder: 400. Freischalten
  * schickt „Ihr Konto wurde freigeschaltet“, Ablehnen „Ihre Registrierung wurde nicht freigegeben“
  * (an die Adresse, die vor dem Anonymisieren gespeichert war).
+ *
+ * Claude-Zugang (claude-access, claude-connections/end; F12 in UserAdministration): nur in der
+ * Test-Stadt, nur die Rolle Admin, nur für Konten ohne Admin, nie am eigenen Konto; sonst 409.
  */
 final readonly class UserActionHandler implements RequestHandler
 {
@@ -59,6 +63,8 @@ final readonly class UserActionHandler implements RequestHandler
                 UserAction::ChangeRole => $admin->assignRole($id, self::roleId($context, $roles, $tenant))[0],
                 UserAction::ChangeDisplayName => $admin->changeDisplayName($id, self::displayName($context)),
                 UserAction::Delete => $admin->delete($id),
+                UserAction::SetClaudeAccess => $admin->setClaudeAccess($id, self::claudeAccess($context)),
+                UserAction::EndClaudeConnections => $admin->endClaudeConnections($id),
             };
         } catch (UserNotFoundException) {
             throw HttpException::notFound();
@@ -119,6 +125,17 @@ final readonly class UserActionHandler implements RequestHandler
         };
 
         return ($roles->findSystemRole($tenant, $systemRole) ?? throw new \LogicException('Standard-Rolle fehlt.'))->id;
+    }
+
+    /**
+     * Feld access: off, read oder write (auch für den Super-Admin, TenantActionHandler).
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public static function claudeAccess(RequestContext $context): ClaudeAccess
+    {
+        return ClaudeAccess::tryFrom($context->stringField('access'))
+            ?? throw HttpException::invalidRequest('Das Feld "access" muss "off", "read" oder "write" sein.');
     }
 
     /**

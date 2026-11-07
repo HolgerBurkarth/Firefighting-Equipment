@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\User;
 
+use FirefightingEquipment\Claude\ClaudeAccess;
+use FirefightingEquipment\Claude\ClaudeAvailability;
 use FirefightingEquipment\Permission\Permissions;
 use FirefightingEquipment\Role\Role;
 use FirefightingEquipment\Role\RoleNotFoundException;
@@ -22,6 +24,9 @@ use FirefightingEquipment\Tenant\Tenant;
  *   Anzeigenamen. Wer eine Rolle zuweist oder freischaltet, braucht alle ihre Rechte
  *   (Permissions::covers); wer eine Rolle ändert, auch alle Rechte der bisherigen (sonst ließe sich
  *   jemandem mit mehr Rechten die Rolle nehmen, wie bei Admin).
+ * - Claude-Zugang (F12, docs/MCP-KONZEPT.md, Abschnitt 2): nur in der Test-Stadt
+ *   (ClaudeAvailability), nur ein Konto mit der Rolle Admin, nur für Konten ohne Admin (deren Zugang
+ *   setzt der Super-Admin), nie am eigenen Konto.
  */
 final readonly class UserAdministration
 {
@@ -180,6 +185,62 @@ final readonly class UserAdministration
         $this->users->anonymize($user->id, $this->assertMayManage(...));
 
         return $this->find($id);
+    }
+
+    /**
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException
+     */
+    public function setClaudeAccess(int $id, ClaudeAccess $access): User
+    {
+        $this->assertClaudeAvailable();
+        $user = $this->find($id);
+        if ($user->id === $this->actor->id) {
+            throw UserRuleViolationException::selfClaudeAccess();
+        }
+        $this->users->setClaudeAccess($user->id, $access, $this->assertMayManageClaude(...));
+
+        return $this->find($id);
+    }
+
+    /**
+     * „Claude-Verbindungen trennen“ (wiederholbar).
+     *
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException
+     */
+    public function endClaudeConnections(int $id): User
+    {
+        $this->assertClaudeAvailable();
+        $user = $this->find($id);
+        $this->users->endClaudeConnections($user->id, $this->assertMayManageClaude(...));
+
+        return $this->find($id);
+    }
+
+    /**
+     * @throws UserRuleViolationException
+     */
+    private function assertClaudeAvailable(): void
+    {
+        if (!ClaudeAvailability::for($this->tenant)) {
+            throw UserRuleViolationException::claudeUnavailable();
+        }
+    }
+
+    /**
+     * F12: nur die Rolle Admin (alle Rechte), nur für Konten ohne Admin.
+     *
+     * @throws UserRuleViolationException
+     */
+    private function assertMayManageClaude(User $user): void
+    {
+        if (!$this->actorPermissions->isAll()) {
+            throw UserRuleViolationException::claudeAccessOnlyByAdmins();
+        }
+        if ($user->role === UserRole::Admin) {
+            throw UserRuleViolationException::claudeAccessOfAdminBySuperAdmin();
+        }
     }
 
     /**

@@ -1,6 +1,12 @@
 import { apiRequest, isRecord, type ApiResult } from './client';
 import { isCount, isId, isUtcTime } from './devices';
-import { parseAdminUser, parseUserList, type AccountStatus, type AdminUser } from './users';
+import {
+    parseAdminUser,
+    parseUserList,
+    type AccountStatus,
+    type AdminUser,
+    type ClaudeAccess,
+} from './users';
 
 /** Stadt in der Verwaltung des Super-Admins (TenantJson::tenant). */
 export interface ManagedTenant {
@@ -8,6 +14,8 @@ export interface ManagedTenant {
     readonly slug: string;
     readonly name: string;
     readonly active: boolean;
+    /** Claude-Zugang verfügbar (bisher nur die Test-Stadt); fehlt das Feld, nein. */
+    readonly claudeAvailable: boolean;
     readonly createdAt: string;
     readonly updatedAt: string;
     /** Aktive, nicht gesperrte Konten (alle Rollen). */
@@ -27,7 +35,9 @@ export function parseManagedTenant(json: unknown): ManagedTenant | null {
     const usersActive = counts['users_active'];
     const adminsActive = counts['admins_active'];
     const adminsInvited = counts['admins_invited'];
+    const claudeAvailable = json['claude_available'] ?? false;
     if (
+        typeof claudeAvailable !== 'boolean' ||
         !isId(id) ||
         typeof slug !== 'string' ||
         typeof name !== 'string' ||
@@ -45,6 +55,7 @@ export function parseManagedTenant(json: unknown): ManagedTenant | null {
         slug,
         name,
         active,
+        claudeAvailable,
         createdAt,
         updatedAt,
         usersActive,
@@ -217,6 +228,37 @@ export function resendInvitation(
     return apiRequest(
         `tenants/${String(tenantId)}/users/${String(userId)}/resend-invitation`,
         parseInvitationResult,
+        { method: 'POST', ...(fetchFn && { fetchFn }) },
+    );
+}
+
+function parseUserResponse(json: unknown): AdminUser | null {
+    return isRecord(json) ? parseAdminUser(json['user']) : null;
+}
+
+/** POST tenants/{id}/users/{user}/claude-access {access}: nur Konten mit der Rolle Admin. */
+export function setTenantUserClaudeAccess(
+    tenantId: number,
+    userId: number,
+    access: ClaudeAccess,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<AdminUser>> {
+    return apiRequest(
+        `tenants/${String(tenantId)}/users/${String(userId)}/claude-access`,
+        parseUserResponse,
+        { method: 'POST', body: { access }, ...(fetchFn && { fetchFn }) },
+    );
+}
+
+/** POST tenants/{id}/users/{user}/claude-connections/end: jedes Konto der Stadt. */
+export function endTenantUserClaudeConnections(
+    tenantId: number,
+    userId: number,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<AdminUser>> {
+    return apiRequest(
+        `tenants/${String(tenantId)}/users/${String(userId)}/claude-connections/end`,
+        parseUserResponse,
         { method: 'POST', ...(fetchFn && { fetchFn }) },
     );
 }

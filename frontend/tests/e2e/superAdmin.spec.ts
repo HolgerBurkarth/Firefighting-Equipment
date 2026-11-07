@@ -579,6 +579,74 @@ test.describe('Stadtdetail', () => {
         });
     });
 
+    test.describe('Claude-Zugang', () => {
+        test.beforeEach(() => {
+            const test = server.tenants.find((tenant) => tenant['id'] === 2);
+            Object.assign(test ?? {}, { claude_available: true });
+            const [thomas, anna, max] = server.users.get(2) ?? [];
+            Object.assign(anna ?? {}, {
+                claude_access: 'read',
+                claude_connections: { count: 1, last_used_at: '2026-11-01T08:00:00Z' },
+            });
+            Object.assign(max ?? {}, {
+                claude_connections: { count: 1, last_used_at: '2026-11-01T08:00:00Z' },
+            });
+            expect(thomas).toBeDefined();
+        });
+
+        test('nur für aktive Admins setzbar, Verbindungen jedes Kontos trennbar', async ({
+            page,
+            apiRequests,
+        }) => {
+            await page.setViewportSize({ width: 1280, height: 800 });
+            await page.goto('/firefighting/service/staedte/2?ansicht=konten');
+            await expect(page.getByTestId('claude-chip-22')).toHaveText('Claude: Lesen');
+            await expect(page.getByTestId('account-22')).toContainText(
+                'verbunden · zuletzt genutzt',
+            );
+            // Max ist kein Admin (wartet): kein „Claude-Zugang …“, aber „trennen“.
+            const max = page.getByTestId('account-23');
+            await expect(max.getByRole('button', { name: /Claude-Zugang/ })).toHaveCount(0);
+            await expect(
+                max.getByRole('button', { name: 'Claude-Verbindungen von Max Neu trennen …' }),
+            ).toBeVisible();
+
+            await page.getByRole('button', { name: 'Claude-Zugang von Thomas Keller …' }).click();
+            const dialog = page.getByRole('dialog', { name: 'Claude-Zugang von Thomas Keller' });
+            await expect(dialog.getByRole('radio', { name: 'Claude-Zugang: Aus' })).toBeChecked();
+            await dialog.getByRole('radio', { name: 'Claude-Zugang: Ändern' }).check();
+            await dialog.getByRole('button', { name: 'Speichern' }).click();
+            await expect(page.getByTestId('success-notice')).toHaveText(
+                'Claude-Zugang von Thomas Keller: Ändern.',
+            );
+            await expect(page.getByTestId('claude-chip-21')).toHaveText('Claude: Ändern');
+
+            await page
+                .getByRole('button', { name: 'Claude-Verbindungen von Anna Berg trennen …' })
+                .click();
+            await page
+                .getByRole('alertdialog', { name: 'Claude-Verbindungen von Anna Berg trennen?' })
+                .getByRole('button', { name: 'Trennen' })
+                .click();
+            await expect(page.getByTestId('success-notice')).toHaveText(
+                'Die Claude-Verbindungen von Anna Berg sind getrennt.',
+            );
+            await expect(page.getByTestId('account-22')).not.toContainText('verbunden');
+
+            const posts = apiRequests.filter((r) => r.method === 'POST');
+            expect(posts.map((r) => [r.path, r.body])).toEqual([
+                ['api/v1/tenants/2/users/21/claude-access', { access: 'write' }],
+                ['api/v1/tenants/2/users/22/claude-connections/end', {}],
+            ]);
+        });
+    });
+
+    test('ohne Claude-Zugang der Stadt keine Knöpfe', async ({ page }) => {
+        await page.goto('/firefighting/service/staedte/2?ansicht=konten');
+        await expect(page.getByTestId('account-21')).toBeVisible();
+        await expect(page.getByRole('button', { name: /Claude/ })).toHaveCount(0);
+    });
+
     test('offene Einladung im Detail erneut senden', async ({ page, apiRequests }) => {
         await page.goto('/firefighting/service/staedte/3?ansicht=konten');
         await page

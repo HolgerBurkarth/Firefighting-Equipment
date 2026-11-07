@@ -51,12 +51,15 @@ import {
     changeUserDisplayName,
     changeUserRole,
     deleteUser as postDelete,
+    endUserClaudeConnections,
     rejectUser as postReject,
+    setUserClaudeAccess,
     setUserLocked as postLocked,
     postBulkRole,
     BULK_ROLE_MAX_USERS,
     type AdminUser,
     type BulkRoleResult,
+    type ClaudeAccess,
 } from '../api/users';
 import {
     currentPermissions,
@@ -445,6 +448,19 @@ export async function bulkAssignRole(
     refreshRoleCounts();
     await userStore.refresh('changed');
     return run ?? { results, error: null, unsent: [] };
+}
+
+/** Claude-Zugang setzen (F12: nur die Rolle Admin, nur Konten ohne Admin); „aus“ trennt alle Verbindungen. */
+export async function setClaudeAccess(
+    id: number,
+    access: ClaudeAccess,
+): Promise<ApiResult<AdminUser>> {
+    return afterUserChange(await setUserClaudeAccess(id, access));
+}
+
+/** Alle Claude-Verbindungen eines Kontos trennen (der Zugang bleibt). */
+export async function endClaudeConnections(id: number): Promise<ApiResult<AdminUser>> {
+    return afterUserChange(await endUserClaudeConnections(id));
 }
 
 /** Löschen = anonymisieren. */

@@ -2,18 +2,21 @@ import { shallowRef } from 'vue';
 import type { ApiError, ApiResult } from '../api/client';
 import {
     createTenant as postTenant,
+    endTenantUserClaudeConnections,
     fetchSuperAdmins,
     fetchTenants,
     inviteAdmin as postInviteAdmin,
     renameTenant as postRenameTenant,
     resendInvitation as postResendInvitation,
     setSuperAdminLocked as postSuperAdminLocked,
+    setTenantUserClaudeAccess,
     setTenantLocked as postTenantLocked,
     type CreatedTenant,
     type InvitationResult,
     type ManagedTenant,
     type SuperAdmin,
 } from '../api/tenants';
+import type { AdminUser, ClaudeAccess } from '../api/users';
 import {
     deleteRole,
     fetchPermissionCatalog,
@@ -151,6 +154,26 @@ export async function resendInvitation(
     userId: number,
 ): Promise<ApiResult<InvitationResult>> {
     return afterTenantChange(await postResendInvitation(tenantId, userId));
+}
+
+/**
+ * Claude-Zugang eines Kontos mit der Rolle Admin (F12); die Konten lädt das Stadtdetail danach selbst
+ * neu (die Liste der Städte ändert sich nicht).
+ */
+export function setClaudeAccessOfAdmin(
+    tenantId: number,
+    userId: number,
+    access: ClaudeAccess,
+): Promise<ApiResult<AdminUser>> {
+    return setTenantUserClaudeAccess(tenantId, userId, access);
+}
+
+/** Claude-Verbindungen eines Kontos der Stadt trennen. */
+export function endClaudeConnectionsOf(
+    tenantId: number,
+    userId: number,
+): Promise<ApiResult<AdminUser>> {
+    return endTenantUserClaudeConnections(tenantId, userId);
 }
 
 // Rollen einer Stadt (Plan Phase 1, Schritt 1.5): keine Liste im Speicher, die Seiten laden selbst.

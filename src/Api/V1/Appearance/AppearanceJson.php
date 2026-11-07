@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Api\V1\Appearance;
 
+use FirefightingEquipment\Claude\ClaudeAvailability;
 use FirefightingEquipment\Http\AppPath;
 use FirefightingEquipment\Tenant\Logo\DefaultAppIcon;
 use FirefightingEquipment\Tenant\Logo\LogoSize;
@@ -37,6 +38,8 @@ final class AppearanceJson
             'accent_color_is_default' => $appearance->accentColor === null,
             'logo_url' => $logoUrls === null ? null : $logoUrls[(string) LogoSize::Large->value],
             'logo_urls' => $logoUrls,
+            // Claude-Zugang verfügbar (bisher nur die Test-Stadt, ClaudeAvailability).
+            'claude_available' => ClaudeAvailability::for($tenant),
         ];
     }
 

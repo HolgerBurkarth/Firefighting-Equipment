@@ -1,7 +1,13 @@
 # Plan: Zugang über Claude (MCP-Konnektor)
 
-Stand: 07.11.2026 (Runde 3, Entwurf zur Freigabe; gebaut wird ab Runde 4 nach Freigabe durch
-Holger). Anforderungen: [`MCP-KONZEPT.md`](MCP-KONZEPT.md). Grundlage: Änderungskonzept E13, Plan
+Stand: 07.11.2026 (Runde 3; freigegeben von Holger am 07.11.2026 samt O2–O14 und der Aufteilung
+in Runden; O1 gelöst: Claude findet die Metadaten, siehe Abschnitt 1).
+
+Abweichungen beim Bau: Die Spalte der Registrierung heißt in `fe_oauth_codes` und
+`fe_claude_connections` `oauth_client_id` (nicht `client_ref`, das in `CLAUDE.md` schon die Kennung
+einer Buchung ist). Migration `0047` kommt mit ihrer Nutzung in M3 (statt M1). Bis T17 gibt es den
+Zugang nur in der Test-Stadt (`ClaudeAvailability`); die Routen zum Setzen und Trennen lehnen in
+anderen Städten mit 409 ab. Anforderungen: [`MCP-KONZEPT.md`](MCP-KONZEPT.md). Grundlage: Änderungskonzept E13, Plan
 Phase 1 (Abschnitt 1, F1, F3, F5, F12), `CLAUDE.md`.
 
 Mit ⚠ markiert: Schritte, die vor dem Bau eine Entscheidung brauchen oder bestehende Regeln aus

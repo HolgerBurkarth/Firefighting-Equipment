@@ -18,6 +18,7 @@ describe('parseTenant', () => {
             name: 'Feuerwehr Test',
             accentColor: '#b71c1c',
             logoUrls: null,
+            claudeAvailable: false,
         });
     });
 

@@ -64,6 +64,7 @@ use FirefightingEquipment\Api\V1\Tenants\TenantActionHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantCreateHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantListHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantSlugAvailabilityHandler;
+use FirefightingEquipment\Api\V1\Tenants\TenantUserClaudeHandler;
 use FirefightingEquipment\Api\V1\Tenants\TenantUserListHandler;
 use FirefightingEquipment\Api\V1\Users\AssignableRoleListHandler;
 use FirefightingEquipment\Api\V1\Users\UserAction;
@@ -110,6 +111,8 @@ final class Routes
             ->add('POST', 'api/v1/tenants/{id}/admins', Access::SuperAdmin, new AdminInvitationHandler(resend: false))
             ->add('GET', 'api/v1/tenants/{id}/users', Access::SuperAdmin, new TenantUserListHandler())
             ->add('POST', 'api/v1/tenants/{id}/users/{user}/resend-invitation', Access::SuperAdmin, new AdminInvitationHandler(resend: true))
+            ->add('POST', 'api/v1/tenants/{id}/users/{user}/claude-access', Access::SuperAdmin, new TenantUserClaudeHandler(endConnections: false))
+            ->add('POST', 'api/v1/tenants/{id}/users/{user}/claude-connections/end', Access::SuperAdmin, new TenantUserClaudeHandler(endConnections: true))
             ->add('GET', 'api/v1/tenants/{id}/roles', Access::SuperAdmin, new RoleHandler(RoleAction::List))
             ->add('POST', 'api/v1/tenants/{id}/roles', Access::SuperAdmin, new RoleHandler(RoleAction::Create))
             ->add('POST', 'api/v1/tenants/{id}/roles/import', Access::SuperAdmin, new RoleHandler(RoleAction::Import))
@@ -193,6 +196,9 @@ final class Routes
             ->add('POST', 'api/v1/users/{id}/unlock', $write(Area::Users), new UserActionHandler(UserAction::Unlock))
             ->add('POST', 'api/v1/users/{id}/role', $write(Area::Users), new UserActionHandler(UserAction::ChangeRole))
             ->add('POST', 'api/v1/users/{id}/display-name', $write(Area::Users), new UserActionHandler(UserAction::ChangeDisplayName))
+            // F12: zusätzlich nur die Rolle Admin (geprüft in UserAdministration, 409).
+            ->add('POST', 'api/v1/users/{id}/claude-access', $write(Area::Users), new UserActionHandler(UserAction::SetClaudeAccess))
+            ->add('POST', 'api/v1/users/{id}/claude-connections/end', $write(Area::Users), new UserActionHandler(UserAction::EndClaudeConnections))
             ->add('GET', 'api/v1/device-types', Requirement::anyOf($read(Area::DeviceTypes), $seeDevices), new DeviceTypeListHandler())
             ->add('POST', 'api/v1/device-types', $write(Area::DeviceTypes), new DeviceTypeActionHandler(DeviceTypeAction::Create))
             ->add('POST', 'api/v1/device-types/{id}/rename', $write(Area::DeviceTypes), new DeviceTypeActionHandler(DeviceTypeAction::Rename))

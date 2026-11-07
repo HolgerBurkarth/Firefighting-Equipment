@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tenant;
 
+use FirefightingEquipment\Claude\ClaudeAccess;
+use FirefightingEquipment\Claude\ClaudeAvailability;
 use FirefightingEquipment\User\AdminInvitation;
 use FirefightingEquipment\User\DuplicateUserEmailException;
 use FirefightingEquipment\User\EmailAddress;
 use FirefightingEquipment\User\User;
 use FirefightingEquipment\User\UserNotFoundException;
 use FirefightingEquipment\User\UserRepository;
+use FirefightingEquipment\User\UserRole;
 use FirefightingEquipment\User\UserRuleViolationException;
 use FirefightingEquipment\User\UserStatus;
 
@@ -19,6 +22,8 @@ use FirefightingEquipment\User\UserStatus;
  * - Städte per ID; unbekannte IDs → TenantNotFoundException.
  * - Konten nur der jeweiligen Stadt; fremde und unbekannte IDs → UserNotFoundException.
  * - In eine gesperrte Stadt wird nicht eingeladen (der Link führte dort zu 403).
+ * - Claude-Zugang (F12): nur in der Test-Stadt; der Super-Admin setzt ihn nur für Konten mit der
+ *   Rolle Admin, trennt aber die Verbindungen jedes Kontos der Stadt.
  */
 final readonly class TenantAdministration
 {
@@ -107,6 +112,36 @@ final readonly class TenantAdministration
 
     /**
      * @throws UserNotFoundException
+     * @throws UserRuleViolationException
+     */
+    public function setClaudeAccess(Tenant $tenant, int $userId, ClaudeAccess $access): User
+    {
+        self::assertClaudeAvailable($tenant);
+        $user = $this->findUser($tenant, $userId);
+        $this->users->setClaudeAccess($user->id, $access, static function (User $locked): void {
+            if ($locked->role !== UserRole::Admin) {
+                throw UserRuleViolationException::claudeAccessOfAdminsOnly();
+            }
+        });
+
+        return $this->findUser($tenant, $userId);
+    }
+
+    /**
+     * @throws UserNotFoundException
+     * @throws UserRuleViolationException
+     */
+    public function endClaudeConnections(Tenant $tenant, int $userId): User
+    {
+        self::assertClaudeAvailable($tenant);
+        $user = $this->findUser($tenant, $userId);
+        $this->users->endClaudeConnections($user->id);
+
+        return $this->findUser($tenant, $userId);
+    }
+
+    /**
+     * @throws UserNotFoundException
      */
     public function findUser(Tenant $tenant, int $userId): User
     {
@@ -123,6 +158,16 @@ final readonly class TenantAdministration
         $list = $this->users->listByTenant($tenant, $status);
 
         return $status === null ? array_values(array_filter($list, static fn (User $u): bool => !$u->isDeleted())) : $list;
+    }
+
+    /**
+     * @throws UserRuleViolationException
+     */
+    private static function assertClaudeAvailable(Tenant $tenant): void
+    {
+        if (!ClaudeAvailability::for($tenant)) {
+            throw UserRuleViolationException::claudeUnavailable();
+        }
     }
 
     /**

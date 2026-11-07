@@ -1,4 +1,5 @@
-import type { AdminUser, BulkRoleResult } from '../api/users';
+import { CLAUDE_ACCESS_LABELS, type AdminUser, type BulkRoleResult } from '../api/users';
+import { changeTimeText } from './changeTime';
 import { searchKey, searchTokens } from './deviceSearch';
 import { compareNames, nameProblem, phpTrim } from './masterData';
 
@@ -179,6 +180,40 @@ export function pendingText(count: number): string {
     return count === 1
         ? '1 neue Anmeldung wartet auf Freischaltung'
         : `${String(count)} neue Anmeldungen warten auf Freischaltung`;
+}
+
+/** Chip „Claude: Lesen“ bzw. „Claude: Ändern“; ohne Zugang keiner (docs/MCP-KONZEPT.md, Abschnitt 2). */
+export function claudeChip(user: AdminUser): string | null {
+    return user.claudeAccess === 'off'
+        ? null
+        : `Claude: ${CLAUDE_ACCESS_LABELS[user.claudeAccess]}`;
+}
+
+/** „verbunden · zuletzt genutzt vor 5 Min.“ bzw. „2 Verbindungen · zuletzt genutzt …“; ohne null. */
+export function claudeConnectionText(user: AdminUser, now: Date = new Date()): string | null {
+    const { count, lastUsedAt } = user.claudeConnections;
+    if (count === 0 || lastUsedAt === null) {
+        return null;
+    }
+    const head = count === 1 ? 'verbunden' : `${String(count)} Verbindungen`;
+    return `${head} · zuletzt genutzt ${changeTimeText(lastUsedAt, now)}`;
+}
+
+/**
+ * Warum der Claude-Zugang im Fenster „Bearbeiten“ nicht änderbar ist (F12); null = änderbar. Nur
+ * für Konten der Rolle Admin aufgerufen (andere sehen die Auswahl nicht).
+ */
+export function claudeAccessBlocker(user: AdminUser, ownId: number | null): string | null {
+    if (user.id === ownId) {
+        return 'Den eigenen Claude-Zugang kann man nicht ändern.';
+    }
+    if (user.role === 'admin') {
+        return 'Für Admins setzt den Claude-Zugang der Super-Admin.';
+    }
+    if (user.status !== 'active') {
+        return 'Den Claude-Zugang gibt es nur für aktive Konten.';
+    }
+    return null;
 }
 
 /** Text, in dem die Suche sucht: Anzeigename, Name und E-Mail in der Vergleichsform. */

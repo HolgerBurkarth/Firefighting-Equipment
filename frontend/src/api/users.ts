@@ -14,6 +14,26 @@ const STATUSES: readonly AccountStatus[] = [
 ];
 const ROLES: readonly UserRole[] = ['user', 'admin', 'superadmin'];
 
+/** Claude-Zugang eines Kontos wie ClaudeAccess in PHP (docs/MCP-KONZEPT.md, Abschnitt 2). */
+export type ClaudeAccess = 'off' | 'read' | 'write';
+
+export const CLAUDE_ACCESS_VALUES: readonly ClaudeAccess[] = ['off', 'read', 'write'];
+
+/** Bezeichnungen wie ClaudeAccess::label() (per Test gleich). */
+export const CLAUDE_ACCESS_LABELS: Readonly<Record<ClaudeAccess, string>> = {
+    off: 'Aus',
+    read: 'Lesen',
+    write: 'Ändern',
+};
+
+/** Bestehende Claude-Verbindungen eines Kontos; lastUsedAt = letzte Nutzung (UTC) oder null. */
+export interface ClaudeConnections {
+    readonly count: number;
+    readonly lastUsedAt: string | null;
+}
+
+const NO_CONNECTIONS: ClaudeConnections = { count: 0, lastUsedAt: null };
+
 /** Konto der Benutzerverwaltung (UserJson::user, nie mit Passwort-Hash). */
 export interface AdminUser {
     readonly id: number;
@@ -35,6 +55,9 @@ export interface AdminUser {
     readonly locked: boolean;
     readonly emailVerifiedAt: string | null;
     readonly createdAt: string;
+    /** Claude-Zugang (seit Schritt M1; fehlt das Feld, „aus“). */
+    readonly claudeAccess: ClaudeAccess;
+    readonly claudeConnections: ClaudeConnections;
 }
 
 export function parseAdminUser(json: unknown): AdminUser | null {
@@ -52,10 +75,15 @@ export function parseAdminUser(json: unknown): AdminUser | null {
     const roleId = json['role_id'] ?? null;
     const roleName = nullableString(json['role_name'] ?? null);
     const invitationCode = parseInvitationRef(json['invitation_code'] ?? null);
+    const claudeAccess = json['claude_access'] ?? 'off';
+    const claudeConnections = parseClaudeConnections(json['claude_connections'] ?? null);
     if (
         (roleId !== null && !isId(roleId)) ||
         roleName === undefined ||
-        invitationCode === undefined
+        invitationCode === undefined ||
+        typeof claudeAccess !== 'string' ||
+        !(CLAUDE_ACCESS_VALUES as readonly string[]).includes(claudeAccess) ||
+        claudeConnections === undefined
     ) {
         return null;
     }
@@ -93,7 +121,31 @@ export function parseAdminUser(json: unknown): AdminUser | null {
         locked,
         emailVerifiedAt,
         createdAt,
+        claudeAccess: claudeAccess as ClaudeAccess,
+        claudeConnections,
     };
+}
+
+/** `claude_connections` {count, last_used_at}; fehlt = keine; undefined = ungültig. */
+function parseClaudeConnections(json: unknown): ClaudeConnections | undefined {
+    if (json === null) {
+        return NO_CONNECTIONS;
+    }
+    if (!isRecord(json)) {
+        return undefined;
+    }
+    const { count } = json;
+    const lastUsedAt = json['last_used_at'];
+    if (
+        typeof count !== 'number' ||
+        !Number.isInteger(count) ||
+        count < 0 ||
+        (lastUsedAt !== null && !isUtcTime(lastUsedAt)) ||
+        count > 0 !== (lastUsedAt !== null)
+    ) {
+        return undefined;
+    }
+    return { count, lastUsedAt };
 }
 
 /** `invitation_code` {id, label} oder null; undefined = ungültig. */
@@ -268,6 +320,26 @@ export function changeUserDisplayName(
     fetchFn?: typeof fetch,
 ): Promise<ApiResult<AdminUser>> {
     return userAction(id, 'display-name', { display_name: displayName }, fetchFn);
+}
+
+/**
+ * POST users/{id}/claude-access {access} (nur die Rolle Admin, nur Konten ohne Admin, nicht das
+ * eigene; „aus“ trennt alle Verbindungen).
+ */
+export function setUserClaudeAccess(
+    id: number,
+    access: ClaudeAccess,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<AdminUser>> {
+    return userAction(id, 'claude-access', { access }, fetchFn);
+}
+
+/** POST users/{id}/claude-connections/end: alle Claude-Verbindungen des Kontos trennen. */
+export function endUserClaudeConnections(
+    id: number,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<AdminUser>> {
+    return userAction(id, 'claude-connections/end', {}, fetchFn);
 }
 
 /** DELETE users/{id}: löschen = anonymisieren (der Verlauf behält „Gelöschter Benutzer #ID“). */

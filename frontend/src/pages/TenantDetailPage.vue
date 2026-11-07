@@ -4,16 +4,23 @@ import { computed, onMounted, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
 import { fetchTenant, fetchTenantUsers, type ManagedTenant } from '../api/tenants';
-import type { AdminUser } from '../api/users';
+import {
+    CLAUDE_ACCESS_LABELS,
+    CLAUDE_ACCESS_VALUES,
+    type AdminUser,
+    type ClaudeAccess,
+} from '../api/users';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
 import TenantRolesPanel from '../components/TenantRolesPanel.vue';
 import { phpTrim } from '../data/masterData';
 import {
+    endClaudeConnectionsOf,
     inviteAdmin,
     renameTenant,
     resendInvitation,
+    setClaudeAccessOfAdmin,
     setTenantLocked,
     tenantList,
 } from '../data/service';
@@ -27,8 +34,9 @@ import {
     tenantState,
     tenantUserRows,
 } from '../data/tenants';
-import { createdText, statusText } from '../data/users';
+import { claudeChip, claudeConnectionText, createdText, statusText } from '../data/users';
 import { goBack } from '../router/back';
+import { useNow } from '../runtime/now';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 
 /**
@@ -36,7 +44,9 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
  * Reiter „Übersicht“ (Name, Adresse nur als Text, Status und Zahlen; Umbenennen, Sperren/Entsperren
  * mit Rückfrage, Admin einladen), „Admins und Benutzer“ (Konten nur zum Ansehen, eingeladene Admins
  * mit „Einladung erneut senden“) und „Rollen“ (TenantRolesPanel). Reiter in der Adresse
- * (`?ansicht=konten` bzw. `rollen`, gleicher Pfad).
+ * (`?ansicht=konten` bzw. `rollen`, gleicher Pfad). Claude-Zugang (F12, nur wo die Stadt ihn hat):
+ * je aktivem Konto mit der Rolle Admin „Claude-Zugang …“, je Konto mit Verbindungen „Claude-
+ * Verbindungen trennen …“ (den Zugang anderer Konten setzt ein Admin der Stadt).
  */
 const route = useRoute();
 const router = useRouter();
@@ -139,10 +149,19 @@ const inviteTouched = ref(false);
 const inviteError = shallowRef<ApiError | null>(null);
 const inviteFieldError = ref<string | null>(null);
 
+// Claude-Zugang eines Admins
+const now = useNow();
+const claudeOpen = ref(false);
+const claudeTarget = ref<AdminUser | null>(null);
+const claudeAccess = ref<ClaudeAccess>('off');
+const claudeError = shallowRef<ApiError | null>(null);
+const claudeAvailable = computed(() => tenant.value?.claudeAvailable === true);
+
 const unsaved = computed(
     () =>
         (renameOpen.value && newName.value !== (tenant.value?.name ?? '')) ||
-        (inviteOpen.value && inviteEmail.value !== ''),
+        (inviteOpen.value && inviteEmail.value !== '') ||
+        (claudeOpen.value && claudeAccess.value !== (claudeTarget.value?.claudeAccess ?? 'off')),
 );
 useUnsavedInput(() => unsaved.value);
 
@@ -259,6 +278,68 @@ async function resend(user: AdminUser): Promise<void> {
     } else {
         failure.value = text.text;
     }
+}
+
+/** Den Zugang setzt der Super-Admin nur für aktive Konten mit der Rolle Admin. */
+function managesClaudeOf(user: AdminUser): boolean {
+    return claudeAvailable.value && user.role === 'admin' && user.status === 'active';
+}
+
+function openClaude(user: AdminUser, event: Event): void {
+    remember(event);
+    claudeTarget.value = user;
+    claudeAccess.value = user.claudeAccess;
+    claudeError.value = null;
+    claudeOpen.value = true;
+}
+
+async function submitClaude(): Promise<void> {
+    const user = claudeTarget.value;
+    if (user === null || busy.value) {
+        return;
+    }
+    if (claudeAccess.value === user.claudeAccess) {
+        claudeOpen.value = false;
+        return;
+    }
+    busy.value = true;
+    const result = await setClaudeAccessOfAdmin(id.value, user.id, claudeAccess.value);
+    busy.value = false;
+    if (!result.ok) {
+        claudeError.value = result.error;
+        return;
+    }
+    claudeOpen.value = false;
+    success.value =
+        result.data.claudeAccess === 'off'
+            ? `${result.data.label} hat keinen Claude-Zugang mehr; bestehende Verbindungen sind getrennt.`
+            : `Claude-Zugang von ${result.data.label}: ${CLAUDE_ACCESS_LABELS[result.data.claudeAccess]}.`;
+    await loadUsers();
+}
+
+const endOpen = ref(false);
+const endTarget = ref<AdminUser | null>(null);
+
+function askEnd(user: AdminUser, event: Event): void {
+    remember(event);
+    endTarget.value = user;
+    endOpen.value = true;
+}
+
+async function confirmEnd(): Promise<void> {
+    const user = endTarget.value;
+    if (user === null) {
+        return;
+    }
+    busy.value = true;
+    const result = await endClaudeConnectionsOf(id.value, user.id);
+    busy.value = false;
+    if (!result.ok) {
+        pageError.value = result.error;
+    } else {
+        success.value = `Die Claude-Verbindungen von ${result.data.label} sind getrennt.`;
+    }
+    await loadUsers();
 }
 
 // Sperren und Entsperren
@@ -516,7 +597,38 @@ onMounted(() => {
                                     <span>{{ user.roleLabel }}</span>
                                     <span>{{ statusText(user) }}</span>
                                     <span class="hint">seit {{ createdText(user) }}</span>
+                                    <span
+                                        v-if="claudeChip(user) !== null"
+                                        class="claude-chip"
+                                        :data-testid="`claude-chip-${String(user.id)}`"
+                                        >{{ claudeChip(user) }}</span
+                                    >
+                                    <span
+                                        v-if="claudeConnectionText(user, now) !== null"
+                                        class="hint"
+                                        >{{ claudeConnectionText(user, now) }}</span
+                                    >
                                 </div>
+                                <button
+                                    v-if="managesClaudeOf(user)"
+                                    class="btn"
+                                    type="button"
+                                    :disabled="busy"
+                                    :aria-label="`Claude-Zugang von ${user.label} …`"
+                                    @click="openClaude(user, $event)"
+                                >
+                                    Claude-Zugang …
+                                </button>
+                                <button
+                                    v-if="claudeAvailable && user.claudeConnections.count > 0"
+                                    class="btn"
+                                    type="button"
+                                    :disabled="busy"
+                                    :aria-label="`Claude-Verbindungen von ${user.label} trennen …`"
+                                    @click="askEnd(user, $event)"
+                                >
+                                    Claude-Verbindungen trennen …
+                                </button>
                                 <button
                                     v-if="
                                         user.status === 'invited' && !user.locked && tenant.active
@@ -612,6 +724,41 @@ onMounted(() => {
             </label>
         </FormDialog>
 
+        <FormDialog
+            v-model:open="claudeOpen"
+            :unsaved="unsaved"
+            :title="`Claude-Zugang von ${claudeTarget?.label ?? ''}`"
+            description="Für Admins setzt den Claude-Zugang der Super-Admin. Claude arbeitet dann mit den Rechten des Kontos – außer Benutzer und Einstellungen."
+            submit-label="Speichern"
+            :busy="busy"
+            :error="claudeError"
+            :return-focus="opener"
+            @submit="submitClaude"
+        >
+            <fieldset class="claude-access" data-testid="claude-access">
+                <legend class="field-label">Claude-Zugang</legend>
+                <label v-for="value in CLAUDE_ACCESS_VALUES" :key="value" class="claude-option">
+                    <input
+                        v-model="claudeAccess"
+                        type="radio"
+                        name="tenant-claude-access"
+                        :aria-label="`Claude-Zugang: ${CLAUDE_ACCESS_LABELS[value]}`"
+                        :value="value"
+                    />
+                    <span>{{ CLAUDE_ACCESS_LABELS[value] }}</span>
+                </label>
+                <p class="field-hint">„Aus“ trennt alle bestehenden Verbindungen.</p>
+            </fieldset>
+        </FormDialog>
+
+        <ConfirmDialog
+            v-model:open="endOpen"
+            :title="`Claude-Verbindungen von ${endTarget?.label ?? ''} trennen?`"
+            description="Claude kann danach nicht mehr für dieses Konto auf die Ausrüstung zugreifen, bis es Claude neu verbindet. Der Claude-Zugang bleibt."
+            confirm-label="Trennen"
+            @confirm="confirmEnd"
+        />
+
         <ConfirmDialog
             v-model:open="lockOpen"
             :title="tenant.active ? `${tenant.name} sperren?` : `${tenant.name} entsperren?`"
@@ -626,6 +773,31 @@ onMounted(() => {
 .hint {
     margin: 0;
     color: var(--muted);
+}
+
+.claude-chip {
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-hover);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+}
+
+.claude-access {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.claude-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--touch-min);
 }
 
 .retry {

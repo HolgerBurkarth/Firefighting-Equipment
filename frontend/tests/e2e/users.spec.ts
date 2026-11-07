@@ -4,6 +4,7 @@ import {
     HTTP_ERROR_CONSOLE,
     meBody,
     test,
+    TEST_TENANT,
     type MockRequest,
     type MockResponse,
 } from './fixtures';
@@ -18,6 +19,7 @@ import { delegate } from './support/masterData';
  * zuweisen (Plan Phase 1, Schritt 1.6), Sperren, Entsperren, Löschen; das eigene Konto (ID 7 wie
  * meBody) ist geschützt. Rollen wie assignableRolesJson (1 Admin, 2 Benutzer, 3 Gerätewart, 4
  * „Live-Test Filter“, 5 nicht vergebbar). Der simulierte Server merkt sich jede Änderung.
+ * Claude-Zugang (docs/PLAN-MCP.md, Schritt M2) nur mit `claude_available` der Stadt.
  */
 
 const ROLE_NAMES: Readonly<Record<number, string>> = {
@@ -212,6 +214,16 @@ function userServer(respond: Respond = () => null) {
             target['display_name'] = body['display_name'];
         });
         api[`DELETE ${path}`] = remove(id);
+        // Wie UserRepository::setClaudeAccess bzw. endClaudeConnections.
+        api[`POST ${path}/claude-access`] = change(id, (target, body) => {
+            target['claude_access'] = body['access'];
+            if (body['access'] === 'off') {
+                target['claude_connections'] = { count: 0, last_used_at: null };
+            }
+        });
+        api[`POST ${path}/claude-connections/end`] = change(id, (target) => {
+            target['claude_connections'] = { count: 0, last_used_at: null };
+        });
     }
     return { api, users };
 }
@@ -397,6 +409,8 @@ test.describe('Benutzer', () => {
         const dialog = page.getByRole('dialog', { name: 'Anna Berg bearbeiten' });
         await expect(dialog.getByLabel('Anzeigename')).toHaveValue('Anna Berg');
         await expect(dialog.getByRole('radio', { name: 'Benutzer' })).toBeChecked();
+        // Stadt ohne Claude-Zugang: keine Auswahl.
+        await expect(dialog.getByTestId('claude-access')).toHaveCount(0);
         // Unverändert: schließt ohne Anfrage.
         await dialog.getByRole('button', { name: 'Speichern' }).click();
         await expect(dialog).toBeHidden();
@@ -539,6 +553,116 @@ test.describe('Benutzer', () => {
         await expect(
             page.getByRole('navigation', { name: 'Hauptmenü' }).getByTestId('account-name'),
         ).toHaveText('Tom Keller');
+    });
+});
+
+test.describe('Claude-Zugang', () => {
+    useServer();
+
+    test.beforeEach(() => {
+        const anna = server.users.find((user) => user['id'] === 8);
+        Object.assign(anna ?? {}, {
+            claude_access: 'write',
+            claude_connections: {
+                count: 2,
+                last_used_at: new Date(Date.now() - 5 * 60_000)
+                    .toISOString()
+                    .replace(/\.\d+Z$/, 'Z'),
+            },
+        });
+    });
+
+    test.use({ tenant: { ...TEST_TENANT, body: { ...TEST_TENANT.body, claude_available: true } } });
+
+    test('Chip und Verbindungen in der Liste', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await open(page);
+        const anna = page.getByTestId('user-8');
+        await expect(anna.getByTestId('claude-chip-8')).toHaveText('Claude: Ändern');
+        await expect(anna).toContainText(/2 Verbindungen · zuletzt genutzt vor \d+ Min\./);
+        await expect(page.getByTestId('user-9').getByTestId('claude-chip-9')).toHaveCount(0);
+    });
+
+    test('Zugang im Fenster „Bearbeiten“ ändern, nur der Zugang wird gesendet', async ({
+        page,
+        apiRequests,
+    }) => {
+        await open(page);
+        await page.getByRole('button', { name: 'Anna Berg bearbeiten' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Anna Berg bearbeiten' });
+        const access = dialog.getByTestId('claude-access');
+        await expect(access.getByRole('radio', { name: 'Claude-Zugang: Ändern' })).toBeChecked();
+        await access.getByRole('radio', { name: 'Claude-Zugang: Lesen' }).check();
+        await dialog.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Claude-Zugang von Anna Berg: Lesen.',
+        );
+        await expect(page.getByTestId('claude-chip-8')).toHaveText('Claude: Lesen');
+        expect(sent(apiRequests, 'POST', 'api/v1/users/8/claude-access')).toEqual([
+            { access: 'read' },
+        ]);
+        expect(sent(apiRequests, 'POST', 'api/v1/users/8/display-name')).toEqual([]);
+        expect(sent(apiRequests, 'POST', 'api/v1/users/8/role')).toEqual([]);
+
+        // „Aus“: der Chip verschwindet, die Verbindungen sind getrennt.
+        await page.getByRole('button', { name: 'Anna Berg bearbeiten' }).click();
+        await dialog.getByRole('radio', { name: 'Claude-Zugang: Aus' }).check();
+        await dialog.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Anna Berg hat keinen Claude-Zugang mehr; bestehende Verbindungen sind getrennt.',
+        );
+        await expect(page.getByTestId('claude-chip-8')).toHaveCount(0);
+        await expect(page.getByTestId('user-8')).not.toContainText('Verbindungen');
+    });
+
+    test('Verbindungen trennen nach Rückfrage, der Zugang bleibt', async ({
+        page,
+        apiRequests,
+    }) => {
+        await open(page);
+        await page.getByRole('button', { name: 'Anna Berg bearbeiten' }).click();
+        await page.getByRole('button', { name: 'Claude-Verbindungen trennen …' }).click();
+        const confirm = page.getByRole('alertdialog', {
+            name: 'Claude-Verbindungen von Anna Berg trennen?',
+        });
+        await expect(confirm).toContainText('Der Claude-Zugang bleibt.');
+        await confirm.getByRole('button', { name: 'Trennen' }).click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Die Claude-Verbindungen von Anna Berg sind getrennt.',
+        );
+        await expect(page.getByTestId('user-8')).not.toContainText('Verbindungen');
+        await expect(page.getByTestId('claude-chip-8')).toHaveText('Claude: Ändern');
+        expect(sent(apiRequests, 'POST', 'api/v1/users/8/claude-connections/end')).toEqual([{}]);
+
+        // Ohne Verbindung gibt es den Knopf nicht.
+        await page.getByRole('button', { name: 'Anna Berg bearbeiten' }).click();
+        await expect(
+            page.getByRole('dialog').getByRole('button', { name: 'Claude-Verbindungen trennen …' }),
+        ).toHaveCount(0);
+    });
+
+    test('Handy: Chip und Verbindungen ohne waagerechten Überstand', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await open(page);
+        await expect(page.getByTestId('claude-chip-8')).toBeVisible();
+        expect(await horizontalOverflow(page)).toBe(0);
+    });
+
+    test('eigenes Konto und nicht aktive Konten: Auswahl gesperrt mit Hinweis', async ({
+        page,
+    }) => {
+        await open(page);
+        await page.getByRole('button', { name: 'Thomas Keller bearbeiten' }).click();
+        const own = page.getByRole('dialog', { name: 'Thomas Keller bearbeiten' });
+        await expect(own.getByTestId('claude-blocker')).toHaveText(
+            'Den eigenen Claude-Zugang kann man nicht ändern.',
+        );
+        await expect(own.getByRole('radio', { name: 'Claude-Zugang: Lesen' })).toBeDisabled();
+        await own.getByRole('button', { name: 'Abbrechen' }).click();
+
+        await page.getByRole('button', { name: 'Zoë Kraus bearbeiten' }).click();
+        const locked = page.getByRole('dialog', { name: 'Zoë Kraus bearbeiten' });
+        await expect(locked.getByRole('radio', { name: 'Claude-Zugang: Lesen' })).toBeEnabled();
     });
 });
 

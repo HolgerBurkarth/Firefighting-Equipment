@@ -57,6 +57,7 @@ final class AppearanceApiTest extends AuthTestCase
             'accent_color_is_default' => true,
             'logo_url' => null,
             'logo_urls' => null,
+            'claude_available' => false,
         ], self::json($response));
     }
 

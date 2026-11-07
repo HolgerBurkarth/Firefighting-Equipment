@@ -200,6 +200,7 @@ describe('API', () => {
                 slug: 'test',
                 name: 'Test-Feuerwehr',
                 active: true,
+                claudeAvailable: false,
                 createdAt: '2026-10-01T08:00:00Z',
                 updatedAt: '2026-10-02T08:00:00Z',
                 usersActive: 13,

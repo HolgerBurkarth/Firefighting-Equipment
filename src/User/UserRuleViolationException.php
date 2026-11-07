@@ -55,6 +55,44 @@ final class UserRuleViolationException extends UserException
         ));
     }
 
+    public static function claudeAccessSuperAdmin(): self
+    {
+        return new self('Super-Admins haben keinen Claude-Zugang.');
+    }
+
+    public static function claudeAccessNotActive(int $id): self
+    {
+        return new self(sprintf(
+            'Den Claude-Zugang gibt es nur für aktive Konten; das Konto #%d ist nicht freigeschaltet.',
+            $id,
+        ));
+    }
+
+    public static function claudeAccessOnlyByAdmins(): self
+    {
+        return new self('Den Claude-Zugang setzt nur ein Konto mit der Rolle Admin.');
+    }
+
+    public static function claudeAccessOfAdminBySuperAdmin(): self
+    {
+        return new self('Für Admins setzt den Claude-Zugang der Super-Admin.');
+    }
+
+    public static function claudeAccessOfAdminsOnly(): self
+    {
+        return new self('Der Super-Admin setzt den Claude-Zugang nur für Admins; für andere Konten setzt ihn ein Admin der Stadt.');
+    }
+
+    public static function selfClaudeAccess(): self
+    {
+        return new self('Den eigenen Claude-Zugang kann man nicht ändern.');
+    }
+
+    public static function claudeUnavailable(): self
+    {
+        return new self('Den Claude-Zugang gibt es bisher nur in der Test-Stadt.');
+    }
+
     public static function deleted(int $id): self
     {
         return new self(sprintf('Das Konto #%d ist gelöscht und kann nicht mehr geändert werden.', $id));

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Tenant;
 
+use FirefightingEquipment\Claude\ClaudeConnectionRepository;
 use FirefightingEquipment\Device\DefaultDeviceTypes;
 use FirefightingEquipment\Role\RoleRepository;
 
@@ -150,8 +151,8 @@ final readonly class TenantRepository
 
     /**
      * Sperrt (false) oder entsperrt (true) eine Stadt. Beim Sperren werden in derselben Transaktion
-     * alle Sitzungen der Konten dieser Stadt beendet (auch wenn sie schon gesperrt war), damit nach
-     * dem Entsperren keine alten Sitzungen wieder gelten.
+     * alle Sitzungen und Claude-Verbindungen der Konten dieser Stadt beendet (auch wenn sie schon
+     * gesperrt war), damit nach dem Entsperren keine alten Sitzungen wieder gelten.
      *
      * @return bool ob sich etwas geändert hat (false: war bereits in diesem Zustand)
      *
@@ -180,6 +181,7 @@ final readonly class TenantRepository
             if (!$active) {
                 $this->pdo->prepare('DELETE FROM fe_sessions WHERE user_id IN (SELECT id FROM fe_users WHERE tenant_id = ?)')
                     ->execute([$row['id']]);
+                new ClaudeConnectionRepository($this->pdo)->deleteForTenant((int) $row['id']);
             }
             $this->pdo->commit();
 

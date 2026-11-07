@@ -25,4 +25,8 @@ enum UserAction
     case ChangeDisplayName;
     /** DELETE api/v1/users/{id} {} */
     case Delete;
+    /** POST api/v1/users/{id}/claude-access {access} (F12, nur die Rolle Admin) */
+    case SetClaudeAccess;
+    /** POST api/v1/users/{id}/claude-connections/end {} */
+    case EndClaudeConnections;
 }

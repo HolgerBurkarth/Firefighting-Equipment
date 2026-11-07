@@ -28,7 +28,9 @@ MA-01;defekt
 ";
 
     /**
-     * @return iterable<string, array{string, string, array<string, mixed>|null}>
+     * Methode, Pfad, Body und optional die Antworten, mit denen ein Admin durchkommt (Standard 200/201).
+     *
+     * @return iterable<string, array{0: string, 1: string, 2: array<string, mixed>|null, 3?: list<int>}>
      */
     public static function adminRoutes(): iterable
     {
@@ -44,6 +46,10 @@ MA-01;defekt
         yield 'Rolle ändern' => ['POST', 'users/{user}/role', ['role' => 'admin']];
         yield 'Anzeigename ändern' => ['POST', 'users/{user}/display-name', ['display_name' => 'Max']];
         yield 'löschen' => ['DELETE', 'users/{user}', []];
+        // Kommt durch, lehnt in Immendingen aber fachlich ab (Claude-Zugang nur in der Test-Stadt,
+        // ClaudeAvailability); die Wirkung prüft ClaudeAccessTest.
+        yield 'Claude-Zugang setzen' => ['POST', 'users/{user}/claude-access', ['access' => 'read'], [409]];
+        yield 'Claude-Verbindungen trennen' => ['POST', 'users/{user}/claude-connections/end', [], [409]];
         yield 'Rolle mehrerer Konten' => ['POST', 'users/bulk/role', ['user_ids' => ['{user}'], 'role_id' => '{user-role}']];
         yield 'Rollen zur Auswahl' => ['GET', 'roles', null];
         yield 'Gerätetyp anlegen' => ['POST', 'device-types', ['name' => 'Funkgerät']];
@@ -77,9 +83,10 @@ MA-01;defekt
 
     /**
      * @param array<string, mixed>|null $body
+     * @param list<int>                 $passes
      */
     #[DataProvider('adminRoutes')]
-    public function testOnlyAdminOfOwnTenant(string $method, string $path, ?array $body): void
+    public function testOnlyAdminOfOwnTenant(string $method, string $path, ?array $body, array $passes = [200, 201]): void
     {
         $admin = $this->account('immendingen', 'admin@example.org', ['role' => 'admin']);
         $this->account('immendingen', 'user@example.org');
@@ -123,7 +130,7 @@ MA-01;defekt
         self::assertSame($before, $this->snapshot(), 'nichts geändert');
 
         $response = $this->sendAny($method, $url, $body, $this->loginCookie('immendingen', 'admin@example.org'));
-        self::assertContains($response->statusCode(), [200, 201], self::responseBody($response));
+        self::assertContains($response->statusCode(), $passes, self::responseBody($response));
     }
 
     /**

@@ -4,7 +4,12 @@ import { computed, onMounted, ref, shallowRef, useId, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { ApiError, ApiResult } from '../api/client';
 import type { AssignableRole } from '../api/roles';
-import type { AdminUser } from '../api/users';
+import {
+    CLAUDE_ACCESS_LABELS,
+    CLAUDE_ACCESS_VALUES,
+    type AdminUser,
+    type ClaudeAccess,
+} from '../api/users';
 import { allows } from '../api/permissions';
 import { currentPermissions, session } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
@@ -18,8 +23,10 @@ import {
     bulkAssignRole,
     deleteUser,
     deviceTypeStore,
+    endClaudeConnections,
     rejectUser,
     saveUser,
+    setClaudeAccess,
     setUserLocked,
     userStore,
     type BulkRoleRun,
@@ -28,6 +35,9 @@ import { filterText, roleFilterOptions, roleNameOf, seesText } from '../data/ass
 import { phpTrim } from '../data/masterData';
 import {
     bulkRoleText,
+    claudeAccessBlocker,
+    claudeChip,
+    claudeConnectionText,
     createdText,
     displayNameProblem,
     nameHint,
@@ -42,6 +52,8 @@ import {
     type SortDir,
     type UserSortKey,
 } from '../data/users';
+import { useNow } from '../runtime/now';
+import { tenantState } from '../runtime/tenantState';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 
 /**
@@ -53,6 +65,9 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
  * öffnet Anzeigename und Rolle, abseits Sperren/Entsperren und Löschen (= anonymisieren). Welche
  * Rollen es gibt, legt der Super-Admin fest; welche das Konto vergeben darf, sagt der Server (F5).
  * Zweiter Reiter „Einladungscodes“ (`?ansicht=einladungscodes`, InvitationCodesPanel).
+ * Claude-Zugang (docs/MCP-KONZEPT.md, Abschnitt 2, F12; nur wo die Stadt ihn hat): Chip und
+ * Verbindungen in der Liste; im Fenster „Bearbeiten“ Aus/Lesen/Ändern und abseits „Trennen“, beides
+ * nur für Konten der Rolle Admin (Admins und das eigene Konto gesperrt mit Hinweis).
  */
 const id = useId();
 const route = useRoute();
@@ -77,6 +92,14 @@ const ownId = computed(() => session.value?.user.id ?? null);
 /** Freischalten, Bearbeiten, Rolle zuweisen nur mit „Benutzer: Ändern“ (Plan Phase 1, 1.7b). */
 const canWrite = computed(() => allows(currentPermissions.value, 'users', 'write'));
 const pending = computed(() => pendingUsers(users.value));
+const now = useNow();
+/** Claude-Zugang verwalten: Stadt hat ihn (bisher nur die Test-Stadt) und die Sitzung hat die Rolle Admin. */
+const managesClaude = computed(
+    () =>
+        tenantState.value.tenant?.claudeAvailable === true &&
+        session.value?.user.role === 'admin' &&
+        canWrite.value,
+);
 
 const roleState = computed(() => assignableRoleStore.state);
 const roles = computed(() => roleState.value.data?.roles ?? []);
@@ -174,6 +197,7 @@ const roleId = ref<number | null>(null);
 const touched = ref(false);
 const nameError = ref<string | null>(null);
 const dialogError = ref<ApiError | null>(null);
+const claudeAccess = ref<ClaudeAccess>('off');
 
 const isOwn = computed(() => target.value !== null && target.value.id === ownId.value);
 /** Anzeigename nur bei aktiven Konten (eingeladene bekommen ihn beim Annehmen der Einladung). */
@@ -189,11 +213,22 @@ const initial = computed((): { displayName: string; roleId: number | null } => (
 }));
 const chosenRole = computed(() => roles.value.find((role) => role.id === roleId.value) ?? null);
 const roleChanged = computed(() => roleId.value !== initial.value.roleId);
+/** Auswahl des Claude-Zugangs im Fenster „Bearbeiten“ (nur mit managesClaude). */
+const showsClaude = computed(() => mode.value === 'edit' && managesClaude.value);
+const claudeBlocker = computed(() =>
+    target.value === null ? null : claudeAccessBlocker(target.value, ownId.value),
+);
+const claudeChanged = computed(
+    () => showsClaude.value && claudeAccess.value !== (target.value?.claudeAccess ?? 'off'),
+);
 
 /** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
 const unsaved = computed(
     () =>
-        dialogOpen.value && (displayName.value !== initial.value.displayName || roleChanged.value),
+        dialogOpen.value &&
+        (displayName.value !== initial.value.displayName ||
+            roleChanged.value ||
+            claudeChanged.value),
 );
 
 const liveProblem = computed(() =>
@@ -218,6 +253,7 @@ function openDialog(user: AdminUser, kind: Mode, event: Event): void {
     touched.value = false;
     nameError.value = null;
     dialogError.value = null;
+    claudeAccess.value = user.claudeAccess;
     dialogOpen.value = true;
     void assignableRoleStore.refresh('open');
 }
@@ -278,6 +314,10 @@ async function submit(): Promise<void> {
         result = await approveUser(user.id, { displayName: name, roleId: roleId.value });
     } else {
         result = await saveUser(user, userChanges(user, displayName.value, roleId.value));
+        // Zugang nach Name und Rolle (ein Wechsel zu Admin setzt ihn ohnehin auf „aus“).
+        if ((result === null || result.ok) && claudeChanged.value) {
+            result = await setClaudeAccess(user.id, claudeAccess.value);
+        }
     }
     busy.value = false;
     if (result === null) {
@@ -295,6 +335,11 @@ async function submit(): Promise<void> {
         success.value = `${saved.label} hat jetzt die Rolle „${roleNameOf(saved)}“ und muss sich neu anmelden.`;
     } else if (saved.roleId !== user.roleId) {
         success.value = `${saved.label} hat jetzt die Rolle „${roleNameOf(saved)}“; sie gilt beim nächsten Aufruf der App.`;
+    } else if (saved.claudeAccess !== user.claudeAccess) {
+        success.value =
+            saved.claudeAccess === 'off'
+                ? `${saved.label} hat keinen Claude-Zugang mehr; bestehende Verbindungen sind getrennt.`
+                : `Claude-Zugang von ${saved.label}: ${CLAUDE_ACCESS_LABELS[saved.claudeAccess]}.`;
     } else {
         success.value = `Änderungen an ${saved.label} gespeichert.`;
     }
@@ -421,8 +466,8 @@ async function submitBulk(): Promise<void> {
     bulkOpen.value = false;
 }
 
-// Rückfragen: Ablehnen, Sperren, Löschen.
-type ConfirmKind = 'reject' | 'lock' | 'delete';
+// Rückfragen: Ablehnen, Sperren, Löschen, Claude-Verbindungen trennen.
+type ConfirmKind = 'reject' | 'lock' | 'delete' | 'claude';
 const confirmKind = ref<ConfirmKind>('reject');
 const confirmTarget = ref<AdminUser | null>(null);
 const confirmOpen = ref(false);
@@ -453,6 +498,12 @@ const confirmTexts = computed(() => {
                 description: `${label} wird auf allen Geräten abgemeldet und kann sich nicht mehr anmelden, bis Sie das Konto entsperren.`,
                 confirm: 'Sperren',
             };
+        case 'claude':
+            return {
+                title: `Claude-Verbindungen von ${label} trennen?`,
+                description: `Claude kann danach nicht mehr für ${label} auf die Ausrüstung zugreifen, bis ${label} Claude neu verbindet. Der Claude-Zugang bleibt.`,
+                confirm: 'Trennen',
+            };
         case 'delete':
             return {
                 title: `${label} löschen?`,
@@ -474,6 +525,8 @@ async function confirmed(): Promise<void> {
         result = await rejectUser(user.id);
     } else if (kind === 'lock') {
         result = await setUserLocked(user.id, true);
+    } else if (kind === 'claude') {
+        result = await endClaudeConnections(user.id);
     } else {
         result = await deleteUser(user.id);
     }
@@ -486,6 +539,7 @@ async function confirmed(): Promise<void> {
         reject: `Die Registrierung von ${user.label} ist abgelehnt.`,
         lock: `${user.label} ist gesperrt.`,
         delete: `${user.label} wurde gelöscht.`,
+        claude: `Die Claude-Verbindungen von ${user.label} sind getrennt.`,
     };
     success.value = messages[kind];
 }
@@ -780,6 +834,17 @@ onMounted(() => {
                                     :class="{ 'role-chip-admin': user.role === 'admin' }"
                                     >{{ roleNameOf(user) }}</span
                                 >
+                                <span
+                                    v-if="claudeChip(user) !== null"
+                                    class="role-chip claude-chip"
+                                    :data-testid="`claude-chip-${String(user.id)}`"
+                                    >{{ claudeChip(user) }}</span
+                                >
+                                <span
+                                    v-if="claudeConnectionText(user, now) !== null"
+                                    class="hint claude-connections"
+                                    >{{ claudeConnectionText(user, now) }}</span
+                                >
                             </td>
                             <td class="col-status">
                                 <span
@@ -937,12 +1002,51 @@ onMounted(() => {
                 }}
             </p>
         </fieldset>
+        <fieldset
+            v-if="showsClaude"
+            class="roles claude-access"
+            :disabled="claudeBlocker !== null"
+            data-testid="claude-access"
+        >
+            <legend class="field-label">Claude-Zugang</legend>
+            <label v-for="value in CLAUDE_ACCESS_VALUES" :key="value" class="role-option">
+                <input
+                    v-model="claudeAccess"
+                    type="radio"
+                    :aria-label="`Claude-Zugang: ${CLAUDE_ACCESS_LABELS[value]}`"
+                    :name="`${id}-claude`"
+                    :value="value"
+                />
+                <span class="role-text">
+                    <strong>{{ CLAUDE_ACCESS_LABELS[value] }}</strong>
+                    <span class="field-hint">{{
+                        value === 'off'
+                            ? 'Keine Verbindung möglich; bestehende werden getrennt.'
+                            : value === 'read'
+                              ? 'Claude darf ansehen, was die Rolle sieht, aber nichts ändern.'
+                              : 'Claude darf, was die Rolle darf – außer Benutzer und Einstellungen.'
+                    }}</span>
+                </span>
+            </label>
+            <p v-if="claudeBlocker !== null" class="field-hint" data-testid="claude-blocker">
+                {{ claudeBlocker }}
+            </p>
+        </fieldset>
         <template v-if="mode === 'edit' && target !== null && !isOwn" #extra>
             <button v-if="target.locked" class="btn" type="button" :disabled="busy" @click="unlock">
                 {{ target.label }} entsperren
             </button>
             <button v-else class="btn" type="button" :disabled="busy" @click="ask('lock', target)">
                 {{ target.label }} sperren …
+            </button>
+            <button
+                v-if="showsClaude && claudeBlocker === null && target.claudeConnections.count > 0"
+                class="btn"
+                type="button"
+                :disabled="busy"
+                @click="ask('claude', target)"
+            >
+                Claude-Verbindungen trennen …
             </button>
             <button
                 class="btn btn-danger"
@@ -1239,6 +1343,15 @@ onMounted(() => {
 .role-chip-admin {
     border-color: var(--line);
     font-weight: var(--font-weight-semibold);
+}
+
+.claude-chip {
+    margin-left: 6px;
+}
+
+.claude-connections {
+    display: block;
+    margin-top: 4px;
 }
 
 .role-option {
