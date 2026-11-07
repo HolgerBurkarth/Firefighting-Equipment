@@ -20,7 +20,10 @@ Geprüft am 07.11.2026, Build `1a7d06d06086`:
   POST` ☑; aber mit falschem Token (auch mit gültigem Format `ffa_` + 43 Zeichen) fehlt
   `error="invalid_token"`: Der Header `Authorization` kommt auf STRATO nicht bei PHP an (PHP als CGI).
   Damit könnte Claude `mcp` nie mit dem Zugriffstoken aufrufen. Korrektur: Commit „Authorization auch
-  aus REDIRECT_HTTP_AUTHORIZATION lesen (Runde 5, Live-Test)“; Ergebnis siehe unten.
+  aus REDIRECT_HTTP_AUTHORIZATION lesen (Runde 5, Live-Test)“. Live mit Build `c05001794be8`
+  weiterhin ☒: STRATO setzt auch `REDIRECT_HTTP_AUTHORIZATION` nicht. Nötig ist eine Regel in
+  `public/.htaccess` (Rückfrage an Holger, 07.11.2026); bis dahin sind die Punkte für Holger ab
+  Schritt 3 („Verbinden“) nicht sinnvoll.
 - ☑ `GET …/test/api/v1/mcp-probe` → 404; `POST …/immendingen/mcp` und
   `…/immendingen/.well-known/openid-configuration` → 404.
 - ☑ Zusätzlich per curl: `POST oauth/register` mit claude.ai-Rücksprung → 201, mit fremder Adresse →
