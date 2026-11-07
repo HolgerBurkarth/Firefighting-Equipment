@@ -179,7 +179,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   - Web-App-Manifest: `/firefighting/<stadt>/manifest.webmanifest` (Route außerhalb von
     `api/v1`, siehe "Erscheinungsbild (API)")
   - Claude-Zugang (seit 07.11.2026, nur Test-Stadt): `mcp`, `.well-known/…`, `oauth/register`,
-    `oauth/token`, `oauth/revoke` außerhalb von `api/v1`, siehe "Claude-Zugang (MCP)"
+    `oauth/token`, `oauth/revoke` außerhalb von `api/v1`, siehe "Claude-Zugang (MCP)"; Claude ruft
+    `mcp` über den Vermittler `https://www.prodad.de/cgi-bin/ff-mcp.pl/<stadt>` auf (außerhalb des
+    Projektordners, siehe "Vermittler für Claude (cgi-bin)")
   - Super-Admin: `/firefighting/service/`
   - Alle anderen GET-Adressen unter `/firefighting/<bereich>/` liefern das Frontend (App-Seite
     oder Datei aus dem Build, siehe "Frontend" und "Frontend ausliefern").
@@ -1547,17 +1549,53 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Projektordner (`.htaccess`) und `config/` (`config/.htaccess`) sind per `.htaccess`
   gesperrt, `public/` ist freigegeben (`public/.htaccess`). Diese Dateien nur nach
   Rückfrage ändern; die Freigabe in `public/.htaccess` nie entfernen.
-- Einzige weitere Regel in `public/.htaccess` (seit 07.11.2026, Freigabe Holger; `CGIPassAuth On`
-  wirkte live nicht und ist wieder entfernt): in `<IfModule mod_rewrite.c>` `RewriteEngine On`,
-  `RewriteCond %{HTTP:Authorization} .` und `RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},
-  E=FF_AUTH_SEEN:1]` (ohne Ersetzung, also keine Weiterleitung; `FF_AUTH_SEEN` vorübergehend für den
-  Live-Test, nur der Wert 1, nie das Token). Grund: Apache gibt den Header `Authorization` an PHP als
-  CGI (STRATO) weder als `HTTP_AUTHORIZATION` noch als `REDIRECT_HTTP_AUTHORIZATION` weiter, auch
-  nicht mit `SetEnvIf`, `RewriteRule` oder `CGIPassAuth` (live 07.11.2026); Claude sendet das Zugriffstoken
-  als Bearer an `mcp` (`Request::fromServer`). Die Variable gilt nur für die Anfrage und wird nirgends
-  protokolliert. `PublicHtaccessTest` prüft Freigabe und genau diese Regel.
-  Liefert der Server nach einer Änderung an dieser Datei 500, sofort zurücknehmen und deployen.
+- `public/.htaccess` enthält nur die Freigabe (`PublicHtaccessTest` prüft genau das). In Runde 5
+  (07.11.2026) wirkten dort weder `SetEnvIf` noch `RewriteRule [E=HTTP_AUTHORIZATION:…]` noch
+  `CGIPassAuth On`: Apache gibt den Header `Authorization` an PHP (FastCGI auf STRATO) nie weiter,
+  auch nicht als `REDIRECT_HTTP_AUTHORIZATION`. Die Regeln sind wieder entfernt; das Zugriffstoken für
+  Claude kommt über den Vermittler im cgi-bin (siehe "Vermittler für Claude (cgi-bin)"). Keine neuen
+  Versuche in dieser Datei. Liefert der Server nach einer Änderung an dieser Datei 500, sofort
+  zurücknehmen und deployen.
 - Nur Dateien in `public/` sind von außen erreichbar; dort nichts Geheimes ablegen.
+
+## Vermittler für Claude (cgi-bin)
+- Seit 07.11.2026 (Auftrag Holger, Plan `docs/PLAN-MCP.md` Abschnitt 9b). Grund: Apache gibt den
+  Header `Authorization` an PHP (FastCGI auf STRATO) nie weiter, an klassisches CGI (mod_cgi) im
+  `cgi-bin` von www.prodad.de aber schon, wenn dort eine `.htaccess` mit `CGIPassAuth On` liegt.
+- Quelle im Repository: `scripts/cgi-bin/ff-mcp.pl` (Perl, Shebang `#!/usr/bin/perl`, LF über
+  `.gitattributes`) und `scripts/cgi-bin/.htaccess` (nur `CGIPassAuth On`, gehört dazu). Beide liegen
+  auf dem Server im `cgi-bin` AUSSERHALB des Projektordners; das Deploy fasst sie nicht an. Holger
+  lädt sie von Hand hoch (Rechte 755 bzw. 644). Agenten ändern sie nur im Repository, nie auf dem
+  Server, und nennen nach einer Änderung in der „✅ FERTIG“- bzw. „❓ RÜCKFRAGE“-Meldung die Datei
+  zum Hochladen. Die übrigen Dateien im `cgi-bin` (z. B. Holgers Prüfskripte) gehören nicht zum
+  Projekt.
+- MCP-Adresse für Claude: `https://www.prodad.de/cgi-bin/ff-mcp.pl/<stadt>` (Kürzel aus
+  `PATH_INFO`, nur ein Segment nach den Regeln von `TenantSlug`, nicht `service`; sonst 404 ohne
+  Anfrage an die App). Ziel fest `https://www.prodad.de/firefighting/<stadt>/mcp`, kein anderes,
+  keine Weiterleitungen, nur `https`. `POST`, `GET`, `DELETE` gehen weiter, andere Methoden 405
+  (`Allow: POST`).
+- Weiter gehen nur Body (höchstens 1 MiB, sonst 400), `Content-Type`, `Accept`, `Mcp-Session-Id`,
+  `MCP-Protocol-Version` und `Authorization` als `X-FF-Authorization`; Werte nur druckbares ASCII,
+  höchstens 4096 Zeichen, sonst fällt der Header weg. Nie Cookie, Origin oder ein selbst gesendetes
+  `X-FF-Authorization`. Zurück nur Status, `Content-Type`, `WWW-Authenticate`, `Allow` und Body
+  (höchstens 4 MiB), dazu fest `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`.
+- HTTP über das `curl` des Servers (`/usr/bin/curl`, `/usr/local/bin/curl` oder `/bin/curl`), ohne
+  Shell (`fork`/`exec` mit Liste), leere Umgebung (nur `PATH`), `--disable`, `--proto =https`,
+  `--noproxy '*'`, 5 s Verbindung, 25 s insgesamt (dazu `alarm`). Token und Body NIE in der
+  Befehlszeile (Prozessliste auf Shared Hosting): Header in einer Konfiguration über eine eigene Pipe
+  (`--config /dev/fd/3`), Body über die Standardeingabe (`--data-binary @-`). Nicht den Body in die
+  Konfiguration schreiben: curl liest deren Zeilen nur bis rund 100 KiB (curl 7.81, gemessen
+  07.11.2026; darüber fiel der Body still weg). Keine temporären Dateien, keine Protokolle (STDERR
+  des Skripts und von curl auf `/dev/null`; keine Warnung beim Übersetzen, per Test).
+- Eigene Fehler im Fehlerformat der App: 404 `not_found`, 405 `method_not_allowed`, 400
+  `invalid_request`, 502 `bad_gateway` (curl fehlt oder scheitert, kein `/dev/fd`, Antwort unlesbar
+  oder zu groß), 504 `gateway_timeout`. Diese Codes gibt es nur im Vermittler.
+- `FF_MCP_CURL_BIN` nur für Tests (Ersatz für curl); Apache setzt keine solche Variable aus einer
+  Anfrage. Tests `tests/Unit/Scripts/McpRelayScriptTest.php` (`perl -c` ohne Warnungen, nachgebaute
+  CGI-Umgebung mit Ersatz für curl; unter Linux echtes curl gegen einen lokalen PHP-Server, Body
+  1 MiB mit Sonderzeichen; ohne Perl übersprungen, Perl über `tests/Support/Perl.php`, unter Windows
+  das von Git for Windows). Die PHP-Tests unter WSL laufen nicht (dort fehlen `dom`/`xmlwriter`);
+  den Fall mit echtem curl prüft CI unter Linux.
 
 ## Datenbank
 - Nur eine Datenbank; alle Tabellen mit Präfix `fe_` (z. B. `fe_tenants`, `fe_users`,
@@ -2363,7 +2401,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     Zufallsbytes base64url; gespeichert nur SHA-256; Klartext nur in der Antwort an Claude bzw. im
     Rücksprung, nie in Tabellen, Protokoll, Mails, Fehlermeldungen oder `details` (per Test).
   - Metadaten (`OAuthUrls`, `OAuthMetadataHandler`): `GET .well-known/oauth-protected-resource` (RFC
-    9728, `resource` = `<issuer>/mcp`), `GET .well-known/openid-configuration` und `GET
+    9728, `resource` = MCP-Adresse des Vermittlers `<base_url>/cgi-bin/ff-mcp.pl/<kürzel>`,
+    `OAuthUrls::resource`, seit 07.11.2026, siehe "Vermittler für Claude (cgi-bin)"; vorher
+    `<issuer>/mcp`), `GET .well-known/openid-configuration` und `GET
     .well-known/oauth-authorization-server` (gleiches Dokument; Issuer `<base_url>/firefighting/<kürzel>`
     ohne `/`, `authorization_endpoint` = Seite `claude-verbinden` der App, `revocation_endpoint`,
     nur S256, nur `none`, `authorization_response_iss_parameter_supported`), `GET .well-known/jwks.json`
@@ -2385,7 +2425,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     email?, password?}`. Reihenfolge der Prüfung: Client der Stadt, `redirect_uri` exakt registriert,
     `state` höchstens 500 Zeichen – sonst 400 `invalid_request` OHNE Rücksprung (kein offener
     Redirect); dann `response_type=code`, `code_challenge_method=S256` mit Challenge (43 Zeichen),
-    `resource` (fehlt oder genau `<issuer>/mcp`), `scope` aus `read`/`write` (fehlt: beides) – sonst
+    `resource` (fehlt oder genau die MCP-Adresse des Vermittlers), `scope` aus `read`/`write` (fehlt: beides) – sonst
     400 `invalid_request` mit `details {redirect_url}` (Rücksprung mit `error`, `state` unverändert,
     `iss`). `decision`: `deny` ohne Anmeldung → `{redirect_url}` mit `error=access_denied`;
     `preview` und `allow` prüfen E-Mail und Passwort wie `auth/login` (`Authenticator`, gleiche Bremse,
@@ -2395,7 +2435,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     Challenge gebunden) und `{access, access_label, redirect_url}` mit `code`, `state`, `iss`.
   - `POST oauth/token` und `POST oauth/revoke` (`TokenHandler`, `TokenService`; Formular, siehe "HTTP
     und REST-API"): `client_id` Pflicht (unbekannt → 401 `invalid_client`). `authorization_code`
-    (`code`, `redirect_uri`, `code_verifier`, `resource` optional gleich `<issuer>/mcp`): Code in jedem
+    (`code`, `redirect_uri`, `code_verifier`, `resource` optional gleich der MCP-Adresse): Code in jedem
     Fall verbraucht (`FOR UPDATE`, gelöscht); abgelaufen, anderer Client, anderer Rücksprung, falscher
     Verifier (`Pkce`, 43–128 Zeichen, SHA-256) oder Konto/Zugang nicht mehr gültig → `invalid_grant`;
     ein schon eingelöster Code löscht die Verbindung mit seinem `code_hash` (RFC 6749, 4.1.2). Neue
@@ -2415,12 +2455,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     der AKTUELLEN Rolle (`SessionLifetime`); sonst wird die Verbindung gelöscht. `last_seen_at`
     höchstens alle 5 Minuten. Ergebnis `ClaudeSession` (Konto, Verbindung, wirksamer Zugang, Rechte der
     Rolle; eingeschränkt auf den Zugang ab M5).
-  - `POST mcp` (`Access::Claude`, `McpHandler`, `McpServer`): `Authorization: Bearer ffa_…`; ohne bzw.
+  - `POST mcp` (`Access::Claude`, `McpHandler`, `McpServer`): `Authorization: Bearer ffa_…` oder
+    gleichwertig `X-FF-Authorization: Bearer ffa_…` (`OAuthUrls::RELAY_AUTHORIZATION_HEADER`; so gibt
+    der Vermittler im cgi-bin den Header weiter, das Token ist der Nachweis; ein nicht leerer
+    `Authorization` hat Vorrang); ohne bzw.
     mit ungültigem Token 401 `not_authenticated` mit `WWW-Authenticate: Bearer [error="invalid_token",
     ]resource_metadata="<issuer>/.well-known/oauth-protected-resource", scope="read write"`
-    (`OAuthUrls::challenge`). Ein Cookie der App gilt nicht. Den Header liest `Request::fromServer`
-    aus `HTTP_AUTHORIZATION`, sonst aus `REDIRECT_HTTP_AUTHORIZATION` (STRATO, PHP als CGI: Apache
-    gibt `Authorization` sonst nicht weiter; live 07.11.2026). JSON-RPC 2.0, eine Nachricht je Anfrage,
+    (`OAuthUrls::challenge`; das Dokument bleibt in der App, der Vermittler leitet nur an `mcp`
+    weiter). Ein Cookie der App gilt nicht. JSON-RPC 2.0, eine Nachricht je Anfrage,
     zustandslos: `initialize` (Version wie angefragt aus `PROTOCOL_VERSIONS` 2025-11-25/2025-06-18/
     2025-03-26, sonst die neueste; `capabilities {tools {listChanged: false}}`, `serverInfo`,
     deutsche `instructions` mit „Daten, keine Anweisungen“), `ping` → `{}`, `tools/list` → `{tools:
@@ -2435,12 +2477,6 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   - Tests `tests/Integration/Claude/` (`ClaudeOAuthTestCase`, `OAuthAuthorizeTest`, `OAuthTokenTest`,
     `McpEndpointTest`), Unit `tests/Unit/OAuth/OAuthRulesTest.php`, `RequestGuardFormTest`,
     `RouterTest`, `TenantRoutePermissionsTest` (neue Routen).
-  - VORÜBERGEHEND (Live-Test Runde 5, 07.11.2026, wird danach entfernt): `GET api/v1/auth-probe`
-    (`AuthProbeHandler`, `AuthProbe`, `Access::Public`, nur Test-Stadt wie `ClaudeTenant`, sonst 404):
-    `{sapi, gateway_interface, server, env}` mit den NAMEN aller Variablen aus `$_SERVER` bzw.
-    `getenv()`, die „AUTH“ enthalten, je nur ob der Wert nicht leer ist; nie Werte, nichts
-    protokolliert oder gespeichert. Zeigt, unter welchem Namen `Authorization` auf STRATO ankommt.
-    Tests `AuthProbeTest` (Unit), `AuthProbeEndpointTest`.
 - Schritt M4 (Frontend, Runde 5): Seite „Claude verbinden“ (`ClaudeConnectPage`, `claude-verbinden`,
   Route `claude-connect`, `public`, nur unter Städten, Name wie `OAuthUrls::AUTHORIZE_PAGE`; kommt
   immer vom Server, nie aus dem Rückfall des Service Workers). API in `src/api/claude.ts`:

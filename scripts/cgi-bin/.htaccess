@@ -1,0 +1,3 @@
+# Vermittler für den Claude-Zugang (ff-mcp.pl, CLAUDE.md "Vermittler für Claude (cgi-bin)"):
+# Apache reicht Authorization an klassisches CGI nur damit weiter.
+CGIPassAuth On

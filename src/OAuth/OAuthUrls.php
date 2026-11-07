@@ -9,13 +9,19 @@ use FirefightingEquipment\Tenant\Tenant;
 
 /**
  * Adressen des OAuth-Servers und der MCP-Ressource einer Stadt (absolut, über app.base_url):
- * Issuer = https://www.prodad.de/firefighting/<kürzel> (ohne / am Ende, RFC 8414), Ressource =
- * <issuer>/mcp (RFC 8707), Metadaten unter <issuer>/.well-known/… (docs/PLAN-MCP.md, Abschnitt 1).
+ * Issuer = https://www.prodad.de/firefighting/<kürzel> (ohne / am Ende, RFC 8414), Metadaten unter
+ * <issuer>/.well-known/… (docs/PLAN-MCP.md, Abschnitt 1). Ressource (RFC 8707) = Adresse des
+ * Vermittlers https://www.prodad.de/cgi-bin/ff-mcp.pl/<kürzel>, der an <issuer>/mcp weiterleitet
+ * (Abschnitt 9b, CLAUDE.md "Vermittler für Claude (cgi-bin)").
  */
 final readonly class OAuthUrls
 {
     public const string AUTHORIZE_PAGE = 'claude-verbinden';
     public const array SCOPES = ['read', 'write'];
+    /** Pfad des Vermittlers (scripts/cgi-bin/ff-mcp.pl) unter app.base_url. */
+    public const string RELAY_PATH = '/cgi-bin/ff-mcp.pl';
+    /** Header, in dem der Vermittler Authorization weitergibt (an mcp gleichwertig mit Authorization). */
+    public const string RELAY_AUTHORIZATION_HEADER = 'X-FF-Authorization';
 
     public function __construct(private AppUrls $urls, private Tenant $tenant)
     {
@@ -28,7 +34,7 @@ final readonly class OAuthUrls
 
     public function resource(): string
     {
-        return $this->issuer() . '/mcp';
+        return $this->urls->base() . self::RELAY_PATH . '/' . $this->tenant->slug->value;
     }
 
     public function protectedResourceMetadata(): string

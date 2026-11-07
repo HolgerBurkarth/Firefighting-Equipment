@@ -67,6 +67,26 @@ final class McpEndpointTest extends ClaudeOAuthTestCase
         );
     }
 
+    /** Der Vermittler im cgi-bin sendet das Token als X-FF-Authorization (gleichwertig). */
+    public function testTokenFromTheRelayHeaderIsAccepted(): void
+    {
+        $tokens = $this->connect();
+        $relay = static fn (string $value): array => ['x-ff-authorization' => $value];
+
+        $ping = $this->mcp(null, ['jsonrpc' => '2.0', 'id' => 7, 'method' => 'ping'], $relay('Bearer ' . $tokens['access_token']));
+        self::assertSame(200, $ping->statusCode());
+        self::assertSame('{"jsonrpc":"2.0","id":7,"result":{}}', self::raw($ping));
+
+        $invalid = $this->mcp(null, self::request('ping'), $relay('Bearer ffa_' . str_repeat('A', 43)));
+        self::assertSame(401, $invalid->statusCode());
+        self::assertStringStartsWith('Bearer error="invalid_token", ', $invalid->headers()['WWW-Authenticate']);
+
+        // Authorization hat Vorrang; ein leerer Authorization zählt als nicht gesendet.
+        $both = $this->mcp(null, self::request('ping'), ['authorization' => 'Bearer abc'] + $relay('Bearer ' . $tokens['access_token']));
+        self::assertSame(401, $both->statusCode());
+        self::assertSame(200, $this->mcp(null, self::request('ping'), ['authorization' => ''] + $relay('Bearer ' . $tokens['access_token']))->statusCode());
+    }
+
     public function testCookieOfTheAppIsNoClaudeLogin(): void
     {
         $cookie = $this->loginCookie(self::CITY, self::EMAIL);

@@ -52,7 +52,6 @@ use FirefightingEquipment\Api\V1\Notices\NoticeAction;
 use FirefightingEquipment\Api\V1\Notices\NoticeActionHandler;
 use FirefightingEquipment\Api\V1\Notices\NoticeListHandler;
 use FirefightingEquipment\Api\V1\OAuth\AuthorizeHandler;
-use FirefightingEquipment\Api\V1\OAuth\AuthProbeHandler;
 use FirefightingEquipment\Api\V1\OAuth\ClientRegistrationHandler;
 use FirefightingEquipment\Api\V1\OAuth\OAuthMetadataDocument;
 use FirefightingEquipment\Api\V1\OAuth\OAuthMetadataHandler;
@@ -251,9 +250,7 @@ final class Routes
             ->add('POST', 'oauth/token', Access::Public, new TokenHandler(), bodyFormat: BodyFormat::Form)
             ->add('POST', 'oauth/revoke', Access::Public, new TokenHandler(revoke: true), bodyFormat: BodyFormat::Form)
             ->add('POST', 'api/v1/oauth/authorize/check', Access::Public, new AuthorizeHandler(checkOnly: true))
-            ->add('POST', 'api/v1/oauth/authorize', Access::Public, new AuthorizeHandler(checkOnly: false))
-            // Vorübergehend (Live-Test Runde 5): kommt Authorization bei PHP an? Nur Namen, nie Werte.
-            ->add('GET', 'api/v1/auth-probe', Access::Public, new AuthProbeHandler());
+            ->add('POST', 'api/v1/oauth/authorize', Access::Public, new AuthorizeHandler(checkOnly: false));
     }
 
     /** Anmeldung, Sitzungen und Passwort; unter service und unter jeder Stadt gleich. */

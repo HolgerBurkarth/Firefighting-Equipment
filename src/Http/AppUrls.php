@@ -43,6 +43,12 @@ final class AppUrls
         return new self(static fn (): string => $baseUrl);
     }
 
+    /** app.base_url, z. B. https://www.prodad.de (ohne / am Ende). */
+    public function base(): string
+    {
+        return $this->baseUrl ??= $this->loadBaseUrl === null ? AppConfig::DEFAULT_BASE_URL : ($this->loadBaseUrl)();
+    }
+
     /**
      * Startseite des Bereichs (mit / am Ende).
      *
@@ -50,9 +56,7 @@ final class AppUrls
      */
     public function area(?Tenant $tenant): string
     {
-        $this->baseUrl ??= $this->loadBaseUrl === null ? AppConfig::DEFAULT_BASE_URL : ($this->loadBaseUrl)();
-
-        return $this->baseUrl . AppPath::PREFIX . '/' . ($tenant?->slug->value ?? AppPath::SERVICE_SCOPE) . '/';
+        return $this->base() . AppPath::PREFIX . '/' . ($tenant?->slug->value ?? AppPath::SERVICE_SCOPE) . '/';
     }
 
     /**

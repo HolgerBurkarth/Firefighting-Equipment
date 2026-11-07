@@ -183,8 +183,10 @@ final readonly class Application
     }
 
     /**
-     * Claude-Verbindung aus Authorization: Bearer ffa_… (nie ein Cookie). Verbindung, Konto, Zugang
-     * und Rechte werden bei jedem Aufruf neu gelesen (ClaudeSessions).
+     * Claude-Verbindung aus Authorization: Bearer ffa_… oder gleichwertig X-FF-Authorization (so gibt
+     * der Vermittler im cgi-bin den Header weiter; das Token selbst ist der Nachweis), Authorization
+     * zuerst; nie ein Cookie. Verbindung, Konto, Zugang und Rechte werden bei jedem Aufruf neu
+     * gelesen (ClaudeSessions).
      *
      * @throws HttpException 401 not_authenticated mit WWW-Authenticate (error="invalid_token", wenn ein
      *                       Token gesendet wurde), 503 database_unavailable
@@ -192,6 +194,9 @@ final readonly class Application
     private function authenticateClaude(Request $request, Tenant $tenant): ClaudeSession
     {
         $header = $request->header('Authorization');
+        if ($header === null || $header === '') {
+            $header = $request->header(OAuthUrls::RELAY_AUTHORIZATION_HEADER);
+        }
         $sent = $header !== null && $header !== '';
         $token = null;
         if ($sent && preg_match('/^Bearer +(\S+) *\z/i', $header, $m) === 1) {

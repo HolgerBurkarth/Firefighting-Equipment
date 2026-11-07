@@ -8,6 +8,29 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-07 – „Aufräumen: public/.htaccess wie vor Runde 5, auth-probe entfernt (Runde 5)“
+
+- Entfernt: die vorübergehende Prüf-Route `GET api/v1/auth-probe` (jetzt 404 `not_found`) und das Lesen von `REDIRECT_HTTP_AUTHORIZATION` (gehörte zur Rewrite-Regel).
+  `public/.htaccess` enthält wieder nur die Freigabe. Grund: Das Token kommt über den Vermittler im
+  cgi-bin als `X-FF-Authorization` (Eintrag darunter).
+- Tests: `PublicHtaccessTest` (nur die Freigabe), `TenantRoutePermissionsTest`, `RequestTest`.
+  `CLAUDE.md`: "Server und .htaccess", "Claude-Zugang (MCP, im Aufbau)", Schritt M3.
+
+## 2026-11-07 – „mcp liest X-FF-Authorization, Ressource ist die Adresse des Vermittlers (Runde 5)“
+
+- `POST mcp` nimmt das Zugriffstoken aus `Authorization` oder gleichwertig aus
+  `X-FF-Authorization` (ein nicht leerer `Authorization` hat Vorrang). Grund: Apache gibt
+  `Authorization` an PHP auf STRATO nie weiter; der neue Vermittler `cgi-bin/ff-mcp.pl` (Quelle
+  `scripts/cgi-bin/ff-mcp.pl`) bekommt ihn und reicht ihn so an `mcp` weiter.
+- `resource` in `GET .well-known/oauth-protected-resource` und die Prüfung des Parameters `resource`
+  (`api/v1/oauth/authorize…`, `oauth/token`) verwenden jetzt die MCP-Adresse des Vermittlers
+  `https://www.prodad.de/cgi-bin/ff-mcp.pl/<kürzel>` statt `…/firefighting/<kürzel>/mcp` (die
+  frühere wird mit `invalid_target` abgelehnt). `resource_metadata` im `WWW-Authenticate` und der
+  Issuer bleiben unverändert.
+- Tests: `McpEndpointTest` (Header des Vermittlers), `OAuthAuthorizeTest`, `OAuthTokenTest`
+  (frühere Adresse), `McpRelayScriptTest` (Konstanten gleich dem Skript). `CLAUDE.md`:
+  "Vermittler für Claude (cgi-bin)", "Claude-Zugang (MCP, im Aufbau)", Schritt M3.
+
 ## 2026-11-07 – „Vorübergehende Prüf-Route auth-probe für Authorization (Runde 5, Live-Test)“
 
 - Neu, VORÜBERGEHEND: `GET api/v1/auth-probe` (öffentlich, nur Test-Stadt, sonst 404) → `{sapi,

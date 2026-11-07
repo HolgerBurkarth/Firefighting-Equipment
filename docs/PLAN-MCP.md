@@ -359,6 +359,69 @@ der Auftrag:
   `error_description`, ohne Token, Code oder Verifier). Bremse `oauth_register`: 20 je IP-Präfix und
   Stunde (429 im Fehlerformat der App mit `Retry-After`).
 
+## 9b. Vermittler im cgi-bin (Runde 5, Fortsetzung)
+
+Live-Test 07.11.2026: Apache gibt den Header `Authorization` an PHP (FastCGI auf STRATO) nie weiter,
+auch nicht mit `SetEnvIf`, `RewriteRule [E=…]` oder `CGIPassAuth` in `public/.htaccess`. Holger hat
+gefunden: Ein Perl-Skript im `cgi-bin` von www.prodad.de (klassisches CGI über mod_cgi) bekommt ihn,
+wenn dort eine `.htaccess` mit `CGIPassAuth On` liegt (Prüfskript `ff-auth-probe.pl`, nur Namen).
+Auftrag Holger vom 07.11.2026:
+
+- **Vermittler** `scripts/cgi-bin/ff-mcp.pl` (Quelle im Repository, dazu `scripts/cgi-bin/.htaccess`
+  mit `CGIPassAuth On`). Holger lädt beide von Hand nach `cgi-bin` hoch (liegt außerhalb des
+  Projektordners, das Deploy fasst ihn nicht an). Agenten ändern ihn nur im Repository.
+  - MCP-Adresse für Claude: `https://www.prodad.de/cgi-bin/ff-mcp.pl/<stadt>`. Die Stadt kommt aus
+    `PATH_INFO`, nur ein Segment nach den Regeln von `TenantSlug` (Kleinbuchstaben, Ziffern,
+    Bindestrich nicht am Rand und nicht doppelt, höchstens 50 Zeichen), sonst 404 ohne Anfrage an die
+    App.
+  - Ziel fest: `https://www.prodad.de/firefighting/<stadt>/mcp`, kein anderes Ziel, keine
+    Weiterleitungen (`--max-redirs 0`, nur `https`). Methoden `POST`, `GET` und `DELETE` gehen weiter
+    (die App antwortet auf `GET`/`DELETE` mit 405), andere beantwortet der Vermittler selbst mit 405
+    (`Allow: POST` wie die App).
+  - Weiter gehen nur: Body (höchstens 1 MiB, sonst 400 ohne Lesen), `Content-Type`, `Accept`,
+    `Mcp-Session-Id`, `MCP-Protocol-Version` und `Authorization` als `X-FF-Authorization`. Werte nur
+    aus druckbaren ASCII-Zeichen und höchstens 4096 Zeichen, sonst fällt der Header weg (die App
+    antwortet dann z. B. mit 401). Andere Header (Cookie, Origin, ein selbst gesendetes
+    `X-FF-Authorization`) gehen nie weiter.
+  - Zurück: Status, `Content-Type`, `WWW-Authenticate`, `Allow` (bei 405) und Body (höchstens
+    4 MiB), dazu fest `Cache-Control: no-store` und `X-Content-Type-Options: nosniff`.
+  - HTTP über das `curl` des Servers (Perl hat für HTTPS kein Modul in den Bordmitteln; `HTTP::Tiny`
+    braucht `IO::Socket::SSL`, das nicht sicher vorhanden ist). Aufruf ohne Shell (`fork` und
+    `exec` mit Liste). **Token und Body nie in der Befehlszeile** (die Prozessliste ist auf Shared
+    Hosting für andere sichtbar): Die Header stehen in einer curl-Konfiguration, die der Vermittler
+    über eine eigene Pipe schreibt (`--config /dev/fd/3`), der Body geht über die Standardeingabe
+    (`--data-binary @-`, unverändert, auch NUL-Bytes). Nicht den Body in der Konfiguration: curl
+    7.81 liest deren Zeilen nur bis rund 100 KiB (gemessen 07.11.2026, darüber fiel `data-raw` still
+    weg und curl sendete GET). Keine temporären Dateien. `--disable` (keine `.curlrc`),
+    `--http1.1`, `--proto =https`, `--noproxy '*'`, Zeitgrenzen 5 s Verbindung und 25 s insgesamt
+    (dazu `alarm` als Rückfall), `--stderr /dev/null`, curl mit leerer Umgebung (nur `PATH`). curl
+    unter `/usr/bin/curl`, `/usr/local/bin/curl` oder `/bin/curl` (erstes vorhandenes); ohne curl
+    oder ohne `/dev/fd` 502.
+  - Fehler des Vermittlers im Fehlerformat der App (`{"error","message"}`): 404 `not_found`,
+    405 `method_not_allowed`, 400 `invalid_request`, 502 `bad_gateway` (curl fehlt oder scheitert,
+    Antwort unlesbar oder zu groß), 504 `gateway_timeout`.
+  - Keine Protokolle: weder Token noch Inhalt (curl schreibt nichts nach stderr, Perl meldet nichts).
+  - Tests (`tests/Unit/Scripts/McpRelayScriptTest.php`): `perl -c`; nachgebaute CGI-Umgebung mit
+    einem Ersatz für curl (Befehlszeile ohne Token, Konfiguration genau, Antwort, Fehlerfälle, curl nie
+    aufgerufen bei 404/405/400); unter Linux zusätzlich mit dem echten curl gegen einen lokalen
+    PHP-Server, der Header und Body zurückgibt (Konfiguration und Body von 1 MiB mit Sonderzeichen).
+    Übersprungen ohne Perl. Die Testumgebung setzt `FF_MCP_CURL_BIN` (nur für Tests; Apache setzt
+    keine solche Variable aus einer Anfrage).
+- **App**: `mcp` liest das Token aus `Authorization` oder `X-FF-Authorization` (gleichwertig, das
+  Token ist der Nachweis; `Authorization` hat Vorrang, wenn beide da sind). `resource` in
+  `.well-known/oauth-protected-resource` und die Prüfung des Parameters `resource` (Autorisierung,
+  Token-Endpunkt) verwenden die neue MCP-Adresse (`<base_url>/cgi-bin/ff-mcp.pl/<kürzel>`).
+  `resource_metadata` im `WWW-Authenticate` bleibt die Adresse des Dokuments in der App
+  (`…/firefighting/<kürzel>/.well-known/oauth-protected-resource`): Der Vermittler leitet nur an
+  `mcp` weiter, das Dokument nennt aber die neue Adresse als `resource` (RFC 9728, 3.3: gleich der
+  aufgerufenen Adresse). Der Issuer bleibt `…/firefighting/<kürzel>`.
+- **Aufräumen**: `public/.htaccess` wieder wie vor Runde 5 (nur die Freigabe; `PublicHtaccessTest`
+  prüft genau das), Prüf-Route `api/v1/auth-probe` entfernt, ebenso das Lesen von
+  `REDIRECT_HTTP_AUTHORIZATION` (gehörte zur Rewrite-Regel).
+- **Ablauf**: je Teil ein Commit (Plan, Vermittler, App, Aufräumen), ein Push, CI, Deploy; dann lädt
+  Holger `ff-mcp.pl` und `.htaccess` hoch (Rechte 755 bzw. 644), danach prüft der Agent live: 401 mit
+  `WWW-Authenticate` über den Vermittler, mit falschem Token `error="invalid_token"`.
+
 ## 10. Offene Fragen (mit Vorschlag)
 
 | Nr. | Frage | Vorschlag |
