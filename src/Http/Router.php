@@ -19,11 +19,11 @@ final class Router
     private const string PLACEHOLDER_PATTERN = '/^\{([a-z][a-z_]*)\}$/D';
     private const string ID_PATTERN = '/^[1-9][0-9]{0,17}$/D';
 
-    /** @var array<string, array<string, array{RequestHandler, Access|Requirement, int}>> Pfad => Methode => Route (mit Body-Grenze) */
+    /** @var array<string, array<string, array{RequestHandler, Access|Requirement, int, BodyFormat}>> Pfad => Methode => Route (mit Body-Grenze) */
     private array $exact = [];
 
     /**
-     * @var array<string, array{segments: list<string>, methods: array<string, array{RequestHandler, Access|Requirement, int}>}>
+     * @var array<string, array{segments: list<string>, methods: array<string, array{RequestHandler, Access|Requirement, int, BodyFormat}>}>
      *      Pfad mit Platzhaltern (Namen durch {} ersetzt) => Segmente und Routen
      */
     private array $patterns = [];
@@ -48,21 +48,33 @@ final class Router
      * @param string $method z. B. "GET"
      * @param string $path ohne führenden Slash, z. B. "api/v1/health" oder "api/v1/auth/sessions/{id}"
      * @param int    $maxBodyBytes Höchstgröße des Bodys (1 bis Request::MAX_UPLOAD_BYTES)
+     * @param BodyFormat $bodyFormat Format des Bodys (Formular nur für öffentliche Routen)
      */
-    public function add(string $method, string $path, Access|Requirement $access, RequestHandler $handler, int $maxBodyBytes = Request::MAX_BODY_BYTES): self
-    {
+    public function add(
+        string $method,
+        string $path,
+        Access|Requirement $access,
+        RequestHandler $handler,
+        int $maxBodyBytes = Request::MAX_BODY_BYTES,
+        BodyFormat $bodyFormat = BodyFormat::Json,
+    ): self {
         if (preg_match(self::METHOD_PATTERN, $method) !== 1) {
             throw new \LogicException(sprintf('Ungültige Methode: %s', $method));
         }
         if (str_starts_with($path, '/') || str_ends_with($path, '/')) {
             throw new \LogicException(sprintf('Pfad ohne Slash am Anfang/Ende angeben: %s', $path));
         }
-        if ($this->forTenant ? $access === Access::SuperAdmin : $access instanceof Requirement) {
+        if ($this->forTenant ? $access === Access::SuperAdmin : ($access instanceof Requirement || $access === Access::Claude)) {
             throw new \LogicException(sprintf(
                 'Zugriff %s ist in diesem Bereich nicht möglich: %s',
                 $access instanceof Requirement ? $access->describe() : $access->value,
                 $path,
             ));
+        }
+
+        if ($bodyFormat === BodyFormat::Form && $access !== Access::Public) {
+            // Ein Formular fremder Seiten trüge sonst das Cookie mit (CSRF).
+            throw new \LogicException(sprintf('Formular nur bei öffentlichen Routen: %s', $path));
         }
 
         if ($maxBodyBytes < 1 || $maxBodyBytes > Request::MAX_UPLOAD_BYTES) {
@@ -90,7 +102,7 @@ final class Router
             }
         }
 
-        $route = [$handler, $access, $maxBodyBytes];
+        $route = [$handler, $access, $maxBodyBytes, $bodyFormat];
         if ($names === []) {
             if (isset($this->exact[$path][$method])) {
                 throw new \LogicException(sprintf('Route doppelt: %s %s', $method, $path));
@@ -147,9 +159,9 @@ final class Router
         }
 
         if (isset($byMethod[$method])) {
-            [$handler, $access, $maxBodyBytes] = $byMethod[$method];
+            [$handler, $access, $maxBodyBytes, $bodyFormat] = $byMethod[$method];
 
-            return new RouteMatch($handler, $access, $params, $maxBodyBytes);
+            return new RouteMatch($handler, $access, $params, $maxBodyBytes, $bodyFormat);
         }
 
         $allowed = array_keys($byMethod);
@@ -159,7 +171,7 @@ final class Router
     }
 
     /**
-     * @return array{array<string, array{RequestHandler, Access|Requirement, int}>, array<string, int>}|null
+     * @return array{array<string, array{RequestHandler, Access|Requirement, int, BodyFormat}>, array<string, int>}|null
      */
     private function matchPattern(string $path): ?array
     {

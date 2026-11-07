@@ -24,4 +24,21 @@ enum ClaudeAccess: string
             self::Write => 'Ändern',
         };
     }
+
+    /**
+     * Der geringere Zugang (wirksam ist z. B. das Minimum aus Zustimmung und aktuellem Zugang).
+     */
+    public function min(self $other): self
+    {
+        return $this->rank() <= $other->rank() ? $this : $other;
+    }
+
+    private function rank(): int
+    {
+        return match ($this) {
+            self::Off => 0,
+            self::Read => 1,
+            self::Write => 2,
+        };
+    }
 }

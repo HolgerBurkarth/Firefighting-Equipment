@@ -40,12 +40,14 @@ test.describe('Service Worker', () => {
                 );
             }
 
-            // claude-verbinden ist eine Route der Stadt: Ob die Stadt ladbar ist, hängt von der
-            // Datenbank des Testservers ab; HTML (die App-Seite) darf es nie sein.
+            // claude-verbinden ist eine Seite der App, kommt aber immer frisch vom Server (nicht aus
+            // dem Rückfall des Service Workers), damit sie nach einem Deploy nie veraltet ist.
             const connect = await page.goto(
-                '/firefighting/test/claude-verbinden?response_type=code&client_id=probe-x',
+                '/firefighting/test/claude-verbinden?response_type=code&client_id=x',
             );
-            expect(connect?.headers()['content-type']).toBe('application/json; charset=utf-8');
+            expect(connect?.status()).toBe(200);
+            expect(connect?.headers()['content-type']).toBe('text/html; charset=utf-8');
+            expect(connect?.fromServiceWorker()).toBe(false);
         });
     });
 

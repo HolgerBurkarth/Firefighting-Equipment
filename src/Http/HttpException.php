@@ -94,6 +94,15 @@ final class HttpException extends \RuntimeException
         return new self('pending_approval', 'Das Konto wartet noch auf die Freischaltung durch einen Admin.', 403);
     }
 
+    /**
+     * „Claude verbinden“: Anmeldung richtig, aber das Konto hat keinen Claude-Zugang (es entsteht
+     * kein Code und kein Rücksprung).
+     */
+    public static function claudeAccessMissing(): self
+    {
+        return new self('claude_access_missing', 'Kein Claude-Zugang – bitte wenden Sie sich an Ihren Admin.', 403);
+    }
+
     public static function invalidCurrentPassword(): self
     {
         return new self('invalid_current_password', 'Das aktuelle Passwort ist falsch.', 403);
@@ -258,9 +267,12 @@ final class HttpException extends \RuntimeException
         return new self('email_taken', $message, 409);
     }
 
-    public static function unsupportedMediaType(): self
+    /**
+     * @param string $expected erwarteter Content-Type (Formular nur bei oauth/token und oauth/revoke)
+     */
+    public static function unsupportedMediaType(string $expected = 'application/json'): self
     {
-        return new self('unsupported_media_type', 'Erwartet wird Content-Type: application/json.', 415);
+        return new self('unsupported_media_type', 'Erwartet wird Content-Type: ' . $expected . '.', 415);
     }
 
     /**

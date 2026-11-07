@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Http;
 
 use FirefightingEquipment\Auth\AuthSession;
+use FirefightingEquipment\Claude\ClaudeSession;
 use FirefightingEquipment\Database\LazyConnection;
 use FirefightingEquipment\Mail\Mailer;
 use FirefightingEquipment\Mail\Notifier;
@@ -42,7 +43,17 @@ final readonly class RequestContext
         public AppUrls $urls = new AppUrls(),
         /** Rechte des Kontos; nur bei Routen mit Requirement (von Application geladen). */
         public ?Permissions $permissions = null,
+        /** Claude-Verbindung; nur bei Routen mit Access::Claude (von Application geprüft). */
+        public ?ClaudeSession $claude = null,
     ) {
+    }
+
+    /**
+     * Die Claude-Verbindung einer Route mit Access::Claude (mcp).
+     */
+    public function claude(): ClaudeSession
+    {
+        return $this->claude ?? throw new \LogicException('Route ohne Claude-Verbindung.');
     }
 
     /**

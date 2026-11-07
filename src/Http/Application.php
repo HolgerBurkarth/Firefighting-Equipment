@@ -7,6 +7,9 @@ namespace FirefightingEquipment\Http;
 use FirefightingEquipment\Auth\AuthSession;
 use FirefightingEquipment\Auth\SessionCookie;
 use FirefightingEquipment\Auth\SessionManager;
+use FirefightingEquipment\Claude\ClaudeAvailability;
+use FirefightingEquipment\Claude\ClaudeSession;
+use FirefightingEquipment\Claude\ClaudeSessions;
 use FirefightingEquipment\Database\ConnectionException;
 use FirefightingEquipment\Database\LazyConnection;
 use FirefightingEquipment\Http\Frontend\FrontendAssets;
@@ -14,6 +17,9 @@ use FirefightingEquipment\Http\Frontend\FrontendHandler;
 use FirefightingEquipment\Mail\ConfiguredMailer;
 use FirefightingEquipment\Mail\Mailer;
 use FirefightingEquipment\Mail\SendmailMailer;
+use FirefightingEquipment\OAuth\OAuthSecret;
+use FirefightingEquipment\OAuth\OAuthSecretKind;
+use FirefightingEquipment\OAuth\OAuthUrls;
 use FirefightingEquipment\Offline\OfflineSettings;
 use FirefightingEquipment\Permission\Requirement;
 use FirefightingEquipment\Tenant\Tenant;
@@ -28,7 +34,8 @@ use FirefightingEquipment\User\Password\PasswordHasher;
  * Datenbank und Sitzung), ändernde Anfragen prüfen (CSRF, JSON-Body; ohne Datenbank), Version der
  * App prüfen (X-Client-Api unter ClientApi::MIN: 409 client_outdated; ohne Datenbank), erst dann
  * die Stadt laden (Datenbank), Sitzung und Zugriffsstufe prüfen (nur bei Routen, die nicht
- * öffentlich sind; unter einer Stadt die Rechte der Rolle samt Feldregeln, Requirement), zum
+ * öffentlich sind; unter einer Stadt die Rechte der Rolle samt Feldregeln, Requirement; bei
+ * Access::Claude statt der Sitzung die Claude-Verbindung aus dem Bearer-Token), zum
  * Schluss den Handler aufrufen. Unbekannte Adressen verbinden sich so nie
  * mit der Datenbank.
  */
@@ -78,7 +85,7 @@ final readonly class Application
             if ($route === null) {
                 return $this->frontend?->respond($request, $path) ?? throw HttpException::notFound();
             }
-            $body = $this->guard->check($request, $route->maxBodyBytes);
+            $body = $this->guard->check($request, $route->maxBodyBytes, $route->bodyFormat);
             if (ClientApi::isOutdated($request->header(ClientApi::HEADER), $this->minClientApi)) {
                 throw HttpException::clientOutdated($this->minClientApi);
             }
@@ -86,7 +93,15 @@ final readonly class Application
 
             $auth = null;
             $permissions = null;
-            if ($route->access !== Access::Public) {
+            $claude = null;
+            if ($route->access === Access::Claude) {
+                // Nur unter einer Stadt (Router::forTenant); ohne Claude-Zugang gibt es die Route nicht.
+                $tenant ?? throw new \LogicException('Access::Claude ohne Stadt.');
+                if (!ClaudeAvailability::for($tenant)) {
+                    throw HttpException::notFound();
+                }
+                $claude = $this->authenticateClaude($request, $tenant);
+            } elseif ($route->access !== Access::Public) {
                 $auth = $this->authenticate($request, $tenant);
                 if ($route->access instanceof Requirement) {
                     // Nur unter einer Stadt (Router::forTenant); die Sitzung gehört zu einem Konto dieser
@@ -100,7 +115,7 @@ final readonly class Application
                 }
             }
 
-            $context = new RequestContext($request, $tenant, $this->db, $this->errors, $route->params, $body, $auth, $this->hasher, $this->mailer, $this->urls, $permissions);
+            $context = new RequestContext($request, $tenant, $this->db, $this->errors, $route->params, $body, $auth, $this->hasher, $this->mailer, $this->urls, $permissions, $claude);
             $response = $route->handler->handle($context);
             // Kodierfehler hier abfangen, nicht erst beim Senden. Ein CSV-Download wird erst beim
             // Senden geschrieben (gestreamt); seine Abfrage hat der Handler schon ausgeführt.
@@ -165,5 +180,31 @@ final readonly class Application
         }
 
         return $auth;
+    }
+
+    /**
+     * Claude-Verbindung aus Authorization: Bearer ffa_… (nie ein Cookie). Verbindung, Konto, Zugang
+     * und Rechte werden bei jedem Aufruf neu gelesen (ClaudeSessions).
+     *
+     * @throws HttpException 401 not_authenticated mit WWW-Authenticate (error="invalid_token", wenn ein
+     *                       Token gesendet wurde), 503 database_unavailable
+     */
+    private function authenticateClaude(Request $request, Tenant $tenant): ClaudeSession
+    {
+        $header = $request->header('Authorization');
+        $sent = $header !== null && $header !== '';
+        $token = null;
+        if ($sent && preg_match('/^Bearer +(\S+) *\z/i', $header, $m) === 1) {
+            $token = OAuthSecret::parse(OAuthSecretKind::AccessToken, $m[1]);
+        }
+        try {
+            $session = $token === null ? null : new ClaudeSessions($this->db->get())->resume($token, $tenant);
+        } catch (ConnectionException | \PDOException $e) {
+            throw HttpException::databaseUnavailable($e);
+        }
+
+        return $session ?? throw HttpException::notAuthenticated([
+            'WWW-Authenticate' => new OAuthUrls($this->urls, $tenant)->challenge(invalidToken: $sent),
+        ]);
     }
 }

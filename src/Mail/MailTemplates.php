@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Mail;
 
+use FirefightingEquipment\Claude\ClaudeAccess;
 use FirefightingEquipment\Device\Device;
 use FirefightingEquipment\Device\DeviceEvent;
 use FirefightingEquipment\Device\DeviceEventType;
@@ -104,6 +105,52 @@ final class MailTemplates
             TXT;
 
         return self::message($user, 'Ihr Passwort wurde geändert', $text);
+    }
+
+    /**
+     * Neue Claude-Verbindung des Kontos (docs/PLAN-MCP.md, O6), mit Hinweis auf „Trennen“. Enthält nie
+     * Token oder Code.
+     *
+     * @param string $target   Ziel, z. B. „claude.ai“ (RedirectUriRules::targetLabel)
+     * @param string $loginUrl Startseite der Stadt
+     *
+     * @throws MailException
+     */
+    public static function claudeConnected(
+        User $user,
+        Tenant $tenant,
+        string $target,
+        ClaudeAccess $access,
+        string $loginUrl,
+        ?\DateTimeImmutable $at = null,
+    ): MailMessage {
+        $local = ($at ?? new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone(self::TIME_ZONE));
+        $when = $local->format('d.m.Y') . ' um ' . $local->format('H:i') . ' Uhr';
+        $greeting = self::greeting($user);
+        $city = $tenant->name->value;
+        $accessLabel = $access->label();
+
+        $text = <<<TXT
+            {$greeting}
+
+            Ihr Konto bei der Feuerwehr Ausrüstungsverwaltung ({$city}) wurde
+            am {$when} mit Claude verbunden.
+
+            Ziel: {$target}
+            Zugang: {$accessLabel}
+
+            Claude arbeitet damit in Ihrem Namen mit den Rechten Ihrer Rolle.
+
+            Sie können die Verbindung jederzeit trennen: in der App unter
+            „Profil“ bzw. „Einstellungen“ → „Angemeldete Geräte“ → „Trennen“.
+
+            Falls Sie das nicht selbst waren: Trennen Sie die Verbindung,
+            ändern Sie Ihr Passwort und informieren Sie Ihren Admin:
+
+            {$loginUrl}
+            TXT;
+
+        return self::message($user, 'Neue Claude-Verbindung', $text);
     }
 
     /**

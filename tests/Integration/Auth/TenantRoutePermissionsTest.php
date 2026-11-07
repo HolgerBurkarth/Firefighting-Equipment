@@ -119,22 +119,30 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'GET api/v1/notices/{id}' => ['admin', 'log:read'],
         'POST api/v1/notices/{id}/resolve' => ['admin', 'log:write'],
         'POST api/v1/notices/{id}/reopen' => ['admin', 'log:write'],
-        // Vorklärung zum Claude-Zugang (nur Test-Stadt, sonst 404; McpProbeTest).
-        'POST mcp' => ['public', 'public'],
+        'GET api/v1/auth/claude-connections' => ['authenticated', 'authenticated'],
+        'DELETE api/v1/auth/claude-connections/{id}' => ['authenticated', 'authenticated'],
+        // Claude-Zugang (nur Test-Stadt, sonst 404 vor der Anmeldung; OAuthServerTest, McpEndpointTest).
+        'POST mcp' => ['public', 'claude'],
         'GET .well-known/oauth-protected-resource' => ['public', 'public'],
         'GET .well-known/openid-configuration' => ['public', 'public'],
         'GET .well-known/oauth-authorization-server' => ['public', 'public'],
         'GET .well-known/jwks.json' => ['public', 'public'],
         'POST oauth/register' => ['public', 'public'],
-        'GET claude-verbinden' => ['public', 'public'],
-        'GET api/v1/mcp-probe' => ['admin', 'settings:write'],
+        'POST oauth/token' => ['public', 'public'],
+        'POST oauth/revoke' => ['public', 'public'],
+        'POST api/v1/oauth/authorize/check' => ['public', 'public'],
+        'POST api/v1/oauth/authorize' => ['public', 'public'],
     ];
 
     /** Routen, die jedes angemeldete Konto ohne Rechteprüfung aufrufen darf (Plan, Abschnitt 3). */
     private const array AUTHENTICATED_ONLY = [
         'GET api/v1/auth/me', 'GET api/v1/auth/sessions', 'DELETE api/v1/auth/sessions/{id}',
         'POST api/v1/auth/sessions/logout-others', 'POST api/v1/auth/password', 'GET api/v1/client-config',
+        'GET api/v1/auth/claude-connections', 'DELETE api/v1/auth/claude-connections/{id}',
     ];
+
+    /** Routen mit Formular statt JSON (BodyFormat::Form). */
+    private const array FORM_ROUTES = ['POST oauth/token', 'POST oauth/revoke'];
 
     /**
      * Gewollte Änderung für die Standard-Rolle Benutzer (Plan, F2, Schritt 1.7a): bisher erlaubt,
@@ -232,7 +240,7 @@ final class TenantRoutePermissionsTest extends AuthTestCase
     public static function requirementRoutes(): iterable
     {
         foreach (self::ROUTES as $key => [, $new]) {
-            if (!in_array($new, ['public', 'authenticated'], true)) {
+            if (!in_array($new, ['public', 'authenticated', 'claude'], true)) {
                 yield $key => [$key];
             }
         }
@@ -362,6 +370,11 @@ final class TenantRoutePermissionsTest extends AuthTestCase
     private function errorOf(string $method, string $slug, string $path, ?string $cookie, array $body = []): array
     {
         $uri = '/firefighting/' . $slug . '/' . preg_replace('/\{[a-z_]+\}/', self::UNKNOWN_ID, $path);
+        if (in_array($method . ' ' . $path, self::FORM_ROUTES, true)) {
+            $response = $this->sendAny($method, $uri, http_build_query($body), $cookie, ['content-type' => 'application/x-www-form-urlencoded']);
+
+            return self::error($response);
+        }
         $response = $this->sendAny($method, $uri, $method === 'GET' ? null : $body, $cookie);
 
         return self::error($response);
@@ -464,12 +477,15 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         return implode(' & ', array_map(static fn (Need $n): string => $n->key(), $needs)) ?: '(keine)';
     }
 
-    /** Die Tabelle nennt nur bekannte Stufen; öffentliche Routen bleiben öffentlich. */
+    /**
+     * Die Tabelle nennt nur bekannte Stufen; öffentliche Routen bleiben öffentlich. mcp (Claude) gilt
+     * hier als öffentlich: Es kennt kein Cookie, und außerhalb der Test-Stadt gibt es die Route nicht.
+     */
     public function testLegacyColumnUsesKnownAccessLevels(): void
     {
         foreach (self::ROUTES as $route => [$legacy, $new]) {
             self::assertContains($legacy, ['public', 'authenticated', 'admin'], $route);
-            self::assertSame($legacy === Access::Public->value, $new === Access::Public->value, $route);
+            self::assertSame($legacy === Access::Public->value, in_array($new, [Access::Public->value, Access::Claude->value], true), $route);
         }
     }
 }
