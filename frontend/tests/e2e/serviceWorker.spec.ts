@@ -14,8 +14,18 @@ test.describe('Service Worker', () => {
     });
 
     test.describe('Adressen des Claude-Zugangs', () => {
-        // Antworten mit 404/405 meldet der Browser in der Konsole.
-        test.use({ allowedConsoleError: HTTP_ERROR_CONSOLE });
+        // Antworten mit 404/405 meldet der Browser in der Konsole. Die Seite „Claude verbinden“ prüft
+        // zuerst die Anfrage; Anfragen einer vom Service Worker kontrollierten Seite gibt WebKit nicht
+        // an page.route(), dort antwortet der Testserver ohne Datenbank (503).
+        test.use({
+            allowedConsoleError: HTTP_ERROR_CONSOLE,
+            api: {
+                'POST api/v1/oauth/authorize/check': {
+                    status: 400,
+                    body: { error: 'invalid_request', message: 'Test.' },
+                },
+            },
+        });
 
         test('beantwortet immer der Server, auch mit installiertem Service Worker', async ({
             page,
@@ -48,6 +58,10 @@ test.describe('Service Worker', () => {
             expect(connect?.status()).toBe(200);
             expect(connect?.headers()['content-type']).toBe('text/html; charset=utf-8');
             expect(connect?.fromServiceWorker()).toBe(false);
+            await expect(
+                page.getByRole('heading', { level: 1, name: 'Claude verbinden' }),
+            ).toBeVisible();
+            await expect(page.getByTestId('claude-check-error')).toBeVisible();
         });
     });
 

@@ -3,11 +3,19 @@ import { computed, onMounted, ref, shallowRef } from 'vue';
 import type { ApiError } from '../api/client';
 import { endSession, fetchSessions, logoutOtherSessions, type AccountSession } from '../api/auth';
 import {
+    connectionLabel,
+    endClaudeConnection,
+    fetchClaudeConnections,
+    type ClaudeConnection,
+} from '../api/claude';
+import {
     endedSessionsText,
     sessionLabel,
     sessionTimeText,
     sortSessions,
 } from '../auth/sessionList';
+import { claudeConnectionTimeText } from '../data/users';
+import { currentAppBase } from '../runtime/appBase';
 import { useNow } from '../runtime/now';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ErrorNotice from './ErrorNotice.vue';
@@ -22,6 +30,9 @@ const busyOthers = ref(false);
 const confirmOpen = ref(false);
 const message = ref<string | null>(null);
 const now = useNow();
+/** Eigene Claude-Verbindungen (nur unter Städten; Plan MCP, O5); null bis zur ersten Antwort. */
+const claude = shallowRef<readonly ClaudeConnection[] | null>(null);
+const withClaude = !currentAppBase().isService;
 
 const sorted = computed(() => (sessions.value === null ? [] : sortSessions(sessions.value)));
 const hasOthers = computed(() => sorted.value.some((session) => !session.current));
@@ -32,7 +43,10 @@ let sequence = 0;
 async function load(): Promise<void> {
     const own = ++sequence;
     loading.value = true;
-    const result = await fetchSessions();
+    const [result, connections] = await Promise.all([
+        fetchSessions(),
+        withClaude ? fetchClaudeConnections() : null,
+    ]);
     if (own !== sequence) {
         return;
     }
@@ -42,6 +56,12 @@ async function load(): Promise<void> {
         loadError.value = null;
     } else {
         loadError.value = result.error;
+    }
+    // Ein Fehler bei den Verbindungen behält die bisherige Liste (die Geräte zeigen ihn schon).
+    if (connections?.ok === true) {
+        claude.value = connections.data;
+    } else if (connections !== null && loadError.value === null) {
+        loadError.value = connections.error;
     }
 }
 
@@ -58,6 +78,21 @@ async function onEnd(session: AccountSession): Promise<void> {
     // 404: schon beendet (abgelaufen oder auf dem anderen Gerät abgemeldet), also auch erledigt.
     if (result.ok || result.error.code === 'not_found') {
         message.value = `${sessionLabel(session)} wurde abgemeldet.`;
+    } else {
+        actionError.value = result.error;
+    }
+    await load();
+}
+
+async function onEndClaude(connection: ClaudeConnection): Promise<void> {
+    busyId.value = -connection.id;
+    actionError.value = null;
+    message.value = null;
+    const result = await endClaudeConnection(connection.id);
+    busyId.value = null;
+    // 404: schon getrennt (abgelaufen oder vom Admin getrennt), also auch erledigt.
+    if (result.ok || result.error.code === 'not_found') {
+        message.value = `${connectionLabel(connection)} wurde getrennt.`;
     } else {
         actionError.value = result.error;
     }
@@ -84,7 +119,11 @@ async function onEndOthers(): Promise<void> {
     <section class="card" aria-labelledby="sessions-heading">
         <div class="heading">
             <h2 id="sessions-heading">Angemeldete Geräte</h2>
-            <p class="hint">Auf diesen Geräten sind Sie gerade angemeldet.</p>
+            <p class="hint">
+                Auf diesen Geräten sind Sie gerade angemeldet<template v-if="claude?.length"
+                    >, dazu Ihre Verbindungen mit Claude</template
+                >.
+            </p>
         </div>
 
         <p
@@ -141,6 +180,31 @@ async function onEndOthers(): Promise<void> {
                         @click="onEnd(session)"
                     >
                         Abmelden
+                    </button>
+                </li>
+                <li
+                    v-for="connection in claude ?? []"
+                    :key="`claude-${connection.id}`"
+                    class="session"
+                    data-testid="claude-connection"
+                >
+                    <span class="session-text">
+                        <span class="session-label">
+                            {{ connectionLabel(connection) }}
+                            <span class="badge">Claude: {{ connection.accessLabel }}</span>
+                        </span>
+                        <span class="session-time">{{
+                            claudeConnectionTimeText(connection, now)
+                        }}</span>
+                    </span>
+                    <button
+                        class="btn"
+                        type="button"
+                        :aria-label="`${connectionLabel(connection)} trennen`"
+                        :disabled="busyId !== null || busyOthers"
+                        @click="onEndClaude(connection)"
+                    >
+                        Trennen
                     </button>
                 </li>
             </ul>
