@@ -63,12 +63,21 @@ Frage: Findet Claude die OAuth-Metadaten unter `/firefighting/test/` (Issuer
    `…/claude-verbinden?…` mit `redirect_uri` `http://localhost:<port>/callback`, alle `checks` `true`.
    Danach `claude mcp remove ausruestung-test`.
 
-Auswertung (vom Agenten nach Holgers Versuch):
+Auswertung (vom Agenten nach Holgers erstem Versuch, Protokoll `api/v1/mcp-probe` gelesen am
+07.11.2026, 07:30 UTC; Abrufe von Claude mit User-Agent `python-httpx/0.28.1`):
 
-- ☐ Claude ruft `POST mcp` auf und folgt `resource_metadata` (Protokoll: `mcp` mit Status 401, dann
-  `protected-resource`).
-- ☐ Claude findet die Metadaten über `openid-configuration` (Protokoll: Schritt
-  `openid-configuration`; ob auch `oauth-authorization-server` abgerufen wurde, notieren).
-- ☐ Claude registriert sich (`register`, `redirect_uris_allowed` true, `client_name`).
-- ☐ Der Browser erreicht `claude-verbinden` mit PKCE S256, `resource` = MCP-Adresse, erlaubtem
-  Rücksprung (`authorize`, alle `checks` true).
+- ☑ Claude ruft `POST mcp` auf (`initialize`, Protokollversion `2025-11-25`, ohne Token → 401) und
+  folgt `resource_metadata` (`protected-resource` 200); zwei Durchläufe, 07:16:15 und 07:17:12 UTC.
+- ☑ Claude findet die Metadaten über `openid-configuration` (Variante 3, 200).
+  `oauth-authorization-server` hat Claude NICHT abgerufen (O1: nicht nötig).
+- ☑ Claude registriert sich (07:17:15, 201): `client_name` „Claude“, `redirect_uris`
+  `["https://claude.ai/api/mcp/auth_callback"]` (erlaubt), `grant_types`
+  `authorization_code`/`refresh_token`, `response_types` `code`, `token_endpoint_auth_method`
+  `none`, `scope` `read write`.
+- ☒ Der Browser hat `claude-verbinden` beim Server nicht erreicht (kein Schritt `authorize` von
+  Claude): Der installierte Service Worker der Test-Stadt lieferte die App („Seite nicht gefunden“).
+  Behoben mit Commit „Service Worker: Adressen des Claude-Zugangs immer vom Server (Runde 4,
+  Aufgabe 0)“. Der Eintrag `authorize` um 07:18:14 mit nur dem Parameter `x` (User-Agent
+  `curl/8.5.0`) ist eine Prüfung per curl, nicht Claude.
+- ☐ Wiederholung durch Holger nach dem Deploy: Der Browser erreicht `claude-verbinden` mit PKCE
+  S256, `resource` = MCP-Adresse, erlaubtem Rücksprung (`authorize`, alle sechs `checks` true).

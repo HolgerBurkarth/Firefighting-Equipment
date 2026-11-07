@@ -21,6 +21,11 @@ use FirefightingEquipment\Http\Request;
 use FirefightingEquipment\Http\Routes;
 
 ini_set('display_errors', '0');
+// Ungefangene Fehler (500 ohne Inhalt) ins Protokoll des Testlaufs (phpServer.ts gibt stderr aus).
+set_exception_handler(static function (Throwable $error): void {
+    file_put_contents('php://stderr', 'update-server.php: ' . $error::class . ': ' . $error->getMessage() . "\n");
+    http_response_code(500);
+});
 
 $frontend = dirname(__DIR__, 3);
 require dirname($frontend) . '/vendor/autoload.php';
@@ -123,8 +128,19 @@ $readState = static function () use ($area, $stateFile): string {
 };
 $state = $readState();
 if ($state === 'next-held' && str_ends_with($path, '/index.html')) {
+    /*
+     * Eine unlesbare Schaltdatei während des Wartens gilt als „noch gehalten“: Die Anfrage endete
+     * sonst mit 500, die Installation scheiterte und die App blieb alt (rote CI 07.11.2026, handy-
+     * chromium, `index.html` nach 0,3 s mit 500 ohne Inhalt).
+     */
     $until = microtime(true) + 20;
-    while ($readState() === 'next-held' && microtime(true) < $until) {
+    while (microtime(true) < $until) {
+        try {
+            if ($readState() !== 'next-held') {
+                break;
+            }
+        } catch (RuntimeException) {
+        }
         usleep(50_000);
     }
 }
