@@ -383,17 +383,20 @@ Auftrag Holger vom 07.11.2026:
     aus druckbaren ASCII-Zeichen und höchstens 4096 Zeichen, sonst fällt der Header weg (die App
     antwortet dann z. B. mit 401). Andere Header (Cookie, Origin, ein selbst gesendetes
     `X-FF-Authorization`) gehen nie weiter.
-  - Zurück: Status, `Content-Type`, `WWW-Authenticate` und Body (höchstens 4 MiB), dazu fest
-    `Cache-Control: no-store` und `X-Content-Type-Options: nosniff`.
+  - Zurück: Status, `Content-Type`, `WWW-Authenticate`, `Allow` (bei 405) und Body (höchstens
+    4 MiB), dazu fest `Cache-Control: no-store` und `X-Content-Type-Options: nosniff`.
   - HTTP über das `curl` des Servers (Perl hat für HTTPS kein Modul in den Bordmitteln; `HTTP::Tiny`
-    braucht `IO::Socket::SSL`, das nicht sicher vorhanden ist). Aufruf ohne Shell (Liste an `exec`
-    über `IPC::Open3`). **Token und Body nie in der Befehlszeile** (die Prozessliste ist auf Shared
-    Hosting für andere sichtbar): Header und Body stehen in einer curl-Konfiguration, die der
-    Vermittler über die Standardeingabe schreibt (`--config -`, Body als `data-raw`, also ohne
-    Sonderbedeutung von `@`; Body mit NUL-Byte → 400). Keine temporären Dateien. `--disable` (keine
-    `.curlrc`), `--http1.1`, `--proto =https`, Zeitgrenzen 5 s Verbindung und 25 s insgesamt
-    (dazu `alarm` als Rückfall), `--stderr /dev/null`. curl unter `/usr/bin/curl`,
-    `/usr/local/bin/curl` oder `/bin/curl` (erstes vorhandenes).
+    braucht `IO::Socket::SSL`, das nicht sicher vorhanden ist). Aufruf ohne Shell (`fork` und
+    `exec` mit Liste). **Token und Body nie in der Befehlszeile** (die Prozessliste ist auf Shared
+    Hosting für andere sichtbar): Die Header stehen in einer curl-Konfiguration, die der Vermittler
+    über eine eigene Pipe schreibt (`--config /dev/fd/3`), der Body geht über die Standardeingabe
+    (`--data-binary @-`, unverändert, auch NUL-Bytes). Nicht den Body in der Konfiguration: curl
+    7.81 liest deren Zeilen nur bis rund 100 KiB (gemessen 07.11.2026, darüber fiel `data-raw` still
+    weg und curl sendete GET). Keine temporären Dateien. `--disable` (keine `.curlrc`),
+    `--http1.1`, `--proto =https`, `--noproxy '*'`, Zeitgrenzen 5 s Verbindung und 25 s insgesamt
+    (dazu `alarm` als Rückfall), `--stderr /dev/null`, curl mit leerer Umgebung (nur `PATH`). curl
+    unter `/usr/bin/curl`, `/usr/local/bin/curl` oder `/bin/curl` (erstes vorhandenes); ohne curl
+    oder ohne `/dev/fd` 502.
   - Fehler des Vermittlers im Fehlerformat der App (`{"error","message"}`): 404 `not_found`,
     405 `method_not_allowed`, 400 `invalid_request`, 502 `bad_gateway` (curl fehlt oder scheitert,
     Antwort unlesbar oder zu groß), 504 `gateway_timeout`.
@@ -401,7 +404,7 @@ Auftrag Holger vom 07.11.2026:
   - Tests (`tests/Unit/Scripts/McpRelayScriptTest.php`): `perl -c`; nachgebaute CGI-Umgebung mit
     einem Ersatz für curl (Befehlszeile ohne Token, Konfiguration genau, Antwort, Fehlerfälle, curl nie
     aufgerufen bei 404/405/400); unter Linux zusätzlich mit dem echten curl gegen einen lokalen
-    PHP-Server, der Header und Body zurückgibt (prüft die Maskierung der Konfiguration).
+    PHP-Server, der Header und Body zurückgibt (Konfiguration und Body von 1 MiB mit Sonderzeichen).
     Übersprungen ohne Perl. Die Testumgebung setzt `FF_MCP_CURL_BIN` (nur für Tests; Apache setzt
     keine solche Variable aus einer Anfrage).
 - **App**: `mcp` liest das Token aus `Authorization` oder `X-FF-Authorization` (gleichwertig, das

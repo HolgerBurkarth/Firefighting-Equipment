@@ -14,3 +14,4 @@
 *.wasm binary
 *.br binary
 *.gz binary
+*.pl text eol=lf

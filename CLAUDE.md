@@ -1559,6 +1559,45 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Liefert der Server nach einer Änderung an dieser Datei 500, sofort zurücknehmen und deployen.
 - Nur Dateien in `public/` sind von außen erreichbar; dort nichts Geheimes ablegen.
 
+## Vermittler für Claude (cgi-bin)
+- Seit 07.11.2026 (Auftrag Holger, Plan `docs/PLAN-MCP.md` Abschnitt 9b). Grund: Apache gibt den
+  Header `Authorization` an PHP (FastCGI auf STRATO) nie weiter, an klassisches CGI (mod_cgi) im
+  `cgi-bin` von www.prodad.de aber schon, wenn dort eine `.htaccess` mit `CGIPassAuth On` liegt.
+- Quelle im Repository: `scripts/cgi-bin/ff-mcp.pl` (Perl, Shebang `#!/usr/bin/perl`, LF über
+  `.gitattributes`) und `scripts/cgi-bin/.htaccess` (nur `CGIPassAuth On`, gehört dazu). Beide liegen
+  auf dem Server im `cgi-bin` AUSSERHALB des Projektordners; das Deploy fasst sie nicht an. Holger
+  lädt sie von Hand hoch (Rechte 755 bzw. 644). Agenten ändern sie nur im Repository, nie auf dem
+  Server, und nennen nach einer Änderung in der „✅ FERTIG“- bzw. „❓ RÜCKFRAGE“-Meldung die Datei
+  zum Hochladen. Die übrigen Dateien im `cgi-bin` (z. B. Holgers Prüfskripte) gehören nicht zum
+  Projekt.
+- MCP-Adresse für Claude: `https://www.prodad.de/cgi-bin/ff-mcp.pl/<stadt>` (Kürzel aus
+  `PATH_INFO`, nur ein Segment nach den Regeln von `TenantSlug`, nicht `service`; sonst 404 ohne
+  Anfrage an die App). Ziel fest `https://www.prodad.de/firefighting/<stadt>/mcp`, kein anderes,
+  keine Weiterleitungen, nur `https`. `POST`, `GET`, `DELETE` gehen weiter, andere Methoden 405
+  (`Allow: POST`).
+- Weiter gehen nur Body (höchstens 1 MiB, sonst 400), `Content-Type`, `Accept`, `Mcp-Session-Id`,
+  `MCP-Protocol-Version` und `Authorization` als `X-FF-Authorization`; Werte nur druckbares ASCII,
+  höchstens 4096 Zeichen, sonst fällt der Header weg. Nie Cookie, Origin oder ein selbst gesendetes
+  `X-FF-Authorization`. Zurück nur Status, `Content-Type`, `WWW-Authenticate`, `Allow` und Body
+  (höchstens 4 MiB), dazu fest `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`.
+- HTTP über das `curl` des Servers (`/usr/bin/curl`, `/usr/local/bin/curl` oder `/bin/curl`), ohne
+  Shell (`fork`/`exec` mit Liste), leere Umgebung (nur `PATH`), `--disable`, `--proto =https`,
+  `--noproxy '*'`, 5 s Verbindung, 25 s insgesamt (dazu `alarm`). Token und Body NIE in der
+  Befehlszeile (Prozessliste auf Shared Hosting): Header in einer Konfiguration über eine eigene Pipe
+  (`--config /dev/fd/3`), Body über die Standardeingabe (`--data-binary @-`). Nicht den Body in die
+  Konfiguration schreiben: curl liest deren Zeilen nur bis rund 100 KiB (curl 7.81, gemessen
+  07.11.2026; darüber fiel der Body still weg). Keine temporären Dateien, keine Protokolle (STDERR
+  des Skripts und von curl auf `/dev/null`; keine Warnung beim Übersetzen, per Test).
+- Eigene Fehler im Fehlerformat der App: 404 `not_found`, 405 `method_not_allowed`, 400
+  `invalid_request`, 502 `bad_gateway` (curl fehlt oder scheitert, kein `/dev/fd`, Antwort unlesbar
+  oder zu groß), 504 `gateway_timeout`. Diese Codes gibt es nur im Vermittler.
+- `FF_MCP_CURL_BIN` nur für Tests (Ersatz für curl); Apache setzt keine solche Variable aus einer
+  Anfrage. Tests `tests/Unit/Scripts/McpRelayScriptTest.php` (`perl -c` ohne Warnungen, nachgebaute
+  CGI-Umgebung mit Ersatz für curl; unter Linux echtes curl gegen einen lokalen PHP-Server, Body
+  1 MiB mit Sonderzeichen; ohne Perl übersprungen, Perl über `tests/Support/Perl.php`, unter Windows
+  das von Git for Windows). Die PHP-Tests unter WSL laufen nicht (dort fehlen `dom`/`xmlwriter`);
+  den Fall mit echtem curl prüft CI unter Linux.
+
 ## Datenbank
 - Nur eine Datenbank; alle Tabellen mit Präfix `fe_` (z. B. `fe_tenants`, `fe_users`,
   `fe_devices`, `fe_device_events`).
