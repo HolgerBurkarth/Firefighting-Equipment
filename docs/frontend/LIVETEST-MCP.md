@@ -34,6 +34,11 @@ Geprüft am 07.11.2026, Build `1a7d06d06086`:
   `api/v1/tenant`) ☑ 200, kein 500. Drei Versuche gescheitert (Code, `SetEnvIf`, `RewriteRule`),
   angehalten; Ursache auf dem Server noch unklar (Header erreicht Apache nicht, oder STRATO entfernt
   die Variable vor PHP).
+  Prüf-Route `GET …/test/api/v1/auth-probe` (Build `74cb075a94a2`): mit `Authorization: Bearer
+  test123`, ohne Header und mit Basic (`curl -u`) jeweils `{"sapi":"cgi-fcgi","gateway_interface":
+  "CGI/1.1","server":[],"env":[]}`: keine einzige Variable mit „AUTH“ bei PHP (auch kein
+  `PHP_AUTH_USER`), trotz `RewriteRule [E=HTTP_AUTHORIZATION:…]`. `…/immendingen/api/v1/auth-probe`
+  → 404 ☑. Nächster Schritt: Rückfrage an Holger (`CGIPassAuth` oder STRATO-Support).
 - ☑ `GET …/test/api/v1/mcp-probe` → 404; `POST …/immendingen/mcp` und
   `…/immendingen/.well-known/openid-configuration` → 404.
 - ☑ Zusätzlich per curl: `POST oauth/register` mit claude.ai-Rücksprung → 201, mit fremder Adresse →
