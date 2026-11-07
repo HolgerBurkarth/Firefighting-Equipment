@@ -8,6 +8,36 @@ ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holge
 
 Stand: deployt am 07.11.2026 (Build `1a7d06d06086`, Migrationen 0045/0046 mit Sicherung vorher).
 
+MCP-Adresse für Claude seit dem Vermittler (CLAUDE.md "Vermittler für Claude (cgi-bin)"):
+`https://www.prodad.de/cgi-bin/ff-mcp.pl/test`, nicht mehr `…/firefighting/test/mcp`.
+
+### Vermittler im cgi-bin (07.11.2026, Build `fa7433111922`)
+
+Holger hat `scripts/cgi-bin/ff-mcp.pl` (755, binär, unverändert) und `.htaccess` mit `CGIPassAuth On`
+ins `cgi-bin` geladen, `ff-auth-probe.pl` gelöscht. Vom Agenten per curl bestätigt (Claude im Chat
+hatte die ersten fünf Punkte schon geprüft):
+
+- ☑ Ohne Stadt, `/immendingen`, `/service`, `/test/x`, `/TEST` → 404 (`not_found` im Fehlerformat).
+- ☑ `GET` und `PUT …/ff-mcp.pl/test` → 405 mit `Allow: POST`, `Cache-Control: no-store`,
+  `X-Content-Type-Options: nosniff`; `DELETE` geht weiter an die App → 405 der App.
+- ☑ `POST` ohne Token → 401 mit `WWW-Authenticate: Bearer resource_metadata="https://www.prodad.de/
+  firefighting/test/.well-known/oauth-protected-resource", scope="read write"`.
+- ☑ `POST` mit falschem Token (`ffa_` + 43 Zeichen) → 401 mit `error="invalid_token"`: Der Header
+  `Authorization` kommt über den Vermittler bei der App an (direkt an `…/firefighting/test/mcp`
+  weiterhin ohne `error="invalid_token"`, wie erwartet).
+- ☑ Ein vom Client selbst gesendetes `X-FF-Authorization` gibt der Vermittler nicht weiter (401 ohne
+  `error="invalid_token"`).
+- ☑ Body: 20 KiB kommen bei der App an (400 „höchstens 16384 Byte“ der App), über 1 MiB lehnt der
+  Vermittler ab (400 „höchstens 1 MiB“).
+- ☑ `oauth-protected-resource`: `resource` = `https://www.prodad.de/cgi-bin/ff-mcp.pl/test`,
+  `authorization_servers` = `["https://www.prodad.de/firefighting/test"]`.
+- ☑ `oauth/register` (localhost-Rücksprung, Name „Agent-Pruefung Vermittler“, nie genutzt, wird nach
+  24 Stunden aufgeräumt) und `api/v1/oauth/authorize/check` mit `resource` = Adresse des
+  Vermittlers → 200; mit der alten Adresse `…/firefighting/test/mcp` → 400 mit Rücksprung
+  `error=invalid_target`.
+- ☐ Ein echtes Zugriffstoken über den Vermittler (`initialize`, `tools/list`) prüft erst Holgers
+  Verbindung (unten), der Agent gibt keine Passwörter ein.
+
 ### Vom Agenten nach dem Deploy (curl und Chrome, nur Test-Stadt)
 
 Geprüft am 07.11.2026, Build `1a7d06d06086`:
@@ -47,6 +77,8 @@ Geprüft am 07.11.2026, Build `1a7d06d06086`:
   (ein vorgeschalteter Proxy entfernt ihn, die `RewriteCond` greift nie), oder Variablen aus der
   `.htaccess` kommen bei PHP gar nicht an. `CGIPassAuth` wieder entfernt, Rückfrage an Holger
   (STRATO-Support).
+  Gelöst über den Vermittler im cgi-bin (siehe oben): ☑ `error="invalid_token"` über
+  `…/cgi-bin/ff-mcp.pl/test`.
 - ☑ `GET …/test/api/v1/mcp-probe` → 404; `POST …/immendingen/mcp` und
   `…/immendingen/.well-known/openid-configuration` → 404.
 - ☑ Zusätzlich per curl: `POST oauth/register` mit claude.ai-Rücksprung → 201, mit fremder Adresse →
@@ -67,7 +99,7 @@ Vorbereitung: In der Benutzerverwaltung der Test-Stadt einem Testkonto, dessen P
 claude.ai vorher entfernen (Einstellungen → Konnektoren → „…“ → „Entfernen“).
 
 1. claude.ai: Einstellungen → Konnektoren → „Benutzerdefinierten Konnektor hinzufügen“, Name
-   `Ausrüstung Test`, URL `https://www.prodad.de/firefighting/test/mcp`, erweiterte Einstellungen leer
+   `Ausrüstung Test`, URL `https://www.prodad.de/cgi-bin/ff-mcp.pl/test`, erweiterte Einstellungen leer
    → „Hinzufügen“ → „Verbinden“.
    - Erwartet: Fenster `https://www.prodad.de/firefighting/test/claude-verbinden?…` mit Logo bzw.
      Name der Test-Stadt, Überschrift „Claude verbinden“, „Claude möchte in Ihrem Namen …“, Stadt =
@@ -103,7 +135,8 @@ claude.ai vorher entfernen (Einstellungen → Konnektoren → „…“ → „E
 
 ### Für Holger: Claude Code verbinden
 
-1. Terminal: `claude mcp add --transport http ausruestung-test https://www.prodad.de/firefighting/test/mcp`.
+1. Terminal: `claude mcp add --transport http ausruestung-test https://www.prodad.de/cgi-bin/ff-mcp.pl/test`
+   (einen alten Eintrag vorher mit `claude mcp remove ausruestung-test` entfernen).
 2. In Claude Code `/mcp` → `ausruestung-test` → „Authenticate“.
    - Erwartet: Der Browser öffnet `…/claude-verbinden?…` mit Ziel „Claude Code auf diesem Rechner
      (localhost)“.
