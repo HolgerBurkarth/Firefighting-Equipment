@@ -4,6 +4,82 @@ Nur in der Test-Stadt `https://www.prodad.de/firefighting/test/`, nie in echten 
 [`../MCP-KONZEPT.md`](../MCP-KONZEPT.md), Plan: [`../PLAN-MCP.md`](../PLAN-MCP.md). Je Schritt wird
 ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holger).
 
+## Runde 5: OAuth, mcp und „Claude verbinden“ (M3, M4)
+
+Stand: gebaut (Commits „OAuth-Server und mcp für den Claude-Zugang, Vorklärung entfernt (Runde 5,
+M3)“ und „Seite „Claude verbinden“ und Claude-Verbindungen im Profil (Runde 5, M4)“). Deploy erst
+nach Holgers Durchsicht von M3; die Punkte unten sind bis dahin offen.
+
+### Vom Agenten nach dem Deploy (curl und Chrome, nur Test-Stadt)
+
+- ☐ `GET …/test/.well-known/openid-configuration`: `revocation_endpoint`, `token_endpoint`
+  `…/test/oauth/token`, `authorization_endpoint` `…/test/claude-verbinden`.
+- ☐ `POST …/test/mcp` ohne Token → 401 mit `WWW-Authenticate`, mit falschem Token zusätzlich
+  `error="invalid_token"`; `GET …/test/mcp` → 405.
+- ☐ `GET …/test/api/v1/mcp-probe` → 404 (Vorklärung entfernt); `…/immendingen/mcp` und
+  `…/immendingen/.well-known/openid-configuration` → 404.
+- ☐ `claude-verbinden?client_id=unbekannt` im Browser: „Diese Anwendung ist bei der Stadt nicht
+  registriert …“, kein Knopf „Zurück zu Claude“, kein Formular.
+- ☐ Profil bzw. Einstellungen → „Angemeldete Geräte“ ohne Verbindung unverändert.
+
+### Für Holger: claude.ai verbinden
+
+Vorbereitung: In der Benutzerverwaltung der Test-Stadt einem Testkonto, dessen Passwort Sie kennen
+(z. B. „Holger Test 1“), den Claude-Zugang „Lesen“ geben. Einen alten Konnektor „Ausrüstung Test“ in
+claude.ai vorher entfernen (Einstellungen → Konnektoren → „…“ → „Entfernen“).
+
+1. claude.ai: Einstellungen → Konnektoren → „Benutzerdefinierten Konnektor hinzufügen“, Name
+   `Ausrüstung Test`, URL `https://www.prodad.de/firefighting/test/mcp`, erweiterte Einstellungen leer
+   → „Hinzufügen“ → „Verbinden“.
+   - Erwartet: Fenster `https://www.prodad.de/firefighting/test/claude-verbinden?…` mit Logo bzw.
+     Name der Test-Stadt, Überschrift „Claude verbinden“, „Claude möchte in Ihrem Namen …“, Stadt =
+     Name der Test-Stadt, Ziel `claude.ai`, angefragter Zugang „Ändern“.
+2. E-Mail und Passwort des Testkontos → „Anmelden und fortfahren“.
+   - Erwartet: „Angemeldet als Holger Test 1. Claude bekommt Zugang: Lesen.“ (höchstens der Zugang
+     des Kontos), Knöpfe „Verbinden“ und „Ablehnen“.
+3. „Verbinden“.
+   - Erwartet: zurück zu claude.ai, der Konnektor ist verbunden; er zeigt **keine Werkzeuge**
+     (tools/list ist leer, Werkzeuge kommen mit M5). Eine Frage wie „Welche Werkzeuge hat Ausrüstung
+     Test?“ ergibt: keine.
+4. Postfach des Testkontos.
+   - Erwartet: Mail „Neue Claude-Verbindung“ von „Feuerwehr Ausrüstungsverwaltung“ mit Stadt, „Ziel:
+     claude.ai“, „Zugang: Lesen“, Uhrzeit und dem Hinweis „… „Angemeldete Geräte“ → „Trennen““; kein
+     Code, kein Token.
+5. App als Testkonto → „Profil“ → „Angemeldete Geräte“.
+   - Erwartet: Eintrag „Claude (claude.ai)“ mit Chip „Claude: Lesen“ und „Zuletzt genutzt … ·
+     verbunden <heute>“, Knopf „Trennen“.
+6. App als Admin → Benutzerverwaltung.
+   - Erwartet: beim Testkonto Chip „Claude: Lesen“ und „verbunden · zuletzt genutzt …“; im Fenster
+     „Bearbeiten“ abseits „Claude-Verbindungen trennen …“.
+7. Im Profil des Testkontos „Trennen“.
+   - Erwartet: „Claude (claude.ai) wurde getrennt.“, Eintrag weg; in claude.ai fordert der Konnektor
+     beim nächsten Gebrauch eine neue Verbindung.
+8. Erneut „Verbinden“ in claude.ai, auf der Seite „Ablehnen“.
+   - Erwartet: zurück zu claude.ai mit einer Fehlermeldung (Verbindung abgelehnt), keine Verbindung
+     im Profil, keine Mail.
+9. Erneut „Verbinden“, Anmeldung mit einem Konto ohne Claude-Zugang (z. B. Ihr Admin-Konto).
+   - Erwartet: „Kein Claude-Zugang – bitte wenden Sie sich an Ihren Admin.“, kein „Verbinden“, kein
+     Rücksprung.
+10. Verbindung für den Rest wieder herstellen (Schritte 1–3) und über die Benutzerverwaltung
+    „Claude-Verbindungen trennen …“ prüfen: Chip bleibt, „verbunden“ verschwindet.
+
+### Für Holger: Claude Code verbinden
+
+1. Terminal: `claude mcp add --transport http ausruestung-test https://www.prodad.de/firefighting/test/mcp`.
+2. In Claude Code `/mcp` → `ausruestung-test` → „Authenticate“.
+   - Erwartet: Der Browser öffnet `…/claude-verbinden?…` mit Ziel „Claude Code auf diesem Rechner
+     (localhost)“.
+3. Anmelden mit dem Testkonto, „Verbinden“.
+   - Erwartet: Der Browser meldet den Erfolg von Claude Code; `/mcp` zeigt `ausruestung-test` als
+     verbunden (`initialize` und `ping` haben geklappt) mit 0 Werkzeugen. Mail „Neue
+     Claude-Verbindung“ mit „Ziel: Claude Code auf dem eigenen Rechner (localhost)“.
+4. Profil → „Angemeldete Geräte“: „Claude Code (localhost)“ mit „Trennen“; die Benutzerverwaltung
+   zeigt „2 Verbindungen“, solange auch claude.ai verbunden ist.
+5. Zeigt die Seite stattdessen „Die Rücksprung-Adresse ist für diese Anwendung nicht registriert.“:
+   Claude Code hat einen anderen Port als bei der Registrierung benutzt (Rücksprung-Adressen werden
+   exakt verglichen, Plan Abschnitt 9a). Bitte melden; Abhilfe ist ein neues `claude mcp add`.
+6. Zum Schluss `claude mcp remove ausruestung-test` und die Verbindung im Profil trennen.
+
 ## Runde 4: Claude-Zugang setzen und trennen (M1, M2)
 
 Nach dem Deploy in der Test-Stadt (Agent im Browser, als Admin der Test-Stadt; Holger am iPhone
