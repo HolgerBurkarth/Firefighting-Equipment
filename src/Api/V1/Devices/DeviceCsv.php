@@ -10,6 +10,7 @@ use FirefightingEquipment\Device\DeviceEvent;
 use FirefightingEquipment\Device\DeviceEventLocation;
 use FirefightingEquipment\Device\DeviceField;
 use FirefightingEquipment\Device\DeviceHistoryEntry;
+use FirefightingEquipment\Device\EventChannel;
 use FirefightingEquipment\Time\GermanFormat;
 
 /**
@@ -31,7 +32,7 @@ final class DeviceCsv
         'Aktionszeit', 'Eingang beim Server', 'Ausrüstungs-ID', 'Nummer', 'Ausrüstungstyp', 'Ereignis', 'Wer',
         'Standort von', 'Standort nach', 'Status von', 'Status nach', 'Wartungsdatum alt', 'Wartungsdatum neu',
         'Feld', 'Alter Wert', 'Neuer Wert', 'Kommentar', 'Übernommen', 'Grund (nicht übernommen)',
-        'Buchungs-Kennung',
+        'Buchungs-Kennung', 'Über Claude',
     ];
 
     /**
@@ -85,6 +86,7 @@ final class DeviceCsv
             $event->applied ? 'Ja' : 'Nein',
             $event->notAppliedReason?->label(),
             $event->clientRef,
+            $event->channel === EventChannel::Claude ? 'Ja' : null,
         ];
     }
 

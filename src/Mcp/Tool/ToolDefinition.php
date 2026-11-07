@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Mcp\Tool;
 
+use FirefightingEquipment\Permission\Requirement;
+
 /**
  * Ein Werkzeug des Claude-Zugangs (docs/MCP-KONZEPT.md, Abschnitt 3): Name (englisch), Titel und
  * Beschreibung (deutsch), inputSchema, Annotationen, die REST-Routen, die es aufrufen darf (die
@@ -27,6 +29,8 @@ final readonly class ToolDefinition
         public bool $readOnly = true,
         public bool $destructive = false,
         public bool $idempotent = true,
+        /** zusätzlich nötig, damit das Werkzeug erscheint (z. B. device.edit bei einer Route, die auch device.code zulässt) */
+        public ?Requirement $requires = null,
     ) {
         if (preg_match('/^[a-z][a-z_]{2,63}\z/', $name) !== 1) {
             throw new \LogicException(sprintf('Ungültiger Name eines Werkzeugs: %s', $name));

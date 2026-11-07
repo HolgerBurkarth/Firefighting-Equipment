@@ -46,7 +46,10 @@ function retry(): void {
                         {{ eventTimeText(event.occurredAt, now) }}
                     </time>
                 </div>
-                <span class="history-user">von {{ event.userName }}</span>
+                <span class="history-user"
+                    >von {{ event.userName
+                    }}<template v-if="event.viaClaude"> · über Claude</template></span
+                >
                 <dl v-if="eventLines(event, now).length > 0" class="history-lines">
                     <div
                         v-for="line in eventLines(event, now)"

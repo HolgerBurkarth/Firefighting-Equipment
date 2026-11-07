@@ -58,6 +58,21 @@ final readonly class ToolApi
     }
 
     /**
+     * Buchungs-Kennung (client_ref, UUID v4) aus Verbindung, Art, Ausrüstung und Inhalt: derselbe
+     * Aufruf (gleiche Version) ergibt dieselbe Kennung, der Server bucht ihn nicht doppelt.
+     *
+     * @param array<string, mixed> $content
+     */
+    public function stableRef(string $kind, int $deviceId, array $content): string
+    {
+        $connection = $this->auth->claude?->connection->id ?? throw new \LogicException('Ohne Claude-Verbindung.');
+        $hash = hash('sha256', implode("\n", [$connection, $kind, $deviceId, json_encode($content, JSON_THROW_ON_ERROR)]));
+        $hex = substr($hash, 0, 12) . '4' . substr($hash, 13, 3) . dechex(8 + (hexdec($hash[16]) & 3)) . substr($hash, 17, 15);
+
+        return sprintf('%s-%s-%s-%s-%s', substr($hex, 0, 8), substr($hex, 8, 4), substr($hex, 12, 4), substr($hex, 16, 4), substr($hex, 20, 12));
+    }
+
+    /**
      * Ob die Route mit den wirksamen Rechten erreichbar ist (ohne Feldregeln eines Bodys), z. B. für
      * Teile einer Antwort, die nicht jede Rolle sieht.
      */

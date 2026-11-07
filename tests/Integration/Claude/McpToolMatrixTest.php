@@ -34,16 +34,33 @@ final class McpToolMatrixTest extends McpToolsTestCase
         'list_locations', 'list_equipment_types',
     ];
 
+    private const array ALL_WRITE = [
+        'book_equipment', 'bulk_book_equipment', 'set_maintenance_date', 'bulk_set_maintenance_date', 'create_equipment',
+        'update_equipment', 'assign_code', 'retire_equipment', 'reinstate_equipment', 'preview_import', 'apply_import',
+        'create_location', 'rename_location', 'lock_location', 'unlock_location', 'create_equipment_type',
+        'rename_equipment_type', 'deactivate_equipment_type', 'activate_equipment_type', 'resolve_notice', 'reopen_notice',
+    ];
+
+    /**
+     * Gerätewart mit Datenfilter: alles an der Ausrüstung, kein Import und keine Verwaltung von Standorten
+     * und Typen (F3).
+     */
+    private const array FILTERED_WRITE = [
+        'book_equipment', 'bulk_book_equipment', 'set_maintenance_date', 'bulk_set_maintenance_date', 'create_equipment',
+        'update_equipment', 'assign_code', 'retire_equipment', 'reinstate_equipment', 'resolve_notice', 'reopen_notice',
+    ];
+
     /**
      * @return iterable<string, array{string, string, list<string>}>
      */
     public static function matrix(): iterable
     {
-        foreach (['read' => 'Lesen', 'read write' => 'Ändern'] as $scope => $label) {
-            yield 'Admin, ' . $label => [self::ADMIN_EMAIL, $scope, self::ALL_READ];
-            yield 'Benutzer, ' . $label => [self::EMAIL, $scope, self::USER_READ];
-            yield 'Datenfilter, ' . $label => [self::FILTERED_EMAIL, $scope, self::ALL_READ];
-        }
+        yield 'Admin, Lesen' => [self::ADMIN_EMAIL, 'read', self::ALL_READ];
+        yield 'Benutzer, Lesen' => [self::EMAIL, 'read', self::USER_READ];
+        yield 'Datenfilter, Lesen' => [self::FILTERED_EMAIL, 'read', self::ALL_READ];
+        yield 'Admin, Ändern' => [self::ADMIN_EMAIL, 'read write', [...self::ALL_READ, ...self::ALL_WRITE]];
+        yield 'Benutzer, Ändern' => [self::EMAIL, 'read write', [...self::USER_READ, 'book_equipment']];
+        yield 'Datenfilter, Ändern' => [self::FILTERED_EMAIL, 'read write', [...self::ALL_READ, ...self::FILTERED_WRITE]];
     }
 
     /**
@@ -55,7 +72,7 @@ final class McpToolMatrixTest extends McpToolsTestCase
         $token = $this->tokenFor($email, $scope);
 
         self::assertSame($expected, $this->toolNames($token));
-        foreach ($expected as $name) {
+        foreach (array_intersect($expected, self::ALL_READ) as $name) {
             $result = $this->callTool($token, $name, $this->sampleArguments($name));
             if ($email === self::FILTERED_EMAIL && $name === 'get_notice') {
                 // Der Hinweis gehört zu M3 im Lager, außerhalb des Datenfilters.
@@ -65,7 +82,7 @@ final class McpToolMatrixTest extends McpToolsTestCase
             self::assertFalse($result['isError'], $name . ': ' . json_encode($result, JSON_UNESCAPED_UNICODE));
             self::assertNotSame([], $result['content'], $name);
         }
-        foreach (array_diff(self::ALL_READ, $expected) as $hidden) {
+        foreach (array_diff([...self::ALL_READ, ...self::ALL_WRITE], $expected) as $hidden) {
             $response = $this->rpc($token, 'tools/call', ['name' => $hidden, 'arguments' => $this->sampleArguments($hidden)]);
             self::assertSame(McpServer::INVALID_PARAMS, $response['error']['code'], $hidden);
         }
@@ -127,6 +144,8 @@ final class McpToolMatrixTest extends McpToolsTestCase
         $this->pdo()->exec("UPDATE fe_users SET claude_access = 'read' WHERE id = " . $this->user);
 
         self::assertSame(self::USER_READ, $this->toolNames($token));
+        $response = $this->rpc($token, 'tools/call', ['name' => 'book_equipment', 'arguments' => ['id' => $this->m1, 'version' => 1, 'status' => 'maintenance']]);
+        self::assertSame(McpServer::INVALID_PARAMS, $response['error']['code']);
     }
 
     /**

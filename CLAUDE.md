@@ -1607,7 +1607,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `fe_devices.identifier_key`, `fe_devices.scan_code`/`scan_code_key` (exakter Vergleich) sowie
   `fe_device_events.old_value`/`new_value` (siehe "Standorte und Geräte"); feste Werte (`role`, `status`, `purpose`, `action`, `kind`, `event_type`, `field`,
   `not_applied_reason`, `outcome`, `reason`, `requested_status`, `other_status`, `system_key`, `area`,
-  `level`),
+  `level`, `channel`),
   `password_hash`, `fe_tenants.accent_color`, `fe_tenant_logos.version` und
   `fe_device_bookings.client_ref` sind
   `ascii`/`ascii_bin`, damit `IN (...)` bzw. `LIKE` Groß- und Kleinschreibung unterscheiden.
@@ -2525,6 +2525,32 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `roles`, `tenant/…`, `auth/…`, Exporte). Tests `McpToolMatrixTest` (Admin, Benutzer, Rolle mit
   Datenfilter × Lesen/Ändern, Zugang aus, gesperrt), `McpReadToolsTest` (Basis `McpToolsTestCase`),
   Unit `ToolRoutesTest`, `PermissionsForClaudeTest`.
+- Schritt M6 (Schreibwerkzeuge und „über Claude“, Runde 6): `WriteTools::all()` (21: `book_equipment`,
+  `bulk_book_equipment`, `set_maintenance_date`, `bulk_set_maintenance_date`, `create_equipment`,
+  `update_equipment` (nur mit `device.edit`), `assign_code` (nur mit `device.code`; beides über
+  `ToolDefinition::$requires`), `retire_equipment`, `reinstate_equipment`, `preview_import`
+  (readOnlyHint, CSV als Text), `apply_import` (nur mit dem Kennzeichen der Vorschau), `create_location`,
+  `rename_location`, `lock_location`, `unlock_location`, `create_equipment_type`,
+  `rename_equipment_type`, `deactivate_equipment_type`, `activate_equipment_type`, `resolve_notice`,
+  `reopen_notice`); nur mit Zugang „Ändern“ und den Rechten der Rolle. Ändernde Werkzeuge an einer
+  Ausrüstung verlangen `version` (veraltet → `version_conflict` mit Stand). `book_equipment` verlangt
+  wie die App bei einem Wechsel auf defekt einen Kommentar ab 5 Zeichen und sendet eine stabile
+  `client_ref` (`ToolApi::stableRef`: UUID v4 aus Verbindung, Werkzeug, Gerät und Inhalt; gleicher
+  Aufruf = keine zweite Buchung). Annotationen siehe `ToolRoutesTest` (`DESTRUCTIVE`,
+  `NOT_IDEMPOTENT`). `mcp` mit Body bis `Request::MAX_UPLOAD_BYTES` (der Vermittler lässt 1 MiB
+  durch). „über Claude“: `EventChannel` (`app`/`claude`), Spalten `fe_device_events.channel`
+  (Migration `0047`) und `fe_device_notice_actions.channel` (`0048`), Standard `app`;
+  `RequestContext::channel()` (`claude`, wenn `AuthSession::$claude` gesetzt ist, also nur über
+  `ToolApi`), weitergereicht an `DeviceRepository`, `DeviceEventWriter`, `DeviceImport`,
+  `DeviceNoticeRepository::change` (optional, Standard `app`; je Schreibwerkzeug ein Test auf
+  `claude` im Verlauf); JSON `channel` in Einträgen des Verlaufs und im Verlauf der Hinweise, CSV
+  „Über Claude“, Log-Mails „Wer: … (über Claude)“ und Zeitbudget
+  `DeviceLogNotifier::CLAUDE_TIME_BUDGET_SECONDS` (5 s). App: `viaClaude` in `DeviceEventEntry`
+  und `NoticeHistoryEntry` (fehlt das Feld: App), Anzeige „von <Name> · über Claude“ im Verlauf
+  (`DeviceHistoryList`), in „Letzte Aktivitäten“ und im Verlauf des Hinweises. Kein Werkzeug für
+  Benutzer, Einladungscodes, Rollen, Einstellungen, eigene Einstellungen und `service`
+  (`ToolRoutesTest`). Tests `McpWriteToolsTest`, `McpToolMatrixTest`, Browser
+  `deviceDetails.spec.ts`, Unit `deviceHistory.spec.ts`, `notices.spec.ts`.
 
 ## Städte verwalten und Admins einladen
 - Nur Super-Admins, nur unter `service` (`Access::SuperAdmin`; Konten einer Stadt haben dort keine
@@ -3097,7 +3123,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`DeviceEvent::label()`), Wer (Anzeigename, anonymisiert „Gelöschter Benutzer #ID“, nie die
   E-Mail), Standort von/nach (aktueller Pfad), Status von/nach, Wartungsdatum alt/neu, Feld (deutsch),
   Alter/Neuer Wert (Beschaffungsdatum als `TT.MM.JJJJ`), Kommentar, Übernommen (Ja/Nein), Grund (nicht
-  übernommen), Buchungs-Kennung (`client_ref`). Zeitraum und Reihenfolge nach Eingang (`created_at`). Dateiname
+  übernommen), Buchungs-Kennung (`client_ref`), Über Claude (`Ja` bzw. leer, seit Schritt M6). Zeitraum und Reihenfolge nach Eingang (`created_at`). Dateiname
   `historie-<kürzel>-<von>-bis-<bis>.csv`.
 
 ## CSV-Import (API)
@@ -3232,7 +3258,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   „… – umgebucht, Status defekt“, bei verschiedenen Zielstatus „Status geändert“; nur ein geändertes
   Gerät → die gewöhnliche Mail `deviceChanged`; Link für Admins auf die Geräteliste).
 - Betreff „Log <Stadtname>: <Grund>“ (z. B. „MA-01 umgebucht, Status defekt“, „CSV-Import: 2 neu,
-  1 geändert“, höchstens 200 Zeichen). Text: Vorgang, Gerät (Kennung, Typ), Wer (Anzeigename), Wann
+  1 geändert“, höchstens 200 Zeichen). Text: Vorgang, Gerät (Kennung, Typ), Wer (Anzeigename, über
+  ein Werkzeug des Claude-Zugangs mit „ (über Claude)“, `EventChannel::suffix`), Wann
   (Europe/Berlin), Von/Nach je Ereignis, Kommentar, Link (KONZEPT.md "Admin-Konsole –
   Entscheidungen", 36; `DeviceLogNotifier::linkFor`): für Admins auf das Gerätedetail
   (`AppUrls::deviceDetails`, `geraete/<id>/details`), beim CSV-Import auf die Geräteliste

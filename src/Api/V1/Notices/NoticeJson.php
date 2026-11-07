@@ -70,6 +70,7 @@ final class NoticeJson
             'user' => self::user($entry->user),
             'at' => AuthJson::time($entry->at),
             'note' => $entry->note,
+            'channel' => $entry->channel->value,
         ];
     }
 

@@ -38,7 +38,7 @@ final readonly class DeviceActionHandler implements RequestHandler
     {
         $tenant = $context->tenant ?? throw new \LogicException('Nur unter einer Stadt.');
         $recorder = new DeviceEventRecorder();
-        $devices = new DeviceRepository($context->db->get(), $context->visibility(), $recorder);
+        $devices = new DeviceRepository($context->db->get(), $context->visibility(), $recorder, $context->channel());
 
         try {
             $device = match ($this->action) {

@@ -236,7 +236,8 @@ onMounted(() => {
                                 ><span v-else class="activity-device">{{
                                     event.device.identifier
                                 }}</span>
-                                {{ event.typeLabel }} · {{ event.userName }}
+                                {{ event.typeLabel }} · {{ event.userName
+                                }}<template v-if="event.viaClaude"> · über Claude</template>
                             </span>
                             <span v-if="activityDetail(event, now) !== ''" class="activity-detail">
                                 {{ activityDetail(event, now) }}

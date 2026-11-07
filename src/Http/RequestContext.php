@@ -7,6 +7,7 @@ namespace FirefightingEquipment\Http;
 use FirefightingEquipment\Auth\AuthSession;
 use FirefightingEquipment\Claude\ClaudeSession;
 use FirefightingEquipment\Database\LazyConnection;
+use FirefightingEquipment\Device\EventChannel;
 use FirefightingEquipment\Mail\Mailer;
 use FirefightingEquipment\Mail\Notifier;
 use FirefightingEquipment\Mail\SendmailMailer;
@@ -54,6 +55,15 @@ final readonly class RequestContext
     public function claude(): ClaudeSession
     {
         return $this->claude ?? throw new \LogicException('Route ohne Claude-Verbindung.');
+    }
+
+    /**
+     * Weg der Anfrage für den Verlauf: Claude, wenn ein Werkzeug des Claude-Zugangs die Route aufruft
+     * (AuthSession::viaClaude), sonst die App.
+     */
+    public function channel(): EventChannel
+    {
+        return $this->auth?->claude !== null ? EventChannel::Claude : EventChannel::App;
     }
 
     /**

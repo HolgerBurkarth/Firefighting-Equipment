@@ -117,6 +117,7 @@ describe('API der Hinweise', () => {
                         user: { id: 7, name: 'Kommandant', email: 'admin@example.org' },
                         at: '2026-10-30T10:00:00Z',
                         note: 'Geklärt\nMaske getauscht',
+                        channel: 'claude',
                     },
                 ],
             }),
@@ -133,7 +134,7 @@ describe('API der Hinweise', () => {
                 comment: 'Ventil klemmt',
             },
             other: { status: { value: 'ready', label: 'einsatzbereit' } },
-            history: [{ action: 'resolve', note: 'Geklärt\nMaske getauscht' }],
+            history: [{ action: 'resolve', note: 'Geklärt\nMaske getauscht', viaClaude: true }],
         });
     });
 

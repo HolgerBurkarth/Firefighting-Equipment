@@ -253,7 +253,8 @@ final class Routes
             ->add('POST', 'api/v1/oauth/authorize', Access::Public, new AuthorizeHandler(checkOnly: false));
 
         // Die Werkzeuge rufen die Routen dieses Routers auf (gleiche Erfordernisse wie in der App).
-        return $router->add('POST', 'mcp', Access::Claude, new McpHandler($router, ToolRegistry::standard()));
+        // Body bis 3 MiB: das Werkzeug des CSV-Imports sendet die Datei (der Vermittler lässt 1 MiB durch).
+        return $router->add('POST', 'mcp', Access::Claude, new McpHandler($router, ToolRegistry::standard()), Request::MAX_UPLOAD_BYTES);
     }
 
     /** Anmeldung, Sitzungen und Passwort; unter service und unter jeder Stadt gleich. */

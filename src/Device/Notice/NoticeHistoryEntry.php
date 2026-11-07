@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Device\Notice;
 
+use FirefightingEquipment\Device\EventChannel;
+
 /**
  * Eintrag im Verlauf eines Hinweises: erledigt (mit optionaler Notiz) oder wieder geöffnet.
  */
@@ -16,6 +18,7 @@ final readonly class NoticeHistoryEntry
         public ?string $note,
         /** UTC */
         public \DateTimeImmutable $at,
+        public EventChannel $channel = EventChannel::App,
     ) {
     }
 }

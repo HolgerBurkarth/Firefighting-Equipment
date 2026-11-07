@@ -44,8 +44,8 @@ final readonly class NoticeActionHandler implements RequestHandler
             $notices = new DeviceNoticeRepository($context->db->get(), $context->visibility());
             $notice = match ($this->action) {
                 NoticeAction::Show => $notices->find($tenant, $id) ?? throw NoticeNotFoundException::forId($id),
-                NoticeAction::Resolve => $notices->change($tenant, $id, $context->auth()->user->id, NoticeChange::Resolve, $note),
-                NoticeAction::Reopen => $notices->change($tenant, $id, $context->auth()->user->id, NoticeChange::Reopen, null),
+                NoticeAction::Resolve => $notices->change($tenant, $id, $context->auth()->user->id, NoticeChange::Resolve, $note, $context->channel()),
+                NoticeAction::Reopen => $notices->change($tenant, $id, $context->auth()->user->id, NoticeChange::Reopen, null, $context->channel()),
             };
         } catch (DeviceException $e) {
             throw DeviceErrors::http($e);

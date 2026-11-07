@@ -26,6 +26,8 @@ export interface NoticeHistoryEntry {
     readonly at: string;
     /** Notiz beim Erledigen (mehrzeilig) oder null. */
     readonly note: string | null;
+    /** Über ein Werkzeug des Claude-Zugangs (`channel` `claude`). */
+    readonly viaClaude: boolean;
 }
 
 /** Status mit deutscher Bezeichnung; null = ungültig. */
@@ -114,7 +116,7 @@ function parseHistoryEntry(json: unknown): NoticeHistoryEntry | null {
     ) {
         return null;
     }
-    return { id, action, actionLabel, user, at, note };
+    return { id, action, actionLabel, user, at, note, viaClaude: json['channel'] === 'claude' };
 }
 
 function parseBooking(json: unknown): Notice['booking'] | null {

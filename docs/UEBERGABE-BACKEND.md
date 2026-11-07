@@ -8,7 +8,21 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
-## 2026-11-07 – „Claude-Zugang: Lesewerkzeuge über die REST-Routen (Runde 6, M5)“
+## 2026-11-07 – „Claude-Zugang: Schreibwerkzeuge und Vermerk „über Claude“ (Runde 6, M6)“
+
+- Neu im Verlauf: Feld `channel` (`app` | `claude`) in jedem Eintrag von `GET devices/{id}/events`
+  und `GET device-events` (Migration `0047`, bisherige Einträge `app`) und in jedem Eintrag von
+  `history` eines Hinweises (`GET notices`, `GET notices/{id}`; Migration `0048`). CSV-Export des
+  Verlaufs mit neuer letzter Spalte „Über Claude“ (`Ja` bzw. leer). Log-Mails „Wer: Erika (über
+  Claude)“. Alle Routen und Antworten sonst unverändert; die App schreibt weiter `app`.
+- `POST mcp`: Body bis 3 MiB (CSV-Import); 21 Schreibwerkzeuge (umbuchen, Sammelaktionen,
+  Wartungsdatum, anlegen, Stammdaten, Code, aussondern, wieder aufnehmen, Import prüfen/übernehmen,
+  Standorte, Ausrüstungstypen, Hinweise) nur mit Zugang „Ändern“ und den Rechten der Rolle;
+  Log-Mails über Claude mit Zeitbudget 5 s.
+- Grund: Schritt M6 (`docs/PLAN-MCP.md`, Abschnitt 9c).
+- Tests: `McpWriteToolsTest`, `McpToolMatrixTest`, `ToolRoutesTest`, `DeviceHistoryExportTest`.
+  `CLAUDE.md`: "Claude-Zugang (MCP, im Aufbau)", Schritt M6; "Standorte und Geräte"; "CSV-Export
+  (API)"; "Benachrichtigung „Log“".
 
 - `POST mcp`: `tools/list` liefert jetzt die Lesewerkzeuge, die das Konto wirksam darf (Rolle ∩
   Claude-Zugang, ohne `users`, `settings`, `mail.log`; `Permissions::forClaude`):
