@@ -351,8 +351,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   - Grundregel: Die API nur erweitern (neue Felder optional, alte noch mindestens einen Deploy
     lang behalten). `n` steigt nur bei einer inkompatiblen Änderung, dann in Datei, `ClientApi` und
     Frontend gemeinsam. `ClientApi::MIN` (MIN_CLIENT_API, höchstens `CURRENT`, per Test) erst nach
-    Rückfrage anheben; derzeit 2 (seit 06.11.2026, Plan Phase 1, Schritt 1.8a: Apps mit 1 richten
-    die Oberfläche nach `role` und aktualisieren sich sofort; vorher 1).
+    Rückfrage anheben; derzeit 3 (seit 08.11.2026, Plan Phase 2, P2.1, Freigabe Holger G13: Apps mit 2 kennen den
+    Status `used` nicht; 2 seit 06.11.2026, Schritt 1.8a: Apps mit 1 richten die Oberfläche nach
+    `role`; vorher 1).
   - Backend: Ist `X-Client-Api` eine Nummer (`ClientApi::fromHeader`: nur Ziffern ohne führende
     Null, höchstens 9 Stellen) unter `ClientApi::MIN`, antwortet `Application` nach `RequestGuard`
     und vor der Stadt mit 409 `client_outdated` (`HttpException::clientOutdated`, `details

@@ -29,11 +29,12 @@ final class ClientApi
     public const int CURRENT = 3;
 
     /**
-     * Kleinste Nummer, die der Server noch annimmt (MIN_CLIENT_API); höchstens CURRENT. 2 seit Plan
-     * Phase 1, Schritt 1.8a: Apps mit 1 richten Menü und Knöpfe nach `role` statt nach den Rechten
-     * und aktualisieren sich daher sofort, bevor Städte eigene Rollen bekommen.
+     * Kleinste Nummer, die der Server noch annimmt (MIN_CLIENT_API); höchstens CURRENT. 3 seit Plan
+     * Phase 2, Schritt P2.1 (Freigabe Holger 08.11.2026, G13): Apps mit 2 kennen den Status `used`
+     * nicht. 2 seit Schritt 1.8a: Apps mit 1 richten Menü und Knöpfe nach `role` statt nach den
+     * Rechten.
      */
-    public const int MIN = 2;
+    public const int MIN = 3;
 
     /** Nur Ziffern ohne führende Null (oder genau 0), höchstens 9 Stellen. */
     private const string PATTERN = '/^(0|[1-9][0-9]{0,8})\z/';
