@@ -8,6 +8,12 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-08 – „ClientApi::MIN 3 (Phase 2, P2.1, G13)“
+
+- `ClientApi::MIN` von 2 auf 3 (Freigabe Holger 08.11.2026): Apps mit `X-Client-Api` 2 bekommen 409
+  `client_outdated` (`details {min_client_api: 3}`) und aktualisieren sich. Tests: `ClientApiTest`,
+  `ApplicationTest`. `CLAUDE.md`: Versionierung der API.
+
 ## 2026-11-08 – „Status „benutzt“ (Phase 2, Runde 8, P2.1)“
 
 - Neuer Status `used` („benutzt“) in `DeviceStatus`: gültig überall, wo Status vorkommen (Geräte,

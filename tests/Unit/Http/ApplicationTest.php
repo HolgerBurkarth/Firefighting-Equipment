@@ -238,8 +238,9 @@ final class ApplicationTest extends TestCase
         yield 'GET unter einer Stadt' => [new Request('GET', '/firefighting/immendingen/api/v1/tenant', ['x-client-api' => '0'])];
         yield 'POST unter service' => [self::post('/firefighting/service/echo/1', ['content-type' => 'application/json', 'x-client-api' => '0'], '{}')];
         yield 'POST unter einer Stadt' => [self::post('/firefighting/immendingen/echo/1', ['content-type' => 'application/json', 'x-client-api' => '0'], '{}')];
-        // Seit Schritt 1.8a (ClientApi::MIN = 2): Apps vor 1.7c.
+        // Seit P2.1 (ClientApi::MIN = 3): Apps vor dem Status `used`.
         yield 'Nummer 1 unter einer Stadt' => [new Request('GET', '/firefighting/immendingen/api/v1/tenant', ['x-client-api' => '1'])];
+        yield 'Nummer 2 unter einer Stadt' => [new Request('GET', '/firefighting/immendingen/api/v1/tenant', ['x-client-api' => '2'])];
     }
 
     #[DataProvider('outdatedClients')]
@@ -256,7 +257,7 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(409, $response->statusCode());
         self::assertSame(
-            '{"error":"client_outdated","message":"Diese Version der App ist veraltet – bitte aktualisieren.","details":{"min_client_api":2}}',
+            '{"error":"client_outdated","message":"Diese Version der App ist veraltet – bitte aktualisieren.","details":{"min_client_api":3}}',
             $response->body(),
         );
         self::assertSame((string) ClientApi::CURRENT, $response->headers()['X-Api-Version']);

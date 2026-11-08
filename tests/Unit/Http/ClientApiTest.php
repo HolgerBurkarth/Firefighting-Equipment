@@ -63,10 +63,12 @@ final class ClientApiTest extends TestCase
 
     public function testAppsBeforeRightsAreOutdated(): void
     {
-        // Schritt 1.8a: Apps vor 1.7c (X-Client-Api 1) richten die Oberfläche nach `role`.
-        self::assertSame(2, ClientApi::MIN);
+        // Schritt 1.8a: Apps vor 1.7c (X-Client-Api 1) richten die Oberfläche nach `role`; seit P2.1
+        // kennen Apps mit 2 den Status `used` nicht.
+        self::assertSame(3, ClientApi::MIN);
         self::assertTrue(ClientApi::isOutdated('1'));
-        self::assertFalse(ClientApi::isOutdated('2'));
+        self::assertTrue(ClientApi::isOutdated('2'));
+        self::assertFalse(ClientApi::isOutdated('3'));
         // Apps vor Phase 0 senden keinen Header und bleiben unberührt (auch curl, Deploy-Skript).
         self::assertFalse(ClientApi::isOutdated(null));
     }
