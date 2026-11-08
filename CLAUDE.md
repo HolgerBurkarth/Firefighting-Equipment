@@ -2547,7 +2547,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   „Über Claude“, Log-Mails „Wer: … (über Claude)“ und Zeitbudget
   `DeviceLogNotifier::CLAUDE_TIME_BUDGET_SECONDS` (5 s). App: `viaClaude` in `DeviceEventEntry`
   und `NoticeHistoryEntry` (fehlt das Feld: App), Anzeige „von <Name> · über Claude“ im Verlauf
-  (`DeviceHistoryList`), in „Letzte Aktivitäten“ und im Verlauf des Hinweises. Kein Werkzeug für
+  (`DeviceHistoryList`), in „Letzte Aktivitäten“ und im Verlauf des Hinweises; die Werkzeuge
+  `get_equipment_history`, `list_city_history` und `get_notice` (Verlauf) mit `via_claude: true` je
+  solchem Eintrag (sonst fehlt das Feld) und „N Einträge davon über Claude.“ im Text
+  (`ToolFormat::viaClaudeText`, Runde 7). Kein Werkzeug für
   Benutzer, Einladungscodes, Rollen, Einstellungen, eigene Einstellungen und `service`
   (`ToolRoutesTest`). Tests `McpWriteToolsTest`, `McpToolMatrixTest`, Browser
   `deviceDetails.spec.ts`, Unit `deviceHistory.spec.ts`, `notices.spec.ts`.

@@ -110,6 +110,10 @@ final class ToolFormat
             'changes' => $changes,
             'comment' => $event['comment'] ?? null,
         ];
+        if (($event['channel'] ?? null) === 'claude') {
+            // Vermerk „über Claude“ wie in App, Detailseite, CSV und Log-Mails.
+            $entry['via_claude'] = true;
+        }
         if (($event['applied'] ?? true) === false) {
             $entry['applied'] = false;
             $entry['not_applied_reason'] = $event['not_applied_label'] ?? null;
@@ -130,6 +134,22 @@ final class ToolFormat
         }
 
         return $entry;
+    }
+
+    /**
+     * Satz zur Zusammenfassung eines Verlaufs: „3 davon über Claude.“ bzw. leer.
+     *
+     * @param list<array<string, mixed>> $events Einträge aus event()
+     */
+    public static function viaClaudeText(array $events): string
+    {
+        $count = count(array_filter($events, static fn (array $e): bool => ($e['via_claude'] ?? false) === true));
+
+        return match ($count) {
+            0 => '',
+            1 => ' 1 Eintrag davon über Claude.',
+            default => sprintf(' %d Einträge davon über Claude.', $count),
+        };
     }
 
     /**

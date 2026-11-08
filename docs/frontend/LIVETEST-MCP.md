@@ -32,6 +32,17 @@ M6 (Build `573e164979a3`, 07.11.2026; Migrationen 0047/0048 nach Sicherung
   401 in 0,36 s (keine Änderung).
 - ☑ Body von 600 KB (`preview_import`) geht durch den Vermittler und `RequestGuard` (401 in 0,83 s,
   vorher 16 KiB-Grenze).
+
+### Von Holger (Claude im Chat, Admin-Konto, Zugang „Ändern“; abgenommen 08.11.2026)
+
+- ☑ `get_overview`, `list_due` und `get_equipment` (M7) stimmen mit der App überein.
+- ☑ M90 per `book_equipment` auf „in Wartung“ und zurück: beide übernommen, zurückgesetzt, Version
+  danach 18.
+- ☑ `book_equipment` mit veralteter Version → `version_conflict`, nichts gebucht.
+- ☒ `get_equipment_history` (und `list_city_history`) zeigten den Vermerk „über Claude“ nicht (Eintrag
+  257 an M90). Behoben in Runde 7 (`via_claude: true`, Text „… davon über Claude.“).
+- ☐ Punkte 1–16 unten (als *Benutzer* und mit Datenfilter): für später offen (Holger, 08.11.2026).
+
 ### Für Holger: in claude.ai prüfen
 
 Vorbereitung (Benutzerverwaltung der Test-Stadt, als Admin):
