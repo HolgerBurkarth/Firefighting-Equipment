@@ -14,9 +14,10 @@ Vom Agenten nach dem Deploy (Build `5c5609a24eea`, 08.11.2026; Chrome als Admin 
   Verlauf“ der Handy-Seite „von Holger Burkarth · über Claude“; CSV-Export des Verlaufs (im Speicher
   gelesen, keine Datei) „Über Claude“ = „Ja“ bei beiden.
 - ☐ Log-Mail zu 257 („Wer: … (über Claude)“): Mails kann der Agent nicht lesen (Holger).
-- ☐ `get_equipment_history`/`list_city_history` mit `via_claude: true`, Fehlerdetails mit `equipment`
-  bei `version_conflict`, Rückfrage nur noch vor aussondern, Import übernehmen, Standort sperren:
-  nur mit Token (Holger in claude.ai; Werkzeugliste nach „Trennen“/„Verbinden“ neu).
+- ☑ `get_equipment_history` an M90 zeigt `via_claude: true` bei 257 und 258; `version_conflict`
+  liefert `details.equipment` mit `number` und `maintenance_due` (Holger mit Claude im Chat über den
+  Konnektor, abgenommen 08.11.2026).
+- ☐ Rückfrage nur noch vor aussondern, Import übernehmen, Standort sperren: nicht eigens geprüft.
 - ☑ Service Worker (T15): die alte Version (`fa7433111922`) übernahm beim Seitenwechsel von selbst
   die neue; Vorab-Cache der Test-Stadt 51 Dateien mit einer CSS-Datei, Seiten der Konsole beim
   ersten Öffnen in `ff-assets` (Detailseite, Formulare).

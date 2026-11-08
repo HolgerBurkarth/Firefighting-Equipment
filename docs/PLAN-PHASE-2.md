@@ -1,6 +1,6 @@
 # Plan Phase 2: Standort-Aufgaben, Wartung, Verleih, Sollbestand, Erinnerungen
 
-Stand: 07.11.2026 (Runde 6, Entwurf zur Freigabe; nichts davon ist gebaut). Grundlage:
+Stand: 08.11.2026 (freigegeben von Holger am 08.11.2026 mit den Entscheidungen unten; Bau ab Runde 8). Grundlage:
 [`AENDERUNGSKONZEPT-2026-11.md`](AENDERUNGSKONZEPT-2026-11.md) (Abschnitte 1–3, 5–7, 9–12,
 Entscheidungen E1–E14), Plan Phase 1 ([`PLAN-PHASE-1-ROLLEN.md`](PLAN-PHASE-1-ROLLEN.md), umgesetzt),
 Claude-Zugang ([`PLAN-MCP.md`](PLAN-MCP.md)), Mockups
@@ -35,9 +35,10 @@ Ablauf"). Alle anderen Migrationen sind reine Erweiterungen.
   geheimen Link je Rückgabe-Standort (Aushang), „Rückgaben bearbeiten“.
 - **Sollbestand** je Standort (Zeilen mit einem oder mehreren gleichwertigen Typen), „außer
   Betrieb“ berechnet, **Tausch** als eine Anfrage (online und offline, „die Wirklichkeit gewinnt“).
-- **Mail-Auswahl je Person** und **Erinnerungen** (Termine fällig, Rückgabe überfällig, optional
-  tägliche Zusammenfassung) über einen **externen Zeitgeber** (E9) ⚠: Abweichung von „Keine
-  Cronjobs“ in `CLAUDE.md` (auf STRATO weiterhin keiner; ein Aufruf von außen).
+- **Mail-Auswahl je Person** (Themen) nur für Mails, die eine Aktion auslöst. **Keine Erinnerungs-Mails
+  und kein externer Zeitgeber** (Entscheidung Holger 08.11.2026, G12): „Termine fällig“ und „Rückgabe
+  überfällig“ zeigt die App (Dashboard, Termine, Verleih). Erinnerungen stehen als Wunsch in
+  `TODO-SPAETER.md` (T19). „Keine Cronjobs“ in `CLAUDE.md` bleibt unverändert.
 - **Geräteträger**: keine Standard-Rolle, sondern eine Rolle, die der Super-Admin anlegt (E1, E2);
   neue Aktionen `device.used`, `device.swap`, Einschränkung „Einmalgeräte nur benutzt melden“.
 - 13 Schritte (P2.1–P2.13), Vorschlag sechs Runden (Abschnitt 9). Keine Migration mit
@@ -93,7 +94,7 @@ Migration; Änderungen an CHECK-Bedingungen als DROP und ADD in EINER `ALTER TAB
 | 0064 | P2.8 | `fe_device_events.swap_id` (NULL; beide Buchungen eines Tauschs tragen dieselbe Kennung) und `fe_device_notices.kind` um `swap_replacement_moved`, `stock_below_minimum` | Erweiterung |
 | 0065 | P2.10 | `fe_user_mail_prefs` (`user_id`, `tenant_id`, `topic` ascii; Zeile = angehakt) | neue Tabelle |
 | 0066 | P2.10 | **[Daten, optional]** Konten mit `notify_device_log = 1` bekommen alle Themen (INSERT … SELECT). Vorschlag G7: nicht migrieren, `notify_device_log = 1` gilt als „alles angehakt“, bis die Person selbst wählt | optional |
-| 0067 | P2.11 | `fe_reminder_log` (`tenant_id`, `kind` `due`/`loan_overdue`/`daily`, `subject_id`, `due_on`, `sent_at`; UNIQUE je Art, Gegenstand und Fälligkeit: keine doppelte Erinnerung) | neue Tabelle |
+| ~~0067~~ | entfällt | ~~`fe_reminder_log` (`tenant_id`, `kind` `due`/`loan_overdue`/`daily`, `subject_id`, `due_on`, `sent_at`; UNIQUE je Art, Gegenstand und Fälligkeit: keine doppelte Erinnerung)~~ | entfällt (G12) |
 | 0068 | P2.13 | **[Daten, optional]** Startbelegung Immendingen (Aufgaben, Standard-Lager) per Migration. Vorschlag: nicht per Migration, sondern Holger richtet in der App ein (wie Rollen in 1.8b) | optional, Vorschlag: entfällt |
 
 Keine Migration ändert vorhandene Zeilen zwingend. Neue Status-Werte und Ereignisarten erweitern nur
@@ -176,20 +177,15 @@ CHECK-Bedingungen.
   inzwischen woanders, bucht der Server trotzdem und legt einen Hinweis an („Wirklichkeit gewinnt“,
   Konzept Abschnitt 6). Unterschreitung offline: gebucht, Hinweis, keine Ablehnung.
 
-### 3.6 Mails und Erinnerungen (P2.10, P2.11; Mockup `Benachrichtigungen`)
+### 3.6 Mail-Auswahl (P2.10; Mockup `Benachrichtigungen`)
 
 - Themen (`MailTopic`): defekt gemeldet, benutzt gemeldet, Rückgabe eingegangen, verliehen,
   Sollbestand unterschritten oder neuer Hinweis, sonstige Umbuchungen und Status, Stammdaten /
-  Wartungsdatum / Import; dazu Erinnerungen: Termin fällig (mit Vorlauf in Tagen), Rückgabe
-  überfällig, tägliche Zusammenfassung. Wählbar mit `mail.log` (Erinnerungen: wer `due` bzw. `loans`
-  sieht); Datenfilter gilt.
-- Externer Zeitgeber (E9) ⚠ G12: `POST service/api/v1/scheduler/run` mit geheimem Token aus der
-  Konfiguration (`scheduler.token`, nur SHA-256 verglichen, `Access::Public` mit eigener Prüfung,
-  Bremse); verarbeitet alle aktiven Städte mit Zeitbudget (wie die Log-Mails, z. B. 20 s je Aufruf,
-  Rest beim nächsten Aufruf), schreibt `fe_reminder_log` (keine doppelte Mail). Zeitgeber z. B.
-  cron-job.org alle 15 Minuten oder ein geplanter GitHub-Workflow (Secret im Repository-Secret).
-- `CLAUDE.md` „Keine Cronjobs: Fälligkeiten werden beim Aufruf berechnet“ wird ergänzt: „… außer den
-  Erinnerungs-Mails, die ein externer Zeitgeber über `scheduler/run` auslöst“.
+  Wartungsdatum / Import; Wählbar mit `mail.log`; Datenfilter gilt.
+- Entfällt (G12, Holger 08.11.2026): Erinnerungen (Termin fällig, Rückgabe überfällig, tägliche
+  Zusammenfassung), `scheduler/run`, `fe_reminder_log` (Migration 0067) und der externe Zeitgeber. Die
+  Themen gelten nur für Mails, die eine Aktion auslöst; die Mockup-Zeilen für Erinnerungen werden nicht
+  gebaut. `CLAUDE.md` „Keine Cronjobs“ bleibt.
 
 ### 3.7 Geräteträger und Einschränkungen (P2.3, P2.8, P2.13)
 
@@ -241,7 +237,7 @@ CHECK-Bedingungen.
 | P2.8 | Tausch online, Prüfung in allen Buchungswegen, `stock.override` | groß | `Handy-Tausch` | live am Handy |
 | P2.9 | Tausch und Unterschreitung offline | mittel | – | live offline (Holger) |
 | P2.10 | Mail-Auswahl je Person | klein | `Benachrichtigungen` | live (Mails Holger) |
-| P2.11 | Externer Zeitgeber, Erinnerungen, tägliche Zusammenfassung | mittel | `Benachrichtigungen` | Einrichtung des Zeitgebers (Holger) |
+| P2.11 | entfällt (G12: keine Erinnerungs-Mails, kein Zeitgeber) | – | – | – |
 | P2.12 | Claude-Werkzeuge für die neuen Abläufe | mittel | – | live mit Claude |
 | P2.13 | Rolle Geräteträger in `test`, Live-Test-Liste, Doku, Startbelegung Immendingen durch Holger | klein | – | – |
 
@@ -254,7 +250,7 @@ CHECK-Bedingungen.
 | 9 | P2.4, P2.10 | – |
 | 10 | P2.5, P2.6 | – |
 | 11 | P2.7, P2.8 | – |
-| 12 | P2.9, P2.11, P2.12, P2.13 | Einrichtung des Zeitgebers (Secret) |
+| 12 | P2.9, P2.12, P2.13 | – |
 
 ## 8. Risiken
 
@@ -264,8 +260,6 @@ CHECK-Bedingungen.
   `(tenant_id, location_id, status)` prüfen, Messung mit 5000 Geräten.
 - Öffentliche Rückgabe ist eine neue Angriffsfläche: Schlüssel 32 Byte, nur Hash, Bremse, keine
   Daten außer Nummer und Typ, Tests für fremde Städte und nicht verliehene Geräte.
-- Externer Zeitgeber: Ausfall darf nichts kaputt machen (nur Mails fehlen); doppelte Aufrufe dürfen
-  keine doppelten Mails senden (UNIQUE im Protokoll).
 
 ## 9. Offene Fragen (mit Vorschlag)
 
@@ -282,9 +276,11 @@ CHECK-Bedingungen.
 | G9 | Abgelehnte Buchung wegen Einschränkung: 403 `forbidden` oder eigener Code? | Eigener Code `restricted_action` (403) mit Meldung; die App zeigt dann „Benutzt melden“. |
 | G10 | Seite „Wartung“ über die Sammelrouten (braucht `devices.bulk`) oder eigene Routen? | Eigene Routen `maintenance/to-workshop`, `maintenance/back` mit Bereich `maintenance` Ändern. |
 | G11 | Was zählt zum Sollbestand: nur „einsatzbereit“? | Ja; „in Wartung“, „benutzt“ und „defekt“ am Fahrzeug zählen nicht (das Fach ist dann außer Betrieb). |
-| G12 | Welcher externe Zeitgeber? | cron-job.org (kostenlos, alle 15 Min.); Alternative geplanter GitHub-Workflow (unzuverlässiger im Takt). Token in `config.local.php`, nie im Repository. |
+| G12 | Welcher externe Zeitgeber? | **Entschieden (Holger 08.11.2026): keiner.** Keine Erinnerungs-Mails, keine tägliche Zusammenfassung; die App zeigt Fälliges und Überfälliges. Wunsch T19. |
 | G13 | `ClientApi::MIN` 3 gleich nach P2.1? | Ja, nach einem Deploy mit `X-Client-Api` 3 (wie 1.8a). |
 | G14 | Status „benutzt“ im CSV-Import erlauben? | Ja, wie die anderen Status (kein Ablauf wird ausgelöst; keine Sammelstelle). |
 | G15 | Verleih mehrerer Geräte: ein Verleih je Gerät oder ein Vorgang mit Positionen? | Je Gerät eine Zeile in `fe_device_loans`, gemeinsamer Kommentar; die Übersicht gruppiert nach Leihnehmer. |
 | G16 | Wer darf Rückgabe-Schlüssel erneuern und Aushänge drucken? | `returns.process` (Gerätewart, Admin). |
 | G17 | Tausch über Claude (P2.12) erlauben? | Ja mit Zugang „Ändern“ und `device.swap`; Unterschreiten ohne Ersatz über Claude nie (`stock.override` fällt in `forClaude` weg). |
+
+**Entscheidungen Holger 08.11.2026:** G1–G11 und G13–G17 wie vorgeschlagen (G1: Wartungsintervall je Typ als eigene Phase direkt nach Phase 2; G13: `ClientApi::MIN` 3 freigegeben, als eigener Schritt nach einem Deploy mit `X-Client-Api` 3, Deploy außerhalb eines Dienstabends); G12 siehe oben. Begriffe in der Oberfläche nach Konzept Abschnitt 9 (Rückgabe, „Ausgeliehen an“, „in Betrieb seit“ …), nicht die Arbeitsbegriffe des Plans. Die beiden optionalen Migrationen mit Datenänderung (0066, 0068) nur nach Rückfrage (Vorschlag: entfallen).
