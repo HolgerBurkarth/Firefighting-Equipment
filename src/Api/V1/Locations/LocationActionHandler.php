@@ -52,12 +52,31 @@ final readonly class LocationActionHandler implements RequestHandler
                 LocationAction::Rename => $locations->rename($tenant, $context->param('id'), self::name($context)),
                 LocationAction::Lock => $locations->lock($tenant, $context->param('id')),
                 LocationAction::Unlock => $locations->unlock($tenant, $context->param('id')),
+                LocationAction::SetTask => self::setTask($context, $locations, $tenant),
             };
         } catch (DeviceException $e) {
             throw DeviceErrors::http($e);
         }
 
         return new JsonResponse(['location' => LocationJson::location($location)], $this->action === LocationAction::Create ? 201 : 200);
+    }
+
+    /**
+     * POST locations/{id}/task: {task: string|null, is_default_store?: bool, collection_accepts?: string}.
+     */
+    private static function setTask(RequestContext $context, LocationRepository $locations, \FirefightingEquipment\Tenant\Tenant $tenant): \FirefightingEquipment\Device\Location
+    {
+        $value = $context->optionalStringField('task');
+        if (!$context->hasField('task')) {
+            throw HttpException::invalidRequest('Das Feld "task" fehlt (null entfernt die Aufgabe).');
+        }
+        $task = $value === null ? null : (\FirefightingEquipment\Device\LocationTask::tryFrom($value) ?? throw HttpException::invalidRequest(sprintf(
+            'Das Feld "task" muss null oder einer der Werte %s sein.',
+            implode(', ', array_map(static fn (\FirefightingEquipment\Device\LocationTask $t): string => sprintf('"%s"', $t->value), \FirefightingEquipment\Device\LocationTask::cases())),
+        )));
+        $default = $context->hasField('is_default_store') ? $context->boolField('is_default_store') : false;
+
+        return $locations->setTask($tenant, $context->param('id'), $task, $default, $context->optionalStringField('collection_accepts'));
     }
 
     /**

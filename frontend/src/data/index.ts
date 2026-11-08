@@ -40,8 +40,11 @@ import {
 import {
     createLocation,
     fetchAllLocations,
+    postLocationTask,
     renameLocation as postLocationName,
     setLocationActive as postLocationActive,
+    type CollectionAccepts,
+    type LocationTaskId,
     type NewLocation,
     type SavedLocation,
 } from '../api/locations';
@@ -172,6 +175,15 @@ async function afterMasterDataChange<T>(
 /** Neuer Standort oder neues Fach (Admin). */
 export async function addLocation(location: NewLocation): Promise<ApiResult<SavedLocation>> {
     return afterMasterDataChange(await createLocation(location), adminLocationStore);
+}
+
+/** Aufgabe eines Standorts der Ebene 1 setzen (null = entfernen). */
+export async function setLocationTask(
+    id: number,
+    task: LocationTaskId | null,
+    options: { defaultStore?: boolean; collectionAccepts?: CollectionAccepts } = {},
+): Promise<ApiResult<SavedLocation>> {
+    return afterMasterDataChange(await postLocationTask(id, task, options), adminLocationStore);
 }
 
 export async function renameLocation(id: number, name: string): Promise<ApiResult<SavedLocation>> {

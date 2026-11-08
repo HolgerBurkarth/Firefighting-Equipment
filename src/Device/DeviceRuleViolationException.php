@@ -19,6 +19,14 @@ final class DeviceRuleViolationException extends DeviceException
         parent::__construct($message);
     }
 
+    /**
+     * @param array<string, int>|null $details
+     */
+    public static function because(string $message, ?array $details = null): self
+    {
+        return new self($message, $details);
+    }
+
     public static function tooDeep(LocationName $parent): self
     {
         return new self(sprintf(

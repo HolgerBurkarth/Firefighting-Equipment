@@ -8,6 +8,21 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-08 – „Standort-Aufgaben (Phase 2, Runde 8, P2.2)“
+
+- Migrationen 0052 (`fe_tenant_location_tasks`) und 0053 (`fe_locations.task`, `is_default_store`,
+  `collection_accepts`, `default_store_key`; nur Erweiterungen). Aufgaben fest im Code (`LocationTask`:
+  `store`, `collection`, `workshop`, `returns`, `borrower`), nur Ebene 1.
+- Standort-JSON (`LocationJson`): neu `task` (oder null), `is_default_store`, `collection_accepts`.
+- Neu: `GET location-tasks` (Rechte wie `GET locations`) → `{tasks: [{task, label, default_label, enabled,
+  locations}]}`; `POST locations/{id}/task {task|null, is_default_store?, collection_accepts?}`
+  (`locations` Ändern; nur freigeschaltete Aufgaben, nur Ebene 1; erstes Lager wird Standard-Lager;
+  Sammelstelle `both` ohne Angabe); Super-Admin `GET/POST tenants/{id}/location-tasks {tasks: [{task,
+  enabled, label?}]}` (Abschalten, solange Standorte die Aufgabe tragen: 409 `details {locations}`).
+- Tests: `LocationTaskTest`, `TenantRoutePermissionsTest`, `SuperAdminRoutesAccessTest`,
+  `TenantReadRoutesAccessTest`; Frontend `locationTasks.spec.ts` (Browser), `locationTasksApi.spec.ts`.
+  `CLAUDE.md`: Standorte und Geräte, Frontend (Standorte, Super-Admin).
+
 ## 2026-11-08 – „ClientApi::MIN 3 (Phase 2, P2.1, G13)“
 
 - `ClientApi::MIN` von 2 auf 3 (Freigabe Holger 08.11.2026): Apps mit `X-Client-Api` 2 bekommen 409

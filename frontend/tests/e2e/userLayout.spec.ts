@@ -171,6 +171,14 @@ test.describe('Hell und dunkel', () => {
                 'background-color',
                 surface,
             );
+            // Ein Seitenwechsel mitten in der Synchronisierung (Standorte, client-config) meldet
+            // WebKit als Skriptfehler „due to access control checks“ (CI 08.11.2026, sporadisch):
+            // erst abwarten, bis nichts mehr unterwegs ist.
+            await expect
+                .poll(() =>
+                    page.evaluate(() => performance.getEntriesByName('ff:search-data').length),
+                )
+                .toBeGreaterThan(0);
             await page.goto('/firefighting/test/geraete/12');
             await expect(page.locator('header.focus-header')).toHaveCSS(
                 'background-color',

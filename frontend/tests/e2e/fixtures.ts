@@ -246,6 +246,20 @@ async function fulfillApi(
         await route.fulfill({ status: 200, json: DEFAULT_CLIENT_CONFIG });
     } else if (method === 'GET' && path === 'api/v1/locations' && !isService) {
         await route.fulfill({ status: 200, json: { locations: [] } });
+    } else if (method === 'GET' && path === 'api/v1/location-tasks' && !isService) {
+        // „Standorte“ des Admins liest die freigeschalteten Aufgaben; ohne eigene Angabe keine.
+        await route.fulfill({
+            status: 200,
+            json: {
+                tasks: ['store', 'collection', 'workshop', 'returns', 'borrower'].map((task) => ({
+                    task,
+                    label: task,
+                    default_label: task,
+                    enabled: false,
+                    locations: 0,
+                })),
+            },
+        });
     } else if (method === 'GET' && path === 'api/v1/auth/claude-connections' && !isService) {
         // „Angemeldete Geräte“ (Profil, Einstellungen) liest neben den Sitzungen die eigenen
         // Claude-Verbindungen; ohne eigene Angabe keine (claudeConnect.spec.ts prüft sie).

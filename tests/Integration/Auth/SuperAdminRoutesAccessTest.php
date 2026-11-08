@@ -44,6 +44,8 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
         yield 'Claude-Zugang setzen' => ['POST', 'tenants/{tenant}/users/{user}/claude-access', ['access' => 'read'], [409]];
         yield 'Claude-Verbindungen trennen' => ['POST', 'tenants/{tenant}/users/{user}/claude-connections/end', [], [409]];
         yield 'Rechte-Katalog' => ['GET', 'permission-catalog', null];
+        yield 'Aufgaben der Standorte lesen' => ['GET', 'tenants/{tenant}/location-tasks', null];
+        yield 'Aufgaben der Standorte speichern' => ['POST', 'tenants/{tenant}/location-tasks', ['tasks' => [['task' => 'store', 'enabled' => true]]]];
         yield 'Rollen auflisten' => ['GET', 'tenants/{tenant}/roles', null];
         yield 'Rolle anlegen' => ['POST', 'tenants/{tenant}/roles', ['name' => 'Live', 'areas' => ['search' => 'read'], 'actions' => [], 'locations' => null, 'device_types' => null]];
         yield 'Rolle kopieren' => ['POST', 'tenants/{tenant}/roles', ['copy_of' => '{role}']];

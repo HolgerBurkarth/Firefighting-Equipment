@@ -231,6 +231,61 @@ final readonly class LocationRepository
         }, $tenant);
     }
 
+    /**
+     * Setzt die Aufgabe eines Standorts der Ebene 1 ($task null = entfernen). Nur freigeschaltete
+     * Aufgaben (LocationTaskRepository). Das erste Lager wird zum Standard-Lager; wird ein anderes
+     * als Standard gewählt, verliert das bisherige die Markierung. Wiederholbar.
+     *
+     * @param string|null $collectionAccepts used, defective oder both (Sammelstelle, Standard both)
+     *
+     * @throws LocationNotFoundException
+     * @throws InvalidDeviceValueException  ungültige Annahme
+     * @throws DeviceRuleViolationException Unterstandort, Aufgabe nicht freigeschaltet
+     */
+    public function setTask(Tenant $tenant, int $id, ?LocationTask $task, bool $defaultStore, ?string $collectionAccepts): Location
+    {
+        if ($collectionAccepts !== null && !in_array($collectionAccepts, ['used', 'defective', 'both'], true)) {
+            throw new InvalidDeviceValueException('Das Feld "collection_accepts" muss "used", "defective" oder "both" sein.');
+        }
+
+        return $this->transaction(function () use ($tenant, $id, $task, $defaultStore, $collectionAccepts): int {
+            $row = $this->lockRow($tenant, $id, 'FOR UPDATE') ?? throw LocationNotFoundException::forId($id);
+            $name = LocationName::fromString((string) $row['name']);
+            if ($task !== null) {
+                if ($row['parent_id'] !== null) {
+                    throw DeviceRuleViolationException::because(sprintf('Eine Aufgabe kann nur ein Standort der obersten Ebene haben; „%s“ ist ein Unterstandort.', $name->value));
+                }
+                if (!new LocationTaskRepository($this->pdo)->isEnabled($tenant, $task)) {
+                    throw DeviceRuleViolationException::because(sprintf('Die Aufgabe „%s“ ist für diese Stadt nicht freigeschaltet.', $task->label()));
+                }
+            }
+
+            $isDefault = $task === LocationTask::Store && $defaultStore;
+            if ($task === LocationTask::Store && !$isDefault) {
+                // Das erste Lager der Stadt wird zum Standard-Lager.
+                $stmt = $this->pdo->prepare('SELECT id FROM fe_locations WHERE tenant_id = ? AND is_default_store = 1 AND id <> ? FOR UPDATE');
+                $stmt->execute([$tenant->id, $id]);
+                $isDefault = $stmt->fetchAll() === [];
+            }
+            if ($isDefault) {
+                $this->pdo->prepare('UPDATE fe_locations SET is_default_store = 0, updated_at = UTC_TIMESTAMP() WHERE tenant_id = ? AND is_default_store = 1 AND id <> ?')
+                    ->execute([$tenant->id, $id]);
+            }
+            $this->pdo->prepare(
+                'UPDATE fe_locations SET task = ?, is_default_store = ?, collection_accepts = ?, updated_at = UTC_TIMESTAMP()'
+                . ' WHERE id = ? AND tenant_id = ?',
+            )->execute([
+                $task?->value,
+                (int) $isDefault,
+                $task === LocationTask::Collection ? ($collectionAccepts ?? 'both') : null,
+                $id,
+                $tenant->id,
+            ]);
+
+            return $id;
+        }, $tenant);
+    }
+
     private function setActive(Tenant $tenant, int $id, bool $active): void
     {
         $this->pdo->prepare('UPDATE fe_locations SET active = ?, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ?')
@@ -299,7 +354,7 @@ final readonly class LocationRepository
         // Gezählt werden nur sichtbare Geräte.
         [$visible, $visibleParams] = $this->visibility->sql('d');
         $stmt = $this->pdo->prepare(
-            'SELECT l.id, l.name, l.kind, l.parent_id, l.active, l.created_at, l.updated_at, COALESCE(c.devices, 0) AS devices'
+            'SELECT l.id, l.name, l.kind, l.parent_id, l.active, l.task, l.is_default_store, l.collection_accepts, l.created_at, l.updated_at, COALESCE(c.devices, 0) AS devices'
             . ' FROM fe_locations l LEFT JOIN ('
             . "SELECT d.location_id, COUNT(*) AS devices FROM fe_devices d WHERE d.tenant_id = ? AND d.status <> 'retired'" . $visible
             . ' GROUP BY d.location_id'
@@ -381,6 +436,10 @@ final readonly class LocationRepository
             $children,
             self::utc((string) $row['created_at']),
             self::utc((string) $row['updated_at']),
+            true,
+            $row['task'] === null ? null : LocationTask::from((string) $row['task']),
+            (int) $row['is_default_store'] === 1,
+            $row['collection_accepts'] === null ? null : (string) $row['collection_accepts'],
         );
     }
 

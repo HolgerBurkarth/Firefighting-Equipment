@@ -29,6 +29,10 @@ final class LocationJson
             'active' => $location->active,
             // Nicht wählbar (Datenfilter, nur Fächer sichtbar): ohne Gerätezahl.
             'selectable' => $location->selectable,
+            // Aufgabe (Phase 2, P2.2): null = ohne Aufgabe.
+            'task' => $location->task?->value,
+            'is_default_store' => $location->isDefaultStore,
+            'collection_accepts' => $location->collectionAccepts,
             'device_count' => $location->selectable ? $location->deviceCount : null,
         ];
         if ($location->level() === 1) {
