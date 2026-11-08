@@ -13,6 +13,7 @@ import {
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
+import TenantTasksPanel from '../components/TenantTasksPanel.vue';
 import TenantRolesPanel from '../components/TenantRolesPanel.vue';
 import { phpTrim } from '../data/masterData';
 import {
@@ -52,11 +53,12 @@ const route = useRoute();
 const router = useRouter();
 const id = computed(() => Number(route.params['id']));
 
-type Tab = 'overview' | 'accounts' | 'roles';
+type Tab = 'overview' | 'accounts' | 'roles' | 'flows';
 const TAB_VIEWS: Readonly<Record<Tab, string | null>> = {
     overview: null,
     accounts: 'konten',
     roles: 'rollen',
+    flows: 'ablaeufe',
 };
 const tab = computed<Tab>({
     get: () =>
@@ -64,7 +66,9 @@ const tab = computed<Tab>({
             ? 'accounts'
             : route.query['ansicht'] === 'rollen'
               ? 'roles'
-              : 'overview',
+              : route.query['ansicht'] === 'ablaeufe'
+                ? 'flows'
+                : 'overview',
     set: (value) => {
         const view = TAB_VIEWS[value];
         void router.replace({ query: view === null ? {} : { ansicht: view } });
@@ -72,7 +76,7 @@ const tab = computed<Tab>({
 });
 
 function selectTab(value: string | number): void {
-    tab.value = value === 'accounts' || value === 'roles' ? value : 'overview';
+    tab.value = value === 'accounts' || value === 'roles' || value === 'flows' ? value : 'overview';
 }
 
 const loaded = shallowRef<ManagedTenant | null>(null);
@@ -465,6 +469,7 @@ onMounted(() => {
                 <TabsTrigger class="tab" value="overview">Übersicht</TabsTrigger>
                 <TabsTrigger class="tab" value="accounts">Admins und Benutzer</TabsTrigger>
                 <TabsTrigger class="tab" value="roles">Rollen</TabsTrigger>
+                <TabsTrigger class="tab" value="flows">Abläufe</TabsTrigger>
             </TabsList>
             <TabsContent class="tab-panel" value="overview">
                 <section class="card" aria-labelledby="tenant-facts" data-testid="tenant-facts">
@@ -657,6 +662,10 @@ onMounted(() => {
                     :tenant-name="tenant.name"
                     :active="tab === 'roles'"
                 />
+            </TabsContent>
+
+            <TabsContent class="tab-panel" value="flows" :unmount-on-hide="false">
+                <TenantTasksPanel :tenant-id="tenant.id" :active="tab === 'flows'" />
             </TabsContent>
         </TabsRoot>
 

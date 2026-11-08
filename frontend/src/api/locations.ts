@@ -18,6 +18,12 @@ export interface SubLocation {
 
 /** Standort der Ebene 1 mit seinen Unterstandorten (LocationJson). */
 export interface Location extends SubLocation {
+    /** Aufgabe (Phase 2, P2.2); fehlt bei älteren Antworten und Offline-Kopien = keine. */
+    readonly task?: LocationTaskId | null;
+    /** Standard-Lager der Stadt (nur bei task `store`). */
+    readonly isDefaultStore?: boolean;
+    /** Nur bei der Sammelstelle: was sie annimmt. */
+    readonly collectionAccepts?: CollectionAccepts | null;
     readonly kindLabel: string;
     /**
      * false: Die Rolle sieht nur Fächer dieses Standorts (Datenfilter, Schritt 1.4); er selbst ist
@@ -27,6 +33,30 @@ export interface Location extends SubLocation {
     /** Einschließlich aller Unterstandorte, auch nicht aufgeführter. */
     readonly deviceCountTotal: number;
     readonly children: readonly SubLocation[];
+}
+
+/** Aufgabe wie LocationTask in PHP. */
+export type LocationTaskId = 'store' | 'collection' | 'workshop' | 'returns' | 'borrower';
+
+export const LOCATION_TASK_IDS: readonly LocationTaskId[] = [
+    'store',
+    'collection',
+    'workshop',
+    'returns',
+    'borrower',
+];
+
+/** Was eine Sammelstelle annimmt (collection_accepts). */
+export type CollectionAccepts = 'used' | 'defective' | 'both';
+
+export const COLLECTION_ACCEPTS: readonly { value: CollectionAccepts; label: string }[] = [
+    { value: 'both', label: 'benutzte und defekte' },
+    { value: 'used', label: 'nur benutzte' },
+    { value: 'defective', label: 'nur defekte' },
+];
+
+export function isLocationTask(value: unknown): value is LocationTaskId {
+    return typeof value === 'string' && (LOCATION_TASK_IDS as readonly string[]).includes(value);
 }
 
 function isKind(value: unknown): value is LocationKind {
@@ -104,7 +134,13 @@ export function parseLocation(json: unknown): Location | null {
         children.push(child);
     }
     const selectable = json['selectable'] !== false;
+    const task = isLocationTask(json['task']) ? json['task'] : null;
+    const accepts = json['collection_accepts'];
     return {
+        task,
+        isDefaultStore: json['is_default_store'] === true,
+        collectionAccepts:
+            accepts === 'used' || accepts === 'defective' || accepts === 'both' ? accepts : null,
         id,
         name,
         kind,
@@ -220,4 +256,94 @@ export function setLocationActive(
         parseLocationResponse,
         { method: 'POST', ...(fetchFn && { fetchFn }) },
     );
+}
+
+/** Aufgabe einer Stadt (GET location-tasks bzw. tenants/{id}/location-tasks). */
+export interface TaskSetting {
+    readonly task: LocationTaskId;
+    /** Name in der Oberfläche (eigener oder Standardname). */
+    readonly label: string;
+    readonly defaultLabel: string;
+    /** Vom Super-Admin freigeschaltet. */
+    readonly enabled: boolean;
+    /** Standorte, die die Aufgabe tragen. */
+    readonly locations: number;
+}
+
+export function parseTaskSettings(json: unknown): readonly TaskSetting[] | null {
+    if (!isRecord(json) || !Array.isArray(json['tasks'])) {
+        return null;
+    }
+    const tasks: TaskSetting[] = [];
+    for (const entry of json['tasks']) {
+        if (!isRecord(entry)) {
+            return null;
+        }
+        const { task, label, enabled, locations } = entry;
+        const defaultLabel = entry['default_label'];
+        if (
+            !isLocationTask(task) ||
+            typeof label !== 'string' ||
+            typeof defaultLabel !== 'string' ||
+            typeof enabled !== 'boolean' ||
+            !isCount(locations)
+        ) {
+            return null;
+        }
+        tasks.push({ task, label, defaultLabel, enabled, locations });
+    }
+    return tasks;
+}
+
+/** GET location-tasks: die Aufgaben der Stadt (der Admin wählt nur freigeschaltete). */
+export function fetchLocationTasks(
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<readonly TaskSetting[]>> {
+    return apiRequest('location-tasks', parseTaskSettings, { ...(fetchFn && { fetchFn }) });
+}
+
+/** POST locations/{id}/task (Admin): Aufgabe setzen oder mit null entfernen. */
+export function postLocationTask(
+    id: number,
+    task: LocationTaskId | null,
+    options: {
+        readonly defaultStore?: boolean;
+        readonly collectionAccepts?: CollectionAccepts;
+    } = {},
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<SavedLocation>> {
+    return apiRequest(`locations/${String(id)}/task`, parseLocationResponse, {
+        method: 'POST',
+        body: {
+            task,
+            ...(options.defaultStore !== undefined && { is_default_store: options.defaultStore }),
+            ...(options.collectionAccepts !== undefined && {
+                collection_accepts: options.collectionAccepts,
+            }),
+        },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** GET tenants/{id}/location-tasks (Super-Admin). */
+export function fetchTenantLocationTasks(
+    tenantId: number,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<readonly TaskSetting[]>> {
+    return apiRequest(`tenants/${String(tenantId)}/location-tasks`, parseTaskSettings, {
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** POST tenants/{id}/location-tasks (Super-Admin): freischalten und umbenennen. */
+export function saveTenantLocationTasks(
+    tenantId: number,
+    entries: readonly { task: LocationTaskId; enabled: boolean; label: string | null }[],
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<readonly TaskSetting[]>> {
+    return apiRequest(`tenants/${String(tenantId)}/location-tasks`, parseTaskSettings, {
+        method: 'POST',
+        body: { tasks: entries },
+        ...(fetchFn && { fetchFn }),
+    });
 }

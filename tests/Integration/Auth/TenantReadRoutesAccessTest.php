@@ -26,6 +26,7 @@ final class TenantReadRoutesAccessTest extends AuthTestCase
         yield 'Gerätetypen mit inaktiven' => ['device-types?include_inactive=1'];
         yield 'Standorte' => ['locations'];
         yield 'Standorte mit gesperrten' => ['locations?include_inactive=1'];
+        yield 'Aufgaben der Standorte' => ['location-tasks'];
         yield 'Standort anzeigen' => ['locations/{location}'];
         yield 'Geräte' => ['devices'];
         yield 'Geräte gefiltert' => ['devices?location_id={location}&include_sublocations=1&status=ready,retired&q=ma&sort=next_inspection_due&limit=10&offset=0'];

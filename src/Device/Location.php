@@ -31,6 +31,12 @@ final readonly class Location
         public \DateTimeImmutable $updatedAt,
         /** false: Standort der Ebene 1 außerhalb des Datenfilters, von dem nur Fächer sichtbar sind */
         public bool $selectable = true,
+        /** Aufgabe (nur Ebene 1), null = keine */
+        public ?LocationTask $task = null,
+        /** Standard-Lager der Stadt (nur bei task = store) */
+        public bool $isDefaultStore = false,
+        /** nur bei task = collection: used, defective oder both */
+        public ?string $collectionAccepts = null,
     ) {
     }
 
@@ -56,6 +62,9 @@ final readonly class Location
             $this->createdAt,
             $this->updatedAt,
             $this->selectable,
+            $this->task,
+            $this->isDefaultStore,
+            $this->collectionAccepts,
         );
     }
 
@@ -79,6 +88,9 @@ final readonly class Location
             $this->createdAt,
             $this->updatedAt,
             $selectable,
+            $this->task,
+            $this->isDefaultStore,
+            $this->collectionAccepts,
         );
     }
 }

@@ -19,4 +19,6 @@ enum LocationAction
     case Lock;
     /** POST api/v1/locations/{id}/unlock {} (Admin) */
     case Unlock;
+    /** POST api/v1/locations/{id}/task {task, is_default_store?, collection_accepts?} (Admin) */
+    case SetTask;
 }

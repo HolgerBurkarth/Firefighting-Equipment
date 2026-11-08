@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import type { ApiError } from '../api/client';
-import type { Location, LocationKind, SubLocation } from '../api/locations';
+import {
+    COLLECTION_ACCEPTS,
+    fetchLocationTasks,
+    type CollectionAccepts,
+    type Location,
+    type LocationKind,
+    type LocationTaskId,
+    type SubLocation,
+    type TaskSetting,
+} from '../api/locations';
 import { allows } from '../api/permissions';
 import { currentPermissions } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
@@ -9,7 +18,13 @@ import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
 import { KIND_ICONS, SUB_ICON } from '../components/locationIcons';
 import { vRowLink } from '../components/rowLink';
-import { addLocation, adminLocationStore, renameLocation, setLocationActive } from '../data';
+import {
+    addLocation,
+    adminLocationStore,
+    renameLocation,
+    setLocationActive,
+    setLocationTask,
+} from '../data';
 import { deviceCountText } from '../data/locationSearch';
 import {
     filterLocationTree,
@@ -73,8 +88,57 @@ const initialName = computed(() =>
     editing.value?.mode === 'edit' ? editing.value.target.name : '',
 );
 
+/**
+ * Aufgaben der Stadt (Phase 2, P2.2): nur freigeschaltete (oder die schon vergebene) lassen sich
+ * wählen; ohne freigeschaltete Aufgabe erscheint der Abschnitt nicht.
+ */
+const taskSettings = ref<readonly TaskSetting[]>([]);
+const taskChoice = ref<LocationTaskId | 'none'>('none');
+const isDefaultStore = ref(false);
+const collectionAccepts = ref<CollectionAccepts>('both');
+
+/** Standort der Ebene 1, der im Fenster bearbeitet wird (nur dort gibt es Aufgaben). */
+const editedTopLocation = computed((): Location | null => {
+    const current = editing.value;
+    return current?.mode === 'edit' && current.parent === null && 'children' in current.target
+        ? current.target
+        : null;
+});
+
+const selectableTasks = computed(() =>
+    taskSettings.value.filter(
+        (setting) => setting.enabled || setting.task === editedTopLocation.value?.task,
+    ),
+);
+const showTasks = computed(
+    () => editedTopLocation.value !== null && selectableTasks.value.length > 0,
+);
+
+function taskLabel(task: LocationTaskId | null | undefined): string | null {
+    return task === null || task === undefined
+        ? null
+        : (taskSettings.value.find((setting) => setting.task === task)?.label ?? null);
+}
+
+const taskChanged = computed(() => {
+    const location = editedTopLocation.value;
+    if (location === null || !showTasks.value) {
+        return false;
+    }
+    const before = location.task ?? 'none';
+    return (
+        taskChoice.value !== before ||
+        (taskChoice.value === 'store' &&
+            isDefaultStore.value !== (location.isDefaultStore ?? false)) ||
+        (taskChoice.value === 'collection' &&
+            collectionAccepts.value !== (location.collectionAccepts ?? 'both'))
+    );
+});
+
 /** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
-const unsaved = computed(() => dialogOpen.value && name.value !== initialName.value);
+const unsaved = computed(
+    () => dialogOpen.value && (name.value !== initialName.value || taskChanged.value),
+);
 useUnsavedInput(() => unsaved.value);
 
 /** Namen, mit denen der neue nicht übereinstimmen darf (auch gesperrte; ohne den eigenen). */
@@ -134,6 +198,13 @@ function openDialog(next: Editing, event: Event): void {
     editing.value = next;
     name.value = next.mode === 'edit' ? next.target.name : '';
     kind.value = 'vehicle';
+    const top =
+        next.mode === 'edit' && next.parent === null && 'children' in next.target
+            ? next.target
+            : null;
+    taskChoice.value = top?.task ?? 'none';
+    isDefaultStore.value = top?.isDefaultStore ?? false;
+    collectionAccepts.value = top?.collectionAccepts ?? 'both';
     touched.value = false;
     nameError.value = null;
     dialogError.value = null;
@@ -172,11 +243,32 @@ async function submit(): Promise<void> {
     if (current === null || liveProblem.value !== null || busy.value) {
         return;
     }
-    if (current.mode === 'edit' && name.value === current.target.name) {
+    if (current.mode === 'edit' && name.value === current.target.name && !taskChanged.value) {
         dialogOpen.value = false;
         return;
     }
     busy.value = true;
+    if (current.mode === 'edit' && taskChanged.value) {
+        const taskResult = await setLocationTask(
+            current.target.id,
+            taskChoice.value === 'none' ? null : taskChoice.value,
+            {
+                defaultStore: isDefaultStore.value,
+                collectionAccepts: collectionAccepts.value,
+            },
+        );
+        if (!taskResult.ok) {
+            busy.value = false;
+            dialogError.value = taskResult.error;
+            return;
+        }
+        if (name.value === current.target.name) {
+            busy.value = false;
+            success.value = `Die Aufgabe von „${current.target.name}“ ist gespeichert.`;
+            dialogOpen.value = false;
+            return;
+        }
+    }
     const result =
         current.mode === 'new'
             ? await addLocation({ name: name.value, kind: kind.value })
@@ -253,11 +345,22 @@ function unlockEdited(): void {
     }
 }
 
+async function loadTasks(): Promise<void> {
+    if (!canWrite.value) {
+        return;
+    }
+    const result = await fetchLocationTasks();
+    if (result.ok) {
+        taskSettings.value = result.data;
+    }
+}
+
 function retry(): void {
     void adminLocationStore.refresh('changed');
 }
 
 onMounted(() => {
+    void loadTasks();
     void adminLocationStore.refresh('open');
 });
 </script>
@@ -358,6 +461,12 @@ onMounted(() => {
                         {{ deviceCountText(group.location.deviceCountTotal) }}
                     </span>
                 </span>
+                <span
+                    v-if="taskLabel(group.location.task) !== null"
+                    class="badge badge-ready"
+                    data-testid="task-chip"
+                    >{{ taskLabel(group.location.task) }}</span
+                >
                 <span v-if="!group.location.active" class="badge badge-retired">gesperrt</span>
                 <button
                     v-if="canWrite && group.location.active"
@@ -505,6 +614,38 @@ onMounted(() => {
                 </svg>
                 {{ option.label }}
             </label>
+        </fieldset>
+        <fieldset v-if="showTasks" class="kinds" data-testid="task-fieldset">
+            <legend class="field-label">Aufgabe</legend>
+            <label class="kind-option">
+                <input v-model="taskChoice" type="radio" name="location-task" value="none" />
+                Keine Aufgabe
+            </label>
+            <label v-for="setting in selectableTasks" :key="setting.task" class="kind-option">
+                <input
+                    v-model="taskChoice"
+                    type="radio"
+                    name="location-task"
+                    :value="setting.task"
+                />
+                {{ setting.label }}
+            </label>
+            <label v-if="taskChoice === 'store'" class="kind-option">
+                <input v-model="isDefaultStore" type="checkbox" />
+                Standard-Lager (das erste Lager wird es automatisch)
+            </label>
+            <fieldset v-if="taskChoice === 'collection'" class="kinds">
+                <legend class="field-label">Nimmt an</legend>
+                <label v-for="option in COLLECTION_ACCEPTS" :key="option.value" class="kind-option">
+                    <input
+                        v-model="collectionAccepts"
+                        type="radio"
+                        name="collection-accepts"
+                        :value="option.value"
+                    />
+                    {{ option.label }}
+                </label>
+            </fieldset>
         </fieldset>
         <template v-if="editing?.mode === 'edit'" #extra>
             <template v-if="editing.target.active">

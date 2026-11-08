@@ -59,6 +59,7 @@ use FirefightingEquipment\Api\V1\OAuth\TokenHandler;
 use FirefightingEquipment\Api\V1\Offline\ClientConfigHandler;
 use FirefightingEquipment\Api\V1\Roles\PermissionCatalogHandler;
 use FirefightingEquipment\Api\V1\Roles\RoleAction;
+use FirefightingEquipment\Api\V1\Locations\LocationTasksHandler;
 use FirefightingEquipment\Api\V1\Roles\RoleHandler;
 use FirefightingEquipment\Api\V1\SuperAdmins\SuperAdminListHandler;
 use FirefightingEquipment\Api\V1\SuperAdmins\SuperAdminLockHandler;
@@ -118,6 +119,8 @@ final class Routes
             ->add('POST', 'api/v1/tenants/{id}/users/{user}/resend-invitation', Access::SuperAdmin, new AdminInvitationHandler(resend: true))
             ->add('POST', 'api/v1/tenants/{id}/users/{user}/claude-access', Access::SuperAdmin, new TenantUserClaudeHandler(endConnections: false))
             ->add('POST', 'api/v1/tenants/{id}/users/{user}/claude-connections/end', Access::SuperAdmin, new TenantUserClaudeHandler(endConnections: true))
+            ->add('GET', 'api/v1/tenants/{id}/location-tasks', Access::SuperAdmin, new LocationTasksHandler(superAdmin: true))
+            ->add('POST', 'api/v1/tenants/{id}/location-tasks', Access::SuperAdmin, new LocationTasksHandler(superAdmin: true))
             ->add('GET', 'api/v1/tenants/{id}/roles', Access::SuperAdmin, new RoleHandler(RoleAction::List))
             ->add('POST', 'api/v1/tenants/{id}/roles', Access::SuperAdmin, new RoleHandler(RoleAction::Create))
             ->add('POST', 'api/v1/tenants/{id}/roles/import', Access::SuperAdmin, new RoleHandler(RoleAction::Import))
@@ -211,6 +214,8 @@ final class Routes
             ->add('POST', 'api/v1/locations/{id}/rename', $write(Area::Locations), new LocationActionHandler(LocationAction::Rename))
             ->add('POST', 'api/v1/locations/{id}/lock', $write(Area::Locations), new LocationActionHandler(LocationAction::Lock))
             ->add('POST', 'api/v1/locations/{id}/unlock', $write(Area::Locations), new LocationActionHandler(LocationAction::Unlock))
+            ->add('POST', 'api/v1/locations/{id}/task', $write(Area::Locations), new LocationActionHandler(LocationAction::SetTask))
+            ->add('GET', 'api/v1/location-tasks', Requirement::anyOf($read(Area::Locations), $seeDevices), new LocationTasksHandler(superAdmin: false))
             ->add('GET', 'api/v1/devices', $seeDevices, new DeviceListHandler())
             // CSV-Export nur mit der Aktion csv.export (Plan, F2; Rolle Benutzer: 403), der Verlauf
             // zusätzlich mit dem Protokoll.

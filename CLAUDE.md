@@ -2705,6 +2705,16 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   eindeutig (`utf8mb4_unicode_ci`, also auch "Straße" = "Strasse"; `parent_key` 0 = Ebene 1). Nie
   gelöscht (Ausnahme: "Gerätedaten zurücksetzen"); sperrbar (`active = 0`) nur, wenn leer (keine nicht ausgesonderten Geräte, keine aktiven
   Unterstandorte; prüft der Code). Gesperrt = kein Ziel für Umbuchungen, die Historie bleibt.
+- Aufgaben von Standorten (seit Phase 2, P2.2; Migrationen 0052/0053, `LocationTask`,
+  `LocationTaskRepository`, `LocationTasksHandler`): Katalog `store` (Lager), `collection`
+  (Sammelstelle), `workshop` (Werkstatt), `returns` (Rückgabe), `borrower` (Ausgeliehen an). Der
+  Super-Admin schaltet sie je Stadt frei und ändert den Anzeigenamen (`GET/POST
+  tenants/{id}/location-tasks`, Reiter „Abläufe“ im Stadtdetail; Abschalten nur ohne Standorte mit der
+  Aufgabe, sonst 409); der Admin vergibt sie an Standorte der Ebene 1 (`POST locations/{id}/task`, im
+  Fenster „Bearbeiten“ der Standorte, nur freigeschaltete; `GET location-tasks`). Standard-Lager: höchstens
+  eines je Stadt (UNIQUE über `default_store_key`), das erste Lager wird es automatisch;
+  `collection_accepts` (`used`/`defective`/`both`) genau bei der Sammelstelle. Eine Aufgabe ändert noch
+  keine Buchung; Abläufe, die sie nutzen, folgen in P2.3 ff.
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann

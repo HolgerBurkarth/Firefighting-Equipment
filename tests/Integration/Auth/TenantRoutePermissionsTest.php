@@ -91,6 +91,8 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'POST api/v1/locations/{id}/rename' => ['admin', 'locations:write'],
         'POST api/v1/locations/{id}/lock' => ['admin', 'locations:write'],
         'POST api/v1/locations/{id}/unlock' => ['admin', 'locations:write'],
+        'POST api/v1/locations/{id}/task' => ['admin', 'locations:write'],
+        'GET api/v1/location-tasks' => ['authenticated', 'locations:read | search:read | devices:read'],
         'GET api/v1/devices' => ['authenticated', 'search:read | devices:read'],
         // Exporte seit Schritt 1.7a nur mit csv.export (Plan, F2; Benutzer siehe CHANGED_FOR_USER).
         'GET api/v1/devices/export' => ['authenticated', 'csv.export'],
