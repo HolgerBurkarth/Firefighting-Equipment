@@ -2540,7 +2540,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   wie die App bei einem Wechsel auf defekt einen Kommentar ab 5 Zeichen und sendet eine stabile
   `client_ref` (`ToolApi::stableRef`: UUID v4 aus Verbindung, Werkzeug, Gerät und Inhalt; gleicher
   Aufruf = keine zweite Buchung). Annotationen siehe `ToolRoutesTest` (`DESTRUCTIVE`,
-  `NOT_IDEMPOTENT`). `mcp` mit Body bis `Request::MAX_UPLOAD_BYTES` (der Vermittler lässt 1 MiB
+  `NOT_IDEMPOTENT`); `destructiveHint` NUR bei `retire_equipment`, `apply_import` und
+  `lock_location` (Holger 08.11.2026, wie `docs/MCP-KONZEPT.md`; neue Werkzeuge nur nach Rückfrage
+  dazu). `mcp` mit Body bis `Request::MAX_UPLOAD_BYTES` (der Vermittler lässt 1 MiB
   durch). „über Claude“: `EventChannel` (`app`/`claude`), Spalten `fe_device_events.channel`
   (Migration `0047`) und `fe_device_notice_actions.channel` (`0048`), Standard `app`;
   `RequestContext::channel()` (`claude`, wenn `AuthSession::$claude` gesetzt ist, also nur über

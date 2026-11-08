@@ -8,6 +8,14 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-08 – „Claude-Zugang: destructiveHint nur bei aussondern, Import, Standort sperren (Runde 7)“
+
+- Nur Annotationen der Werkzeuge in `tools/list`: `destructiveHint` true nur noch bei
+  `retire_equipment`, `apply_import`, `lock_location`; `set_maintenance_date`,
+  `bulk_set_maintenance_date`, `update_equipment`, `assign_code`, `deactivate_equipment_type` jetzt
+  false. Grund: Festlegung Holger (wie `MCP-KONZEPT.md`); Claude fragt nur dort vorher nach.
+- Tests: `ToolRoutesTest::testWriteToolsHaveTheirHints` (Liste `DESTRUCTIVE`). `CLAUDE.md`: Schritt M6.
+
 ## 2026-11-08 – „Claude-Zugang: Fehlerdetails der Werkzeuge in ihren Begriffen (Runde 7)“
 
 - Nur Werkzeuge an `POST mcp`, REST-Routen unverändert: `details` eines Fehlerergebnisses
