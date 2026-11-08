@@ -81,7 +81,7 @@ const DEFAULT_LOADERS: AdminOverviewLoaders = {
         fetchDevicePage({
             limit: NOT_READY_LIMIT,
             offset: 0,
-            status: ['maintenance', 'defective'],
+            status: ['maintenance', 'defective', 'used'],
             sort: 'status',
             dir: 'desc',
         }),

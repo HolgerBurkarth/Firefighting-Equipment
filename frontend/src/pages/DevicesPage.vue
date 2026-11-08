@@ -164,6 +164,7 @@ const STATUS_LABELS: Readonly<Record<ActiveStatus, string>> = {
     ready: 'einsatzbereit',
     maintenance: 'in Wartung',
     defective: 'defekt',
+    used: 'benutzt',
 };
 
 function toggleStatus(status: ActiveStatus): void {
@@ -778,6 +779,12 @@ const canBulk = computed(
     border-color: var(--status-maintenance-fg);
     background: var(--status-maintenance-bg);
     color: var(--status-maintenance-fg);
+}
+
+.status-chip-used[aria-pressed='true'] {
+    border-color: var(--status-used-fg);
+    background: var(--status-used-bg);
+    color: var(--status-used-fg);
 }
 
 .status-chip-defective[aria-pressed='true'] {

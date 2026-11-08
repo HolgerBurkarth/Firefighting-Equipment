@@ -13,6 +13,7 @@ enum DeviceStatus: string
     case Ready = 'ready';
     case Maintenance = 'maintenance';
     case Defective = 'defective';
+    case Used = 'used';
     case Retired = 'retired';
 
     public function label(): string
@@ -21,6 +22,7 @@ enum DeviceStatus: string
             self::Ready => 'einsatzbereit',
             self::Maintenance => 'in Wartung',
             self::Defective => 'defekt',
+            self::Used => 'benutzt',
             self::Retired => 'ausgesondert',
         };
     }

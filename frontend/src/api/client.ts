@@ -7,7 +7,7 @@ import { reportServerReached } from '../runtime/connectivity';
  * Änderungen erhöhen (CLAUDE.md, "Versionierung der API für das Frontend").
  */
 export const CLIENT_API_HEADER = 'X-Client-Api';
-export const CLIENT_API_VERSION = 2;
+export const CLIENT_API_VERSION = 3;
 /** Vertragsnummer des Servers in jeder JSON- und CSV-Antwort (ClientApi::RESPONSE_HEADER). */
 export const API_VERSION_HEADER = 'X-Api-Version';
 

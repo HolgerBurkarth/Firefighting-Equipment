@@ -35,7 +35,7 @@ final class DeviceExportTest extends ExportApiTestCase
         self::assertSame('attachment; filename="ausruestung-immendingen-2026-06-15.csv"', $response->headers()['Content-Disposition']);
         self::assertSame('no-store', $response->headers()['Cache-Control']);
         self::assertSame('nosniff', $response->headers()['X-Content-Type-Options']);
-        self::assertSame('2', $response->headers()['X-Api-Version']);
+        self::assertSame('3', $response->headers()['X-Api-Version']);
         self::assertSame(
             "\xEF\xBB\xBFNummer;Scan-Code;Ausrüstungstyp;Standort;Status;Nächste Wartung;Seriennummer;Hersteller;Modell;Beschaffungsdatum;Notiz\r\n",
             $body,

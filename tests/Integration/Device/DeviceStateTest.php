@@ -52,6 +52,22 @@ final class DeviceStateTest extends DeviceApiTestCase
         self::assertSame(['state_changed', $this->userId, null, null, 'ready', 'defective', null], self::state($this->events($device['id'])[1]));
     }
 
+    public function testStatusUsedCanBeBookedFilteredAndCounted(): void
+    {
+        $device = $this->createViaApi('MA-01');
+
+        $response = $this->api('POST', 'devices/' . $device['id'] . '/state', ['version' => 1, 'status' => 'used'], $this->user);
+
+        self::assertSame(200, $response->statusCode(), $response->body());
+        self::assertSame(['used', 'benutzt'], [self::json($response)['device']['status'], self::json($response)['device']['status_label']]);
+        self::assertSame(['state_changed', $this->userId, null, null, 'ready', 'used', null], self::state($this->events($device['id'])[1]));
+        $list = self::json($this->api('GET', 'devices?status=used'));
+        self::assertSame(1, $list['total']);
+        self::assertSame(0, self::json($this->api('GET', 'devices?status=ready'))['total']);
+        $summary = self::json($this->api('GET', 'device-summary'))['devices']['by_status'];
+        self::assertSame(['used', 1], [$summary[3]['status'], $summary[3]['count']]);
+    }
+
     public function testMoveAndStatusInOneEvent(): void
     {
         $device = $this->createViaApi('MA-01', ['status' => 'maintenance']);

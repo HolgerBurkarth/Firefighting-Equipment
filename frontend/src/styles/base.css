@@ -221,6 +221,11 @@ h2 {
     color: var(--status-defective-fg);
 }
 
+.badge-used {
+    background: var(--status-used-bg);
+    color: var(--status-used-fg);
+}
+
 .badge-retired {
     background: var(--status-retired-bg);
     color: var(--status-retired-fg);

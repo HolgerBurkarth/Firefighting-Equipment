@@ -23,15 +23,16 @@ export function readinessTile(summary: DeviceSummaryCounts): DashboardTile & { p
     };
 }
 
-/** „3“ mit „2 defekt · 1 in Wartung“ (Teile mit 0 entfallen). */
+/** „4“ mit „2 defekt · 1 in Wartung · 1 benutzt“ (Teile mit 0 entfallen). */
 export function notReadyTile(summary: DeviceSummaryCounts): DashboardTile {
-    const { defective, maintenance } = summary.byStatus;
+    const { defective, maintenance, used } = summary.byStatus;
     const parts = [
         ...(defective > 0 ? [`${String(defective)} defekt`] : []),
         ...(maintenance > 0 ? [`${String(maintenance)} in Wartung`] : []),
+        ...(used > 0 ? [`${String(used)} benutzt`] : []),
     ];
     return {
-        value: String(defective + maintenance),
+        value: String(defective + maintenance + used),
         detail: parts.length === 0 ? 'Alle Ausrüstungen einsatzbereit' : parts.join(' · '),
     };
 }

@@ -112,7 +112,7 @@ final class DeviceImportFileTest extends TestCase
 
         self::assertSame([
             'Die Nummer darf nur Buchstaben, Ziffern, Leerzeichen, Bindestrich (-), Schrägstrich (/) und Punkt (.) enthalten.',
-            'Unbekannter Status „kaputt“ (möglich: einsatzbereit, in Wartung, defekt).',
+            'Unbekannter Status „kaputt“ (möglich: einsatzbereit, in Wartung, defekt, benutzt).',
             'Das Datum der nächsten Wartung „31.02.2027“ ist kein gültiger Kalendertag.',
             'Die Seriennummer darf höchstens 100 Zeichen lang sein (angegeben: 101).',
             'Das Beschaffungsdatum „01.03.27“ muss ein Datum im Format TT.MM.JJJJ (oder JJJJ-MM-TT) sein.',

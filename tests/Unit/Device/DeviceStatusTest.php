@@ -16,7 +16,7 @@ final class DeviceStatusTest extends TestCase
     public function testValuesMatchSchemaAndHaveGermanLabels(): void
     {
         self::assertSame(
-            ['ready' => 'einsatzbereit', 'maintenance' => 'in Wartung', 'defective' => 'defekt', 'retired' => 'ausgesondert'],
+            ['ready' => 'einsatzbereit', 'maintenance' => 'in Wartung', 'defective' => 'defekt', 'used' => 'benutzt', 'retired' => 'ausgesondert'],
             array_combine(
                 array_map(static fn (DeviceStatus $s): string => $s->value, DeviceStatus::cases()),
                 array_map(static fn (DeviceStatus $s): string => $s->label(), DeviceStatus::cases()),

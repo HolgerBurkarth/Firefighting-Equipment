@@ -56,6 +56,8 @@
     --status-maintenance-bg: #fff1db;
     --status-defective-fg: #9b1c1c;
     --status-defective-bg: #fce4e2;
+    --status-used-fg: #1f4e8c;
+    --status-used-bg: #e1ecfa;
     --status-retired-fg: #5b6675;
     --status-retired-bg: #eef0f3;
 
@@ -110,6 +112,8 @@
     --status-maintenance-bg: #3d2e12;
     --status-defective-fg: #f2938e;
     --status-defective-bg: #43201f;
+    --status-used-fg: #8ab8f0;
+    --status-used-bg: #1b2f4a;
     --status-retired-fg: #a9b4c1;
     --status-retired-bg: #2c3644;
     --success: #7bc892;
@@ -145,6 +149,8 @@
         --status-maintenance-bg: #3d2e12;
         --status-defective-fg: #f2938e;
         --status-defective-bg: #43201f;
+        --status-used-fg: #8ab8f0;
+        --status-used-bg: #1b2f4a;
         --status-retired-fg: #a9b4c1;
         --status-retired-bg: #2c3644;
         --success: #7bc892;

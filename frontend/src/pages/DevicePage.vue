@@ -103,7 +103,7 @@ const status = computed<BookableStatus | null>(() => {
         return chosenStatus.value;
     }
     const current = device.value?.status;
-    return current === undefined || current === 'retired' ? null : current;
+    return current === undefined || current === 'retired' || current === 'used' ? null : current;
 });
 const changesLocation = computed(
     () => device.value !== null && locationId.value !== device.value.location.id,

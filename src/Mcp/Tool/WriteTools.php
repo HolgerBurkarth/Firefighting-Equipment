@@ -25,7 +25,7 @@ use FirefightingEquipment\Permission\Requirement;
  */
 final class WriteTools
 {
-    private const array SERVICE_STATUS = ['ready', 'maintenance', 'defective'];
+    private const array SERVICE_STATUS = ['ready', 'maintenance', 'defective', 'used'];
     private const array KINDS = ['vehicle', 'room', 'external'];
     private const int MIN_DEFECT_COMMENT = 5;
 
@@ -62,7 +62,7 @@ final class WriteTools
         return new ToolDefinition(
             'book_equipment',
             'Umbuchen / Status ändern',
-            'Eine Ausrüstung umbuchen und/oder ihren Status setzen (einsatzbereit, in Wartung, defekt) wie '
+            'Eine Ausrüstung umbuchen und/oder ihren Status setzen (einsatzbereit, in Wartung, defekt, benutzt) wie '
             . '„Umbuchen“ in der App. Braucht die Version aus get_equipment. Wechselt der Status auf defekt, '
             . 'ist ein Kommentar mit mindestens 5 Zeichen Pflicht („Was ist defekt?“). Ein zweiter gleicher '
             . 'Aufruf bucht nicht doppelt.',
@@ -70,7 +70,7 @@ final class WriteTools
                 'id' => ReadTools::id('ID der Ausrüstung.'),
                 'version' => self::version(),
                 'location_id' => ReadTools::id('Neuer Standort oder Fach (ID aus list_locations); weglassen = unverändert.'),
-                'status' => ['type' => 'string', 'enum' => self::SERVICE_STATUS, 'description' => 'Neuer Status: ready (einsatzbereit), maintenance (in Wartung), defective (defekt); weglassen = unverändert.'],
+                'status' => ['type' => 'string', 'enum' => self::SERVICE_STATUS, 'description' => 'Neuer Status: ready (einsatzbereit), maintenance (in Wartung), defective (defekt), used (benutzt); weglassen = unverändert.'],
                 'comment' => self::comment(),
             ], ['id', 'version']),
             ['POST api/v1/devices/{id}/state', 'GET api/v1/devices/{id}'],

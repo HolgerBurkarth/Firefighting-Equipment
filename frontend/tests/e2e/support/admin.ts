@@ -8,20 +8,22 @@ export function summaryJson(
         ready?: number;
         maintenance?: number;
         defective?: number;
+        used?: number;
         overdue?: number;
         dueSoon?: number;
         openNotices?: number;
     } = {},
 ): Record<string, unknown> {
-    const { ready = 0, maintenance = 0, defective = 0 } = counts;
+    const { ready = 0, maintenance = 0, defective = 0, used = 0 } = counts;
     return {
         today: '2026-10-30',
         devices: {
-            total: ready + maintenance + defective,
+            total: ready + maintenance + defective + used,
             by_status: [
                 { status: 'ready', status_label: 'einsatzbereit', count: ready },
                 { status: 'maintenance', status_label: 'in Wartung', count: maintenance },
                 { status: 'defective', status_label: 'defekt', count: defective },
+                { status: 'used', status_label: 'benutzt', count: used },
             ],
         },
         inspection: {

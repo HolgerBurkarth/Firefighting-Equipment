@@ -17,7 +17,7 @@ enum DeviceSort: string
     case DeviceType = 'device_type';
     /** natürlich nach dem angezeigten Pfad des Standorts („HLF 20 / G1“) */
     case Location = 'location';
-    /** fachlich: einsatzbereit, in Wartung, defekt, ausgesondert */
+    /** fachlich: einsatzbereit, in Wartung, defekt, benutzt, ausgesondert */
     case Status = 'status';
     /** nach nächster Prüfung; Geräte ohne Datum in beiden Richtungen am Ende */
     case NextInspectionDue = 'next_inspection_due';

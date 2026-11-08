@@ -22,10 +22,11 @@ final class ClientApi
     public const string RESPONSE_HEADER = 'X-Api-Version';
 
     /**
-     * Aktuelle Vertragsnummer; nur bei inkompatiblen Änderungen erhöhen. 2 seit Plan Phase 1, Schritt
-     * 1.7c: Menü, Leiste und Knöpfe folgen den Rechten der Rolle (`permissions`), nicht mehr `role`.
+     * Aktuelle Vertragsnummer; nur bei inkompatiblen Änderungen erhöhen. 3 seit Plan Phase 2, Schritt
+     * P2.1: neuer Status `used` (benutzt) in Geräten, Zählungen und Filtern; 2 seit Schritt 1.7c: Menü,
+     * Leiste und Knöpfe folgen den Rechten der Rolle (`permissions`), nicht mehr `role`.
      */
-    public const int CURRENT = 2;
+    public const int CURRENT = 3;
 
     /**
      * Kleinste Nummer, die der Server noch annimmt (MIN_CLIENT_API); höchstens CURRENT. 2 seit Plan

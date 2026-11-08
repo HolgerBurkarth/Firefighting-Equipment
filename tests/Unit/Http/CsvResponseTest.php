@@ -31,7 +31,7 @@ final class CsvResponseTest extends TestCase
             'Content-Disposition' => 'attachment; filename="geraete-immendingen-2026-06-15.csv"',
             'Cache-Control' => 'no-store',
             'X-Content-Type-Options' => 'nosniff',
-            'X-Api-Version' => '2',
+            'X-Api-Version' => '3',
         ], $response->headers());
         self::assertSame(JsonResponse::DEFAULT_HEADERS['Cache-Control'], $response->headers()['Cache-Control']);
         self::assertSame((string) ClientApi::CURRENT, $response->headers()[ClientApi::RESPONSE_HEADER]);

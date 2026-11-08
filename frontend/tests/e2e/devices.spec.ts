@@ -366,7 +366,7 @@ test.describe('Ausrüstungsliste (PC)', () => {
     test('Kacheln und Namen führen zur gefilterten Liste', async ({ page }) => {
         await page.goto('/firefighting/test/dashboard');
         await page.getByTestId('tile-not-ready').click();
-        await expect(page).toHaveURL(/\/geraete\?status=maintenance(,|%2C)defective$/);
+        await expect(page).toHaveURL(/\/geraete\?status=maintenance(,|%2C)defective(,|%2C)used$/);
         await expect(identifiers(page)).toHaveText(['M2', 'PA 4']);
 
         await page.goto('/firefighting/test/standorte');

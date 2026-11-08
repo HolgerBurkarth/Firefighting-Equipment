@@ -853,7 +853,7 @@ final readonly class DeviceRepository
             DeviceSort::Identifier => "NATURAL_SORT_KEY(d.identifier) {$dir}",
             DeviceSort::DeviceType => "NATURAL_SORT_KEY(t.name) {$dir}",
             DeviceSort::Location => "NATURAL_SORT_KEY(IF(p.id IS NULL, l.name, CONCAT(p.name, ' / ', l.name))) {$dir}",
-            DeviceSort::Status => "FIELD(d.status, 'ready', 'maintenance', 'defective', 'retired') {$dir}",
+            DeviceSort::Status => "FIELD(d.status, 'ready', 'maintenance', 'defective', 'used', 'retired') {$dir}",
             DeviceSort::NextInspectionDue => "d.next_inspection_due IS NULL, d.next_inspection_due {$dir}",
         };
 

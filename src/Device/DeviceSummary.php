@@ -10,8 +10,8 @@ namespace FirefightingEquipment\Device;
 final readonly class DeviceSummary
 {
     /**
-     * @param array<string, int> $byStatus Anzahl je Statuswert (ready, maintenance, defective; immer
-     *                                     alle drei, auch 0)
+     * @param array<string, int> $byStatus Anzahl je Statuswert (ready, maintenance, defective, used;
+     *                                     immer alle vier, auch 0)
      */
     public function __construct(
         public InspectionWindow $window,

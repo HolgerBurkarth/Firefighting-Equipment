@@ -743,7 +743,7 @@ test.describe('Updates der App: Zurück-Knopf', () => {
 
 test.describe('Updates der App: Antworten der API verlangen ein Update', () => {
     /** Wie ClientApi::RESPONSE_HEADER im Backend; die laufende App kennt die Nummer 1. */
-    const NEWER_API = { 'X-Api-Version': '3' };
+    const NEWER_API = { 'X-Api-Version': '4' };
 
     /**
      * Mail-Link in einem zweiten Tab (wie aus einem Mailprogramm) mit der alten Version; danach
