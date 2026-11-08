@@ -277,7 +277,7 @@ final class ReadTools
                 $total = (int) ($page['total'] ?? count($events));
 
                 return ToolResult::ok(
-                    sprintf('Verlauf: %s', ToolFormat::pagingText($total, $offset, count($events), 'offset')),
+                    sprintf('Verlauf: %s%s', ToolFormat::pagingText($total, $offset, count($events), 'offset'), ToolFormat::viaClaudeText($events)),
                     ['events' => $events, 'paging' => ToolFormat::paging($total, $offset, count($events))],
                     ['events[].user', 'events[].comment', 'events[].changes'],
                 );
@@ -377,7 +377,7 @@ final class ReadTools
                 $total = (int) ($page['total'] ?? count($events));
 
                 return ToolResult::ok(
-                    sprintf('Letzte Aktivitäten: %s', ToolFormat::pagingText($total, $offset, count($events), 'offset')),
+                    sprintf('Letzte Aktivitäten: %s%s', ToolFormat::pagingText($total, $offset, count($events), 'offset'), ToolFormat::viaClaudeText($events)),
                     ['events' => $events, 'paging' => ToolFormat::paging($total, $offset, count($events))],
                     ['events[].user', 'events[].comment', 'events[].changes'],
                 );
@@ -433,6 +433,7 @@ final class ReadTools
                     'user' => is_array($h['user'] ?? null) ? ($h['user']['name'] ?? null) : null,
                     'at' => ToolFormat::time($h['at'] ?? null),
                     'note' => $h['note'] ?? null,
+                    ...(($h['channel'] ?? null) === 'claude' ? ['via_claude' => true] : []),
                 ], self::list(is_array($notice) ? ($notice['history'] ?? []) : []));
 
                 return ToolResult::ok(

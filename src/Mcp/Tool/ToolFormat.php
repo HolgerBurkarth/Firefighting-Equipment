@@ -110,6 +110,10 @@ final class ToolFormat
             'changes' => $changes,
             'comment' => $event['comment'] ?? null,
         ];
+        if (($event['channel'] ?? null) === 'claude') {
+            // Vermerk „über Claude“ wie in App, Detailseite, CSV und Log-Mails.
+            $entry['via_claude'] = true;
+        }
         if (($event['applied'] ?? true) === false) {
             $entry['applied'] = false;
             $entry['not_applied_reason'] = $event['not_applied_label'] ?? null;
@@ -130,6 +134,51 @@ final class ToolFormat
         }
 
         return $entry;
+    }
+
+    /**
+     * Satz zur Zusammenfassung eines Verlaufs: „3 davon über Claude.“ bzw. leer.
+     *
+     * @param list<array<string, mixed>> $events Einträge aus event()
+     */
+    public static function viaClaudeText(array $events): string
+    {
+        $count = count(array_filter($events, static fn (array $e): bool => ($e['via_claude'] ?? false) === true));
+
+        return match ($count) {
+            0 => '',
+            1 => ' 1 Eintrag davon über Claude.',
+            default => sprintf(' %d Einträge davon über Claude.', $count),
+        };
+    }
+
+    /**
+     * details einer Fehlerantwort der REST-API in den Begriffen der Werkzeuge: device → equipment
+     * (Stand wie get_equipment, mit version), Anzahlen beim Sperren eines Standorts (devices,
+     * sublocations) → equipment_count, sublocation_count. Andere Angaben (z. B. line, summary der
+     * Import-Vorschau) bleiben.
+     *
+     * @param array<array-key, mixed> $details
+     *
+     * @return array<string, mixed>
+     */
+    public static function details(array $details): array
+    {
+        $result = [];
+        foreach ($details as $key => $value) {
+            $key = (string) $key;
+            if ($key === 'device') {
+                $result['equipment'] = is_array($value) ? self::equipmentDetail($value) : null;
+            } elseif ($key === 'devices' && is_int($value)) {
+                $result['equipment_count'] = $value;
+            } elseif ($key === 'sublocations' && is_int($value)) {
+                $result['sublocation_count'] = $value;
+            } else {
+                $result[$key] = $value;
+            }
+        }
+
+        return $result;
     }
 
     /**

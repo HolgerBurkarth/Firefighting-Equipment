@@ -118,8 +118,9 @@ Regeln für alle Werkzeuge:
   und Antworten deutsch** mit den Begriffen der App (Ausrüstung, Ausrüstungstyp, Termine, Wartung,
   Wartungsdatum, Nummer, Standort, Fach).
 - **Annotationen**: `readOnlyHint: true` bei allen Lesewerkzeugen; bei ändernden `readOnlyHint:
-  false`, `destructiveHint` true nur bei aussondern, Import übernehmen, Standort sperren und
-  Ausrüstungstyp deaktivieren; `idempotentHint` bei Werkzeugen, die bei gleichem Inhalt nichts
+  false`, `destructiveHint` true nur bei aussondern, Import übernehmen und Standort sperren
+  (Festlegung Holger, 08.11.2026; Ausrüstungstyp deaktivieren, Stammdaten, Code und Wartungsdatum
+  ohne); `idempotentHint` bei Werkzeugen, die bei gleichem Inhalt nichts
   doppelt tun (z. B. Buchung mit `client_ref`); `openWorldHint: false`.
 - **Gleichzeitige Änderungen**: Ändernde Werkzeuge verlangen die `version` aus dem letzten Lesen;
   veraltet → Fehlerergebnis mit dem aktuellen Stand (wie 409 `version_conflict`), Claude liest neu

@@ -63,11 +63,8 @@ final class ToolRoutesTest extends TestCase
         'POST api/v1/notices/{id}/reopen',
     ];
 
-    /** Werkzeuge mit destructiveHint (docs/PLAN-MCP.md, Abschnitt 9c). */
-    private const array DESTRUCTIVE = [
-        'set_maintenance_date', 'bulk_set_maintenance_date', 'update_equipment', 'assign_code', 'retire_equipment',
-        'apply_import', 'lock_location', 'deactivate_equipment_type',
-    ];
+    /** Werkzeuge mit destructiveHint: nur diese drei (Holger 08.11.2026, docs/MCP-KONZEPT.md). */
+    private const array DESTRUCTIVE = ['retire_equipment', 'apply_import', 'lock_location'];
 
     /** Werkzeuge ohne idempotentHint (ein zweiter Aufruf legt neu an bzw. übernimmt neu). */
     private const array NOT_IDEMPOTENT = ['create_equipment', 'apply_import', 'create_location', 'create_equipment_type'];

@@ -448,9 +448,9 @@ der Auftrag:
   Ausrüstung verlangen `version`; veraltet → `version_conflict` mit dem aktuellen Stand.
   `book_equipment` prüft wie die App den Kommentar bei defekt (mindestens 5 Zeichen) und sendet eine
   Buchungs-Kennung aus Verbindung und Inhalt (`ToolApi::stableRef`, UUID v4): ein zweiter gleicher
-  Aufruf bucht nicht doppelt (`idempotentHint`). `destructiveHint` bei allem, was Werte leert oder
-  überschreibt bzw. aus dem Betrieb nimmt (aussondern, Import übernehmen, Standort sperren, Typ
-  deaktivieren, Stammdaten, Code, Wartungsdatum); nicht bei Umbuchen, Anlegen, Umbenennen,
+  Aufruf bucht nicht doppelt (`idempotentHint`). `destructiveHint` seit Runde 7 (Holger 08.11.2026)
+  nur bei aussondern, Import übernehmen und Standort sperren (wie `MCP-KONZEPT.md`; in Runde 6 auch
+  Typ deaktivieren, Stammdaten, Code, Wartungsdatum); nicht bei Umbuchen, Anlegen, Umbenennen,
   Entsperren, Wiederaufnehmen und Hinweisen. CSV-Import: `preview_import` (readOnlyHint, die Datei als
   Text) und getrennt `apply_import` mit dem Kennzeichen. Body von `mcp` bis 3 MiB (der Vermittler
   lässt 1 MiB durch, also Dateien bis rund 700 KB).

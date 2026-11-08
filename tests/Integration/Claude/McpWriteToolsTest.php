@@ -48,7 +48,37 @@ final class McpWriteToolsTest extends McpToolsTestCase
         $stale = $this->callTool($this->token, 'book_equipment', ['id' => $this->m1, 'version' => 1, 'status' => 'ready']);
         self::assertTrue($stale['isError']);
         self::assertSame('version_conflict', $stale['structuredContent']['error']);
-        self::assertSame(2, $stale['structuredContent']['details']['device']['version']);
+        self::assertSame(2, $stale['structuredContent']['details']['equipment']['version']);
+    }
+
+    public function testErrorDetailsUseTheTermsOfTheTools(): void
+    {
+        $this->data($this->token, 'book_equipment', ['id' => $this->m1, 'version' => 1, 'status' => 'maintenance']);
+
+        foreach ([
+            'book_equipment' => ['status' => 'ready'],
+            'set_maintenance_date' => ['maintenance_due' => '2030-01-01'],
+            'update_equipment' => ['model' => 'X'],
+            'retire_equipment' => [],
+        ] as $tool => $arguments) {
+            $stale = $this->callTool($this->token, $tool, ['id' => $this->m1, 'version' => 1, ...$arguments]);
+            self::assertSame('version_conflict', $stale['structuredContent']['error'], $tool);
+            $details = $stale['structuredContent']['details'];
+            self::assertSame(['equipment'], array_keys($details), $tool);
+            $equipment = $details['equipment'];
+            self::assertSame(['M1', 'maintenance', 2], [$equipment['number'], $equipment['status'], $equipment['version']], $tool);
+            self::assertArrayHasKey('maintenance_due', $equipment);
+            self::assertArrayHasKey('equipment_type', $equipment);
+            foreach (['identifier', 'next_inspection_due', 'device_type', 'state_changed_at'] as $rest) {
+                self::assertArrayNotHasKey($rest, $equipment, $tool . ': ' . $rest);
+            }
+            self::assertStringNotContainsString('"device"', $stale['content'][0]['text'], $tool);
+            self::assertStringContainsString('"equipment"', $stale['content'][0]['text'], $tool);
+        }
+
+        $lock = $this->callTool($this->token, 'lock_location', ['id' => $this->store]);
+        self::assertSame('rule_violation', $lock['structuredContent']['error']);
+        self::assertSame(['equipment_count', 'sublocation_count'], array_keys($lock['structuredContent']['details']));
     }
 
     public function testDefectiveNeedsACommentLikeInTheApp(): void
@@ -164,6 +194,26 @@ final class McpWriteToolsTest extends McpToolsTestCase
         self::assertSame('open', $this->data($this->token, 'reopen_notice', ['id' => $this->notice])['notice']['status']);
         $history = self::json($this->send('GET', self::AREA . 'api/v1/notices/' . $this->notice, cookie: $this->adminCookie))['notice']['history'];
         self::assertSame(['claude', 'claude'], array_column($history, 'channel'));
+    }
+
+    public function testHistoryToolsShowOverClaude(): void
+    {
+        $this->data($this->token, 'book_equipment', ['id' => $this->m1, 'version' => 1, 'status' => 'maintenance']);
+
+        $history = $this->callTool($this->token, 'get_equipment_history', ['id' => $this->m1]);
+        $events = $history['structuredContent']['events'];
+        self::assertTrue($events[0]['via_claude'], 'Buchung über Claude');
+        self::assertArrayNotHasKey('via_claude', $events[1], 'Anlegen über die App ohne Vermerk');
+        self::assertStringContainsString('1 Eintrag davon über Claude.', $history['content'][0]['text']);
+
+        $city = $this->callTool($this->token, 'list_city_history', []);
+        $first = $city['structuredContent']['events'][0];
+        self::assertSame([$this->m1, true], [$first['equipment']['id'], $first['via_claude']]);
+        self::assertStringContainsString('davon über Claude.', $city['content'][0]['text']);
+
+        $this->data($this->token, 'resolve_notice', ['id' => $this->notice]);
+        $notice = $this->data($this->token, 'get_notice', ['id' => $this->notice])['notice'];
+        self::assertTrue($notice['history'][0]['via_claude']);
     }
 
     public function testHistoryExportAndLogMailSayOverClaude(): void

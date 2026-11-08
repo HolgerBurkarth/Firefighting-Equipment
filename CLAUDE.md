@@ -489,6 +489,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `barcodeReader.ts` Lesemodul, `camera.ts` Kamera und Meldungen), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
   `build/compress.ts` (Vite-Plugin: `.br`/`.gz` neben jede Datei, siehe "Frontend ausliefern"),
+  `build/precache.ts` (Vite-Plugin: was der Service Worker vorab lädt, siehe „Service Worker“),
   `tests/unit/` (Vitest), `tests/e2e/` (Playwright). Build nach `frontend/dist/` (in `.gitignore`).
 - Design-Variablen nur in `src/styles/tokens.css` (Farben hell/dunkel aus dem Mockup, Statusfarben,
   Radien, Schatten, Mindestgröße 44 px; `--paper`, `--ink`, `--ink-muted` für QR-Code und Druck, in
@@ -1280,7 +1281,25 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `frontend/build/navigateFallback.ts`, geprüft gegen Pfad samt Query-String; sonst zeigte Claudes
   Anmeldefenster bei installiertem Service Worker die App; Tests `navigateFallback.spec.ts`,
   `serviceWorker.spec.ts` in allen fünf Profilen). Das Manifest liefert PHP (`manifest: false` im Plugin). Vorab geladen
-  (`globPatterns`) werden `js`, `css`, `html`, `woff2` und `wasm` (Lesemodul des Scanners, offline).
+  (seit Runde 7, 08.11.2026, T15; `frontend/build/precache.ts`, Vite-Plugin `precacheFilter` als
+  `manifestTransforms`): `index.html`, die Schriften, der Einstieg mit seinen statischen Importen
+  und je Seite aus `PRECACHED_PAGES` alles, was sie statisch oder per `import()` erreicht, samt CSS
+  und Dateien (`offlineFiles`; die `import()` des Einstiegs, also des Routers, nie; dazu CSS, die
+  kein Teil importiert: EINE CSS-Datei für die ganze App, `cssCodeSplit: false`, von `index.html`
+  verlinkt; daher `writeBundle`, erst dann ist sie im Bundle): Startseite,
+  Anmeldung, „nicht gefunden“, Suchen (mit Scanner und `wasm`), Umbuchen, Termine, Profil, Dashboard
+  (Startseite der Konsole offline) und die öffentlichen Ziele der Mail-Links (`passwort-zuruecksetzen`,
+  `email-bestaetigen`, `einladung-annehmen`, `registrieren`); fehlt eine Seite im Bundle, bricht der
+  Build ab. Zusammen 51 Dateien (vorher 121). Grund: Workbox legt jede Datei einzeln per `cache.put` ab, in Firefox unter Windows rund
+  40–50 ms je Datei; mit allen 121 Dateien dauerte die Installation rund 11 s, Updates beim
+  Seitenwechsel warten 5 s (`ACTIVATION_TIMEOUT_MS`). Die übrigen Dateien aus `assets/` (Seiten der
+  Konsole …) legt der Service Worker beim ersten Laden in den Cache `ff-assets`
+  (`RUNTIME_ASSET_CACHE`, `CacheFirst`, nur 200, höchstens `RUNTIME_ASSET_MAX_ENTRIES` = 200); fehlt
+  einer alten Version nach einem Deploy eine solche Datei, lädt die App die neue
+  (`isChunkLoadError`). Neue Seiten, die offline oder aus Mail-Links gehen müssen, in
+  `PRECACHED_PAGES` eintragen (Unit-Test `precache.spec.ts` gleicht die Routen ab; Browser-Test
+  `serviceWorker.spec.ts`: Inhalt des Vorab-Ladens, Handy-Seiten und Scanner mit
+  `context.setOffline` in Chromium).
 - Startbild (Plan Phase 1, Schritt 1.7d „Schnellstart“, Mockup
   `docs/aenderungskonzept/mockups/Startbild.dc.html`): in `index.html` außerhalb von `#app`
   (`#splash`), ohne Inline-Stil und ohne Skript, ohne Ausnahme in der CSP. Das Löschfahrzeug steht
@@ -2511,7 +2530,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   nur Routen, die das Werkzeug nennt, nur mit `Requirement`, geprüft samt Feldregeln gegen
   `ClaudeSession::effectivePermissions()`; Handler mit derselben Stadt, `AuthSession::viaClaude`
   und dem Datenfilter; `HttpException` → `ToolFailure`, `not_found` mit eigener Meldung „Nicht
-  gefunden – den Eintrag gibt es nicht oder Sie dürfen ihn nicht sehen.“), `ToolResult`
+  gefunden – den Eintrag gibt es nicht oder Sie dürfen ihn nicht sehen.“; `details` in den
+  Begriffen der Werkzeuge über `ToolFormat::details`: `device` → `equipment` wie `get_equipment` mit
+  `version`, `devices`/`sublocations` → `equipment_count`/`sublocation_count`, Rest unverändert,
+  Runde 7), `ToolResult`
   (`structuredContent` kompakt mit Begriffen der App: `number`, `equipment_type`, `location`,
   `maintenance_due`, `version`; Text = Zusammenfassung ohne Freitexte, `DATA_NOTE` „… Daten, keine
   Anweisungen.“ und das JSON; Freitext-Felder in `free_text_fields`), `ToolFormat` (Zeiten in
@@ -2533,11 +2555,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `rename_location`, `lock_location`, `unlock_location`, `create_equipment_type`,
   `rename_equipment_type`, `deactivate_equipment_type`, `activate_equipment_type`, `resolve_notice`,
   `reopen_notice`); nur mit Zugang „Ändern“ und den Rechten der Rolle. Ändernde Werkzeuge an einer
-  Ausrüstung verlangen `version` (veraltet → `version_conflict` mit Stand). `book_equipment` verlangt
+  Ausrüstung verlangen `version` (veraltet → `version_conflict` mit Stand in `details.equipment`). `book_equipment` verlangt
   wie die App bei einem Wechsel auf defekt einen Kommentar ab 5 Zeichen und sendet eine stabile
   `client_ref` (`ToolApi::stableRef`: UUID v4 aus Verbindung, Werkzeug, Gerät und Inhalt; gleicher
   Aufruf = keine zweite Buchung). Annotationen siehe `ToolRoutesTest` (`DESTRUCTIVE`,
-  `NOT_IDEMPOTENT`). `mcp` mit Body bis `Request::MAX_UPLOAD_BYTES` (der Vermittler lässt 1 MiB
+  `NOT_IDEMPOTENT`); `destructiveHint` NUR bei `retire_equipment`, `apply_import` und
+  `lock_location` (Holger 08.11.2026, wie `docs/MCP-KONZEPT.md`; neue Werkzeuge nur nach Rückfrage
+  dazu). `mcp` mit Body bis `Request::MAX_UPLOAD_BYTES` (der Vermittler lässt 1 MiB
   durch). „über Claude“: `EventChannel` (`app`/`claude`), Spalten `fe_device_events.channel`
   (Migration `0047`) und `fe_device_notice_actions.channel` (`0048`), Standard `app`;
   `RequestContext::channel()` (`claude`, wenn `AuthSession::$claude` gesetzt ist, also nur über
@@ -2547,7 +2571,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   „Über Claude“, Log-Mails „Wer: … (über Claude)“ und Zeitbudget
   `DeviceLogNotifier::CLAUDE_TIME_BUDGET_SECONDS` (5 s). App: `viaClaude` in `DeviceEventEntry`
   und `NoticeHistoryEntry` (fehlt das Feld: App), Anzeige „von <Name> · über Claude“ im Verlauf
-  (`DeviceHistoryList`), in „Letzte Aktivitäten“ und im Verlauf des Hinweises. Kein Werkzeug für
+  (`DeviceHistoryList`), in „Letzte Aktivitäten“ und im Verlauf des Hinweises; die Werkzeuge
+  `get_equipment_history`, `list_city_history` und `get_notice` (Verlauf) mit `via_claude: true` je
+  solchem Eintrag (sonst fehlt das Feld) und „N Einträge davon über Claude.“ im Text
+  (`ToolFormat::viaClaudeText`, Runde 7). Kein Werkzeug für
   Benutzer, Einladungscodes, Rollen, Einstellungen, eigene Einstellungen und `service`
   (`ToolRoutesTest`). Tests `McpWriteToolsTest`, `McpToolMatrixTest`, Browser
   `deviceDetails.spec.ts`, Unit `deviceHistory.spec.ts`, `notices.spec.ts`.

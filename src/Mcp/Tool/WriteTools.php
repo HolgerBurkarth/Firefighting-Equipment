@@ -16,10 +16,12 @@ use FirefightingEquipment\Permission\Requirement;
  * veraltet → Fehlerergebnis version_conflict mit dem aktuellen Stand. Der Verlauf vermerkt jede
  * Änderung „über Claude“ (RequestContext::channel()).
  *
- * destructiveHint: Werkzeuge, die Werte leeren oder überschreiben bzw. Ausrüstung, Standorte oder
- * Typen aus dem Betrieb nehmen (aussondern, Import übernehmen, Standort sperren, Typ deaktivieren,
- * Stammdaten, Code, Wartungsdatum). idempotentHint: ein zweiter gleicher Aufruf ändert nichts mehr
- * (Version, Zielzustand oder Buchungs-Kennung); nicht beim Anlegen und beim Import.
+ * destructiveHint nur bei aussondern, Import übernehmen und Standort sperren (Festlegung Holger,
+ * 08.11.2026, wie docs/MCP-KONZEPT.md): Claude fragt dort vorher nach; alle anderen schreibenden
+ * Werkzeuge ohne (Stammdaten, Code, Wartungsdatum und Typ deaktivieren lassen sich mit demselben
+ * Werkzeug zurückstellen, der Verlauf behält den alten Wert). idempotentHint: ein zweiter gleicher
+ * Aufruf ändert nichts mehr (Version, Zielzustand oder Buchungs-Kennung); nicht beim Anlegen und
+ * beim Import.
  */
 final class WriteTools
 {
@@ -179,7 +181,6 @@ final class WriteTools
                 return self::deviceResult($api->post('api/v1/devices/{id}/inspection-due', ['id' => (int) $args->int('id')], $body), 'Wartungsdatum gespeichert.');
             },
             readOnly: false,
-            destructive: true,
         );
     }
 
@@ -222,7 +223,6 @@ final class WriteTools
                 return self::bulkResult($api->post('api/v1/devices/bulk/inspection-due', [], $body), 'Wartungsdatum');
             },
             readOnly: false,
-            destructive: true,
         );
     }
 
@@ -311,7 +311,6 @@ final class WriteTools
                 return self::deviceResult($api->post('api/v1/devices/{id}/fields', ['id' => (int) $args->int('id')], $body), 'Stammdaten gespeichert.');
             },
             readOnly: false,
-            destructive: true,
             requires: Requirement::action(Action::DeviceEdit),
         );
     }
@@ -337,7 +336,6 @@ final class WriteTools
                 return self::deviceResult($api->post('api/v1/devices/{id}/fields', ['id' => (int) $args->int('id')], $body), 'Code gespeichert.');
             },
             readOnly: false,
-            destructive: true,
             requires: Requirement::action(Action::DeviceCode),
         );
     }
@@ -575,7 +573,6 @@ final class WriteTools
                 ['POST api/v1/device-types/{id}/deactivate'],
                 static fn (ToolArguments $args, ToolApi $api): ToolResult => $result($api->post('api/v1/device-types/{id}/deactivate', $id($args)), 'Ausrüstungstyp deaktiviert.'),
                 readOnly: false,
-                destructive: true,
             ),
             new ToolDefinition(
                 'activate_equipment_type',

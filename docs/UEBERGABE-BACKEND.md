@@ -8,6 +8,32 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-08 – „Claude-Zugang: destructiveHint nur bei aussondern, Import, Standort sperren (Runde 7)“
+
+- Nur Annotationen der Werkzeuge in `tools/list`: `destructiveHint` true nur noch bei
+  `retire_equipment`, `apply_import`, `lock_location`; `set_maintenance_date`,
+  `bulk_set_maintenance_date`, `update_equipment`, `assign_code`, `deactivate_equipment_type` jetzt
+  false. Grund: Festlegung Holger (wie `MCP-KONZEPT.md`); Claude fragt nur dort vorher nach.
+- Tests: `ToolRoutesTest::testWriteToolsHaveTheirHints` (Liste `DESTRUCTIVE`). `CLAUDE.md`: Schritt M6.
+
+## 2026-11-08 – „Claude-Zugang: Fehlerdetails der Werkzeuge in ihren Begriffen (Runde 7)“
+
+- Nur Werkzeuge an `POST mcp`, REST-Routen unverändert: `details` eines Fehlerergebnisses
+  (`isError`) nennt den Stand jetzt wie `get_equipment` (`details.equipment` mit `number`,
+  `equipment_type`, `maintenance_due`, `version` …) statt im Format der REST-API (`details.device`
+  mit `identifier`, `next_inspection_due`); beim Sperren eines Standorts `equipment_count` und
+  `sublocation_count` statt `devices`/`sublocations`. Andere Angaben bleiben (z. B. `summary` bei
+  `import_outdated`).
+- Tests: `McpWriteToolsTest::testErrorDetailsUseTheTermsOfTheTools`. `CLAUDE.md`: Schritte M5, M6.
+
+## 2026-11-08 – „Claude-Zugang: Verlauf der Werkzeuge mit Vermerk „über Claude“ (Runde 7)“
+
+- Nur Werkzeuge an `POST mcp`, REST-Routen unverändert: `get_equipment_history`,
+  `list_city_history` und der Verlauf in `get_notice` tragen je Eintrag über Claude `via_claude:
+  true` (sonst fehlt das Feld), die Zusammenfassung „N Einträge davon über Claude.“. Vorher fehlte
+  der Vermerk in den Werkzeugen (Eintrag 257 an M90, Live-Test Holger).
+- Tests: `McpWriteToolsTest::testHistoryToolsShowOverClaude`. `CLAUDE.md`: Schritt M6.
+
 ## 2026-11-07 – „Claude-Zugang: Schreibwerkzeuge und Vermerk „über Claude“ (Runde 6, M6)“
 
 - Neu im Verlauf: Feld `channel` (`app` | `claude`) in jedem Eintrag von `GET devices/{id}/events`

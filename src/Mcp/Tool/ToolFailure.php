@@ -9,7 +9,8 @@ use FirefightingEquipment\Http\HttpException;
 /**
  * Fehler eines Werkzeugs: wird zum Ergebnis mit isError (nicht zum Protokollfehler), damit Claude
  * die Meldung sieht und den Aufruf berichtigen kann. Code und Meldung wie die Fehlerantwort der
- * REST-API (z. B. version_conflict mit dem aktuellen Stand in details).
+ * REST-API, details in den Begriffen der Werkzeuge (ToolFormat::details; z. B. version_conflict
+ * mit dem aktuellen Stand in details.equipment samt version).
  */
 final class ToolFailure extends \RuntimeException
 {
@@ -38,7 +39,7 @@ final class ToolFailure extends \RuntimeException
             return self::notFound(self::NOT_FOUND);
         }
 
-        return new self($e->errorCode, $e->getMessage(), $e->details);
+        return new self($e->errorCode, $e->getMessage(), $e->details === null ? null : ToolFormat::details($e->details));
     }
 
     public static function forbidden(): self
