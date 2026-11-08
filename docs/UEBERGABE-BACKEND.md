@@ -8,6 +8,19 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-08 – „Status „benutzt“ (Phase 2, Runde 8, P2.1)“
+
+- Neuer Status `used` („benutzt“) in `DeviceStatus`: gültig überall, wo Status vorkommen (Geräte,
+  Filter `status=used`, Sortierung nach Status hinter `defective`, `POST devices/{id}/state` und
+  `bulk/state`, Hinweise, Verlauf, CSV-Export, CSV-Import „benutzt“ erlaubt, „Gültige Werte“,
+  Claude-Werkzeuge). `GET device-summary`: `by_status` hat jetzt vier Einträge (`used` zuletzt).
+  Migrationen 0049–0051 erweitern nur CHECK-Bedingungen.
+- `X-Client-Api` / `X-Api-Version` jetzt 3 (neuer Statuswert: Apps vor dieser Version kennen ihn nicht).
+  `ClientApi::MIN` bleibt 2; Anhebung auf 3 als eigener Schritt nach dem Deploy, außerhalb eines Dienstabends.
+- Tests: `DeviceStateTest::testStatusUsedCanBeBookedFilteredAndCounted`, `DeviceSummaryTest`,
+  `DeviceStatusTest`, `ClientApiTest`; Frontend `adminOverview.spec.ts`, `tokens.spec.ts`.
+  `CLAUDE.md`: Abschnitte HTTP und REST-API (Versionierung), Standorte und Geräte (Status).
+
 ## 2026-11-08 – „Claude-Zugang: destructiveHint nur bei aussondern, Import, Standort sperren (Runde 7)“
 
 - Nur Annotationen der Werkzeuge in `tools/list`: `destructiveHint` true nur noch bei

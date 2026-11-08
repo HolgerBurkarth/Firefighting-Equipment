@@ -80,7 +80,7 @@ describe('Design-Variablen', () => {
         ['hell', light],
         ['dunkel', darkForced],
     ])('Kontrast %s (mindestens 4,5:1)', (_mode, tokens) => {
-        it.each(['ready', 'maintenance', 'defective', 'retired'])('Status %s', (status) => {
+        it.each(['ready', 'maintenance', 'defective', 'used', 'retired'])('Status %s', (status) => {
             const fg = hex(tokens, `--status-${status}-fg`);
             const bg = hex(tokens, `--status-${status}-bg`);
             expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);

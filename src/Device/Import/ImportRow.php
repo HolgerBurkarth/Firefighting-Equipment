@@ -78,7 +78,7 @@ final readonly class ImportRow
                 $retired = true;
                 $status = null;
             } elseif ($status === null) {
-                $errors[] = sprintf('Unbekannter Status „%s“ (möglich: einsatzbereit, in Wartung, defekt).', $statusText);
+                $errors[] = sprintf('Unbekannter Status „%s“ (möglich: einsatzbereit, in Wartung, defekt, benutzt).', $statusText);
             }
         }
 

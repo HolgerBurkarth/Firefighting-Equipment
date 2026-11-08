@@ -115,7 +115,7 @@ describe('GET device-summary', () => {
         expect(summary()).toEqual({
             today: '2026-10-30',
             total: 45,
-            byStatus: { ready: 42, maintenance: 1, defective: 2 },
+            byStatus: { ready: 42, maintenance: 1, defective: 2, used: 0 },
             overdue: 2,
             dueSoon: 4,
             dueSoonDays: 30,
@@ -348,6 +348,18 @@ describe('Kacheln des Dashboards', () => {
             },
         });
         expect(notReadyTile(onlyDefective).detail).toBe('1 defekt');
+        const withUsed = summary({
+            devices: {
+                total: 5,
+                by_status: [
+                    { status: 'ready', count: 3 },
+                    { status: 'maintenance', count: 0 },
+                    { status: 'defective', count: 1 },
+                    { status: 'used', count: 1 },
+                ],
+            },
+        });
+        expect(notReadyTile(withUsed)).toEqual({ value: '2', detail: '1 defekt · 1 benutzt' });
     });
 
     it('Termine und offene Hinweise (Einzahl und Mehrzahl)', () => {

@@ -250,7 +250,7 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
         ], 'Kennung;Gerätetyp;Standort;Status;Nächste Prüfung'));
 
         self::assertSame([
-            'Unbekannter Status „kaputt“ (möglich: einsatzbereit, in Wartung, defekt).',
+            'Unbekannter Status „kaputt“ (möglich: einsatzbereit, in Wartung, defekt, benutzt).',
             'Das Datum der nächsten Wartung „31.02.2027“ ist kein gültiger Kalendertag.',
         ], self::row($preview, 2)['messages']);
         self::assertSame(['Die Nummer fehlt.'], self::row($preview, 3)['messages']);

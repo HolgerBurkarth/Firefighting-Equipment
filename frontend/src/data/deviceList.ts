@@ -4,7 +4,12 @@ import { INSPECTION_WINDOW_DAYS } from './inspections';
 
 /** Status, nach denen die Geräteliste filtert (ausgesonderte über `showRetired`). */
 export type ActiveStatus = Exclude<DeviceStatus, 'retired'>;
-export const ACTIVE_STATUSES: readonly ActiveStatus[] = ['ready', 'maintenance', 'defective'];
+export const ACTIVE_STATUSES: readonly ActiveStatus[] = [
+    'ready',
+    'maintenance',
+    'defective',
+    'used',
+];
 
 export const DEVICE_SORTS: readonly DeviceSort[] = [
     'identifier',

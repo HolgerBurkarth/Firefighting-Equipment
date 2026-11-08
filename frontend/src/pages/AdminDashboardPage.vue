@@ -47,7 +47,7 @@ function deviceLink(id: number): RouteLocationRaw | null {
     return allowed('device') ? { name: 'device', params: { id } } : null;
 }
 
-const NOT_READY_QUERY = { status: 'maintenance,defective' };
+const NOT_READY_QUERY = { status: 'maintenance,defective,used' };
 
 const tiles = computed(() => {
     const data = overview.value;

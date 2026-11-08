@@ -14,11 +14,12 @@ describe('Status', () => {
             Ready: STATUS_LABELS.ready,
             Maintenance: STATUS_LABELS.maintenance,
             Defective: STATUS_LABELS.defective,
+            Used: STATUS_LABELS.used,
             Retired: STATUS_LABELS.retired,
         });
     });
 
-    it('buchbar sind alle außer ausgesondert, in der Reihenfolge der Tasten', () => {
+    it('buchbar sind alle außer ausgesondert und benutzt (kommt mit „Benutzt melden“), in der Reihenfolge der Tasten', () => {
         expect(BOOKABLE_STATUSES).toEqual(['ready', 'maintenance', 'defective']);
     });
 });

@@ -42,7 +42,7 @@ describe('apiRequest', () => {
         await apiRequest('auth/me', parseOk, { fetchFn: fetch });
         await apiRequest('auth/logout', parseOk, { method: 'POST', fetchFn: fetch });
         await apiRequest('x', parseOk, { method: 'DELETE', fetchFn: fetch });
-        expect(requests.map((request) => request.headers['X-Client-Api'])).toEqual(['2', '2', '2']);
+        expect(requests.map((request) => request.headers['X-Client-Api'])).toEqual(['3', '3', '3']);
     });
 
     it('liest das Fehlerformat mit details', async () => {
@@ -141,7 +141,7 @@ describe('apiDownload', () => {
         expect(requests[0]?.url).toBe(
             'https://www.prodad.de/firefighting/test/api/v1/devices/export?status=defective',
         );
-        expect(requests[0]?.headers['X-Client-Api']).toBe('2');
+        expect(requests[0]?.headers['X-Client-Api']).toBe('3');
     });
 
     it('Fehler kommen als ApiError, 401 meldet ab', async () => {
@@ -174,7 +174,7 @@ describe('Vertragsnummer des Servers (X-Api-Version) und client_outdated', () =>
             details: { min_client_api: 3 },
         };
         const result = await apiRequest('auth/me', parseOk, {
-            fetchFn: respond(409, body, { 'X-Api-Version': '3' }).fetch,
+            fetchFn: respond(409, body, { 'X-Api-Version': '4' }).fetch,
         });
         expect(!result.ok && result.error.code).toBe('client_outdated');
         expect(!result.ok && result.error.details).toEqual({ min_client_api: 3 });
@@ -191,16 +191,16 @@ describe('Vertragsnummer des Servers (X-Api-Version) und client_outdated', () =>
         const outdated = vi.fn();
         setOutdatedHandler(outdated);
         await apiRequest('x', parseOk, {
-            fetchFn: respond(200, { ok: true }, { 'X-Api-Version': '3' }).fetch,
+            fetchFn: respond(200, { ok: true }, { 'X-Api-Version': '4' }).fetch,
         });
         await apiRequest('x', parseOk, {
-            fetchFn: respond(404, { error: 'not_found', message: 'x' }, { 'X-Api-Version': '3' })
+            fetchFn: respond(404, { error: 'not_found', message: 'x' }, { 'X-Api-Version': '4' })
                 .fetch,
         });
         await apiDownload(
             'devices/export',
             'g.csv',
-            respond(200, 'a;b', { 'X-Api-Version': '3' }).fetch,
+            respond(200, 'a;b', { 'X-Api-Version': '4' }).fetch,
         );
         expect(outdated.mock.calls).toEqual([['newer_api'], ['newer_api'], ['newer_api']]);
     });
@@ -209,7 +209,7 @@ describe('Vertragsnummer des Servers (X-Api-Version) und client_outdated', () =>
         const outdated = vi.fn();
         setOutdatedHandler(outdated);
         for (const headers of [
-            { 'X-Api-Version': '2' },
+            { 'X-Api-Version': '3' },
             { 'X-Api-Version': '1' },
             { 'X-Api-Version': '0' },
             {},

@@ -4,6 +4,24 @@ Nur in der Test-Stadt `https://www.prodad.de/firefighting/test/`, nie in echten 
 [`../MCP-KONZEPT.md`](../MCP-KONZEPT.md), Plan: [`../PLAN-MCP.md`](../PLAN-MCP.md). Je Schritt wird
 ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holger).
 
+## Runde 7: Vermerk „über Claude“ in den Werkzeugen, Fehlerdetails, destructiveHint
+
+Vom Agenten nach dem Deploy (Build `5c5609a24eea`, 08.11.2026; Chrome als Admin der Test-Stadt, curl):
+
+- ☑ `build.json` = `5c5609a24eea`, `health` ok; Vermittler ohne Token 401 in 0,35 / 0,36 / 0,64 s,
+  `…/ff-mcp.pl/immendingen` 404.
+- ☑ Eintrag 257 (und 258) an M90: in der REST-API `channel` = `claude`; Detailseite und „Details und
+  Verlauf“ der Handy-Seite „von Holger Burkarth · über Claude“; CSV-Export des Verlaufs (im Speicher
+  gelesen, keine Datei) „Über Claude“ = „Ja“ bei beiden.
+- ☐ Log-Mail zu 257 („Wer: … (über Claude)“): Mails kann der Agent nicht lesen (Holger).
+- ☑ `get_equipment_history` an M90 zeigt `via_claude: true` bei 257 und 258; `version_conflict`
+  liefert `details.equipment` mit `number` und `maintenance_due` (Holger mit Claude im Chat über den
+  Konnektor, abgenommen 08.11.2026).
+- ☐ Rückfrage nur noch vor aussondern, Import übernehmen, Standort sperren: nicht eigens geprüft.
+- ☑ Service Worker (T15): die alte Version (`fa7433111922`) übernahm beim Seitenwechsel von selbst
+  die neue; Vorab-Cache der Test-Stadt 51 Dateien mit einer CSS-Datei, Seiten der Konsole beim
+  ersten Öffnen in `ff-assets` (Detailseite, Formulare).
+
 ## Runde 6: Werkzeuge (M5 Lesen, M6 Ändern)
 
 MCP-Adresse unverändert `https://www.prodad.de/cgi-bin/ff-mcp.pl/test`. Ein bestehender Konnektor

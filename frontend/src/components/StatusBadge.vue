@@ -8,6 +8,7 @@ const SYMBOLS: Readonly<Record<DeviceStatus, string>> = {
     ready: '✓',
     maintenance: '◐',
     defective: '✕',
+    used: '●',
     retired: '–',
 };
 </script>

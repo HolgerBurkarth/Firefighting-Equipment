@@ -1,12 +1,12 @@
 import { apiRequest, isRecord, type ApiResult } from './client';
-import type { BookableStatus } from './devices';
+import type { ActiveStatus } from '../data/deviceList';
 
 /** Antwort von GET device-summary (DeviceSummaryHandler), ohne ausgesonderte Geräte. */
 export interface DeviceSummaryCounts {
     /** JJJJ-MM-TT (Europe/Berlin). */
     readonly today: string;
     readonly total: number;
-    readonly byStatus: Readonly<Record<BookableStatus, number>>;
+    readonly byStatus: Readonly<Record<ActiveStatus, number>>;
     readonly overdue: number;
     readonly dueSoon: number;
     readonly dueSoonDays: number;
@@ -19,25 +19,31 @@ function isCount(value: unknown): value is number {
     return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
-function parseByStatus(json: unknown): Record<BookableStatus, number> | null {
+function parseByStatus(json: unknown): Record<ActiveStatus, number> | null {
     if (!Array.isArray(json)) {
         return null;
     }
-    const counts: Partial<Record<BookableStatus, number>> = {};
+    const counts: Partial<Record<ActiveStatus, number>> = {};
     for (const entry of json) {
         if (!isRecord(entry) || !isCount(entry['count'])) {
             return null;
         }
         const status = entry['status'];
-        if (status !== 'ready' && status !== 'maintenance' && status !== 'defective') {
+        if (
+            status !== 'ready' &&
+            status !== 'maintenance' &&
+            status !== 'defective' &&
+            status !== 'used'
+        ) {
             return null;
         }
         counts[status] = entry['count'];
     }
-    const { ready, maintenance, defective } = counts;
+    // `used` (benutzt) kennt erst der Server ab Phase 2; fehlt es, sind es 0.
+    const { ready, maintenance, defective, used = 0 } = counts;
     return ready === undefined || maintenance === undefined || defective === undefined
         ? null
-        : { ready, maintenance, defective };
+        : { ready, maintenance, defective, used };
 }
 
 export function parseDeviceSummaryCounts(json: unknown): DeviceSummaryCounts | null {

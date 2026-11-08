@@ -218,7 +218,7 @@ test.describe('Dashboard', () => {
             params.get('sort'),
             params.get('dir'),
             params.get('limit'),
-        ]).toEqual(['maintenance,defective', 'status', 'desc', '10']);
+        ]).toEqual(['maintenance,defective,used', 'status', 'desc', '10']);
         const events = apiRequests.find((r) => r.path === 'api/v1/device-events');
         expect(new URL(events?.url ?? '').searchParams.get('limit')).toBe('8');
     });

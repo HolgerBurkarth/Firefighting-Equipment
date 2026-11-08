@@ -344,7 +344,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   für alle Arbeiten an API und Frontend): Die App sendet bei JEDEM API-Aufruf `X-Client-Api: <n>`
   (`apiRequest`/`apiDownload` in `frontend/src/api/client.ts`, `ClientApi::HEADER`/`CURRENT` in
   `src/Http/ClientApi.php`; die Zahl steht in `resources/client-api.json`, abgeglichen von
-  `ClientApiTest` und `clientApi.spec.ts`; derzeit 2, seit Schritt 1.7c: Menü, Leiste und Knöpfe
+  `ClientApiTest` und `clientApi.spec.ts`; derzeit 3, seit Phase 2, Schritt P2.1: neuer Status `used`; 2 seit Schritt 1.7c: Menü, Leiste und Knöpfe
   folgen den Rechten statt `role`; vorher 1). Ein gewöhnlicher Header einer Anfrage an
   dieselbe Adresse: kein CORS-Preflight, `RequestGuard` prüft nur `Content-Type`, `Origin` und Body
   (per Test).
@@ -2680,7 +2680,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Scan-Code bleibt am ausgesonderten Gerät gespeichert. In der CHECK-Bedingung stehen die Zeichen als
   `'\\x{1D}'` (in SQL-Strings doppelter Backslash, sonst wird aus `\x` ein `x`).
 - Status (`status`, `ascii_bin`): `ready` (einsatzbereit), `maintenance` (in Wartung), `defective`
-  (defekt), `retired` (ausgesondert). Ausgesonderte Geräte sind aus normalen Listen und Prüffristen
+  (defekt), `used` (benutzt, seit Phase 2 P2.1, Migrationen 0049–0051; zählt als nicht einsatzbereit,
+  in der App noch nicht wählbar bis „Benutzt melden“, P2.3), `retired` (ausgesondert). Ausgesonderte Geräte sind aus normalen Listen und Prüffristen
   ausgeblendet, nicht umbuchbar; der Admin kann sie wieder aufnehmen. Geräte werden nie gelöscht
   (jedes hat ein Ereignis, der Fremdschlüssel verhindert das Löschen; einzige Ausnahme: "Gerätedaten
   zurücksetzen").

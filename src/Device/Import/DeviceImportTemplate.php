@@ -111,7 +111,7 @@ final class DeviceImportTemplate
         foreach (self::paths($tree) as [$path]) {
             $rows[] = [ImportColumn::Location->label(), $path];
         }
-        foreach ([DeviceStatus::Ready, DeviceStatus::Maintenance, DeviceStatus::Defective] as $status) {
+        foreach ([DeviceStatus::Ready, DeviceStatus::Maintenance, DeviceStatus::Defective, DeviceStatus::Used] as $status) {
             $rows[] = [ImportColumn::Status->label(), $status->label()];
         }
         foreach ([ImportColumn::NextInspectionDue, ImportColumn::ProcuredOn] as $column) {

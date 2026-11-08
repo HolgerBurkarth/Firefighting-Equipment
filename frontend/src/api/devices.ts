@@ -1,9 +1,9 @@
 import { apiDownload, apiRequest, isRecord, type ApiResult, type DownloadedFile } from './client';
 
 /** Status wie DeviceStatus in PHP. */
-export type DeviceStatus = 'ready' | 'maintenance' | 'defective' | 'retired';
+export type DeviceStatus = 'ready' | 'maintenance' | 'defective' | 'used' | 'retired';
 
-const STATUSES: readonly DeviceStatus[] = ['ready', 'maintenance', 'defective', 'retired'];
+const STATUSES: readonly DeviceStatus[] = ['ready', 'maintenance', 'defective', 'used', 'retired'];
 
 /** Kurzform eines Geräts (DeviceJson::summary, z. B. in GET inspection-due). */
 export interface DeviceSummary {
@@ -272,7 +272,7 @@ export function fetchDevice(id: number, fetchFn?: typeof fetch): Promise<ApiResu
 }
 
 /** Status, die ein User setzen darf (POST devices/{id}/state; aussondern nur der Admin). */
-export type BookableStatus = Exclude<DeviceStatus, 'retired'>;
+export type BookableStatus = Exclude<DeviceStatus, 'retired' | 'used'>;
 
 export const BOOKABLE_STATUSES: readonly BookableStatus[] = ['ready', 'maintenance', 'defective'];
 
@@ -281,6 +281,7 @@ export const STATUS_LABELS: Readonly<Record<DeviceStatus, string>> = {
     ready: 'einsatzbereit',
     maintenance: 'in Wartung',
     defective: 'defekt',
+    used: 'benutzt',
     retired: 'ausgesondert',
 };
 

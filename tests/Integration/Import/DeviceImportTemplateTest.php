@@ -112,6 +112,7 @@ final class DeviceImportTemplateTest extends ImportApiTestCase
             ['Status', 'einsatzbereit'],
             ['Status', 'in Wartung'],
             ['Status', 'defekt'],
+            ['Status', 'benutzt'],
             ['Nächste Wartung', 'Datum TT.MM.JJJJ, z. B. 01.03.2027'],
             ['Beschaffungsdatum', 'Datum TT.MM.JJJJ, z. B. 01.03.2027'],
         ], self::parse($body), 'nur aktive, nur die eigene Stadt (tuttlingen hat auch HLF 20)');

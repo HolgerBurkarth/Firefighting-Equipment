@@ -15,7 +15,7 @@ final class ReadTools
     /** Standard für Listen, wenn Claude keine Anzahl angibt. */
     private const int DEFAULT_LIMIT = 25;
 
-    private const array STATUS = ['ready', 'maintenance', 'defective', 'retired'];
+    private const array STATUS = ['ready', 'maintenance', 'defective', 'used', 'retired'];
 
     private const array SORT = [
         'number' => 'identifier',
@@ -91,7 +91,7 @@ final class ReadTools
                     $text .= sprintf(' Offene Hinweise im Protokoll: %d.', $data['open_notices']);
                 }
                 if ($api->allows('GET api/v1/devices')) {
-                    $list = $api->get('api/v1/devices', query: ['status' => 'maintenance,defective', 'sort' => 'status', 'dir' => 'desc', 'limit' => 10]);
+                    $list = $api->get('api/v1/devices', query: ['status' => 'maintenance,defective,used', 'sort' => 'status', 'dir' => 'desc', 'limit' => 10]);
                     $devices = array_map(ToolFormat::equipment(...), self::list($list['devices'] ?? []));
                     $data['not_ready'] = ['equipment' => $devices, 'total' => $list['total'] ?? count($devices)];
                     $text .= sprintf(' Nicht einsatzbereit: %d (Liste mit search_equipment und status).', $data['not_ready']['total']);
@@ -164,7 +164,7 @@ final class ReadTools
                     'minItems' => 1,
                     'maxItems' => 4,
                     'uniqueItems' => true,
-                    'description' => 'Nur diese Status: ready (einsatzbereit), maintenance (in Wartung), defective (defekt), retired (ausgesondert).',
+                    'description' => 'Nur diese Status: ready (einsatzbereit), maintenance (in Wartung), defective (defekt), used (benutzt), retired (ausgesondert).',
                 ],
                 'include_retired' => ['type' => 'boolean', 'description' => 'Ohne status: auch ausgesonderte Ausrüstung.'],
                 'sort' => ['type' => 'string', 'enum' => array_keys(self::SORT), 'description' => 'Sortierung (Standard number).'],
