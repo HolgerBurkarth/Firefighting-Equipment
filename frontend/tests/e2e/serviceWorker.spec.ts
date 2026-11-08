@@ -139,43 +139,51 @@ test.describe('Service Worker', () => {
         await context.setOffline(false);
     });
 
-    test('lädt vorab nur die Offline-Seiten, die Konsole bei Bedarf (T15)', async ({ page }) => {
-        await page.goto('/firefighting/test/anmelden');
-        await controlledBy(page);
+    test.describe('Vorab-Laden', () => {
+        // Anfragen einer vom Service Worker kontrollierten Seite gibt WebKit nicht an page.route(); die
+        // Anmeldeseite fragt dann den Testserver ohne Datenbank (503 in der Konsole).
+        test.use({ allowedConsoleError: HTTP_ERROR_CONSOLE });
 
-        const precached = await cachedPaths(page, 'precache');
-        for (const prefix of [
-            'SearchPage',
-            'DevicePage',
-            'InspectionsPage',
-            'ProfilePage',
-            'CodeScanner',
-            'barcodeReader',
-            'HomePage',
-            'LoginPage',
-            'NotFoundPage',
-            'AdminDashboardPage',
-            'PasswordResetPage',
-            'EmailVerifyPage',
-            'InvitationAcceptPage',
-            'RegisterPage',
-        ]) {
-            expect(precached, prefix).toContain(`assets/${assetName(prefix, '.js')}`);
-        }
-        expect(precached).toContain(`assets/${assetName('zxing_reader', '.wasm')}`);
-        expect(precached).toContain('index.html');
-        // Eine CSS-Datei für die ganze App (cssCodeSplit: false), von index.html verlinkt.
-        expect(precached).toContain(`assets/${assetName('style', '.css')}`);
-        const users = `assets/${assetName('UsersPage', '.js')}`;
-        expect(precached).not.toContain(users);
-        // Vorher alle 121 Dateien des Builds; jetzt rund 70 (T15).
-        expect(precached.length).toBeLessThan(80);
+        test('lädt vorab nur die Offline-Seiten, die Konsole bei Bedarf (T15)', async ({
+            page,
+        }) => {
+            await page.goto('/firefighting/test/anmelden');
+            await controlledBy(page);
 
-        // Eine Seite der Konsole legt der Service Worker beim ersten Laden ab (nur 200er).
-        await page.evaluate(async (path) => {
-            await fetch(new URL(path, document.baseURI));
-        }, users);
-        await expect.poll(() => cachedPaths(page, 'ff-assets')).toEqual([users]);
+            const precached = await cachedPaths(page, 'precache');
+            for (const prefix of [
+                'SearchPage',
+                'DevicePage',
+                'InspectionsPage',
+                'ProfilePage',
+                'CodeScanner',
+                'barcodeReader',
+                'HomePage',
+                'LoginPage',
+                'NotFoundPage',
+                'AdminDashboardPage',
+                'PasswordResetPage',
+                'EmailVerifyPage',
+                'InvitationAcceptPage',
+                'RegisterPage',
+            ]) {
+                expect(precached, prefix).toContain(`assets/${assetName(prefix, '.js')}`);
+            }
+            expect(precached).toContain(`assets/${assetName('zxing_reader', '.wasm')}`);
+            expect(precached).toContain('index.html');
+            // Eine CSS-Datei für die ganze App (cssCodeSplit: false), von index.html verlinkt.
+            expect(precached).toContain(`assets/${assetName('style', '.css')}`);
+            const users = `assets/${assetName('UsersPage', '.js')}`;
+            expect(precached).not.toContain(users);
+            // Vorher alle 121 Dateien des Builds; jetzt 51 (T15).
+            expect(precached.length).toBeLessThan(60);
+
+            // Eine Seite der Konsole legt der Service Worker beim ersten Laden ab (nur 200er).
+            await page.evaluate(async (path) => {
+                await fetch(new URL(path, document.baseURI));
+            }, users);
+            await expect.poll(() => cachedPaths(page, 'ff-assets')).toEqual([users]);
+        });
     });
 });
 
