@@ -48,7 +48,7 @@ export const RUNTIME_ASSET_CACHE = 'ff-assets';
 /** Höchstens so viele Dateien im RUNTIME_ASSET_CACHE (ältere fallen weg, mehrere Versionen). */
 export const RUNTIME_ASSET_MAX_ENTRIES = 200;
 
-/** Teil eines Bundles, wie ihn Rollup/Rolldown in generateBundle liefert (nur, was hier zählt). */
+/** Teil eines Bundles, wie ihn Rollup/Rolldown in writeBundle liefert (nur, was hier zählt). */
 export interface BundleChunk {
     type: 'chunk';
     fileName: string;
@@ -70,8 +70,8 @@ export interface BundleAsset {
 /**
  * Dateien, die vorab geladen werden: der Einstieg mit seinen statischen Importen (nicht seinen
  * import(): darüber erreicht der Router jede Seite) und je Seite aus PRECACHED_PAGES alles, was sie
- * statisch oder per import() erreicht, jeweils mit CSS und Dateien (z. B. das WASM des Scanners).
- * Fehlt eine Seite im Bundle, bricht der Build ab (sonst ginge sie offline still verloren).
+ * statisch oder per import() erreicht, jeweils mit CSS und Dateien (z. B. das WASM des Scanners),
+ * dazu CSS, die kein Teil importiert (von index.html verlinkt). Fehlt eine Seite im Bundle, bricht der Build ab (sonst ginge sie offline still verloren).
  */
 export function offlineFiles(
     bundle: Readonly<Record<string, BundleChunk | BundleAsset>>,
@@ -128,20 +128,36 @@ export function offlineFiles(
         }
         visit(chunk.fileName, true);
     }
+    // CSS, die kein Teil importiert, verlinkt index.html (eine Datei für die ganze App,
+    // cssCodeSplit: false in vite.config.ts).
+    const chunkCss = new Set(
+        [...chunks.values()].flatMap((c) => [...(c.viteMetadata?.importedCss ?? [])]),
+    );
+    for (const item of Object.values(bundle)) {
+        if (
+            item.type === 'asset' &&
+            item.fileName.endsWith('.css') &&
+            !chunkCss.has(item.fileName)
+        ) {
+            files.add(item.fileName);
+        }
+    }
     return files;
 }
 
 /**
  * Vite-Plugin: bestimmt beim Schreiben des Bundles die Dateien für das Vorab-Laden. Die
  * Workbox-Konfiguration filtert damit ihre Liste (`manifestTransforms: [plugin.manifestTransform]`);
- * vite-plugin-pwa erzeugt sw.js erst nach dem Bundle.
+ * vite-plugin-pwa erzeugt sw.js erst danach (closeBundle).
  */
 export function precacheFilter(): Plugin & { manifestTransform: ManifestTransform } {
     let files: Set<string> | null = null;
     return {
         name: 'ff-precache-filter',
         apply: 'build',
-        generateBundle(_options, bundle) {
+        // writeBundle: erst dann enthält das Bundle auch die gemeinsame CSS-Datei (vite:css-post);
+        // vite-plugin-pwa schreibt sw.js danach (closeBundle).
+        writeBundle(_options, bundle) {
             files = offlineFiles(bundle);
         },
         // Nicht „transform“: so heißt ein Hook von Vite.

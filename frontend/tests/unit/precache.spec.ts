@@ -79,6 +79,20 @@ describe('Vorab-Laden des Service Workers (T15)', () => {
         ]);
     });
 
+    it('nimmt CSS mit, die kein Teil importiert (von index.html verlinkt, eine Datei)', () => {
+        const items = bundle();
+        items['assets/style-1.css'] = { type: 'asset', fileName: 'assets/style-1.css' };
+        items['assets/UsersPage-1.css'] = { type: 'asset', fileName: 'assets/UsersPage-1.css' };
+        items['assets/UsersPage-1.js'] = chunk('assets/UsersPage-1.js', {
+            facadeModuleId: page('UsersPage'),
+            css: ['assets/UsersPage-1.css'],
+        });
+
+        const files = offlineFiles(items, ['SearchPage']);
+        expect(files).toContain('assets/style-1.css');
+        expect(files).not.toContain('assets/UsersPage-1.css');
+    });
+
     it('folgt einem Teil des Einstiegs, den eine Seite erreicht, auch dessen import()', () => {
         const items = bundle();
         // Ein Teil, den Einstieg und Seite statisch importieren, lädt den Scanner per import().
@@ -111,7 +125,7 @@ describe('Vorab-Laden des Service Workers (T15)', () => {
             'Plugin nicht gelaufen',
         );
 
-        const generate = plugin.generateBundle as unknown as (
+        const generate = plugin.writeBundle as unknown as (
             options: unknown,
             items: unknown,
         ) => void;

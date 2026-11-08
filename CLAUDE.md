@@ -1284,11 +1284,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (seit Runde 7, 08.11.2026, T15; `frontend/build/precache.ts`, Vite-Plugin `precacheFilter` als
   `manifestTransforms`): `index.html`, die Schriften, der Einstieg mit seinen statischen Importen
   und je Seite aus `PRECACHED_PAGES` alles, was sie statisch oder per `import()` erreicht, samt CSS
-  und Dateien (`offlineFiles`; die `import()` des Einstiegs, also des Routers, nie): Startseite,
+  und Dateien (`offlineFiles`; die `import()` des Einstiegs, also des Routers, nie; dazu CSS, die
+  kein Teil importiert: EINE CSS-Datei für die ganze App, `cssCodeSplit: false`, von `index.html`
+  verlinkt; daher `writeBundle`, erst dann ist sie im Bundle): Startseite,
   Anmeldung, „nicht gefunden“, Suchen (mit Scanner und `wasm`), Umbuchen, Termine, Profil, Dashboard
   (Startseite der Konsole offline) und die öffentlichen Ziele der Mail-Links (`passwort-zuruecksetzen`,
   `email-bestaetigen`, `einladung-annehmen`, `registrieren`); fehlt eine Seite im Bundle, bricht der
-  Build ab. Grund: Workbox legt jede Datei einzeln per `cache.put` ab, in Firefox unter Windows rund
+  Build ab. Zusammen 51 Dateien (vorher 121). Grund: Workbox legt jede Datei einzeln per `cache.put` ab, in Firefox unter Windows rund
   40–50 ms je Datei; mit allen 121 Dateien dauerte die Installation rund 11 s, Updates beim
   Seitenwechsel warten 5 s (`ACTIVATION_TIMEOUT_MS`). Die übrigen Dateien aus `assets/` (Seiten der
   Konsole …) legt der Service Worker beim ersten Laden in den Cache `ff-assets`

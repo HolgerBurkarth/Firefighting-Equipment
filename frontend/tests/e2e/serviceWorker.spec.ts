@@ -164,6 +164,8 @@ test.describe('Service Worker', () => {
         }
         expect(precached).toContain(`assets/${assetName('zxing_reader', '.wasm')}`);
         expect(precached).toContain('index.html');
+        // Eine CSS-Datei für die ganze App (cssCodeSplit: false), von index.html verlinkt.
+        expect(precached).toContain(`assets/${assetName('style', '.css')}`);
         const users = `assets/${assetName('UsersPage', '.js')}`;
         expect(precached).not.toContain(users);
         // Vorher alle 121 Dateien des Builds; jetzt rund 70 (T15).

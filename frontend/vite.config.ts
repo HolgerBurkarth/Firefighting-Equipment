@@ -82,6 +82,9 @@ export default defineConfig({
     build: {
         outDir: 'dist',
         emptyOutDir: true,
+        // Eine CSS-Datei für die ganze App (rund 100 KB, komprimiert rund 15 KB) statt einer je
+        // Seite: weniger Dateien im Vorab-Laden des Service Workers (build/precache.ts, T15).
+        cssCodeSplit: false,
         target: ['es2022', 'safari16', 'firefox115', 'chrome111'],
         // Namen wie FrontendAssets (PHP) sie ausliefert; per Browser-Test für jede Datei geprüft.
         rolldownOptions: { output: { sanitizeFileName } },
