@@ -48,7 +48,37 @@ final class McpWriteToolsTest extends McpToolsTestCase
         $stale = $this->callTool($this->token, 'book_equipment', ['id' => $this->m1, 'version' => 1, 'status' => 'ready']);
         self::assertTrue($stale['isError']);
         self::assertSame('version_conflict', $stale['structuredContent']['error']);
-        self::assertSame(2, $stale['structuredContent']['details']['device']['version']);
+        self::assertSame(2, $stale['structuredContent']['details']['equipment']['version']);
+    }
+
+    public function testErrorDetailsUseTheTermsOfTheTools(): void
+    {
+        $this->data($this->token, 'book_equipment', ['id' => $this->m1, 'version' => 1, 'status' => 'maintenance']);
+
+        foreach ([
+            'book_equipment' => ['status' => 'ready'],
+            'set_maintenance_date' => ['maintenance_due' => '2030-01-01'],
+            'update_equipment' => ['model' => 'X'],
+            'retire_equipment' => [],
+        ] as $tool => $arguments) {
+            $stale = $this->callTool($this->token, $tool, ['id' => $this->m1, 'version' => 1, ...$arguments]);
+            self::assertSame('version_conflict', $stale['structuredContent']['error'], $tool);
+            $details = $stale['structuredContent']['details'];
+            self::assertSame(['equipment'], array_keys($details), $tool);
+            $equipment = $details['equipment'];
+            self::assertSame(['M1', 'maintenance', 2], [$equipment['number'], $equipment['status'], $equipment['version']], $tool);
+            self::assertArrayHasKey('maintenance_due', $equipment);
+            self::assertArrayHasKey('equipment_type', $equipment);
+            foreach (['identifier', 'next_inspection_due', 'device_type', 'state_changed_at'] as $rest) {
+                self::assertArrayNotHasKey($rest, $equipment, $tool . ': ' . $rest);
+            }
+            self::assertStringNotContainsString('"device"', $stale['content'][0]['text'], $tool);
+            self::assertStringContainsString('"equipment"', $stale['content'][0]['text'], $tool);
+        }
+
+        $lock = $this->callTool($this->token, 'lock_location', ['id' => $this->store]);
+        self::assertSame('rule_violation', $lock['structuredContent']['error']);
+        self::assertSame(['equipment_count', 'sublocation_count'], array_keys($lock['structuredContent']['details']));
     }
 
     public function testDefectiveNeedsACommentLikeInTheApp(): void

@@ -153,6 +153,35 @@ final class ToolFormat
     }
 
     /**
+     * details einer Fehlerantwort der REST-API in den Begriffen der Werkzeuge: device → equipment
+     * (Stand wie get_equipment, mit version), Anzahlen beim Sperren eines Standorts (devices,
+     * sublocations) → equipment_count, sublocation_count. Andere Angaben (z. B. line, summary der
+     * Import-Vorschau) bleiben.
+     *
+     * @param array<array-key, mixed> $details
+     *
+     * @return array<string, mixed>
+     */
+    public static function details(array $details): array
+    {
+        $result = [];
+        foreach ($details as $key => $value) {
+            $key = (string) $key;
+            if ($key === 'device') {
+                $result['equipment'] = is_array($value) ? self::equipmentDetail($value) : null;
+            } elseif ($key === 'devices' && is_int($value)) {
+                $result['equipment_count'] = $value;
+            } elseif ($key === 'sublocations' && is_int($value)) {
+                $result['sublocation_count'] = $value;
+            } else {
+                $result[$key] = $value;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Seiteninformation einer Liste mit Hinweis auf weitere Einträge und Filter.
      *
      * @return array<string, mixed>
