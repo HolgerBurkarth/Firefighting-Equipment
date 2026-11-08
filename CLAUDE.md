@@ -489,6 +489,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `barcodeReader.ts` Lesemodul, `camera.ts` Kamera und Meldungen), `src/styles/` (`tokens.css` Design-Variablen, `base.css`),
   `build/appBase.ts` (Vite-Plugin: Platzhalter im Build, Basispfad im Dev-Server),
   `build/compress.ts` (Vite-Plugin: `.br`/`.gz` neben jede Datei, siehe "Frontend ausliefern"),
+  `build/precache.ts` (Vite-Plugin: was der Service Worker vorab lädt, siehe „Service Worker“),
   `tests/unit/` (Vitest), `tests/e2e/` (Playwright). Build nach `frontend/dist/` (in `.gitignore`).
 - Design-Variablen nur in `src/styles/tokens.css` (Farben hell/dunkel aus dem Mockup, Statusfarben,
   Radien, Schatten, Mindestgröße 44 px; `--paper`, `--ink`, `--ink-muted` für QR-Code und Druck, in
@@ -1280,7 +1281,23 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `frontend/build/navigateFallback.ts`, geprüft gegen Pfad samt Query-String; sonst zeigte Claudes
   Anmeldefenster bei installiertem Service Worker die App; Tests `navigateFallback.spec.ts`,
   `serviceWorker.spec.ts` in allen fünf Profilen). Das Manifest liefert PHP (`manifest: false` im Plugin). Vorab geladen
-  (`globPatterns`) werden `js`, `css`, `html`, `woff2` und `wasm` (Lesemodul des Scanners, offline).
+  (seit Runde 7, 08.11.2026, T15; `frontend/build/precache.ts`, Vite-Plugin `precacheFilter` als
+  `manifestTransforms`): `index.html`, die Schriften, der Einstieg mit seinen statischen Importen
+  und je Seite aus `PRECACHED_PAGES` alles, was sie statisch oder per `import()` erreicht, samt CSS
+  und Dateien (`offlineFiles`; die `import()` des Einstiegs, also des Routers, nie): Startseite,
+  Anmeldung, „nicht gefunden“, Suchen (mit Scanner und `wasm`), Umbuchen, Termine, Profil, Dashboard
+  (Startseite der Konsole offline) und die öffentlichen Ziele der Mail-Links (`passwort-zuruecksetzen`,
+  `email-bestaetigen`, `einladung-annehmen`, `registrieren`); fehlt eine Seite im Bundle, bricht der
+  Build ab. Grund: Workbox legt jede Datei einzeln per `cache.put` ab, in Firefox unter Windows rund
+  40–50 ms je Datei; mit allen 121 Dateien dauerte die Installation rund 11 s, Updates beim
+  Seitenwechsel warten 5 s (`ACTIVATION_TIMEOUT_MS`). Die übrigen Dateien aus `assets/` (Seiten der
+  Konsole …) legt der Service Worker beim ersten Laden in den Cache `ff-assets`
+  (`RUNTIME_ASSET_CACHE`, `CacheFirst`, nur 200, höchstens `RUNTIME_ASSET_MAX_ENTRIES` = 200); fehlt
+  einer alten Version nach einem Deploy eine solche Datei, lädt die App die neue
+  (`isChunkLoadError`). Neue Seiten, die offline oder aus Mail-Links gehen müssen, in
+  `PRECACHED_PAGES` eintragen (Unit-Test `precache.spec.ts` gleicht die Routen ab; Browser-Test
+  `serviceWorker.spec.ts`: Inhalt des Vorab-Ladens, Handy-Seiten und Scanner mit
+  `context.setOffline` in Chromium).
 - Startbild (Plan Phase 1, Schritt 1.7d „Schnellstart“, Mockup
   `docs/aenderungskonzept/mockups/Startbild.dc.html`): in `index.html` außerhalb von `#app`
   (`#splash`), ohne Inline-Stil und ohne Skript, ohne Ausnahme in der CSP. Das Löschfahrzeug steht

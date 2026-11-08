@@ -8,6 +8,7 @@ import {
     test,
 } from './fixtures';
 import { deviceDetail, deviceJson, devicesEndpoint, LOCATIONS } from './support/devices';
+import { storedDeviceIds } from './support/offlineCopy';
 
 /**
  * Schnellstart (Plan Phase 1, Schritt 1.7d): Angemeldete starten mit der gespeicherten Sitzung und der
@@ -38,40 +39,6 @@ async function holdMe(
         await route.fulfill({ status, json: body, headers: { 'Cache-Control': 'no-store' } });
     });
     return { release: answer, requested: () => requested };
-}
-
-/** Lokale Kopie des Kontos 7 der Stadt `test` (IDs), ohne die Datenbank anzulegen. */
-function storedDeviceIds(page: Page): Promise<number[] | null> {
-    return page.evaluate(
-        () =>
-            new Promise<number[] | null>((resolve) => {
-                const open = indexedDB.open('ff-offline');
-                open.onupgradeneeded = () => {
-                    open.transaction?.abort();
-                };
-                open.onerror = () => {
-                    resolve(null);
-                };
-                open.onsuccess = () => {
-                    const db = open.result;
-                    if (!db.objectStoreNames.contains('snapshots')) {
-                        db.close();
-                        resolve(null);
-                        return;
-                    }
-                    const get = db.transaction('snapshots').objectStore('snapshots').get('test:7');
-                    get.onsuccess = () => {
-                        const value = get.result as { devices?: { id: number }[] } | undefined;
-                        db.close();
-                        resolve(value?.devices?.map((device) => device.id) ?? null);
-                    };
-                    get.onerror = () => {
-                        db.close();
-                        resolve(null);
-                    };
-                };
-            }),
-    );
 }
 
 test.describe('Schnellstart: Angemeldete starten sofort', () => {
