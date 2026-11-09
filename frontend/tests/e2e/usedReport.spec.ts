@@ -132,7 +132,7 @@ test.describe('Geräteträger: Einmalgeräte nur benutzt melden', () => {
         expect(apiRequests.filter((r) => r.path === 'api/v1/devices/2/state')).toHaveLength(0);
     });
 
-    test('Doppeltipp-Schutz: Klicks in den ersten 400 ms zählen nicht, Escape sofort', async ({
+    test('Doppeltipp-Schutz: „Benutzt melden“ ist 400 ms gesperrt, Escape sofort', async ({
         page,
         apiRequests,
     }) => {
@@ -142,17 +142,15 @@ test.describe('Geräteträger: Einmalgeräte nur benutzt melden', () => {
         const dialog = page.getByTestId('confirm-dialog');
         const confirm = dialog.getByRole('button', { name: 'Benutzt melden' });
         await expect(dialog).toBeVisible();
-        await expect(confirm).toHaveAttribute('aria-disabled', 'true');
-        // Ein zweiter Tipp direkt nach dem Öffnen (force: Playwright wartet sonst auf aria-disabled).
+        await expect(confirm).toBeDisabled();
+        // Ein zweiter Tipp direkt nach dem Öffnen (force: Playwright wartet sonst, bis der Knopf bedienbar ist).
         // eslint-disable-next-line playwright/no-force-option -- ein Tipp, den Playwright sonst abwarten würde
         await confirm.click({ force: true });
-        // eslint-disable-next-line playwright/no-force-option -- wie oben
-        await dialog.getByRole('button', { name: 'Abbrechen' }).click({ force: true });
         await expect(dialog).toBeVisible();
         expect(usedRequests(apiRequests, 2)).toHaveLength(0);
 
         await page.clock.runFor(450);
-        await expect(confirm).toHaveAttribute('aria-disabled', 'false');
+        await expect(confirm).toBeEnabled();
         await confirm.click();
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
         expect(usedRequests(apiRequests, 2)).toHaveLength(1);

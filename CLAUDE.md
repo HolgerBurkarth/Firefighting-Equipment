@@ -1257,8 +1257,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   mindestens 48 px), `ErrorNotice`, `MailHint` (Spam-Ordner, Absender zu den Kontakten),
   `BrandCard` (Logo 512 px oder Standard-Symbol, Name; unter `service` „Super-Admin“),
   `AccountPanel`, `ConfirmDialog` (Rückfrage über Reka UI `AlertDialog`, Fokus auf „Abbrechen“;
-  nie `window.confirm`; Klicks und Taps auf die Knöpfe zählen erst `CONFIRM_GUARD_MS` = 400 ms nach dem
-  Öffnen, bis dahin `aria-disabled`, Tastatur sofort: Schutz gegen Doppeltipp, Runde 11). Anmeldeseite: Formular ausgeblendet bei `tenant_not_found`/`tenant_inactive`,
+  nie `window.confirm`; der bestätigende Knopf ist erst `CONFIRM_GUARD_MS` = 400 ms nach dem
+  Öffnen bedienbar (`disabled`), „Abbrechen“ und Escape gehen sofort: Schutz gegen Doppeltipp, Runde 11). Anmeldeseite: Formular ausgeblendet bei `tenant_not_found`/`tenant_inactive`,
   Passwort wird unverändert gesendet und nur bei `invalid_credentials` geleert, bei 429 Knopf mit
   Countdown bis `Retry-After`, bei `email_not_verified` „Bestätigungsmail erneut senden“.
 - Tokens und Einladungscodes aus Links (`#token=…`, `#code=…`) nur über `takeFragmentParam`

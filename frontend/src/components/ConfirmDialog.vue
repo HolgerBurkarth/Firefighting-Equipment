@@ -14,8 +14,8 @@ import {
 /**
  * Rückfrage vor einer Aktion mit Folgen (Reka UI AlertDialog, kein window.confirm). Der Fokus
  * steht beim Öffnen auf „Abbrechen“; Escape bricht ab. Gegen Doppeltipp (am iPhone wurde so eine
- * Rückfrage ungewollt bestätigt) nehmen die Knöpfe in den ersten `CONFIRM_GUARD_MS` nach dem
- * Öffnen keine Klicks an (`aria-disabled`, damit Tests warten); die Tastatur bleibt sofort bedienbar.
+ * Rückfrage ungewollt bestätigt) ist der bestätigende Knopf in den ersten `CONFIRM_GUARD_MS` nach dem
+ * Öffnen gesperrt (`disabled`, Tests warten darauf); „Abbrechen“ und die Tastatur (Escape) gehen sofort.
  */
 const CONFIRM_GUARD_MS = 400;
 
@@ -47,14 +47,6 @@ watch(
 onBeforeUnmount(() => {
     clearTimeout(timer);
 });
-
-/** Klicks (Maus und Touch), nicht Tastatur: Enter/Leertaste lösen `detail` 0 aus. */
-function guardClick(event: MouseEvent): void {
-    if (!armed.value && event.detail > 0) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-}
 </script>
 
 <template>
@@ -66,13 +58,13 @@ function guardClick(event: MouseEvent): void {
                 <AlertDialogDescription class="confirm-description">
                     {{ description }}
                 </AlertDialogDescription>
-                <div class="confirm-actions" @click.capture="guardClick">
-                    <AlertDialogCancel class="btn" :aria-disabled="!armed">{{
+                <div class="confirm-actions">
+                    <AlertDialogCancel class="btn">{{
                         cancelLabel ?? 'Abbrechen'
                     }}</AlertDialogCancel>
                     <AlertDialogAction
                         class="btn confirm-action"
-                        :aria-disabled="!armed"
+                        :disabled="!armed"
                         @click="emit('confirm')"
                     >
                         {{ confirmLabel }}
