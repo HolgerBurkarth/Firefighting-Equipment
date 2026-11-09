@@ -18,7 +18,8 @@ use FirefightingEquipment\Device\Stock\StockMode;
  * Eintrag des Verleihs, P2.5); sie läuft mit dem gesperrten Stand VOR der Buchung, nur wenn sich
  * wirklich etwas ändert, und ein Fehler rollt die Buchung zurück.
  *
- * $stock: Prüfung gegen den Sollbestand (P2.8), siehe StockMode; $swapId: Kennung eines Tauschs (beide Buchungen).
+ * $stock: Prüfung gegen den Sollbestand (P2.8), siehe StockMode; $swapId: Kennung eines Tauschs (beide Buchungen);
+ * $action: besondere Art, wird am Ereignis gespeichert (Verleih).
  */
 final readonly class DeviceStateChange
 {
@@ -32,6 +33,7 @@ final readonly class DeviceStateChange
         public ?\Closure $inTransaction = null,
         public StockMode $stock = StockMode::Enforce,
         public ?string $swapId = null,
+        public ?EventAction $action = null,
     ) {
         if ($locationId === null && $status === null) {
             throw new InvalidDeviceValueException('Bitte einen neuen Standort (location_id) und/oder Status (status) angeben.');

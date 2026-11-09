@@ -14,6 +14,7 @@ use FirefightingEquipment\Device\DeviceException;
 use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\DeviceStateChange;
 use FirefightingEquipment\Device\DeviceText;
+use FirefightingEquipment\Device\EventAction;
 use FirefightingEquipment\Device\Loan\LoanRepository;
 use FirefightingEquipment\Device\LocationRepository;
 use FirefightingEquipment\Http\HttpException;
@@ -73,6 +74,7 @@ final readonly class LoanLendHandler implements RequestHandler
             null,
             true,
             $loans->lending($tenant, $user->id, $borrower['id'], $contact, $due?->value, $comment),
+            action: EventAction::Lent,
         );
 
         $results = [];

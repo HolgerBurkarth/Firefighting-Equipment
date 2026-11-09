@@ -108,6 +108,34 @@ final class LoanTest extends DeviceApiTestCase
         self::assertSame(['Herr Maier', 'Übung'], [$list['loans'][0]['contact'], $list['loans'][0]['comment']]);
     }
 
+    public function testLentKeepsItsLabelWhenTheTaskIsSwitchedOffAndOldEntriesAreRebookings(): void
+    {
+        $this->enableTasks();
+        $a = $this->createViaApi('HRT 20');
+        self::assertSame(200, $this->api('POST', 'loans', ['devices' => self::entries([$a]), 'borrower_location_id' => $this->nachbar])->statusCode());
+        $stored = $this->pdo()->query("SELECT action FROM fe_device_events WHERE device_id = " . (int) $a['id'] . " AND event_type = 'state_changed'")->fetchColumn();
+        self::assertSame('lent', $stored, 'der Verleih wird am Ereignis gespeichert');
+
+        // Ein Eintrag aus der Zeit vor der Spalte: gleiche Art Buchung, aber ohne gespeicherten Wert.
+        $this->insert('fe_device_events', [
+            'tenant_id' => $this->tenantId, 'device_id' => $a['id'], 'event_type' => 'state_changed', 'user_id' => $this->adminId,
+            'from_location_id' => $this->nachbar, 'to_location_id' => $this->schule,
+        ]);
+
+        // Die Stadt schaltet die Aufgabe ab (und nimmt sie den Standorten).
+        $this->pdo()->prepare("UPDATE fe_locations SET task = NULL WHERE id IN (?, ?)")->execute([$this->nachbar, $this->schule]);
+        $this->pdo()->prepare("DELETE FROM fe_tenant_location_tasks WHERE tenant_id = ? AND task = 'borrower'")->execute([$this->tenantId]);
+
+        $history = self::json($this->api('GET', 'devices/' . $a['id'] . '/events'))['events'];
+        self::assertSame(['Umgebucht', 'Verliehen', 'Angelegt'], array_column($history, 'type_label'));
+        $log = self::json($this->api('GET', 'device-events'))['events'];
+        self::assertContains('Verliehen', array_column($log, 'type_label'));
+
+        $csv = self::responseBody($this->sendAny('GET', self::url('immendingen', 'device-events/export'), cookie: $this->admin));
+        self::assertStringContainsString(';Verliehen;', $csv);
+        self::assertStringContainsString(';Umgebucht;', $csv);
+    }
+
     public function testLogMailCallsALendingLent(): void
     {
         $this->enableTasks();

@@ -26,7 +26,7 @@ final readonly class DeviceEventRepository
 {
     private const string SELECT = 'SELECT e.id, e.event_type, e.user_id, e.actor_name, u.status AS user_status, u.display_name, u.name AS user_name,'
         . ' e.from_location_id, fl.name AS from_name, fp.name AS from_parent,'
-        . ' e.to_location_id, tl.name AS to_name, tp.name AS to_parent, (tl.task = \'borrower\') AS to_borrower,'
+        . ' e.to_location_id, tl.name AS to_name, tp.name AS to_parent, (e.action = \'lent\') AS to_borrower,'
         . ' e.from_status, e.to_status, e.from_due, e.to_due, e.field, e.old_value, e.new_value, e.comment, e.created_at,'
         . ' e.occurred_at, e.applied, e.not_applied_reason, e.channel, b.client_ref, e.swap_id,'
         // Tausch (P2.8): die andere Ausrüstung (Nummer, Typ und Standort für den Datenfilter) und ob dies die herausgenommene ist

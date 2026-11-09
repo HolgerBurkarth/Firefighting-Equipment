@@ -535,7 +535,7 @@ final readonly class DeviceRepository
             }
         }
 
-        $eventId = $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment, swapId: $change->swapId);
+        $eventId = $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment, swapId: $change->swapId, action: $change->action);
         if ($change->inTransaction !== null) {
             ($change->inTransaction)($current);
         }
@@ -918,6 +918,7 @@ final readonly class DeviceRepository
         ?ActionTime $occurredAt = null,
         ?string $actorName = null,
         ?string $swapId = null,
+        ?EventAction $action = null,
     ): int {
         $set = implode('', array_map(static fn (string $f): string => ', ' . self::COLUMNS[$f] . ' = ?', array_keys($fields)));
         // state_version vor version: richtig, ob MariaDB die Zuweisungen nacheinander oder gleichzeitig
@@ -944,6 +945,7 @@ final readonly class DeviceRepository
             $occurredAt,
             $actorName,
             $swapId,
+            $action,
         );
 
         return (int) $this->pdo->lastInsertId();
