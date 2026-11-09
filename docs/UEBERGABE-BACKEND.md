@@ -21,6 +21,14 @@ committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, 
   (nicht über Claude). Verleih, Wartung und Rückgaben werden ebenfalls geprüft (Fehler je Eintrag). Offline-Buchungen nicht (P2.9).
 - Tests: `StockSwapTest`, `TenantRoutePermissionsTest`, `NoticeKindTest`, `RoleApiTest`.
 
+## 2026-11-09 – „Tausch im Verlauf (Phase 2, Runde 11)“
+
+- Jeder Verlaufseintrag (`devices/{id}/events`, `device-events`) trägt `swap_id` (Kennung des Tauschs, sonst `null`). `type_label`:
+  die herausgenommene Ausrüstung „Getauscht gegen M92“, der Ersatz „Als Ersatz für M90“ (Vorrang vor „Benutzt gemeldet“); ist die
+  andere Ausrüstung für die Rolle unsichtbar (Datenfilter), „Getauscht gegen andere Ausrüstung“. Ebenso CSV „Ereignis“ und Log-Mail
+  (Betreff „2 Ausrüstungen – getauscht“, Zeile „Tausch: …“). Commit-Betreff: „Tausch im Verlauf: swap_id und eigene Bezeichnung (Runde 11)“.
+  Tests: `StockSwapTest`, `DeviceLogNotificationTest` (auch Betreff „benutzt gemeldet“), `DeviceEventListTest`.
+
 ## 2026-11-09 – „Benutzt melden heißt „Benutzt gemeldet“ im Verlauf (Phase 2, Runde 10)“
 
 - `type_label` eines Verlaufseintrags (`devices/{id}/events`, `device-events`, CSV „Ereignis“, Log-Mail „Vorgang“ und Betreff): eine

@@ -44,6 +44,12 @@ final readonly class DeviceEvent
         public EventChannel $channel = EventChannel::App,
         /** Buchung auf einen Standort mit der Aufgabe „Ausgeliehen an“ (Verleih, P2.5): Bezeichnung „Verliehen“ */
         public bool $lent = false,
+        /** Tausch (P2.8): Kennung, die beide Buchungen teilen; null = kein Tausch */
+        public ?string $swapId = null,
+        /** Nummer der anderen Ausrüstung des Tauschs (null, wenn die Rolle sie nicht sieht) */
+        public ?string $swapPartner = null,
+        /** true = die herausgenommene Ausrüstung, false = der Ersatz */
+        public bool $swapOut = false,
     ) {
     }
 
@@ -78,6 +84,42 @@ final readonly class DeviceEvent
             $this->clientRef,
             $this->channel,
             $this->lent,
+            $this->swapId,
+            $this->swapPartner,
+            $this->swapOut,
+        );
+    }
+
+    /**
+     * Derselbe Eintrag ohne die Nummer der anderen Ausrüstung eines Tauschs (Datenfilter).
+     */
+    public function withoutSwapPartner(): self
+    {
+        return new self(
+            $this->id,
+            $this->type,
+            $this->userId,
+            $this->userName,
+            $this->fromLocation,
+            $this->toLocation,
+            $this->fromStatus,
+            $this->toStatus,
+            $this->fromDue,
+            $this->toDue,
+            $this->field,
+            $this->oldValue,
+            $this->newValue,
+            $this->comment,
+            $this->createdAt,
+            $this->clientOccurredAt,
+            $this->applied,
+            $this->notAppliedReason,
+            $this->clientRef,
+            $this->channel,
+            $this->lent,
+            $this->swapId,
+            null,
+            $this->swapOut,
         );
     }
 
@@ -91,7 +133,7 @@ final readonly class DeviceEvent
 
     /**
      * Deutsche Bezeichnung; bei state_changed nach Inhalt („Ausgesondert“, „Wieder aufgenommen“,
-     * „Verliehen“, „Benutzt gemeldet“, „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“).
+     * „Getauscht gegen M92“, „Als Ersatz für M90“, „Verliehen“, „Benutzt gemeldet“, „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“).
      */
     public function label(): string
     {
@@ -108,6 +150,8 @@ final readonly class DeviceEvent
 
         return match (true) {
             $this->userId === null => 'Rückgabe',
+            $this->swapId !== null && $this->swapOut => 'Getauscht gegen ' . ($this->swapPartner ?? 'andere Ausrüstung'),
+            $this->swapId !== null => 'Als Ersatz für ' . ($this->swapPartner ?? 'andere Ausrüstung'),
             $this->lent && $this->toLocation !== null && $this->toStatus === null => 'Verliehen',
             $this->toStatus === DeviceStatus::Used => 'Benutzt gemeldet',
             $this->toStatus === DeviceStatus::Retired => 'Ausgesondert',

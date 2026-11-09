@@ -170,6 +170,14 @@ final class StockSwapTest extends DeviceApiTestCase
             $this->pdo()->query("SELECT swap_id FROM fe_device_events WHERE swap_id IS NOT NULL ORDER BY id")->fetchAll(\PDO::FETCH_COLUMN),
         );
         self::assertSame(2, (int) $this->pdo()->query('SELECT COUNT(DISTINCT device_id) FROM fe_device_events WHERE swap_id IS NOT NULL')->fetchColumn());
+
+        // Der Verlauf nennt den Tausch mit der Nummer der anderen Ausrüstung (vor „Benutzt gemeldet“).
+        $outEvent = self::json($this->api('GET', 'devices/' . $out['id'] . '/events'))['events'][0];
+        $inEvent = self::json($this->api('GET', 'devices/' . $in['id'] . '/events'))['events'][0];
+        self::assertSame(['Getauscht gegen M9', $body['swap_id']], [$outEvent['type_label'], $outEvent['swap_id']]);
+        self::assertSame(['Als Ersatz für M1', $body['swap_id']], [$inEvent['type_label'], $inEvent['swap_id']]);
+        $history = self::json($this->api('GET', 'device-events?limit=2'))['events'];
+        self::assertSame(['Als Ersatz für M1', 'Getauscht gegen M9'], array_column($history, 'type_label'));
     }
 
     public function testSwapWithoutCollectionPointKeepsTheLocation(): void

@@ -40,6 +40,7 @@ final class DeviceEventJson
             'not_applied_label' => $event->notAppliedReason?->label(),
             'client_ref' => $event->clientRef,
             'channel' => $event->channel->value,
+            'swap_id' => $event->swapId,
             'user' => ['id' => $event->userId, 'name' => $event->userName],
             'comment' => $event->comment,
             'location' => $hasLocation

@@ -90,6 +90,29 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         self::assertStringContainsString("Standort: HLF 20 / G1 → Lager\nStatus: einsatzbereit → defekt\nKommentar: Ventil klemmt", $mail->text);
     }
 
+    public function testReportUsedAndSwapHaveTheirOwnSubjects(): void
+    {
+        $a = $this->createViaApi('MA-01');
+        $b = $this->createViaApi('MA-02', ['location_id' => $this->room]);
+        $c = $this->createViaApi('MA-03', ['location_id' => $this->room]);
+        $this->mailer->sent = [];
+
+        $response = $this->api('POST', 'devices/' . $c['id'] . '/used', ['version' => 1]);
+        self::assertSame(200, $response->statusCode(), $response->body());
+        self::assertSame(self::SUBJECT_PREFIX . 'MA-03 benutzt gemeldet', $this->mailer->sent[0]->subject);
+        self::assertStringContainsString('Vorgang: Benutzt gemeldet', $this->mailer->sent[0]->text);
+
+        $this->mailer->sent = [];
+        $response = $this->api('POST', 'devices/swap', [
+            'out' => ['id' => $a['id'], 'version' => 1],
+            'in' => ['id' => $b['id'], 'version' => 1],
+        ]);
+        self::assertSame(200, $response->statusCode(), $response->body());
+        self::assertSame(self::SUBJECT_PREFIX . '2 Ausrüstungen – getauscht', $this->mailer->sent[0]->subject);
+        self::assertStringContainsString('Tausch: Getauscht gegen MA-02', $this->mailer->sent[0]->text);
+        self::assertStringContainsString('Tausch: Als Ersatz für MA-01', $this->mailer->sent[0]->text);
+    }
+
     public function testSubjectsOfAllActions(): void
     {
         $id = $this->createViaApi('MA-01')['id'];
