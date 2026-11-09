@@ -176,6 +176,35 @@ test.describe('Rückfrage nennt die Sammelstelle', () => {
     });
 });
 
+test.describe('Rückfrage bei direkt geöffneter Seite', () => {
+    test.use({
+        api: {
+            'GET api/v1/auth/me': me([]),
+            'GET api/v1/devices': devicesEndpoint([M1]),
+            ...deviceDetail(M1),
+            ...LOCATIONS,
+            'GET api/v1/client-config': {
+                status: 200,
+                body: { ...DEFAULT_CLIENT_CONFIG, used_target: { id: 40, name: 'Wache' } },
+            },
+        },
+    });
+
+    test('nennt die Sammelstelle, nie den Ersatztext', async ({ page }) => {
+        await page.addInitScript(() => {
+            localStorage.removeItem('ff-used-target:test');
+        });
+        await page.goto('/firefighting/test/geraete/1');
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'M1 · Atemschutzmaske' }),
+        ).toBeVisible();
+        await page.getByTestId('report-used').click();
+        const dialog = page.getByTestId('confirm-dialog');
+        await expect(dialog).toContainText('Es kommt in die Sammelstelle Wache.');
+        await expect(dialog).not.toContainText('falls es eine gibt');
+    });
+});
+
 test.describe('Ohne Einschränkung und ohne die Aktion', () => {
     test.describe('Rolle ohne Einschränkung', () => {
         test.use({

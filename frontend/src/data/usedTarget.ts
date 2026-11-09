@@ -1,4 +1,6 @@
 import { ref } from 'vue';
+import type { ApiResult } from '../api/client';
+import type { ClientConfig } from '../api/clientConfig';
 
 /**
  * Name der Sammelstelle, in die „Benutzt melden“ bucht (`client-config`, `used_target`): `null` = die
@@ -46,4 +48,41 @@ export function usedTargetText(name: string | null | undefined): string {
         return 'Es kommt in die Sammelstelle, falls es eine gibt – sonst bleibt der Standort.';
     }
     return name === null ? 'Der Standort bleibt.' : `Es kommt in die Sammelstelle ${name}.`;
+}
+
+function isUnknown(): boolean {
+    return usedTargetName.value === undefined;
+}
+
+export const USED_TARGET_TIMEOUT_MS = 2000;
+
+/**
+ * Vor der Rückfrage „Benutzt melden“: ist die Sammelstelle noch unbekannt (Seite direkt geöffnet),
+ * `client-config` kurz laden (mit Frist). Offline oder ohne Antwort bleibt sie unbekannt, dann gilt der
+ * Ersatztext.
+ */
+export async function ensureUsedTarget(options: {
+    area: string;
+    offline: boolean;
+    fetchConfig: () => Promise<ApiResult<ClientConfig>>;
+    storage: Pick<Storage, 'setItem'> | null;
+    timeoutMs?: number;
+}): Promise<void> {
+    if (!isUnknown() || options.offline) {
+        return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<null>((resolve) => {
+        timer = setTimeout(() => {
+            resolve(null);
+        }, options.timeoutMs ?? USED_TARGET_TIMEOUT_MS);
+    });
+    try {
+        const result = await Promise.race([options.fetchConfig(), timeout]);
+        if (result !== null && result.ok && isUnknown()) {
+            rememberUsedTarget(options.area, result.data.usedTarget ?? null, options.storage);
+        }
+    } finally {
+        clearTimeout(timer);
+    }
 }

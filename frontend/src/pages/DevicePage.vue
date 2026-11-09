@@ -35,7 +35,9 @@ import {
 } from '../data/booking';
 import { actionTime, offlineBookingProblem, pendingDevice, queuedText } from '../data/bookingQueue';
 import { offlineData } from '../data/offline';
-import { usedTargetName, usedTargetText } from '../data/usedTarget';
+import { fetchClientConfig } from '../api/clientConfig';
+import { ensureUsedTarget, usedTargetName, usedTargetText } from '../data/usedTarget';
+import { currentAppBase } from '../runtime/appBase';
 import { connectivity, isOffline } from '../runtime/connectivity';
 import {
     bookingLocationChoices,
@@ -365,10 +367,22 @@ const usedConfirmTitle = computed(
 );
 const usedConfirmDescription = computed(() => usedTargetText(usedTargetName.value));
 
-function askReportUsed(): void {
+async function askReportUsed(): Promise<void> {
     if (device.value === null || saving.value || alreadyUsed.value) {
         return;
     }
+    let storage: Storage | null = null;
+    try {
+        storage = localStorage;
+    } catch {
+        // Ohne Speicher gilt der Wert nur für diesen Seitenaufruf.
+    }
+    await ensureUsedTarget({
+        area: currentAppBase().area,
+        offline: isOffline.value,
+        fetchConfig: () => fetchClientConfig(),
+        storage,
+    });
     usedConfirmOpen.value = true;
 }
 
@@ -706,7 +720,7 @@ async function submit(
                     type="button"
                     data-testid="report-used"
                     :disabled="saving || alreadyUsed"
-                    @click="askReportUsed"
+                    @click="void askReportUsed()"
                 >
                     {{ saving && usedOnly ? 'Wird gespeichert …' : 'Benutzt melden' }}
                 </button>
