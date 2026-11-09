@@ -62,6 +62,7 @@ use FirefightingEquipment\Api\V1\Roles\RoleAction;
 use FirefightingEquipment\Api\V1\Loans\LoanLendHandler;
 use FirefightingEquipment\Api\V1\Loans\LoanListHandler;
 use FirefightingEquipment\Api\V1\Returns\PublicReturnHandler;
+use FirefightingEquipment\Api\V1\Stock\StockHandler;
 use FirefightingEquipment\Api\V1\Returns\ReturnPointHandler;
 use FirefightingEquipment\Api\V1\Returns\ReturnProcess;
 use FirefightingEquipment\Api\V1\Returns\ReturnProcessHandler;
@@ -246,6 +247,8 @@ final class Routes
             ->add('POST', 'api/v1/devices/{id}/fields', $deviceFields, new DeviceActionHandler(DeviceAction::UpdateFields))
             ->add('POST', 'api/v1/devices/{id}/inspection-due', $write(Area::Due), new DeviceActionHandler(DeviceAction::SetInspectionDue))
             ->add('POST', 'api/v1/devices/{id}/state', $book, new DeviceStateHandler($clock, $offline))
+            ->add('GET', 'api/v1/stock', $read(Area::Locations), new StockHandler(save: false))
+            ->add('POST', 'api/v1/locations/{id}/stock-rules', $write(Area::Locations), new StockHandler(save: true))
             ->add('GET', 'api/v1/loans', $read(Area::Loans), new LoanListHandler($clock))
             ->add('POST', 'api/v1/loans', $write(Area::Loans), new LoanLendHandler())
             ->add('POST', 'api/v1/loans/to-collection', $write(Area::Loans), new ReturnProcessHandler(ReturnProcess::ToCollection))

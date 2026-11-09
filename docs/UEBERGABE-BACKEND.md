@@ -8,6 +8,15 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Sollbestand (Phase 2, Runde 9, P2.7)“
+
+- Migrationen 0059 (`fe_stock_rules`), 0060 (`fe_stock_rule_types`). Abweichungen vom Plan: keine Spalten
+  `only_listed_types`/`position`, keine Tabelle `fe_location_outages`; „außer Betrieb“ wird nur berechnet.
+- Neu: `GET stock` (`locations` Ansehen), `POST locations/{id}/stock-rules` (`locations` Ändern); siehe `CLAUDE.md`,
+  Standorte und Geräte, „Sollbestand“. Keine bestehende Route ändert sich; die Prüfung der Buchungen gegen den
+  Sollbestand und der Tausch (P2.8) folgen später.
+- Tests: `StockTest`, `TenantRoutePermissionsTest`; Frontend `stock.spec.ts`.
+
 ## 2026-11-09 – „Rückgabe ohne Anmeldung (Phase 2, Runde 9, P2.6)“
 
 - Migrationen 0056 (`fe_return_points`), 0057 (`public_return` in `fe_auth_attempts`), 0058 (`fe_device_events`:

@@ -250,6 +250,12 @@ async function fulfillApi(
         await route.fulfill({ status: 200, json: DEFAULT_CLIENT_CONFIG });
     } else if (method === 'GET' && path === 'api/v1/locations' && !isService) {
         await route.fulfill({ status: 200, json: { locations: [] } });
+    } else if (method === 'GET' && path === 'api/v1/stock' && !isService) {
+        // „Standorte“ zeigt den Sollbestand (Phase 2, P2.7); ohne eigene Angabe keinen.
+        await route.fulfill({
+            status: 200,
+            json: { locations: [], summary: { locations: 0, out_of_service: 0 } },
+        });
     } else if (method === 'GET' && path === 'api/v1/location-tasks' && !isService) {
         // „Standorte“ des Admins liest die freigeschalteten Aufgaben; ohne eigene Angabe keine.
         await route.fulfill({

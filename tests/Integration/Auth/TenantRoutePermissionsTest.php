@@ -91,6 +91,8 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'GET api/v1/locations' => ['authenticated', 'locations:read | search:read | devices:read'],
         'POST api/v1/locations' => ['admin', 'locations:write'],
         'GET api/v1/locations/{id}' => ['authenticated', 'locations:read | search:read | devices:read'],
+        'GET api/v1/stock' => ['admin', 'locations:read'],
+        'POST api/v1/locations/{id}/stock-rules' => ['admin', 'locations:write'],
         'POST api/v1/locations/{id}/rename' => ['admin', 'locations:write'],
         'POST api/v1/locations/{id}/lock' => ['admin', 'locations:write'],
         'POST api/v1/locations/{id}/unlock' => ['admin', 'locations:write'],

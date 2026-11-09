@@ -14,6 +14,7 @@ import {
 import { allows } from '../api/permissions';
 import { currentPermissions } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
+import StockPanel from '../components/StockPanel.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
 import { KIND_ICONS, SUB_ICON } from '../components/locationIcons';
@@ -39,6 +40,8 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
 /** Ändern nur mit „Standorte: Ändern“; der Name führt nur mit Recht zur Geräteliste (1.7b). */
 const canWrite = computed(() => allows(currentPermissions.value, 'locations', 'write'));
 const canListDevices = computed(() => allows(currentPermissions.value, 'devices'));
+/** Sollbestand (P2.7): lesen mit dem Bereich, ändern nur mit Ändern (StockPanel). */
+const canListStock = computed(() => allows(currentPermissions.value, 'locations'));
 
 /**
  * Standorte der Stadt als Baum (KONZEPT.md, "Bereiche des Admins"): Fahrzeuge, Räume und Externe
@@ -688,6 +691,8 @@ onMounted(() => {
             </template>
         </template>
     </FormDialog>
+
+    <StockPanel v-if="canListStock" />
 
     <ConfirmDialog
         v-model:open="confirmOpen"

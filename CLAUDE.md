@@ -2807,6 +2807,23 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `ReturnPoster` zum Drucken, `returnLink` in `src/data/loans.ts`) und „In der Rückgabe“ (Auswahl, „In Ordnung ins Lager“,
   „Benutzte und Defekte in die Sammelstelle“, `processReturns`). Tests `returnPage.spec.ts`, `loans.spec.ts`, Unit
   `returns.spec.ts`.
+- Sollbestand (Phase 2, P2.7, Runde 9; Plan 3.5, ohne Tausch und ohne Prüfung der Buchungen, die kommen mit P2.8):
+  Migrationen 0059 `fe_stock_rules` (Standort, `min_count` 1–99) und 0060 `fe_stock_rule_types` (Typen einer Regel,
+  gleichwertig, `ON DELETE CASCADE` nur dort). Abweichungen vom Plan: keine Spalten `only_listed_types` und
+  `position`, keine Tabelle `fe_location_outages` (kein Verlauf von „außer Betrieb“, keine Hinweise im Protokoll) –
+  „außer Betrieb“ wird nur berechnet. Gezählt wird (G11): einsatzbereite (`ready`), nicht ausgesonderte Ausrüstung
+  der Typen einer Regel am Standort, bei der Ebene 1 samt Fächern (`StockRepository::overview`, eine Abfrage).
+  `GET stock` (`locations` Ansehen): `{locations [{location {id, name, path, level}, rules [{id, min_count, types
+  [{id, name}], have, missing}], out_of_service}], summary {locations, out_of_service}}` nur Standorte mit Regeln
+  (gesperrte nicht), mit Datenfilter nur Sichtbares. `POST locations/{id}/stock-rules {rules: [{min_count,
+  device_type_ids}]}` (`locations` Ändern, F3: nie mit Datenfilter) ersetzt alle Regeln des Standorts (höchstens
+  20 Regeln mit je 1–20 verschiedenen Typen; leere Liste = keine), Antwort `{stock: {rules, out_of_service}|null}`;
+  gesperrter Standort 409, Typ einer anderen Stadt oder unbekannt 400, Standort unbekannt 404. Tests `StockTest`.
+  Frontend: `StockPanel` unten auf „Standorte“ (`src/api/stock.ts`, `src/data/stock.ts`; Liste mit Chip „außer
+  Betrieb“/„vollständig“ und „mindestens 3 Atemschutzmaske oder Funkgerät: 2 vorhanden, 1 fehlt“; Fenster „Sollbestand
+  festlegen“ mit Standort, Regeln aus Anzahl und Typ-Kästchen; die Typen lädt erst das Fenster). Browser-Tests
+  fragen `GET api/v1/stock` ohne eigene Angabe mit „keine Regeln“ (`tests/e2e/fixtures.ts`). Nicht gebaut: Kachel im
+  Dashboard, Anzeige am Fahrzeug in der Baumzeile (`docs/TODO-SPAETER.md`, T21). Tests `stock.spec.ts` (Browser, Unit).
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann
