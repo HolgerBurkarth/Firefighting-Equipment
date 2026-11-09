@@ -4,6 +4,18 @@ Nur in der Test-Stadt `https://www.prodad.de/firefighting/test/`, nie in echten 
 [`../MCP-KONZEPT.md`](../MCP-KONZEPT.md), Plan: [`../PLAN-MCP.md`](../PLAN-MCP.md). Je Schritt wird
 ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holger).
 
+## Runde 12 und 14: Ergebnisse (Claude im Chat, Test-Stadt, 09.11.2026, Build `97f497f5cee8`)
+
+- ☑ `report_used`: M93 → Kleiderkammer, benutzt; Verlauf „Benutzt gemeldet“, `via_claude`.
+- ☑ `swap_equipment`: M90 gegen M92; Verlauf „Getauscht gegen M92“, `via_claude`.
+- ☑ Eigenheit des Konnektors (kein Fehler des Servers): Der claude.ai-Konnektor hält die Werkzeugliste vom Verbinden fest. Aufgaben nach dem Verbinden freigeschaltet und `tools/list` neu abgerufen → weiter 33 Werkzeuge. Erst nach Trennen und neu Verbinden erscheinen die neuen.
+- ☑ Nach neuem Verbinden mit freigeschalteten Aufgaben erscheinen `lend_equipment`, `list_loans`, `list_maintenance`.
+- ☑ `list_loans`: Leihnehmer Hattingen, offene Verleihe, `in_returns`.
+- ☑ `list_maintenance`: Sammelstelle (Kleiderkammer), Werkstatt (Atemschutzwerkstatt), Standard-Lager.
+- ☑ `lend_equipment`: M92 an Hattingen mit Ansprechpartner und „Rückgabe bis“ 16.11.2026; `list_loans` zeigt den Verleih; Verlauf „Verliehen“, `via_claude`.
+- ☑ Nach dem Abschalten der Aufgaben scheitert `lend_equipment` mit „Das Werkzeug „lend_equipment“ steht mit den aktuellen Rechten, dem Zugang und den freigeschalteten Abläufen dieser Stadt nicht (mehr) zur Verfügung. Bitte die Werkzeugliste (tools/list) neu abrufen.“
+- Zurückgesetzt: Aufgaben entfernt, Abläufe abgeschaltet, M90 HLF 20 / G1, M92 Lager Gerätehaus, M93 HLF 20 (alle einsatzbereit), M94 Lager Gerätehaus in Wartung.
+
 ## Runde 12: Werkzeuge für die Abläufe der Phase 2 (P2.12)
 
 Neu: `report_used`, `swap_equipment`, `lend_equipment` (Zugang „Ändern“, Rechte `device.used`, `device.swap`,

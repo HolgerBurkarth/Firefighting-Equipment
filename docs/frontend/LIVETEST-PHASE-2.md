@@ -133,12 +133,12 @@ Vom Agenten im Browser (Test-Stadt, Admin; `health` ok, keine Migration):
 - ☑ Ursache des Befunds „Verleih steht im CSV als Umgebucht“: Die Bezeichnung „Verliehen“ wird beim Lesen aus der AKTUELLEN Aufgabe des Standorts gebildet. Nach dem Abschalten der Aufgabe „Ausgeliehen an“ (Rücksetzen nach dem Test) heißen alte Verleihe überall „Umgebucht“, im CSV wie im JSON und in der App (geprüft: `device-events` und Export zeigen für M91–M93 beide „Umgebucht“). CSV und JSON stimmen im Code überein (Test `testOwnLabelsMatchTheJsonHistory`). Offen als Frage an Holger: Soll der Verleih dauerhaft am Eintrag gespeichert werden (Migration)?
 - ☑ Export enthält weiter „Benutzt gemeldet“, „Getauscht gegen M92“, „Als Ersatz für M90“, „Rückgabe“.
 - ☐ Tausch bei Verbindungsabbruch in die Warteschlange (Flugmodus nach dem Antippen von „Tauschen“), nur am iPhone (Holger); im Browser-Test abgedeckt.
-- ☐ Claude-Werkzeuge `report_used`, `swap_equipment`, `lend_equipment`, `list_loans`, `list_maintenance`: Konnektor trennen und neu verbinden, dann Liste in `LIVETEST-MCP.md`, „Runde 12“ (Holger mit Claude im Chat).
+- ☑ Claude-Werkzeuge `report_used`, `swap_equipment`, `lend_equipment`, `list_loans`, `list_maintenance`: geprüft, Ergebnisse in `LIVETEST-MCP.md`, „Runde 12“ und „Runde 14“.
 - Nichts verändert (nur gelesen, Dialog ohne Buchung geschlossen).
 
 ## Runde 13: Verleih dauerhaft im Verlauf (Build `5e108090795f`, 09.11.2026)
 
 - ☑ Deploy: Migration 0065 (reine Erweiterung `fe_device_events.action`) lief auf dem Server, Build-Kennung stimmt, `health` ok.
 - ☑ Bestehender Verlauf der Test-Stadt lässt sich über den Claude-Konnektor lesen (`list_city_history`); die früheren Verleihe (vor der Spalte, ohne Wert) heißen erwartungsgemäß „Umgebucht“.
-- ☐ Verleih in der Test-Stadt, dann Aufgabe „Ausgeliehen an“ abschalten: Eintrag heißt weiter „Verliehen“ in Verlauf, „Letzte Aktivitäten“, CSV-Export und Log-Mail (Holger als Super-Admin; ohne Anmeldung als Super-Admin nicht prüfbar; lokal durch `LoanTest` abgedeckt).
-- ☐ Claude-Werkzeuge der Abläufe aus Runde 12 (Konnektor neu verbinden, `LIVETEST-MCP.md`, „Runde 12“).
+- ☑ Verleih bleibt „Verliehen“ (Claude im Chat, 09.11.2026): M94 an Hattingen verliehen, zurückgebucht, dann Aufgabe „Ausgeliehen an“ abgeschaltet → Verlauf, „Letzte Aktivitäten“ und CSV-Export zeigen weiter „Verliehen“. Log-Mail nicht geprüft (lokal durch `LoanTest` abgedeckt).
+- ☑ Claude-Werkzeuge der Abläufe aus Runde 12: geprüft, Ergebnisse in `LIVETEST-MCP.md`, „Runde 12“ und „Runde 14“.

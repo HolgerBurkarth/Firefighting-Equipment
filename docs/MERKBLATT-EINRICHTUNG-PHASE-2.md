@@ -49,6 +49,11 @@ Hinweise:
 - Das Freischalten ändert noch keine Buchung und keinen Standort.
 - Nach dem Speichern erscheint „Die Abläufe sind gespeichert.“. Die Rechte der Konten ändern sich
   dadurch (neue Bereiche); die Apps laden sie beim nächsten Aufruf.
+- **Claude-Konnektor neu verbinden:** Nach dem Freischalten oder Abschalten von Abläufen muss der
+  Claude-Konnektor getrennt und neu verbunden werden (claude.ai: Konnektor „Trennen“, dann „Verbinden“),
+  damit Claude die passenden Werkzeuge sieht. Der Konnektor merkt sich die Werkzeugliste vom Verbinden;
+  ein erneutes Abrufen genügt nicht. Ohne neues Verbinden fehlen z. B. `lend_equipment`, `list_loans`,
+  `list_maintenance`, bzw. ein abgeschaltetes Werkzeug scheitert mit dem Hinweis, die Liste neu abzurufen.
 - **⚠ Entscheidung:** Welche Aufgaben braucht Immendingen zum Start? Naheliegend: alle fünf. Wer
   nur „Benutzt melden“ und Sollbestand will, braucht **Sammelstelle** (und **Lager** als Ziel von
   „Zurück“); Verleih/Rückgabe kann später folgen.
