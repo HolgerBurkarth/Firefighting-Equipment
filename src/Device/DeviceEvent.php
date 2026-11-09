@@ -91,7 +91,7 @@ final readonly class DeviceEvent
 
     /**
      * Deutsche Bezeichnung; bei state_changed nach Inhalt („Ausgesondert“, „Wieder aufgenommen“,
-     * „Verliehen“, „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“).
+     * „Verliehen“, „Benutzt gemeldet“, „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“).
      */
     public function label(): string
     {
@@ -109,6 +109,7 @@ final readonly class DeviceEvent
         return match (true) {
             $this->userId === null => 'Rückgabe',
             $this->lent && $this->toLocation !== null && $this->toStatus === null => 'Verliehen',
+            $this->toStatus === DeviceStatus::Used => 'Benutzt gemeldet',
             $this->toStatus === DeviceStatus::Retired => 'Ausgesondert',
             $this->fromStatus === DeviceStatus::Retired => 'Wieder aufgenommen',
             $this->toLocation !== null && $this->toStatus !== null => 'Umgebucht und Status geändert',

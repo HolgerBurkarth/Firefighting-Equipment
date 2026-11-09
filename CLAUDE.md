@@ -3078,7 +3078,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   der Quittung per LEFT JOIN). Reihenfolge bleibt nach Eingang (`id`); nicht übernommene Einträge
   heißen „Umbuchung nicht übernommen“, „Statusänderung nicht übernommen“ bzw. „Umbuchung und
   Statusänderung nicht übernommen“. `type_label` bei `state_changed` nach Inhalt: „Ausgesondert“, „Wieder aufgenommen“,
-  „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“; sonst „Angelegt“, „Importiert“,
+  „Benutzt gemeldet“ (Zielstatus benutzt), „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“; sonst „Angelegt“, „Importiert“,
   „Wartungsdatum geändert“, „Stammdaten geändert“. Standorte erscheinen mit ihrem aktuellen Namen und
   Pfad (die Historie speichert nur die ID; nach dem Umbenennen steht dort der neue Name; bewusst so
   in Version 1, Namen zum Zeitpunkt bräuchten eine Migration).

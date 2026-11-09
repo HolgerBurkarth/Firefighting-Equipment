@@ -700,6 +700,9 @@ final class MailTemplates
                 if ($event->fromStatus === DeviceStatus::Retired) {
                     return 'wieder aufgenommen';
                 }
+                if ($event->label() === 'Benutzt gemeldet') {
+                    return 'benutzt gemeldet';
+                }
                 $parts = [];
                 if ($event->toLocation !== null) {
                     $parts[] = $event->label() === 'Verliehen' ? 'verliehen' : 'umgebucht';

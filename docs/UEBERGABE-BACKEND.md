@@ -21,6 +21,13 @@ committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, 
   (nicht über Claude). Verleih, Wartung und Rückgaben werden ebenfalls geprüft (Fehler je Eintrag). Offline-Buchungen nicht (P2.9).
 - Tests: `StockSwapTest`, `TenantRoutePermissionsTest`, `NoticeKindTest`, `RoleApiTest`.
 
+## 2026-11-09 – „Benutzt melden heißt „Benutzt gemeldet“ im Verlauf (Phase 2, Runde 10)“
+
+- `type_label` eines Verlaufseintrags (`devices/{id}/events`, `device-events`, CSV „Ereignis“, Log-Mail „Vorgang“ und Betreff): eine
+  Buchung mit Zielstatus „benutzt“ (Benutzt melden, auch Tausch) heißt „Benutzt gemeldet“ (statt „Umgebucht und Status
+  geändert“); Betreff der Log-Mail „<Nummer> benutzt gemeldet“. Nur die Bezeichnung, keine neuen Felder.
+  Commit-Betreff: „Benutzt melden heißt im Verlauf „Benutzt gemeldet“ (Runde 10)“. Tests: `DeviceEventTest`.
+
 ## 2026-11-09 – „Verleih heißt „Verliehen“ im Verlauf (Phase 2, Runde 10)“
 
 - `type_label` eines Verlaufseintrags (`devices/{id}/events`, `device-events`, CSV „Ereignis“, Log-Mail „Vorgang“ und Betreff): eine
