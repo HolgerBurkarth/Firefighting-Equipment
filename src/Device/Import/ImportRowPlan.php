@@ -105,6 +105,31 @@ final readonly class ImportRowPlan
     }
 
     /**
+     * Dieselbe Zeile mit weiteren Warnungen.
+     *
+     * @param list<string> $extra
+     */
+    public function withWarnings(array $extra): self
+    {
+        return new self(
+            $this->line,
+            $this->identifier,
+            $this->result,
+            $this->device,
+            $this->changes,
+            $this->messages,
+            [...$this->warnings, ...$extra],
+            $this->key,
+            $this->newDevice,
+            $this->fieldChanges,
+            $this->dueChanged,
+            $this->due,
+            $this->locationId,
+            $this->status,
+        );
+    }
+
+    /**
      * Die Zeile für ein Konto mit Datenfilter (Sammelmail „Log“): neue Geräte nur mit sichtbarem Typ
      * und Standort, bestehende, wenn sie vorher oder nachher sichtbar sind; ein Standort außerhalb
      * erscheint als „anderer Standort“. Fehler und übersprungene Zeilen (ohne Gerät) nie; null =

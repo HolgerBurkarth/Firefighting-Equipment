@@ -3384,6 +3384,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   „4,00638E+12“) oder aus Ziffern, der ohne führende Nullen einem LÄNGEREN vorhandenen Scan-Code
   (desselben oder eines anderen nicht ausgesonderten Geräts) entspricht („4006381333931“ ↔
   „04006381333931“). Mehr als 15 Ziffern rundet Excel auf Nullen; das ist nicht erkennbar (README).
+  Sollbestand (Runde 11, `DeviceImportPlanner::withStockWarnings`): ändern die bestehenden Zeilen zusammen Standort oder Status so,
+  dass der Bestand einer Regel unter die Soll-Anzahl fällt, warnen genau die Zeilen, die ihn verringern („Sollbestand unterschritten –
+  HLF 20: 1 von mindestens 2 Atemschutzmaske einsatzbereit. Die Zeile wird trotzdem übernommen.“); neue Ausrüstung zählt nicht mit.
   Zusammenfassung
   `summary {rows, new, changed, unchanged, skipped, errors, warnings}` (Warnungen = Zeilen mit
   Warnung).

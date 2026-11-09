@@ -21,6 +21,13 @@ committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, 
   (nicht über Claude). Verleih, Wartung und Rückgaben werden ebenfalls geprüft (Fehler je Eintrag). Offline-Buchungen nicht (P2.9).
 - Tests: `StockSwapTest`, `TenantRoutePermissionsTest`, `NoticeKindTest`, `RoleApiTest`.
 
+## 2026-11-09 – „Sollbestand im CSV-Import (Phase 2, Runde 11)“
+
+- `POST devices/import/preview` (und die erneute Prüfung beim Übernehmen): Zeilen, die zusammen den Sollbestand einer Regel
+  unterschreiten, tragen in `warnings` „Sollbestand unterschritten – <Regel>. Die Zeile wird trotzdem übernommen.“; zählt in
+  `summary.warnings`, blockiert nichts, das Kennzeichen (`token`) ändert sich nicht. Commit-Betreff: „CSV-Import warnt bei
+  unterschrittenem Sollbestand (Runde 11)“. Tests: `DeviceImportPreviewTest`.
+
 ## 2026-11-09 – „Hinweis nennt die unterschrittene Regel (Phase 2, Runde 11)“
 
 - Neue Spalte `fe_device_notices.detail` (Migration 0063, reine Erweiterung). Hinweise tragen im JSON `detail` (String oder `null`);
