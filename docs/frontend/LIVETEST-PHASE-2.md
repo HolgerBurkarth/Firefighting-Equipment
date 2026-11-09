@@ -135,3 +135,10 @@ Vom Agenten im Browser (Test-Stadt, Admin; `health` ok, keine Migration):
 - ☐ Tausch bei Verbindungsabbruch in die Warteschlange (Flugmodus nach dem Antippen von „Tauschen“), nur am iPhone (Holger); im Browser-Test abgedeckt.
 - ☐ Claude-Werkzeuge `report_used`, `swap_equipment`, `lend_equipment`, `list_loans`, `list_maintenance`: Konnektor trennen und neu verbinden, dann Liste in `LIVETEST-MCP.md`, „Runde 12“ (Holger mit Claude im Chat).
 - Nichts verändert (nur gelesen, Dialog ohne Buchung geschlossen).
+
+## Runde 13: Verleih dauerhaft im Verlauf (Build `5e108090795f`, 09.11.2026)
+
+- ☑ Deploy: Migration 0065 (reine Erweiterung `fe_device_events.action`) lief auf dem Server, Build-Kennung stimmt, `health` ok.
+- ☑ Bestehender Verlauf der Test-Stadt lässt sich über den Claude-Konnektor lesen (`list_city_history`); die früheren Verleihe (vor der Spalte, ohne Wert) heißen erwartungsgemäß „Umgebucht“.
+- ☐ Verleih in der Test-Stadt, dann Aufgabe „Ausgeliehen an“ abschalten: Eintrag heißt weiter „Verliehen“ in Verlauf, „Letzte Aktivitäten“, CSV-Export und Log-Mail (Holger als Super-Admin; ohne Anmeldung als Super-Admin nicht prüfbar; lokal durch `LoanTest` abgedeckt).
+- ☐ Claude-Werkzeuge der Abläufe aus Runde 12 (Konnektor neu verbinden, `LIVETEST-MCP.md`, „Runde 12“).

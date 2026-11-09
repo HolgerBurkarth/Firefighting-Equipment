@@ -116,6 +116,15 @@ final readonly class McpServer
         $name = $params['name'] ?? null;
         $tool = is_string($name) ? $this->tools->find($name, $this->router, $this->session->effectivePermissions()) : null;
         if ($tool === null) {
+            if (is_string($name) && $this->tools->exists($name)) {
+                // Die Liste wird bei jedem Aufruf neu berechnet; ein Client mit älterer Liste erfährt hier den Grund.
+                return self::error($id, self::INVALID_PARAMS, sprintf(
+                    'Das Werkzeug „%s“ steht mit den aktuellen Rechten, dem Zugang und den freigeschalteten '
+                    . 'Abläufen dieser Stadt nicht (mehr) zur Verfügung. Bitte die Werkzeugliste (tools/list) neu abrufen.',
+                    $name,
+                ));
+            }
+
             return self::error($id, self::INVALID_PARAMS, sprintf(
                 'Unbekanntes Werkzeug: %s',
                 is_string($name) ? mb_substr($name, 0, 100) : '(ohne Namen)',

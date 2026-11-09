@@ -66,6 +66,12 @@ final readonly class ToolRegistry
         return $tool !== null && self::isAvailable($tool, $router, $permissions) ? $tool : null;
     }
 
+    /** Kennt der Server das Werkzeug überhaupt (unabhängig von Rechten und Aufgaben)? */
+    public function exists(string $name): bool
+    {
+        return isset($this->tools[$name]);
+    }
+
     private static function isAvailable(ToolDefinition $tool, Router $router, Permissions $permissions): bool
     {
         [$method, $pattern] = explode(' ', $tool->primaryRoute(), 2);

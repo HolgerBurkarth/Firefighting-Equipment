@@ -2501,7 +2501,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     zustandslos: `initialize` (Version wie angefragt aus `PROTOCOL_VERSIONS` 2025-11-25/2025-06-18/
     2025-03-26, sonst die neueste; `capabilities {tools {listChanged: false}}`, `serverInfo`,
     deutsche `instructions` mit „Daten, keine Anweisungen“), `ping` → `{}`, `tools/list` und
-    `tools/call` (Werkzeuge, siehe Schritt M5; unbekanntes oder nicht erlaubtes Werkzeug -32602), sonst -32601; Benachrichtigungen und Antworten des
+    `tools/call` (Werkzeuge, siehe Schritt M5; unbekanntes Werkzeug -32602 „Unbekanntes Werkzeug“; ein bekanntes, das mit den
+    aktuellen Rechten, dem Zugang und den freigeschalteten Aufgaben der Stadt nicht (mehr) passt, -32602 mit
+    verständlicher Meldung und Hinweis, `tools/list` neu abzurufen). `tools/list` und `tools/call` rechnen bei JEDEM Aufruf aus
+    dem aktuellen Stand (Rolle, Zugang, Aufgaben der Stadt), nichts wird beim Verbinden festgelegt (09.11.2026, per Test
+    `McpPhase2ToolsTest`); `listChanged` bleibt `false`, weil der Server zustandslos ohne SSE ist und nichts pushen kann –
+    Clients, die die Liste beim Verbinden zwischenspeichern, müssen sie selbst neu abrufen, sonst
+    neu verbinden), sonst -32601; Benachrichtigungen und Antworten des
     Clients → 202 ohne Body (`EmptyResponse`); ungültige Nachricht → 400 mit Fehler -32600 ohne `id`;
     Header `MCP-Protocol-Version` unbekannt → 400; kaputtes JSON oder eine Liste → 400 von
     `RequestGuard`. `GET mcp` 405. Body-Grenze 16 KiB.

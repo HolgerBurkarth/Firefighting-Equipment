@@ -77,6 +77,29 @@ final class McpPhase2ToolsTest extends McpToolsTestCase
         }
     }
 
+    public function testToolListFollowsTasksEnabledOrDisabledAfterConnecting(): void
+    {
+        // Dasselbe Token (dieselbe Verbindung) vor, während und nach dem Freischalten der Aufgaben.
+        self::assertNotContains('lend_equipment', $this->toolNames($this->token));
+
+        $this->enableTasks();
+        self::assertContains('lend_equipment', $this->toolNames($this->token));
+        self::assertFalse($this->callTool($this->token, 'list_loans', [])['isError'] ?? true);
+
+        $this->pdo()->prepare('UPDATE fe_tenant_location_tasks SET enabled = 0 WHERE tenant_id = ?')->execute([$this->tenantId]);
+        $names = $this->toolNames($this->token);
+        foreach (['list_loans', 'list_maintenance', 'lend_equipment'] as $gone) {
+            self::assertNotContains($gone, $names);
+        }
+        $error = $this->rpc($this->token, 'tools/call', ['name' => 'lend_equipment', 'arguments' => new \stdClass()])['error'];
+        self::assertSame(McpServer::INVALID_PARAMS, $error['code']);
+        self::assertStringContainsString('nicht (mehr) zur Verfügung', $error['message']);
+        self::assertStringContainsString('tools/list', $error['message']);
+
+        $unknown = $this->rpc($this->token, 'tools/call', ['name' => 'gibt_es_nicht', 'arguments' => new \stdClass()])['error'];
+        self::assertStringContainsString('Unbekanntes Werkzeug', $unknown['message']);
+    }
+
     public function testReportUsedGoesToTheCollectionPointAndIsMarkedAsClaude(): void
     {
         $this->enableTasks();
