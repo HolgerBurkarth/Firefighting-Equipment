@@ -35,35 +35,38 @@ interface LoanRow {
     contact: string | null;
 }
 
-function loansServer(options: { borrowers?: boolean } = {}) {
+function loansServer(options: { borrowers?: boolean; empty?: boolean } = {}) {
     const hasBorrowers = options.borrowers ?? true;
     const catalog = [
         deviceJson(1, { identifier: 'M1' }),
         deviceJson(2, { identifier: 'M2' }),
         deviceJson(3, { identifier: 'M3', status: 'retired', status_label: 'ausgesondert' }),
     ];
-    let loans: LoanRow[] = [
-        {
-            id: 1,
-            device: deviceJson(10, {
-                identifier: 'HRT 16',
-                location: { id: 80, name: 'FF Nachbar', path: 'FF Nachbar' },
-            }),
-            borrower: NACHBAR,
-            due: '2026-11-01',
-            contact: 'Herr Maier',
-        },
-        {
-            id: 2,
-            device: deviceJson(11, {
-                identifier: 'HRT 20',
-                location: { id: 80, name: 'FF Nachbar', path: 'FF Nachbar' },
-            }),
-            borrower: NACHBAR,
-            due: null,
-            contact: null,
-        },
-    ];
+    let loans: LoanRow[] =
+        options.empty === true
+            ? []
+            : [
+                  {
+                      id: 1,
+                      device: deviceJson(10, {
+                          identifier: 'HRT 16',
+                          location: { id: 80, name: 'FF Nachbar', path: 'FF Nachbar' },
+                      }),
+                      borrower: NACHBAR,
+                      due: '2026-11-01',
+                      contact: 'Herr Maier',
+                  },
+                  {
+                      id: 2,
+                      device: deviceJson(11, {
+                          identifier: 'HRT 20',
+                          location: { id: 80, name: 'FF Nachbar', path: 'FF Nachbar' },
+                      }),
+                      borrower: NACHBAR,
+                      due: null,
+                      contact: null,
+                  },
+              ];
     const posted: unknown[] = [];
     const state = () => ({
         today: '2026-11-09',
@@ -178,6 +181,40 @@ let server = loansServer();
 
 test.beforeEach(() => {
     server = loansServer();
+});
+
+test.describe('Verleih: erster Verleih', () => {
+    test.use({
+        api: {
+            'GET api/v1/auth/me': admin(),
+            ...ADMIN_OVERVIEW,
+            ...delegate(() => server.api as Record<string, (request: MockRequest) => MockResponse>),
+        },
+    });
+
+    test.beforeEach(async ({ page }) => {
+        server = loansServer({ empty: true });
+        await page.setViewportSize({ width: 1280, height: 800 });
+    });
+
+    test('Meldung „… verliehen.“, nie kurz „nichts verliehen“ darunter', async ({ page }) => {
+        await page.goto('/firefighting/test/verleih');
+        await expect(page.getByTestId('loan-summary')).toHaveText('Zurzeit ist nichts verliehen.');
+        await page.getByTestId('lend-open').click();
+        const dialog = page.getByTestId('form-dialog');
+        await dialog.getByTestId('lend-code').fill('M1');
+        await dialog.getByTestId('lend-code').press('Enter');
+        await dialog.getByRole('combobox', { name: 'Ausgeliehen an' }).click();
+        await page.getByRole('option', { name: 'Schule' }).click();
+        await dialog.getByRole('button', { name: 'Verleihen', exact: true }).click();
+
+        await expect(page.getByTestId('loan-result')).toHaveText(
+            '1 Ausrüstung an „Schule“ verliehen.',
+        );
+        // Zwischen der Meldung und dem neuen Stand nie der alte, leere Zustand.
+        await expect(page.getByText('Zurzeit ist nichts verliehen.')).toHaveCount(0);
+        await expect(page.getByTestId('loan-summary')).toHaveText('1 verliehen');
+    });
 });
 
 test.describe('Verleih mit Recht „Ändern“', () => {
@@ -427,7 +464,7 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
         await page.goto('/firefighting/test/verleih');
         const place = page.getByTestId('return-place');
         await expect(place).toContainText('Rückgabe');
-        await expect(page.getByTestId('return-link-state')).toHaveText('Noch kein Aushang');
+        await expect(page.getByTestId('return-link-state')).toHaveText('Kein gültiger Aushang');
 
         await place.getByTestId('renew-key').click();
         const issued = page.getByTestId('issued-key');
@@ -453,7 +490,7 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
             .getByTestId('confirm-dialog')
             .getByRole('button', { name: 'Ungültig machen' })
             .click();
-        await expect(page.getByTestId('return-link-state')).toHaveText('Noch kein Aushang');
+        await expect(page.getByTestId('return-link-state')).toHaveText('Kein gültiger Aushang');
     });
 
     test('In der Rückgabe: Benutzte und Defekte in die Sammelstelle, der Rest ins Lager', async ({

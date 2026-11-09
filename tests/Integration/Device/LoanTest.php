@@ -97,10 +97,34 @@ final class LoanTest extends DeviceApiTestCase
         $events = $this->events($a['id']);
         self::assertSame(['state_changed', $this->g1, $this->nachbar, 'Übung'], [...array_slice(self::state($events[1]), 0, 1), ...array_slice(self::state($events[1]), 2, 2), self::state($events[1])[6]]);
 
+        $history = self::json($this->api('GET', 'devices/' . $a['id'] . '/events'))['events'];
+        self::assertSame(['Verliehen', 'Angelegt'], array_column($history, 'type_label'), 'eigene Bezeichnung für den Verleih');
+        $log = self::json($this->api('GET', 'device-events'))['events'];
+        self::assertContains('Verliehen', array_column($log, 'type_label'), 'auch in den Letzten Aktivitäten');
+
         $list = self::json($this->api('GET', 'loans'));
         self::assertSame(['open' => 2, 'overdue' => 0], $list['summary']);
         self::assertSame(['HRT 20', 'HRT 3'], array_map(static fn (array $l): string => $l['device']['identifier'], $list['loans']), 'gleicher Leihnehmer, kein Datum: in der Reihenfolge des Verleihs');
         self::assertSame(['Herr Maier', 'Übung'], [$list['loans'][0]['contact'], $list['loans'][0]['comment']]);
+    }
+
+    public function testLogMailCallsALendingLent(): void
+    {
+        $this->enableTasks();
+        $this->account(null, 'chef@example.org', ['notify_device_log' => 1]);
+        $a = $this->createViaApi('HRT 20');
+        $b = $this->createViaApi('HRT 3');
+        $c = $this->createViaApi('HRT 4');
+        $this->mailer->sent = [];
+
+        self::assertSame(200, $this->api('POST', 'loans', ['devices' => self::entries([$a]), 'borrower_location_id' => $this->nachbar])->statusCode());
+        self::assertCount(1, $this->mailer->sent);
+        self::assertStringContainsString('HRT 20 verliehen', $this->mailer->sent[0]->subject);
+        self::assertStringContainsString('Vorgang: Verliehen', $this->mailer->sent[0]->text);
+
+        $this->mailer->sent = [];
+        self::assertSame(200, $this->api('POST', 'loans', ['devices' => self::entries([$b, $c]), 'borrower_location_id' => $this->schule])->statusCode());
+        self::assertStringContainsString('(verliehen)', $this->mailer->sent[0]->text);
     }
 
     public function testListOrdersByBorrowerThenDueDateAndCountsOverdue(): void

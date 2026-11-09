@@ -71,3 +71,17 @@ kann nur der Super-Admin freischalten; ohne sie gibt es den Bereich Verleih nich
 - ☐ Seite „Wartung“: gleiche Zeit sortiert natürlich nach Nummer (HRT 16 vor HRT 20), Rückfragen mit „Sie steht/Sie
   stehen“; Standort-Liste: Chip „Standard-Lager“; Rollen-Editor: Vorschau „Darf“ nennt „bei Einmalgeräten nur Benutzt
   melden“ (Holger, braucht freigeschaltete Aufgaben bzw. Super-Admin).
+
+### Live-Prüfung Runde 9 durch Claude im Browser (Test-Stadt, 09.11.2026)
+
+Geprüft mit freigeschalteten Aufgaben (danach alles zurückgesetzt: Abläufe abgeschaltet, Aufgaben entfernt, Aushang widerrufen, M92 und M93 wieder am Ausgangsort; die Rolle „Live-Test Geräteträger“ (ID 23) bleibt).
+
+- ☑ Abläufe: alle fünf Aufgaben freigeschaltet und zugewiesen (Lager Gerätehaus = Lager, Kleiderkammer = Sammelstelle, Atemschutzwerkstatt = Werkstatt, Hattingen = Ausgeliehen an, Ippingen = Rückgabe); Standortliste zeigt „Standard-Lager“.
+- ☑ Rollen-Editor: Vorschau „Darf“ nennt „bei Einmalgeräten nur Benutzt melden“.
+- ☑ Wartung: Rückfragen in Einzahl/Mehrzahl richtig (HRT 16 nach HRT 20 war richtig: 1 s später gebucht).
+- ☑ Verleihen: M92 an Hattingen mit Frist 08.11.2026 → „seit 1 Tag überfällig“ rot, roter Zähler „Verleih 1“ im Menü, Dashboard-Kachel „Verliehen 1, davon 1 überfällig“.
+- ☑ Aushang erzeugen, erneuern (mit Rückfrage), widerrufen (mit Rückfrage); QR-Code vorhanden; der Schlüssel verschwindet sofort aus der Adresse.
+- ☑ Rückgabe ohne Anmeldung: M92 „benutzt“ → Verlauf „Rückgabe“ von „Live-Test Claude (ohne Anmeldung)“ mit Hinweis; Enter prüft; nicht verliehene und unbekannte Nummer bekommen dieselbe Meldung.
+- ☑ In der Rückgabe: „Benutzte und Defekte in die Sammelstelle …“ (M92 → Kleiderkammer, benutzt) und „In Ordnung ins Lager …“ (M93 → Lager Gerätehaus, einsatzbereit).
+- ☒ „Benutzt melden“ bei direkt geöffneter Seite (M94): Ersatztext „falls es eine gibt …“ trotz vorhandener Sammelstelle → behoben in Runde 10 (`client-config` wird vor der Rückfrage geladen), live noch zu prüfen.
+- ☒ Korrekturen aus der Prüfung, behoben in Runde 10 (live noch zu prüfen): Meldung „1 Ausrüstung an „Hattingen“ verliehen.“; die Liste zeigt nach dem Verleihen nie kurz „Zurzeit ist nichts verliehen.“ („Liste wird aktualisiert …“); ein Verleih heißt im Verlauf, in „Letzte Aktivitäten“, im CSV und in der Log-Mail „Verliehen“; nach „Widerrufen“ steht „Kein gültiger Aushang“.

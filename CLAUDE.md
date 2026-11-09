@@ -639,7 +639,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   melden“ mit Hinweis (`used-only-hint`). Vorher eine Rückfrage (`ConfirmDialog`, Standard „Abbrechen“:
   „M1 als benutzt melden?“ und „Es kommt in die Sammelstelle <Name>.“ bzw. „Der Standort bleibt.“; der Name kommt
   aus `GET client-config` `used_target`, gemerkt je Stadt in `src/data/usedTarget.ts`, localStorage
-  `ff-used-target:<kürzel>`, daher auch offline und bei Rollen, die die Sammelstelle nicht sehen). Offline in die Warteschlange (`QueuedBooking.used`, Text „M1 →
+  `ff-used-target:<kürzel>`, daher auch offline und bei Rollen, die die Sammelstelle nicht sehen; ist der Name noch unbekannt, lädt die Seite vor der Rückfrage `client-config` mit Frist 2 s, `ensureUsedTarget`; nur offline ohne gemerkten Wert gilt der Ersatztext). Offline in die Warteschlange (`QueuedBooking.used`, Text „M1 →
   benutzt gemeldet“, `QUEUE_FORMAT` 2). Ausrüstungstypen: Kästchen „Einmalgerät“ im Fenster, Chip in der
   Liste (`setDeviceTypeSingleUse`). Rollen: „3 · Einschränkungen“ im Editor (`catalog.restrictions`).
   Tests `usedReport.spec.ts`, `deviceTypes.spec.ts`, `roles.spec.ts`, Unit `permissions.spec.ts`,
@@ -2779,7 +2779,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Ändern, `LoanLendHandler`): `{devices: [{id, version}], borrower_location_id, contact?, due_back_on?, comment?}`,
   höchstens 50, Antwort wie die Sammelaktionen plus `borrower`, danach eine Sammelmail „Log“. Die Aufgabe
   „Ausgeliehen an“ lässt sich von einem Standort nicht entfernen, solange dort Ausrüstung verliehen ist (409).
-  Tests `LoanTest`. Frontend: `LoansPage` (`verleih`, Menü „Verleih“ mit rotem Zähler der überfälligen
+  Tests `LoanTest`. Der Verlauf nennt einen Verleih „Verliehen“ (`DeviceEvent::$lent`: Buchung auf einen Standort mit der Aufgabe `borrower`, nur Standort, kein Status; auch in CSV und Log-Mail). Frontend: `LoansPage` (nach einer Aktion zeigt die Seite bis zum neuen Stand „Liste wird aktualisiert …“ statt des alten, womöglich leeren Stands; Meldung „N Ausrüstungen an „X“ verliehen.“; `verleih`, Menü „Verleih“ mit rotem Zähler der überfälligen
   Rückgaben, `PAGE_RIGHTS.loans`), `LendDialog` (Nummer oder Scan-Code per Enter hinzufügen, Leihnehmer, Ansprechpartner,
   „Rückgabe bis“, Kommentar), `src/api/loans.ts`, `src/data/loans.ts`, `lendEquipment` in `src/data/index.ts`,
   Kachel „Verliehen“ im Dashboard (`AdminOverview.loans`, nur mit dem Bereich). Tests `loans.spec.ts` (Browser, Unit).

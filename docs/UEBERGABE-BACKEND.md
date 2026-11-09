@@ -8,6 +8,12 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Verleih heißt „Verliehen“ im Verlauf (Phase 2, Runde 10)“
+
+- `type_label` eines Verlaufseintrags (`devices/{id}/events`, `device-events`, CSV „Ereignis“, Log-Mail „Vorgang“ und Betreff): eine
+  Umbuchung auf einen Standort mit der Aufgabe „Ausgeliehen an“ heißt „Verliehen“ (statt „Umgebucht“); Betreff der Log-Mail
+  „<Nummer> verliehen“. Nur die Bezeichnung, keine neuen Felder. Tests: `LoanTest`.
+
 ## 2026-11-09 – „Sollbestand (Phase 2, Runde 9, P2.7)“
 
 - Migrationen 0059 (`fe_stock_rules`), 0060 (`fe_stock_rule_types`). Abweichungen vom Plan: keine Spalten
