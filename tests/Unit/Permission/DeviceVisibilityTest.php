@@ -101,6 +101,8 @@ final class DeviceVisibilityTest extends TestCase
     public function testAllIsUsedOnlyAtKnownPlaces(): void
     {
         self::assertSame([
+            // Name der Sammelstelle für „Benutzt melden“ (der Ablauf gibt das Ziel vor, G4); keine Geräte.
+            'src/Api/V1/Offline/ClientConfigHandler.php' => 1,
             // Super-Admin: Standorte und Typen als Auswahl für „Sieht nur …“ (ohne Geräte).
             'src/Api/V1/Roles/RoleHandler.php' => 2,
             // Antwort auf eine Buchung durch einen Ablauf (Benutzt melden, G4): das Gerät darf den Filter verlassen haben.

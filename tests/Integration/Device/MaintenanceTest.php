@@ -113,6 +113,22 @@ final class MaintenanceTest extends DeviceApiTestCase
         self::assertArrayHasKey('state_changed_at', $body['collection']['devices'][0]);
     }
 
+    public function testSameTimeSortsNaturallyByIdentifier(): void
+    {
+        $this->enableTasks();
+        $ids = [];
+        foreach (['HRT 20', 'HRT 3', 'HRT 16'] as $identifier) {
+            $ids[] = $this->createViaApi($identifier, ['location_id' => $this->collection])['id'];
+        }
+        $this->pdo()->exec("UPDATE fe_devices SET state_changed_at = '2026-01-01 10:00:00' WHERE id IN (" . implode(',', $ids) . ')');
+
+        $response = $this->api('GET', 'maintenance');
+        self::assertSame(200, $response->statusCode(), $response->body());
+        $body = self::json($response);
+
+        self::assertSame(['HRT 3', 'HRT 16', 'HRT 20'], array_column($body['collection']['devices'], 'identifier'));
+    }
+
     public function testListUsesTheRenamedTaskLabelAndEmptyStages(): void
     {
         $this->enableTasks(withStore: false, withWorkshop: false);

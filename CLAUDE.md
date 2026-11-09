@@ -636,7 +636,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `used: true` → `POST devices/{id}/used` ohne Standort und Status (`StateChangeRequest.used`), Kommentar
   optional, danach wie Speichern. Mit der Einschränkung `single_use_used_only` (`restricted`) und einem
   Einmalgerät (`deviceType.singleUse`) entfallen Standort und Status und „Speichern“; es bleibt „Benutzt
-  melden“ mit Hinweis (`used-only-hint`). Offline in die Warteschlange (`QueuedBooking.used`, Text „M1 →
+  melden“ mit Hinweis (`used-only-hint`). Vorher eine Rückfrage (`ConfirmDialog`, Standard „Abbrechen“:
+  „M1 als benutzt melden?“ und „Es kommt in die Sammelstelle <Name>.“ bzw. „Der Standort bleibt.“; der Name kommt
+  aus `GET client-config` `used_target`, gemerkt je Stadt in `src/data/usedTarget.ts`, localStorage
+  `ff-used-target:<kürzel>`, daher auch offline und bei Rollen, die die Sammelstelle nicht sehen). Offline in die Warteschlange (`QueuedBooking.used`, Text „M1 →
   benutzt gemeldet“, `QUEUE_FORMAT` 2). Ausrüstungstypen: Kästchen „Einmalgerät“ im Fenster, Chip in der
   Liste (`setDeviceTypeSingleUse`). Rollen: „3 · Einschränkungen“ im Editor (`catalog.restrictions`).
   Tests `usedReport.spec.ts`, `deviceTypes.spec.ts`, `roles.spec.ts`, Unit `permissions.spec.ts`,
@@ -3075,7 +3078,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`OfflineSettings::fromConfigFile` in `Application::create`; Tests: `OfflineSettings::fixed`).
   `max_age_days` prüft nur das Handy. `GET client-config` (`Access::Authenticated`,
   `ClientConfigHandler`, in `TenantReadRoutesAccessTest`): `{server_time (UTC, …Z), offline
-  {max_age_days, queue_max_age_days}, max_clock_skew_seconds}`.
+  {max_age_days, queue_max_age_days}, max_clock_skew_seconds, used_target {id, name}|null}` (`used_target`
+  seit Runde 9: Sammelstelle für „Benutzt melden“, unabhängig vom Datenfilter; `ClientConfigHandler` ist
+  eine bekannte Stelle von `DeviceVisibility::all()`).
 
 ## Hinweise (API)
 - Nur Admins der Stadt (`Access::Admin`, in `AdminRoutesAccessTest`): `GET notices[?status=open|

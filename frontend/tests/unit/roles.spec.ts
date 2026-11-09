@@ -279,6 +279,20 @@ describe('Vorschau und Tabelle', () => {
         });
     });
 
+    it('Vorschau „Darf“ nennt die Einschränkung', () => {
+        expect(
+            rolePreview(
+                catalog(),
+                form({
+                    areas: { search: 'read' },
+                    actions: ['book.move', 'device.used'],
+                    restrictions: ['single_use_used_only'],
+                }),
+                null,
+            ).may,
+        ).toBe('Umbuchen, Benutzt melden, bei Einmalgeräten nur Benutzt melden');
+    });
+
     it('„So sieht es die Rolle“', () => {
         expect(
             rolePreview(

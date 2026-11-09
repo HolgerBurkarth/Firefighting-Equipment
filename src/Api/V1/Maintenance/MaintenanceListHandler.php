@@ -25,7 +25,7 @@ use FirefightingEquipment\Tenant\Tenant;
  * Antwort {"collection": Stufe, "workshop": Stufe, "default_store": {id, name}|null}; je Stufe
  * {label, locations [{id, name}], total, shown, devices [Eintrag wie GET devices]}: die nicht
  * ausgesonderten Geräte an den aktiven Standorten mit der Aufgabe Sammelstelle bzw. Werkstatt (samt
- * Fächern), am längsten wartende zuerst (`state_changed_at`, G5: kein Zwischenspeicher). Höchstens
+ * Fächern), am längsten wartende zuerst (`state_changed_at`, G5: kein Zwischenspeicher; bei gleicher Zeit natürlich nach Nummer). Höchstens
  * MAX_SHOWN je Stufe; `total` zählt alle. Ohne einen solchen Standort ist die Stufe leer. Das Konto mit
  * dem Bereich hat nie einen Datenfilter (F3).
  */
@@ -73,7 +73,7 @@ final readonly class MaintenanceListHandler implements RequestHandler
             $total += $page->total;
             array_push($found, ...$page->devices);
         }
-        usort($found, static fn (Device $a, Device $b): int => ($a->stateChangedAt ?? $a->updatedAt) <=> ($b->stateChangedAt ?? $b->updatedAt) ?: $a->id <=> $b->id);
+        usort($found, static fn (Device $a, Device $b): int => ($a->stateChangedAt ?? $a->updatedAt) <=> ($b->stateChangedAt ?? $b->updatedAt) ?: strnatcasecmp($a->identifier->value, $b->identifier->value) ?: $a->id <=> $b->id);
         $shown = array_slice($found, 0, self::MAX_SHOWN);
 
         return [

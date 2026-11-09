@@ -307,6 +307,11 @@ function locationCount(options: FilterOptions): number {
     return options.locations.reduce((sum, location) => sum + 1 + location.children.length, 0);
 }
 
+/** Kurzform einer Einschränkung in der Vorschau „Darf“ (sonst ihre Bezeichnung). */
+const RESTRICTION_PREVIEW: Readonly<Record<string, string>> = {
+    single_use_used_only: 'bei Einmalgeräten nur Benutzt melden',
+};
+
 export interface RolePreview {
     /** „Menü am PC“: Seiten der Konsole; leer = keine Konsole. */
     readonly menu: readonly string[];
@@ -349,10 +354,17 @@ export function rolePreview(
     }
     bar.push('Profil');
     const actions = effectiveActions(catalog, form).map((action) => action.label);
+    // Einschränkungen gehören zu „Darf“ („…, bei Einmalgeräten nur Benutzt melden“).
+    const restrictions = catalog.restrictions
+        .filter((restriction) => form.restrictions.includes(restriction.key))
+        .map((restriction) => RESTRICTION_PREVIEW[restriction.key] ?? restriction.label);
     return {
         menu,
         bar,
-        may: actions.length === 0 ? 'nichts ändern, nur ansehen' : actions.join(', '),
+        may:
+            actions.length === 0
+                ? 'nichts ändern, nur ansehen'
+                : [...actions, ...restrictions].join(', '),
         sees: filterSummary(
             form.locationsMode === 'all' ? null : form.locations,
             form.typesMode === 'all' ? null : form.deviceTypes,

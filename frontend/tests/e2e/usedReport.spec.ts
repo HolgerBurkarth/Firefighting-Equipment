@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import {
+    DEFAULT_CLIENT_CONFIG,
     expect,
     meBody,
     NETWORK_ERROR_CONSOLE,
@@ -70,6 +71,13 @@ function usedRequests(requests: readonly MockRequest[], id: number): Record<stri
         .map((r) => r.body as Record<string, unknown>);
 }
 
+/** Die Rückfrage vor „Benutzt melden“: Standard „Abbrechen“, bestätigt wird bewusst. */
+async function confirmUsed(page: Page): Promise<void> {
+    const dialog = page.getByTestId('confirm-dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Benutzt melden' }).click();
+}
+
 async function openFromSearch(page: Page, term: string, title: string): Promise<void> {
     await page.goto('/firefighting/test/suchen');
     await page.getByRole('searchbox', { name: 'Ausrüstung suchen' }).fill(term);
@@ -101,6 +109,15 @@ test.describe('Geräteträger: Einmalgeräte nur benutzt melden', () => {
         await expect(page.getByRole('button', { name: 'Speichern' })).toHaveCount(0);
 
         await page.getByTestId('report-used').click();
+        const dialog = page.getByTestId('confirm-dialog');
+        await expect(dialog).toContainText('M2 als benutzt melden?');
+        await expect(dialog).toContainText('Der Standort bleibt.');
+        await expect(dialog.getByRole('button', { name: 'Abbrechen' })).toBeFocused();
+        await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+        await expect(dialog).toHaveCount(0);
+        expect(usedRequests(apiRequests, 2)).toHaveLength(0);
+        await page.getByTestId('report-used').click();
+        await confirmUsed(page);
 
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
         await expect(page.getByTestId('booking-notice')).toHaveText(
@@ -119,6 +136,7 @@ test.describe('Geräteträger: Einmalgeräte nur benutzt melden', () => {
         await openFromSearch(page, 'M2', 'M2 · Einmalfilter');
         await page.getByLabel('Kommentar (optional)').fill('Einsatz Waldbrand');
         await page.getByTestId('report-used').click();
+        await confirmUsed(page);
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
         expect(usedRequests(apiRequests, 2)[0]).toMatchObject({ comment: 'Einsatz Waldbrand' });
     });
@@ -132,6 +150,29 @@ test.describe('Geräteträger: Einmalgeräte nur benutzt melden', () => {
         await expect(page.getByTestId('used-only-hint')).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Speichern' })).toBeVisible();
         await expect(page.getByTestId('report-used')).toBeEnabled();
+    });
+});
+
+test.describe('Rückfrage nennt die Sammelstelle', () => {
+    test.use({
+        api: {
+            'GET api/v1/auth/me': me([]),
+            'GET api/v1/devices': devicesEndpoint([M1]),
+            ...deviceDetail(M1),
+            ...LOCATIONS,
+            'GET api/v1/client-config': {
+                status: 200,
+                body: { ...DEFAULT_CLIENT_CONFIG, used_target: { id: 40, name: 'Wache' } },
+            },
+        },
+    });
+
+    test('„Es kommt in die Sammelstelle Wache.“', async ({ page }) => {
+        await openFromSearch(page, 'M1', 'M1 · Atemschutzmaske');
+        await page.getByTestId('report-used').click();
+        const dialog = page.getByTestId('confirm-dialog');
+        await expect(dialog).toContainText('M1 als benutzt melden?');
+        await expect(dialog).toContainText('Es kommt in die Sammelstelle Wache.');
     });
 });
 
@@ -233,6 +274,7 @@ test.describe('Benutzt melden ohne Verbindung', () => {
         await context.setOffline(true);
         await expect(page.getByTestId('offline-notice')).toContainText('Offline – angezeigt');
         await page.getByTestId('report-used').click();
+        await confirmUsed(page);
 
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
         await expect(page.getByTestId('queued-waiting')).toContainText('M2 → benutzt gemeldet');

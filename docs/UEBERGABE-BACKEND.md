@@ -8,6 +8,14 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Korrekturen aus dem Live-Test Runde 8b (Runde 9)“
+
+- `GET client-config`: neues Feld `used_target` (`{id, name}` der Sammelstelle, in die „Benutzt melden“ bucht,
+  sonst `null`; unabhängig vom Datenfilter). Nur Zusatz. Zweck: Die Rückfrage vor „Benutzt melden“ nennt den Ort.
+- `GET maintenance`: bei gleicher Zeit (`state_changed_at`) natürlich nach Nummer sortiert (vorher nach ID).
+- Tests: `ClientConfigTest`, `MaintenanceTest::testSameTimeSortsNaturallyByIdentifier`,
+  `DeviceVisibilityTest` (bekannte Stelle von `DeviceVisibility::all()`).
+
 ## 2026-11-09 – „Wartung: Sammelstelle und Werkstatt (Phase 2, Runde 8b, P2.4)“
 
 - Neuer Bereich `maintenance` (Katalog, `auth/me` `permissions.areas`): nur in Städten mit freigeschalteter

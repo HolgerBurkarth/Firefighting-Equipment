@@ -361,6 +361,24 @@ final readonly class LocationRepository
     }
 
     /**
+     * Wie {@see collectionPointForUsed()}, mit dem Namen (für die Rückfrage der App).
+     *
+     * @return array{id: int, name: string}|null
+     */
+    public function collectionPointForUsedWithName(Tenant $tenant): ?array
+    {
+        $id = $this->collectionPointForUsed($tenant);
+        if ($id === null) {
+            return null;
+        }
+        $stmt = $this->pdo->prepare('SELECT name FROM fe_locations WHERE id = ? AND tenant_id = ?');
+        $stmt->execute([$id, $tenant->id]);
+        $name = $stmt->fetchColumn();
+
+        return $name === false ? null : ['id' => $id, 'name' => (string) $name];
+    }
+
+    /**
      * Aktive Standorte der Ebene 1 mit dieser Aufgabe (Name, ID), nach ID; für die Seite „Wartung“ und
      * die Ziele ihrer Sammelaktionen. Unabhängig vom Datenfilter (Phase 2, G4). Mit $defaultStoreOnly
      * nur das Standard-Lager.

@@ -118,16 +118,22 @@ onMounted(() => {
 const toWorkshopPossible = computed(() => (stage('workshop')?.locations.length ?? 0) > 0);
 const backPossible = computed(() => state.value?.defaultStore != null);
 
-const confirmTitle = computed(() =>
-    pending.value === 'collection'
-        ? `${String(picked.value.collection.length)} Ausrüstung(en) zur Werkstatt bringen?`
-        : `${String(picked.value.workshop.length)} Ausrüstung(en) zurück ins Lager bringen?`,
+const confirmCount = computed(() =>
+    pending.value === 'collection' ? picked.value.collection.length : picked.value.workshop.length,
 );
-const confirmDescription = computed(() =>
-    pending.value === 'collection'
-        ? `Sie stehen dann in „${stage('workshop')?.locations[0]?.name ?? 'der Werkstatt'}“ mit dem Status „in Wartung“.`
-        : `Sie stehen dann in „${state.value?.defaultStore?.name ?? 'dem Lager'}“ mit dem Status „einsatzbereit“.`,
-);
+const confirmTitle = computed(() => {
+    const count = confirmCount.value;
+    const what = count === 1 ? '1 Ausrüstung' : `${String(count)} Ausrüstungen`;
+    return pending.value === 'collection'
+        ? `${what} zur Werkstatt bringen?`
+        : `${what} zurück ins Lager bringen?`;
+});
+const confirmDescription = computed(() => {
+    const they = confirmCount.value === 1 ? 'Sie steht' : 'Sie stehen';
+    return pending.value === 'collection'
+        ? `${they} dann in „${stage('workshop')?.locations[0]?.name ?? 'der Werkstatt'}“ mit dem Status „in Wartung“.`
+        : `${they} dann in „${state.value?.defaultStore?.name ?? 'dem Lager'}“ mit dem Status „einsatzbereit“.`;
+});
 
 function ask(key: StageKey): void {
     pending.value = key;

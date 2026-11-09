@@ -11,6 +11,7 @@ import { pendingDevice, type BookingQueue, type QueueLimits } from './bookingQue
 import type { DeviceStore } from './deviceStore';
 import type { LocationStore } from './locationStore';
 import type { OtherQueues } from './otherQueues';
+import { loadUsedTarget, rememberUsedTarget } from './usedTarget';
 
 /**
  * Format der lokalen Kopie: 2 seit Plan Phase 1, Schritt 1.7c (mit `permissions`). Format 1 (ohne)
@@ -254,6 +255,8 @@ export function installBookingQueue(options: BookingQueueInstallOptions): () => 
         // Standardwerte (7 Tage) gelten.
     }
 
+    loadUsedTarget(options.area, storage);
+
     function applyPending(): void {
         for (const booking of queue.state.bookings) {
             if (booking.state === 'done' || booking.state === 'failed') {
@@ -279,6 +282,7 @@ export function installBookingQueue(options: BookingQueueInstallOptions): () => 
                 queueMaxAgeDays: result.data.queueMaxAgeDays,
             };
             queue.setLimits(limits);
+            rememberUsedTarget(options.area, result.data.usedTarget ?? null, storage);
             try {
                 storage?.setItem(limitsKey(options.area), JSON.stringify(limits));
             } catch {

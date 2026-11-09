@@ -120,6 +120,17 @@ function taskLabel(task: LocationTaskId | null | undefined): string | null {
         : (taskSettings.value.find((setting) => setting.task === task)?.label ?? null);
 }
 
+/** Chip der Aufgabe; das Standard-Lager als solches („Standard-Lager“). */
+function taskChipText(location: {
+    readonly task?: LocationTaskId | null;
+    readonly isDefaultStore?: boolean;
+}): string | null {
+    const label = taskLabel(location.task);
+    return label !== null && location.task === 'store' && location.isDefaultStore === true
+        ? `Standard-${label}`
+        : label;
+}
+
 const taskChanged = computed(() => {
     const location = editedTopLocation.value;
     if (location === null || !showTasks.value) {
@@ -465,7 +476,7 @@ onMounted(() => {
                     v-if="taskLabel(group.location.task) !== null"
                     class="badge badge-ready"
                     data-testid="task-chip"
-                    >{{ taskLabel(group.location.task) }}</span
+                    >{{ taskChipText(group.location) }}</span
                 >
                 <span v-if="!group.location.active" class="badge badge-retired">gesperrt</span>
                 <button
