@@ -102,7 +102,7 @@ describe('Katalog und Grenzen wie im Backend', () => {
             'loans',
         ]);
         expect(parsed.levelLabels).toEqual({ read: 'Ansehen', write: 'Ändern' });
-        expect(allActions(parsed)).toHaveLength(11);
+        expect(allActions(parsed)).toHaveLength(13);
         expect(parsed.restrictions.map((restriction) => restriction.key)).toEqual([
             'single_use_used_only',
         ]);

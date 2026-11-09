@@ -32,7 +32,7 @@ final class PermissionsForClaudeTest extends TestCase
     {
         $all = Permissions::all();
         $allAreas = ['dashboard' => 'read', 'search' => 'read', 'devices' => 'write', 'locations' => 'write', 'device_types' => 'write', 'due' => 'write', 'log' => 'write', 'maintenance' => 'write', 'loans' => 'write'];
-        $allActions = array_values(array_filter(array_map(static fn (Action $a): string => $a->value, Action::cases()), static fn (string $a): bool => $a !== 'mail.log'));
+        $allActions = array_values(array_filter(array_map(static fn (Action $a): string => $a->value, Action::cases()), static fn (string $a): bool => !in_array($a, ['mail.log', 'stock.override'], true))); // G17: nie über Claude
         $read = array_map(static fn (): string => 'read', $allAreas);
 
         yield 'Admin, Ändern' => [$all, ClaudeAccess::Write, $allAreas, $allActions];

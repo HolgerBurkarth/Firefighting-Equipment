@@ -8,6 +8,25 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Sollbestand bei Buchungen und Tausch (Phase 2, Runde 10, P2.8)“
+
+- Neu: `POST devices/swap` (Aktion `device.swap`): `{out {id, version}, in {id, version}, out_status? (used|defective|maintenance),
+  out_location_id?, comment?, confirmed_below_minimum?}` → `{out, in, swap_id}`. „out“ geht in die Sammelstelle (benutzt bzw. defekt),
+  der einsatzbereite Ersatz „in“ kommt an dessen bisherigen Standort; eine Transaktion, beide Verlaufseinträge mit `swap_id`
+  (Migration 0061, noch nicht in der JSON-Antwort des Verlaufs).
+- Neu: Buchungen (`POST devices/{id}/state` und `/used`), die den Sollbestand einer Regel unterschreiten würden, lehnt der Server mit
+  409 `rule_violation` ab, `details.stock {location {id, name, path}, rule {id, min_count, types}, have, missing, can_override}`.
+  Neues Feld `confirmed_below_minimum: true` (nur mit der Aktion `stock.override` wirksam) bucht trotzdem und legt bei einer
+  `client_ref` den Hinweis `stock_below_minimum` an (Migration 0062). Neue Aktionen im Katalog: `device.swap`, `stock.override`
+  (nicht über Claude). Verleih, Wartung und Rückgaben werden ebenfalls geprüft (Fehler je Eintrag). Offline-Buchungen nicht (P2.9).
+- Tests: `StockSwapTest`, `TenantRoutePermissionsTest`, `NoticeKindTest`, `RoleApiTest`.
+
+## 2026-11-09 – „Verleih heißt „Verliehen“ im Verlauf (Phase 2, Runde 10)“
+
+- `type_label` eines Verlaufseintrags (`devices/{id}/events`, `device-events`, CSV „Ereignis“, Log-Mail „Vorgang“ und Betreff): eine
+  Umbuchung auf einen Standort mit der Aufgabe „Ausgeliehen an“ heißt „Verliehen“ (statt „Umgebucht“); Betreff der Log-Mail
+  „<Nummer> verliehen“. Nur die Bezeichnung, keine neuen Felder. Tests: `LoanTest`.
+
 ## 2026-11-09 – „Sollbestand (Phase 2, Runde 9, P2.7)“
 
 - Migrationen 0059 (`fe_stock_rules`), 0060 (`fe_stock_rule_types`). Abweichungen vom Plan: keine Spalten

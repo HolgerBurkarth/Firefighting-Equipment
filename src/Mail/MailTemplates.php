@@ -702,7 +702,7 @@ final class MailTemplates
                 }
                 $parts = [];
                 if ($event->toLocation !== null) {
-                    $parts[] = 'umgebucht';
+                    $parts[] = $event->label() === 'Verliehen' ? 'verliehen' : 'umgebucht';
                 }
                 if ($event->toStatus !== null) {
                     $parts[] = 'Status ' . $event->toStatus->label();
@@ -724,19 +724,21 @@ final class MailTemplates
     private static function bulkReason(array $events): string
     {
         $moved = false;
+        $lentOnly = true;
         $statuses = [];
         foreach ($events as $event) {
             if ($event->type !== DeviceEventType::StateChanged) {
                 continue;
             }
             $moved = $moved || $event->toLocation !== null;
+            $lentOnly = $lentOnly && $event->label() === 'Verliehen';
             if ($event->toStatus !== null) {
                 $statuses[$event->toStatus->value] = $event->toStatus;
             }
         }
         $parts = [];
         if ($moved) {
-            $parts[] = 'umgebucht';
+            $parts[] = $lentOnly ? 'verliehen' : 'umgebucht';
         }
         if ($statuses !== []) {
             $parts[] = count($statuses) === 1 ? 'Status ' . array_values($statuses)[0]->label() : 'Status geändert';

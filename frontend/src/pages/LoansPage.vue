@@ -44,10 +44,14 @@ const resultText = ref<string | null>(null);
 const resultOk = ref(true);
 const failures = ref<{ id: number; identifier: string; text: string }[]>([]);
 
+/** Nach einer Aktion bis zum neuen Stand: statt des alten (womöglich leeren) Stands „wird aktualisiert“. */
+const updating = ref(false);
+
 async function load(): Promise<void> {
     loading.value = true;
     const result = await fetchLoans();
     loading.value = false;
+    updating.value = false;
     if (result.ok) {
         state.value = result.data;
         error.value = null;
@@ -226,12 +230,21 @@ async function runProcess(): Promise<void> {
         run.results.filter((result) => result.outcome !== 'error').map((result) => result.id),
     );
     pickedReturns.value = pickedReturns.value.filter((id) => !done.has(id));
+    updating.value = true;
     void load();
 }
 
 function onDone(run: BulkRun, borrower: LoanPlace | null): void {
-    const target = borrower === null ? '' : ` an „${borrower.name}“`;
-    showRun(`${bulkResultText('lend', run).replace(/\.$/, '')}${target}.`, run);
+    const counts = bulkCounts(run);
+    if (borrower !== null && counts.errors === 0 && run.unsent.length === 0 && run.error === null) {
+        const what =
+            counts.applied === 1 ? '1 Ausrüstung' : `${String(counts.applied)} Ausrüstungen`;
+        showRun(`${what} an „${borrower.name}“ verliehen.`, run);
+    } else {
+        const target = borrower === null ? '' : ` an „${borrower.name}“`;
+        showRun(`${bulkResultText('lend', run).replace(/\.$/, '')}${target}.`, run);
+    }
+    updating.value = true;
     void load();
 }
 
@@ -280,7 +293,10 @@ function printPoster(): void {
     </ul>
 
     <template v-if="state !== null">
-        <p class="summary" data-testid="loan-summary">{{ loansSummary(state) }}</p>
+        <p v-if="updating" class="summary" role="status" data-testid="loan-updating">
+            Liste wird aktualisiert …
+        </p>
+        <p v-else class="summary" data-testid="loan-summary">{{ loansSummary(state) }}</p>
         <p v-if="canLend && !lendPossible" class="hint" data-testid="no-borrower">
             Es gibt noch keinen Leihnehmer. Der Admin vergibt die Aufgabe „{{
                 state.borrowerLabel
@@ -348,7 +364,7 @@ function printPoster(): void {
                     <strong class="identifier">{{ place.name }}</strong>
                     <span class="since" data-testid="return-link-state">{{
                         place.linkCreatedAt === null
-                            ? 'Noch kein Aushang'
+                            ? 'Kein gültiger Aushang'
                             : `Aushang gültig seit ${changeTimeText(place.linkCreatedAt, now)}`
                     }}</span>
                     <template v-if="canLend">

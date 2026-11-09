@@ -12,7 +12,7 @@ namespace FirefightingEquipment\Device;
 final class DeviceRuleViolationException extends DeviceException
 {
     /**
-     * @param array<string, int>|null $details
+     * @param array<string, mixed>|null $details
      */
     private function __construct(string $message, public readonly ?array $details = null)
     {
@@ -20,7 +20,7 @@ final class DeviceRuleViolationException extends DeviceException
     }
 
     /**
-     * @param array<string, int>|null $details
+     * @param array<string, mixed>|null $details
      */
     public static function because(string $message, ?array $details = null): self
     {

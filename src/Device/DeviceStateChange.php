@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Device;
 
+use FirefightingEquipment\Device\Stock\StockMode;
+
 /**
  * Gewünschte Umbuchung und/oder Statusänderung (POST devices/{id}/state): mindestens eines von
  * beiden, nie ausgesondert (dafür retire). Ob sich wirklich etwas ändert, entscheidet
@@ -15,6 +17,8 @@ namespace FirefightingEquipment\Device;
  * $inTransaction: Arbeit, die der Ablauf in DERSELBEN Transaktion wie die Buchung erledigt (z. B. der
  * Eintrag des Verleihs, P2.5); sie läuft mit dem gesperrten Stand VOR der Buchung, nur wenn sich
  * wirklich etwas ändert, und ein Fehler rollt die Buchung zurück.
+ *
+ * $stock: Prüfung gegen den Sollbestand (P2.8), siehe StockMode; $swapId: Kennung eines Tauschs (beide Buchungen).
  */
 final readonly class DeviceStateChange
 {
@@ -26,6 +30,8 @@ final readonly class DeviceStateChange
         public ?DeviceStatus $status,
         public bool $process = false,
         public ?\Closure $inTransaction = null,
+        public StockMode $stock = StockMode::Enforce,
+        public ?string $swapId = null,
     ) {
         if ($locationId === null && $status === null) {
             throw new InvalidDeviceValueException('Bitte einen neuen Standort (location_id) und/oder Status (status) angeben.');

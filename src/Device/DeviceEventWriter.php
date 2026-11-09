@@ -22,7 +22,7 @@ final class DeviceEventWriter
 
     private const array COLUMNS = [
         'tenant_id', 'device_id', 'event_type', 'user_id', 'actor_name', 'from_location_id', 'to_location_id', 'from_status',
-        'to_status', 'from_due', 'to_due', 'field', 'old_value', 'new_value', 'comment', 'occurred_at', 'applied',
+        'to_status', 'swap_id', 'from_due', 'to_due', 'field', 'old_value', 'new_value', 'comment', 'occurred_at', 'applied',
         'not_applied_reason', 'channel',
     ];
 
@@ -69,6 +69,7 @@ final class DeviceEventWriter
      *
      * @param ActionTime|null $occurredAt Aktionszeit auf dem Handy; null = Serverzeit (created_at)
      * @param string|null     $actorName  Rückgabe ohne Anmeldung (P2.6): Name des Überbringers; dann ist $userId null
+     * @param string|null     $swapId     Tausch (P2.8): Kennung, die beide Buchungen teilen
      */
     public function stateChanged(
         Tenant $tenant,
@@ -81,8 +82,10 @@ final class DeviceEventWriter
         ?string $comment,
         ?ActionTime $occurredAt = null,
         ?string $actorName = null,
+        ?string $swapId = null,
     ): void {
         $this->insert($tenant, $deviceId, $userId, 'state_changed', [
+            'swap_id' => $swapId,
             'from_location_id' => $fromLocationId,
             'to_location_id' => $toLocationId,
             'from_status' => $fromStatus?->value,

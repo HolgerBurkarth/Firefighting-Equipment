@@ -75,7 +75,7 @@ final class RoleApiTest extends AuthTestCase
         self::assertFalse($actions['csv.import']['with_filter'], 'F3');
         self::assertNull($actions['mail.log']['requires']);
         self::assertSame(['key' => 'csv.export', 'label' => 'CSV-Export', 'requires' => ['area' => 'devices', 'level' => 'read'], 'with_filter' => true], $actions['csv.export']);
-        self::assertCount(11, $actions);
+        self::assertCount(13, $actions);
     }
 
     public function testListShowsDefaultRolesWithUsage(): void
@@ -510,7 +510,7 @@ final class RoleApiTest extends AuthTestCase
         self::assertSame(['read'], array_values(array_unique([$copy['areas']['dashboard'], $copy['areas']['search']])));
         self::assertSame('write', $copy['areas']['users']);
         self::assertCount(11, $copy['areas']);
-        self::assertCount(11, $copy['actions']);
+        self::assertCount(13, $copy['actions']);
     }
 
     /** F10: Übernahme aus einer anderen Stadt mit den Rechten, ohne Datenfilter. */

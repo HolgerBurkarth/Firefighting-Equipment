@@ -42,6 +42,8 @@ final readonly class DeviceEvent
         /** Kennung der Buchung vom Handy (client_ref), falls mitgesendet */
         public ?string $clientRef = null,
         public EventChannel $channel = EventChannel::App,
+        /** Buchung auf einen Standort mit der Aufgabe „Ausgeliehen an“ (Verleih, P2.5): Bezeichnung „Verliehen“ */
+        public bool $lent = false,
     ) {
     }
 
@@ -75,6 +77,7 @@ final readonly class DeviceEvent
             $this->notAppliedReason,
             $this->clientRef,
             $this->channel,
+            $this->lent,
         );
     }
 
@@ -88,7 +91,7 @@ final readonly class DeviceEvent
 
     /**
      * Deutsche Bezeichnung; bei state_changed nach Inhalt („Ausgesondert“, „Wieder aufgenommen“,
-     * „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“).
+     * „Verliehen“, „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“).
      */
     public function label(): string
     {
@@ -105,6 +108,7 @@ final readonly class DeviceEvent
 
         return match (true) {
             $this->userId === null => 'Rückgabe',
+            $this->lent && $this->toLocation !== null && $this->toStatus === null => 'Verliehen',
             $this->toStatus === DeviceStatus::Retired => 'Ausgesondert',
             $this->fromStatus === DeviceStatus::Retired => 'Wieder aufgenommen',
             $this->toLocation !== null && $this->toStatus !== null => 'Umgebucht und Status geändert',

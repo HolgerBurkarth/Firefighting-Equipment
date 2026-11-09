@@ -14,6 +14,9 @@ use FirefightingEquipment\Device\Booking\DeviceStateSnapshot;
 use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
 use FirefightingEquipment\Device\Notice\NewNotice;
 use FirefightingEquipment\Device\Notice\NoticeKind;
+use FirefightingEquipment\Device\Stock\StockGuard;
+use FirefightingEquipment\Device\Stock\StockMode;
+use FirefightingEquipment\Device\Stock\StockViolation;
 use FirefightingEquipment\Device\Booking\DuplicateClientRefException;
 use FirefightingEquipment\Offline\ActionTime;
 use FirefightingEquipment\Permission\DeviceVisibility;
@@ -455,12 +458,15 @@ final readonly class DeviceRepository
         /** @var array{BookingOutcome, ?BookingReason, ?int, ?int} $result */
         $result = $this->atomically(function () use ($tenant, $userId, $id, $expectedVersion, $change, $comment, $booking): array {
             $before = null;
+            $below = false;
             if ($booking?->occurredAt !== null) {
                 $current = $this->lockDevice($tenant, $id);
                 $before = $this->stateSnapshot($tenant, $current);
                 [$outcome, $reason, $eventId] = $this->offline($tenant, $userId, $current, $expectedVersion, $change, $comment, $booking->occurredAt);
             } else {
-                [$outcome, $reason, $eventId] = $this->online($tenant, $userId, $this->lockForChange($tenant, $id, $expectedVersion), $change, $comment);
+                $current = $this->lockForChange($tenant, $id, $expectedVersion);
+                $before = $change->stock === StockMode::Override ? $this->stateSnapshot($tenant, $current) : null;
+                [$outcome, $reason, $eventId, $below] = $this->online($tenant, $userId, $current, $change, $comment);
             }
 
             if ($booking?->clientRef === null) {
@@ -471,10 +477,12 @@ final readonly class DeviceRepository
             );
 
             // Hinweis an die Admins: nur Offline-Buchungen mit besonderem Ergebnis oder nach Rückfrage.
-            $kind = NoticeKind::forResult($reason, $booking->staleConfirmed);
-            $noticeId = $kind === null || $booking->occurredAt === null || $before === null ? null : new DeviceNoticeRepository($this->pdo, $this->visibility)->create(
+            // Online nur, wenn die Buchung mit stock.override den Sollbestand unterschritten hat (P2.8).
+            $kind = $below ? NoticeKind::StockBelowMinimum : NoticeKind::forResult($reason, $booking->staleConfirmed);
+            $at = $booking->occurredAt ?? ($below ? ActionTime::fromString(gmdate('Y-m-d\TH:i:s\Z')) : null);
+            $noticeId = $kind === null || $at === null || $before === null ? null : new DeviceNoticeRepository($this->pdo, $this->visibility)->create(
                 $tenant,
-                new NewNotice($kind, $booking->staleConfirmed, $id, $bookingId, $eventId, $userId, $booking->occurredAt, $change, $before),
+                new NewNotice($kind, $booking->staleConfirmed, $id, $bookingId, $eventId, $userId, $at, $change, $before),
             );
 
             return [$outcome, $reason, $eventId, $noticeId];
@@ -496,9 +504,9 @@ final readonly class DeviceRepository
     /**
      * Buchung ohne Aktionszeit (Version bereits geprüft): wie bisher, Fehler als Ausnahme.
      *
-     * @return array{BookingOutcome, ?BookingReason, ?int} Ergebnis, Grund, Ereignis
+     * @return array{BookingOutcome, ?BookingReason, ?int, bool} Ergebnis, Grund, Ereignis, Sollbestand mit stock.override unterschritten
      *
-     * @throws DeviceRuleViolationException ausgesondert, Ziel-Standort gesperrt
+     * @throws DeviceRuleViolationException ausgesondert, Ziel-Standort gesperrt, Sollbestand unterschritten
      * @throws InvalidDeviceValueException  Ziel-Standort unbekannt oder fremd
      */
     private function online(Tenant $tenant, int $userId, Device $current, DeviceStateChange $change, ?string $comment): array
@@ -510,18 +518,29 @@ final readonly class DeviceRepository
         $locationId = $change->locationId ?? $current->locationId;
         $status = $change->status ?? $current->status;
         if ($locationId === $current->locationId && $status === $current->status) {
-            return [BookingOutcome::Unchanged, null, null];
+            return [BookingOutcome::Unchanged, null, null, false];
         }
         if ($locationId !== $current->locationId) {
             $this->lockActiveLocation($tenant, $locationId, $change->process);
         }
 
-        $eventId = $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment);
+        $below = false;
+        if ($change->stock !== StockMode::Skip) {
+            $violations = new StockGuard($this->pdo)->violations($tenant, [['device' => $current, 'locationId' => $locationId, 'status' => $status]]);
+            if ($violations !== []) {
+                if ($change->stock !== StockMode::Override) {
+                    throw self::stockBelowMinimum($violations[0], $change->stock === StockMode::Ask);
+                }
+                $below = true;
+            }
+        }
+
+        $eventId = $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment, swapId: $change->swapId);
         if ($change->inTransaction !== null) {
             ($change->inTransaction)($current);
         }
 
-        return [BookingOutcome::Applied, null, $eventId];
+        return [BookingOutcome::Applied, null, $eventId, $below];
     }
 
     /**
@@ -581,6 +600,89 @@ final readonly class DeviceRepository
     /**
      * Aktueller Stand mit Aktionszeit und dem Konto, das ihn gesetzt hat (für Hinweise).
      */
+    /**
+     * Tausch (P2.8): $out geht heraus (Ziel und Status laut $outChange), $in kommt an dessen bisherigen
+     * Standort. Beides oder nichts in EINER Transaktion; beide Buchungen tragen dieselbe Kennung
+     * (fe_device_events.swap_id). Der Ersatz muss einsatzbereit sein. Der Sollbestand wird über beide
+     * Buchungen zusammen geprüft (der Ersatz gleicht das Herausgehende aus), $stock wie bei book().
+     *
+     * @return array{Device, Device, string} Gerät heraus, Ersatz (je Stand danach), Kennung des Tauschs
+     *
+     * @throws DeviceNotFoundException
+     * @throws DeviceVersionConflictException
+     * @throws DeviceRuleViolationException   ausgesondert, Ersatz nicht einsatzbereit, Ziel gesperrt, Sollbestand
+     * @throws InvalidDeviceValueException    dasselbe Gerät zweimal, Ziel unbekannt
+     */
+    public function swap(Tenant $tenant, int $userId, int $outId, int $outVersion, int $inId, int $inVersion, DeviceStateChange $outChange, ?string $comment, StockMode $stock): array
+    {
+        if ($outId === $inId) {
+            throw new InvalidDeviceValueException('Die Ausrüstung kann nicht gegen sich selbst getauscht werden.');
+        }
+        $swapId = bin2hex(random_bytes(16));
+        $this->atomically(function () use ($tenant, $userId, $outId, $outVersion, $inId, $inVersion, $outChange, $comment, $stock, $swapId): bool {
+            // Gesperrt wird immer in der Reihenfolge der IDs (keine Verklemmung bei gegenläufigen Tauschen).
+            $versions = [$outId => $outVersion, $inId => $inVersion];
+            ksort($versions);
+            $locked = [];
+            foreach ($versions as $id => $version) {
+                $locked[$id] = $this->lockForChange($tenant, $id, $version);
+            }
+            $out = $locked[$outId];
+            $in = $locked[$inId];
+            foreach ([$out, $in] as $device) {
+                if ($device->isRetired()) {
+                    throw DeviceRuleViolationException::retiredNotMovable($device->identifier);
+                }
+            }
+            if ($in->status !== DeviceStatus::Ready) {
+                throw DeviceRuleViolationException::because(sprintf('%s ist nicht einsatzbereit und kann nicht als Ersatz dienen.', $in->identifier->value));
+            }
+
+            $outLocation = $outChange->locationId ?? $out->locationId;
+            $outStatus = $outChange->status ?? $out->status;
+            $inLocation = $out->locationId;
+            if ($outLocation !== $out->locationId) {
+                $this->lockActiveLocation($tenant, $outLocation, $outChange->process);
+            }
+            if ($inLocation !== $in->locationId) {
+                $this->lockActiveLocation($tenant, $inLocation);
+            }
+
+            if ($stock !== StockMode::Skip) {
+                $violations = new StockGuard($this->pdo)->violations($tenant, [
+                    ['device' => $out, 'locationId' => $outLocation, 'status' => $outStatus],
+                    ['device' => $in, 'locationId' => $inLocation, 'status' => $in->status],
+                ]);
+                if ($violations !== [] && $stock !== StockMode::Override) {
+                    throw self::stockBelowMinimum($violations[0], $stock === StockMode::Ask);
+                }
+            }
+
+            if ($outLocation !== $out->locationId || $outStatus !== $out->status) {
+                $this->applyState($tenant, $userId, $out, $outLocation, $outStatus, [], $comment, swapId: $swapId);
+            }
+            if ($inLocation !== $in->locationId) {
+                $this->applyState($tenant, $userId, $in, $inLocation, $in->status, [], $comment, swapId: $swapId);
+            }
+
+            return true;
+        });
+
+        // Das ausgehende Gerät darf aus dem Datenfilter gefallen sein (Ziel gibt der Ablauf vor, G4).
+        $all = new self($this->pdo, DeviceVisibility::all(), null, $this->channel);
+
+        return [
+            $all->find($tenant, $outId) ?? throw DeviceNotFoundException::forId($outId),
+            $all->find($tenant, $inId) ?? throw DeviceNotFoundException::forId($inId),
+            $swapId,
+        ];
+    }
+
+    private static function stockBelowMinimum(StockViolation $violation, bool $canOverride): DeviceRuleViolationException
+    {
+        return DeviceRuleViolationException::because($violation->message(), ['stock' => [...$violation->toArray(), 'can_override' => $canOverride]]);
+    }
+
     public function stateSnapshot(Tenant $tenant, Device $device): DeviceStateSnapshot
     {
         $stmt = $this->pdo->prepare(
@@ -736,6 +838,7 @@ final readonly class DeviceRepository
         ?string $comment,
         ?ActionTime $occurredAt = null,
         ?string $actorName = null,
+        ?string $swapId = null,
     ): int {
         $set = implode('', array_map(static fn (string $f): string => ', ' . self::COLUMNS[$f] . ' = ?', array_keys($fields)));
         // state_version vor version: richtig, ob MariaDB die Zuweisungen nacheinander oder gleichzeitig
@@ -761,6 +864,7 @@ final readonly class DeviceRepository
             $comment,
             $occurredAt,
             $actorName,
+            $swapId,
         );
 
         return (int) $this->pdo->lastInsertId();

@@ -28,6 +28,8 @@ export type PermissionAction =
     | 'book.move'
     | 'book.status'
     | 'device.used'
+    | 'device.swap'
+    | 'stock.override'
     | 'device.create'
     | 'device.edit'
     | 'device.retire'
@@ -61,6 +63,8 @@ export const PERMISSION_ACTIONS: readonly PermissionAction[] = [
     'book.move',
     'book.status',
     'device.used',
+    'device.swap',
+    'stock.override',
     'device.create',
     'device.edit',
     'device.retire',

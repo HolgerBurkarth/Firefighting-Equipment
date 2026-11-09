@@ -49,3 +49,50 @@ Test-Stadt, kein Super-Admin-Konto) am 08.11.2026 nach dem Deploy.
   danach zurückgesetzt, Wartung 403, M90 wieder HLF 20 / G1, einsatzbereit (geprüft von Claude im Browser,
   09.11.2026).
 
+
+## Runde 9: P2.5 bis P2.7 und Korrekturen (Build `715e960ad7be`, 09.11.2026)
+
+Vom Agenten im Browser (Admin der Test-Stadt, kein Super-Admin-Konto). Die Aufgaben „Ausgeliehen an“ und „Rückgabe“
+kann nur der Super-Admin freischalten; ohne sie gibt es den Bereich Verleih nicht (wie vor Phase 2).
+
+- ☑ Migrationen 0055–0060 ausgeführt, `health` ok, `build.json` = `715e960ad7be`.
+- ☑ `GET loans` ohne freigeschaltete Aufgabe: 403. `POST returns/check` mit erfundenem Schlüssel: 400 „Dieser
+  Rückgabe-Link gilt nicht (mehr)“, ohne Anmeldung erreichbar.
+- ☑ Sollbestand: Regel „mindestens 99 Atemschutzgerät“ an HLF 20 gesetzt; „Standorte“ zeigt das Panel „Sollbestand“
+  mit „außer Betrieb“ und „6 vorhanden, 93 fehlen“; danach alle Regeln entfernt (`stock` null).
+- ☑ „Benutzt melden“ an M90: Rückfrage „M90 als benutzt melden?“, Fokus auf „Abbrechen“, Abbrechen ändert nichts. (Direkt
+  geöffnet, ohne vorherige Synchronisierung: Text „falls es eine gibt – sonst bleibt der Standort“.)
+- ☐ Als Super-Admin „Ausgeliehen an“ und „Rückgabe“ freischalten, je einen Standort zuweisen; dann Seite „Verleih“:
+  Verleihen mit Nummer, „Rückgabe bis“ überfällig rot, Kachel im Dashboard, roter Zähler im Menü (Holger; danach
+  abschalten).
+- ☐ Aushang erzeugen, QR-Code mit dem Handy scannen, Ausrüstung ohne Anmeldung zurückgeben (Name, Zustand); Verlauf
+  zeigt „Rückgabe“ von „<Name> (ohne Anmeldung)“; Aushang drucken (Holger, iPhone).
+- ☐ „In der Rückgabe“: „In Ordnung ins Lager“ und „Benutzte und Defekte in die Sammelstelle“ (Holger).
+- ☐ Seite „Wartung“: gleiche Zeit sortiert natürlich nach Nummer (HRT 16 vor HRT 20), Rückfragen mit „Sie steht/Sie
+  stehen“; Standort-Liste: Chip „Standard-Lager“; Rollen-Editor: Vorschau „Darf“ nennt „bei Einmalgeräten nur Benutzt
+  melden“ (Holger, braucht freigeschaltete Aufgaben bzw. Super-Admin).
+
+### Live-Prüfung Runde 9 durch Claude im Browser (Test-Stadt, 09.11.2026)
+
+Geprüft mit freigeschalteten Aufgaben (danach alles zurückgesetzt: Abläufe abgeschaltet, Aufgaben entfernt, Aushang widerrufen, M92 und M93 wieder am Ausgangsort; die Rolle „Live-Test Geräteträger“ (ID 23) bleibt).
+
+- ☑ Abläufe: alle fünf Aufgaben freigeschaltet und zugewiesen (Lager Gerätehaus = Lager, Kleiderkammer = Sammelstelle, Atemschutzwerkstatt = Werkstatt, Hattingen = Ausgeliehen an, Ippingen = Rückgabe); Standortliste zeigt „Standard-Lager“.
+- ☑ Rollen-Editor: Vorschau „Darf“ nennt „bei Einmalgeräten nur Benutzt melden“.
+- ☑ Wartung: Rückfragen in Einzahl/Mehrzahl richtig (HRT 16 nach HRT 20 war richtig: 1 s später gebucht).
+- ☑ Verleihen: M92 an Hattingen mit Frist 08.11.2026 → „seit 1 Tag überfällig“ rot, roter Zähler „Verleih 1“ im Menü, Dashboard-Kachel „Verliehen 1, davon 1 überfällig“.
+- ☑ Aushang erzeugen, erneuern (mit Rückfrage), widerrufen (mit Rückfrage); QR-Code vorhanden; der Schlüssel verschwindet sofort aus der Adresse.
+- ☑ Rückgabe ohne Anmeldung: M92 „benutzt“ → Verlauf „Rückgabe“ von „Live-Test Claude (ohne Anmeldung)“ mit Hinweis; Enter prüft; nicht verliehene und unbekannte Nummer bekommen dieselbe Meldung.
+- ☑ In der Rückgabe: „Benutzte und Defekte in die Sammelstelle …“ (M92 → Kleiderkammer, benutzt) und „In Ordnung ins Lager …“ (M93 → Lager Gerätehaus, einsatzbereit).
+- ☒ „Benutzt melden“ bei direkt geöffneter Seite (M94): Ersatztext „falls es eine gibt …“ trotz vorhandener Sammelstelle → behoben in Runde 10 (`client-config` wird vor der Rückfrage geladen), live noch zu prüfen.
+- ☒ Korrekturen aus der Prüfung, behoben in Runde 10 (live noch zu prüfen): Meldung „1 Ausrüstung an „Hattingen“ verliehen.“; die Liste zeigt nach dem Verleihen nie kurz „Zurzeit ist nichts verliehen.“ („Liste wird aktualisiert …“); ein Verleih heißt im Verlauf, in „Letzte Aktivitäten“, im CSV und in der Log-Mail „Verliehen“; nach „Widerrufen“ steht „Kein gültiger Aushang“.
+
+## Runde 10: P2.8 (Sollbestand bei Buchungen, Tausch; 09.11.2026)
+
+Noch nicht live geprüft (Build folgt nach dem Deploy der Runde).
+
+- ☐ Sollbestand setzen (HLF 20: mindestens 2 Atemschutzmasken, 2 einsatzbereite am HLF); eine davon in Wartung setzen: Hinweis
+  „Am Standort … blieben nur 1 von mindestens 2“, Knöpfe „Tauschen …“ und (Admin) „Trotzdem buchen …“.
+- ☐ „Tauschen …“: Ersatz aus dem Lager wählen, M-Nummer geht in die Sammelstelle (benutzt), Ersatz steht am HLF; Verlauf beider
+  Ausrüstungen; Sollbestand wieder erfüllt; danach alles zurücksetzen und die Regeln entfernen.
+- ☐ „Trotzdem buchen“ (Admin): Hinweis „Sollbestand unterschritten“ im Protokoll; erledigen.
+- ☐ Geräteträger (Rolle ID 23) ohne `device.swap`: kein Knopf „Tauschen …“ (Rolle um die Aktion erweitern nur mit Holger).

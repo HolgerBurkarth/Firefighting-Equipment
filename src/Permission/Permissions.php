@@ -204,7 +204,7 @@ final readonly class Permissions
             $areas[$area] = $access === ClaudeAccess::Write ? $level : AreaLevel::Read;
         }
         $actions = $access === ClaudeAccess::Write
-            ? array_values(array_filter($this->actions(), static fn (Action $a): bool => $a !== Action::MailLog))
+            ? array_values(array_filter($this->actions(), static fn (Action $a): bool => !in_array($a, [Action::MailLog, Action::StockOverride], true)))
             : [];
 
         return new self(false, $areas, $actions, $this->visibility, $this->revision, $this->roleName, $this->restrictions, $this->enabledTasks);
