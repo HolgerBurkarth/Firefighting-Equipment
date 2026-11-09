@@ -100,3 +100,15 @@ Live-Prüfung Runde 10 durch Claude im Browser (Test-Stadt, Build `cc9926f979eb`
 - ☑ Verleih: „1 Ausrüstung an „Hattingen“ verliehen.“, dazwischen „Liste wird aktualisiert …“, Verlauf „Verliehen“, nach Widerrufen „Kein gültiger Aushang“.
 - ➖ Rolle „Live-Test Geräteträger“ ohne „Tauschen …“: Rolle hat `device.swap` nicht; Handy-Ansicht nicht erneut geprüft.
 - Zurückgesetzt: M90 HLF 20 / G1 einsatzbereit, M91 Lager Gerätehaus in Wartung, M92 Lager Gerätehaus einsatzbereit, M93 HLF 20 einsatzbereit, Regel am Live-Test Wagen entfernt, nichts verliehen, „Holger (Test)“ wieder Rolle Benutzer, „Live-Testtyp 2“ kein Einmalgerät, Aushang widerrufen, Aufgaben entfernt, Abläufe abgeschaltet. Rolle ID 23 bleibt.
+
+## Runde 11: Korrekturen, P2.9, P2.10 (Build `43425f65a020`, 09.11.2026)
+
+Vom Agenten im Browser (Test-Stadt, Admin; ein Service Worker hielt anfangs die alte Version, Neuladen nach Abmelden des Service Workers). Migrationen 0063 und 0064 ausgeführt, `health` ok.
+
+- ☑ Doppeltipp-Schutz: „Benutzt melden“ in der Rückfrage 50 ms nach dem Öffnen gesperrt, nach 650 ms frei; „Abbrechen“ immer bedienbar.
+- ☑ Tauschen (M90 → M92, „in Wartung“): Ersatzliste zeigt nur M92 (gleicher Typ, Lager); M93 (gleiches Fahrzeug) fehlt, Meldung „M90 ⇄ M92 · getauscht“.
+- ☑ Verlauf: M90 „Getauscht gegen M92“, M92 „Als Ersatz für M90“ (vor „Benutzt gemeldet“ bzw. „Umgebucht“).
+- ☑ Mail-Auswahl: unter Einstellungen erscheint mit eingeschalteter Benachrichtigung „Mails zu diesen Vorgängen“ (Alle Vorgänge / Nur ausgewählte); Benachrichtigung danach wieder aus.
+- ☐ „Andere Standorte anzeigen“ mit Warnung (braucht Sollbestand an einem zweiten Fahrzeug), Hinweis mit Regel im Protokoll (braucht „Trotzdem buchen“), CSV-Import-Warnung (Datei), „Benutzt gemeldet“ in CSV und Mail (Mail), Auswahl speichern und danach Mails (Holger).
+- ☐ Tausch offline am iPhone (Flugmodus), Hinweis „Ersatz inzwischen woanders“ (Holger).
+- Zurückgesetzt: M90 HLF 20 / G1 einsatzbereit, M92 Lager Gerätehaus einsatzbereit.
