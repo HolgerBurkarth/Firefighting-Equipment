@@ -374,7 +374,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     `client_outdated` gilt bei `auth/me` als Störung (`isTransientError`: nie abmelden), der
     Verbindungshinweis und der graue Streifen entfallen dabei. Eine Buchung der Warteschlange mit
     `client_outdated` bleibt `waiting` (der Lauf endet), nach dem Update sendet sie die neue
-    Version. Gespeichert wird die Warteschlange mit Formatversion (`QUEUE_FORMAT` = 2 seit P2.3,
+    Version. Gespeichert wird die Warteschlange mit Formatversion (`QUEUE_FORMAT` = 3 seit P2.9 (Tausch), 2 seit P2.3,
     `{format, bookings}`, `readStoredQueue`: Liste ohne Hülle = Format 1, Format 1 und 2 werden gelesen;
     ein neueres Format zeigt und überschreibt eine alte App nie). Steigt `n` mit anderen Einträgen, steigt `QUEUE_FORMAT`,
     und `readStoredQueue` wandelt ältere Formate um. Tests: `client.spec.ts`, `appUpdate.spec.ts`
@@ -2836,8 +2836,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   bestätigt), `Override` (`confirmed_below_minimum: true` im Body von `/state` und `/used`), `Skip`. Abgelehnt: 409
   `rule_violation` mit `details.stock {location {id, name, path}, rule {id, min_count, types}, have (nach der Buchung),
   missing, can_override}`; mit Override gebucht, und hat die Buchung eine `client_ref`, legt `book()` den Hinweis
-  `stock_below_minimum` an (Mail an die Empfänger „Log“ wie sonst). Offline-Buchungen (`occurred_at`) und Sammelaktionen
-  der Liste werden nicht geprüft bzw. nur mit `Enforce` (Offline: P2.9, noch offen). `POST devices/swap` (Aktion
+  `stock_below_minimum` an (Mail an die Empfänger „Log“ wie sonst). Offline-Buchungen (`occurred_at`) werden seit P2.9
+  (Runde 11) nie abgelehnt: gebucht, dazu Hinweis `stock_below_minimum` mit `detail`; Sammelaktionen der Liste nur mit `Enforce`. `POST devices/swap` (Aktion
   `device.swap`, `DeviceSwapHandler`, `DeviceRepository::swap`): `{out {id, version}, in {id, version}, out_status?
   (used|defective|maintenance, Standard used), out_location_id?, comment?, confirmed_below_minimum?}`; „out“ geht in die
   Sammelstelle für benutzte bzw. defekte Ausrüstung (auch außerhalb des Datenfilters, G4), sonst bleibt der Standort;
@@ -2846,8 +2846,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Status danach, Kommentar), in `DevicePage` der
   Knopf „Tauschen …“ (`swap-open`, nur online) und bei 409 mit `details.stock` der Kasten `stock-block` mit „Tauschen …“
   und, mit `stock.override`, „Trotzdem buchen …“ (Rückfrage, sendet `confirmed_below_minimum`); `src/data/swap.ts`
-  (`parseStockBlock`, `swapCandidates`: einsatzbereit, Typen der verletzten Regel zuerst). Nicht gebaut: Tausch offline
-  (P2.9), Prüfung im CSV-Import. Tests `StockSwapTest`, `NoticeKindTest`, Browser `swap.spec.ts`, Unit `swap.spec.ts`.
+  (`parseStockBlock`, `swapCandidates`: einsatzbereit, Typen der verletzten Regel zuerst). Offline (P2.9, Runde 11): `POST devices/swap`
+  nimmt zusätzlich `client_ref`, `occurred_at`, `confirmed_stale` (`ActionTimeGuard` wie bei `/state`, Wiederholung über
+  `fe_device_bookings` am ausgehenden Gerät, der Ersatz gehört zum Hash). Mit `occurred_at`: keine Versionsprüfung, „Wirklichkeit
+  gewinnt“ – der Tausch wird gebucht; war der Ersatz inzwischen nicht mehr einsatzbereit oder anders gebucht, Hinweis
+  `swap_replacement_moved` (`detail` nennt den Grund), unterschreitet er den Sollbestand, Hinweis `stock_below_minimum`; abgelehnt nur
+  bei ausgesonderter Ausrüstung oder gesperrtem Ziel (409). Antwort zusätzlich `result` wie eine Buchung. App: Eintrag `swap` in der
+  Warteschlange (`QUEUE_FORMAT` 3, `postQueuedSwap`), „Tauschen …“ auch offline (Streifen „Offline“ und Kopie nicht zu alt); scheitert
+  ein online gesendeter Tausch an der Verbindung, bleibt der Fehler (kein stilles Umleiten in die Warteschlange). Tests `StockSwapTest`, `NoticeKindTest`, Browser `swap.spec.ts`, Unit `swap.spec.ts`.
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann

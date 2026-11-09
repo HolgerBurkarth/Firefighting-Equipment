@@ -21,6 +21,18 @@ committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, 
   (nicht über Claude). Verleih, Wartung und Rückgaben werden ebenfalls geprüft (Fehler je Eintrag). Offline-Buchungen nicht (P2.9).
 - Tests: `StockSwapTest`, `TenantRoutePermissionsTest`, `NoticeKindTest`, `RoleApiTest`.
 
+## 2026-11-09 – „Tausch und Unterschreitung offline (Phase 2, Runde 11, P2.9)“
+
+- `POST devices/swap` nimmt zusätzlich `client_ref`, `occurred_at`, `confirmed_stale` (wie `/state`; `occurred_at` nur mit `client_ref`).
+  Mit `client_ref` trägt die Antwort `result` (`DeviceBookingJson`), wiederholt gesendet `replayed: true` (`swap_id` dann ggf. `null`).
+  Mit `occurred_at`: keine Versionsprüfung („Wirklichkeit gewinnt“); der Tausch wird gebucht, auch wenn der Ersatz inzwischen nicht
+  mehr einsatzbereit oder anders gebucht war (Hinweis `swap_replacement_moved`, `detail` nennt den Grund) oder der Sollbestand
+  unterschritten wird (Hinweis `stock_below_minimum`); 409 nur bei ausgesonderter Ausrüstung oder gesperrtem Ziel, 422/409 wie bei
+  `/state` für die Aktionszeit. Offline-Buchungen über `/state` und `/used` werden bei Unterschreitung nicht abgelehnt, sondern mit
+  Hinweis `stock_below_minimum` gebucht. App-Warteschlange `QUEUE_FORMAT` 3. Commit-Betreff: „Tausch und Unterschreitung offline im
+  Backend: client_ref, Aktionszeit, Hinweise (P2.9)“ und „Tausch und Unterschreitung offline in der App (P2.9)“. Tests: `StockSwapTest`,
+  Browser `offline.spec.ts`, Unit `bookingQueue.spec.ts`.
+
 ## 2026-11-09 – „Sollbestand im CSV-Import (Phase 2, Runde 11)“
 
 - `POST devices/import/preview` (und die erneute Prüfung beim Übernehmen): Zeilen, die zusammen den Sollbestand einer Regel
