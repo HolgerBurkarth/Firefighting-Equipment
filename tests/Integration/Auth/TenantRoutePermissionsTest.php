@@ -111,6 +111,9 @@ final class TenantRoutePermissionsTest extends AuthTestCase
             . ' device_type_id → device.edit, serial_number → device.edit, manufacturer → device.edit, model → device.edit,'
             . ' procured_on → device.edit, note → device.edit'],
         'POST api/v1/devices/{id}/inspection-due' => ['admin', 'due:write'],
+        'GET api/v1/maintenance' => ['admin', 'maintenance:read'],
+        'POST api/v1/maintenance/to-workshop' => ['admin', 'maintenance:write'],
+        'POST api/v1/maintenance/back' => ['admin', 'maintenance:write'],
         'POST api/v1/devices/{id}/used' => ['admin', 'device.used'],
         'POST api/v1/devices/{id}/state' => ['authenticated', 'book.move | book.status; Felder: location_id → book.move, status → book.status'],
         'POST api/v1/devices/{id}/retire' => ['admin', 'device.retire'],
@@ -155,6 +158,16 @@ final class TenantRoutePermissionsTest extends AuthTestCase
     private const array CHANGED_FOR_USER = ['GET api/v1/devices/export', 'GET api/v1/device-events/export'];
 
     private int $roleCounter = 0;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Der Bereich „Wartung“ gilt nur in einer Stadt mit Sammelstelle oder Werkstatt (Phase 2, P2.4).
+        foreach (['collection', 'workshop'] as $task) {
+            $this->insert('fe_tenant_location_tasks', ['tenant_id' => $this->tenant('immendingen')->id, 'task' => $task, 'enabled' => 1]);
+        }
+    }
 
     public function testTableMatchesDeclaredRoutes(): void
     {

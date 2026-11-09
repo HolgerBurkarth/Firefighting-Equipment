@@ -7,6 +7,7 @@ export type AdminMenuIconName =
     | 'tag'
     | 'account'
     | 'list'
+    | 'wrench'
     | 'settings'
     | 'logout'
     | 'city'
@@ -42,6 +43,7 @@ export const ADMIN_MENU: readonly AdminMenuEntry[] = [
     },
     { route: 'locations', label: 'Standorte', icon: 'location' },
     { route: 'device-types', label: 'Ausrüstungstypen', icon: 'tag' },
+    { route: 'maintenance', label: 'Wartung', icon: 'wrench' },
     { route: 'users', label: 'Benutzer', icon: 'account', badge: 'pendingUsers' },
     {
         route: 'notices',

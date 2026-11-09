@@ -8,7 +8,7 @@ import { commentLength, MIN_DEFECT_COMMENT_LENGTH } from './booking';
  * Auswahlen in Blöcken zu BULK_MAX_DEVICES nacheinander senden, Fortschritt und Ergebnis.
  */
 
-export type BulkAction = 'inspection-due' | 'state';
+export type BulkAction = 'inspection-due' | 'state' | 'to-workshop' | 'back';
 
 /** Ergebnis eines Laufs über alle Blöcke. */
 export interface BulkRun {
@@ -77,6 +77,8 @@ function devices(count: number): string {
 const ACTION_LABELS: Readonly<Record<BulkAction, string>> = {
     'inspection-due': 'Wartungsdatum',
     state: 'Umbuchen / Status',
+    'to-workshop': 'Zur Werkstatt',
+    back: 'Zurück ins Lager',
 };
 
 /** Zusammenfassung, z. B. „Prüfdatum: 10 Geräte geändert, 1 unverändert, 1 nicht möglich.“ */

@@ -31,6 +31,7 @@ import {
     type DeviceType,
 } from '../api/deviceTypes';
 import { fetchInspectionOverview, type InspectionOverview } from '../api/inspections';
+import { postBack, postToWorkshop } from '../api/maintenance';
 import {
     createInvitationCode as postInvitationCode,
     revokeInvitationCode as postRevoke,
@@ -335,6 +336,24 @@ export async function bulkChangeState(
     return afterBulk(
         await runInBlocks(entries, (block) => postBulkState(block, comment), onProgress),
     );
+}
+
+/** „Zur Werkstatt“ (Seite Wartung; Phase 2, P2.4): der Server bucht ins Ziel der Werkstatt. */
+export async function maintenanceToWorkshop(
+    devices: readonly DeviceListItem[],
+    onProgress?: (done: number, total: number) => void,
+): Promise<BulkRun> {
+    const entries = devices.map((device) => ({ id: device.id, version: device.version }));
+    return afterBulk(await runInBlocks(entries, (block) => postToWorkshop(block), onProgress));
+}
+
+/** „Zurück ins Lager“ (Seite Wartung): ins Standard-Lager, einsatzbereit. */
+export async function maintenanceBack(
+    devices: readonly DeviceListItem[],
+    onProgress?: (done: number, total: number) => void,
+): Promise<BulkRun> {
+    const entries = devices.map((device) => ({ id: device.id, version: device.version }));
+    return afterBulk(await runInBlocks(entries, (block) => postBack(block), onProgress));
 }
 
 function afterBulk(run: BulkRun): BulkRun {

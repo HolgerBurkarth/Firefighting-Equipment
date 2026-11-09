@@ -56,7 +56,7 @@ final class RoleApiTest extends AuthTestCase
         $catalog = self::json($this->get('permission-catalog'));
 
         self::assertSame(
-            ['dashboard', 'search', 'devices', 'locations', 'device_types', 'due', 'log', 'users', 'settings'],
+            ['dashboard', 'search', 'devices', 'locations', 'device_types', 'due', 'log', 'users', 'settings', 'maintenance'],
             array_column($catalog['areas'], 'key'),
         );
         $areas = array_column($catalog['areas'], null, 'key');
@@ -95,7 +95,7 @@ final class RoleApiTest extends AuthTestCase
         self::assertFalse($roles[0]['editable']);
         self::assertFalse($roles[0]['deletable']);
         self::assertSame('admin', $roles[0]['system_key']);
-        self::assertSame(['dashboard', 'search', 'devices', 'locations', 'device_types', 'due', 'log', 'users', 'settings'], array_keys($roles[0]['areas']));
+        self::assertSame(['dashboard', 'search', 'devices', 'locations', 'device_types', 'due', 'log', 'users', 'settings', 'maintenance'], array_keys($roles[0]['areas']));
         self::assertSame(['accounts' => 1, 'invitation_codes' => 0], $roles[0]['usage']);
 
         self::assertSame([
@@ -174,7 +174,7 @@ final class RoleApiTest extends AuthTestCase
         yield 'Name zu lang' => [['name' => str_repeat('ä', 51)], 'Der Name der Rolle darf höchstens 50 Zeichen lang sein (angegeben: 51).'];
         yield 'Name mit Zeilenumbruch' => [['name' => "A\nB"], 'Der Name der Rolle darf keine Steuerzeichen (z. B. Zeilenumbrüche) enthalten.'];
         yield 'Beschreibung zu lang' => [['description' => str_repeat('x', 201)], 'Die Kurzbeschreibung darf höchstens 200 Zeichen lang sein (angegeben: 201).'];
-        yield 'Bereich unbekannt' => [['areas' => ['maintenance' => 'read']], 'Unbekannter Bereich „maintenance“.'];
+        yield 'Bereich unbekannt' => [['areas' => ['loans' => 'read']], 'Unbekannter Bereich „loans“.'];
         yield 'Bereiche als Liste' => [['areas' => ['search']], 'Das Feld "areas" muss ein Objekt Bereich → Stufe sein.'];
         yield 'Stufe unbekannt' => [['areas' => ['search' => 'none']], 'Die Stufe für „Suchen und Ausrüstung ansehen“ muss "read" oder "write" sein.'];
         yield 'Dashboard ändern' => [['areas' => ['dashboard' => 'write']], 'Für „Dashboard“ gibt es nur „Ansehen“.'];
@@ -509,7 +509,7 @@ final class RoleApiTest extends AuthTestCase
         self::assertNull($copy['description']);
         self::assertSame(['read'], array_values(array_unique([$copy['areas']['dashboard'], $copy['areas']['search']])));
         self::assertSame('write', $copy['areas']['users']);
-        self::assertCount(9, $copy['areas']);
+        self::assertCount(10, $copy['areas']);
         self::assertCount(11, $copy['actions']);
     }
 

@@ -8,6 +8,16 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Wartung: Sammelstelle und Werkstatt (Phase 2, Runde 8b, P2.4)“
+
+- Neuer Bereich `maintenance` (Katalog, `auth/me` `permissions.areas`): nur in Städten mit freigeschalteter
+  Aufgabe Sammelstelle oder Werkstatt; sonst fehlt er auch für *Admin* (`permissions.version` ändert sich beim
+  Umschalten). Katalog-Datei neu.
+- Neu: `GET maintenance`, `POST maintenance/to-workshop`, `POST maintenance/back` (siehe `CLAUDE.md`, Standorte
+  und Geräte, „Wartung“). Keine Migration (G5).
+- Tests: `MaintenanceTest`, `TenantRoutePermissionsTest`, `PermissionsForClaudeTest`; Frontend
+  `maintenance.spec.ts`.
+
 ## 2026-11-09 – „Einmalgeräte und Benutzt melden (Phase 2, Runde 8b, P2.3)“
 
 - Migration 0054: `fe_device_types.single_use` (Standard 0). Migration 0055 entfällt („Benutzt melden“

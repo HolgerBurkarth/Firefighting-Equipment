@@ -107,6 +107,16 @@
                 "read",
                 "write"
             ]
+        },
+        {
+            "key": "maintenance",
+            "label": "Wartung",
+            "hint": "Sammelstelle und Werkstatt: Ausrüstung zur Wartung bringen und zurückholen",
+            "levels": [
+                "read",
+                "write"
+            ],
+            "levels_with_filter": []
         }
     ],
     "levels": [

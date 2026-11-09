@@ -2274,7 +2274,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   offener App“, `page.clock`); die Browser-Tests prüfen `X-Client-Api` gegen
   `resources/client-api.json`.
 - Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank): `Area` (`dashboard`,
-  `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`; `maxLevel`:
+  `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`, `maintenance` (seit P2.4); `maxLevel`:
   `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`
   (`book.move`, `book.status`, `device.used` (seit P2.3, braucht `search` Ansehen, Gruppe „Buchen“), `device.create`, `device.edit`, `device.retire`, `device.code`,
   `devices.bulk`, `csv.import`, `csv.export` (seit Schritt 1.7a, braucht `devices` Ansehen, auch mit
@@ -2742,6 +2742,23 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `RoleJson`/Katalog/`RoleFields`/`auth/me`): `POST devices/{id}/state` und `devices/bulk/state` lehnen
   Einmalgeräte ab (`SingleUseGuard`, 403 `restricted_action`; in der Sammelaktion je Eintrag als Fehler),
   die Rolle Admin hat nie eine. Tests `DeviceUsedTest`, `RoleApiTest`.
+- Wartung (Phase 2, P2.4, Runde 8b; Bereich `maintenance`, Seite „Wartung“): `Area::Maintenance` gibt es nur in
+  einer Stadt mit freigeschalteter Aufgabe Sammelstelle oder Werkstatt (`Area::requiredTasks`,
+  `Permissions::withEnabledTasks`, geladen in `PermissionRepository`; ohne Aufgaben sieht auch *Admin* den
+  Bereich nicht, „alles wie heute“; schaltet der Super-Admin Aufgaben um, ändert sich `permissions.version`).
+  F3: mit Datenfilter kein Zugriff (`excludedWithFilter` Ansehen). Routen (G10, eigene statt Sammelrouten):
+  `GET maintenance` (`MaintenanceListHandler`: je Stufe `collection`/`workshop` `{label, locations, total, shown,
+  devices}`, die nicht ausgesonderten Geräte an den aktiven Standorten der Aufgabe samt Fächern, am längsten
+  wartende zuerst nach `state_changed_at` (G5: keine Spalte 0056), höchstens 200 je Stufe; dazu
+  `default_store`), `POST maintenance/to-workshop` und `POST maintenance/back {devices: [{id, version}],
+  comment?}` (Bereich Ändern, `MaintenanceMoveHandler`, höchstens 50, Antwort und Teilerfolg wie die
+  Sammelaktionen der Liste plus `target`): Ziel erste aktive Werkstatt (Status in Wartung; Einmalgeräte als
+  Fehler `rule_violation`) bzw. Standard-Lager (einsatzbereit), auch außerhalb des Datenfilters
+  (`DeviceStateChange::$process`); fehlt das Ziel, 409 vor jeder Änderung. Sammelmail „Log“ wie sonst.
+  Tests `MaintenanceTest`. Frontend: `MaintenancePage` (`wartung`, Menü „Wartung“ nach „Ausrüstungstypen“,
+  `PAGE_RIGHTS.maintenance`), `src/api/maintenance.ts`, `src/data/maintenance.ts` („seit“, Transportliste
+  nur zum Kopieren; CSV/Druck und „Wartungsdatum setzen“ siehe `docs/TODO-SPAETER.md` T20), `maintenanceToWorkshop`/
+  `maintenanceBack` in `src/data/index.ts`. Tests `maintenance.spec.ts` (Browser, Unit).
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann

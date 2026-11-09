@@ -218,6 +218,13 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS['device-types'], layout: 'admin' },
         });
         routes.push({
+            // Sammelstelle und Werkstatt (Phase 2, P2.4).
+            path: '/wartung',
+            name: 'maintenance',
+            component: () => import('../pages/MaintenancePage.vue'),
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.maintenance, layout: 'admin' },
+        });
+        routes.push({
             // Nur positive Ganzzahlen ohne führende Null (wie die Platzhalter im Backend).
             path: '/geraete/:id([1-9]\\d{0,17})',
             name: 'device',

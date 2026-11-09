@@ -84,7 +84,10 @@ export function permissionsJson(
 /** Rechte der Standard-Rollen, wie der Server sie in auth/me sendet (Admin: alles). */
 export const ADMIN_RIGHTS = permissionsJson(
     Object.fromEntries(
-        CATALOG.areas.map((area) => [area.key, area.levels.includes('write') ? 'write' : 'read']),
+        // Wartung gibt es nur in Städten mit Sammelstelle oder Werkstatt (Phase 2, P2.4).
+        CATALOG.areas
+            .filter((area) => area.key !== 'maintenance')
+            .map((area) => [area.key, area.levels.includes('write') ? 'write' : 'read']),
     ),
     CATALOG.action_groups.flatMap((group) => group.actions.map((action) => action.key)),
 );

@@ -158,7 +158,7 @@ final readonly class DeviceBulkHandler implements RequestHandler
     /**
      * @return array<string, mixed>
      */
-    private static function result(int $id, string $outcome, bool $replayed, ?Device $device, ?HttpException $error): array
+    public static function result(int $id, string $outcome, bool $replayed, ?Device $device, ?HttpException $error): array
     {
         return [
             'id' => $id,

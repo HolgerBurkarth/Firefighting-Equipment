@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Permission;
 
+use FirefightingEquipment\Device\LocationTask;
 use FirefightingEquipment\Role\SystemRole;
 use FirefightingEquipment\Tenant\Tenant;
 
@@ -38,9 +39,10 @@ final readonly class PermissionRepository
             return Permissions::none();
         }
         $roleId = (int) $role['id'];
+        $tasks = $this->enabledTasks($tenantId);
         if ($role['system_key'] === SystemRole::Admin->value) {
             // CHECK chk_fe_roles_admin: die Rolle Admin nie mit Datenfilter.
-            return Permissions::all()->ofRole($roleId, (int) $role['version'], DeviceVisibility::all(), (string) $role['name']);
+            return Permissions::all()->ofRole($roleId, (int) $role['version'], DeviceVisibility::all(), (string) $role['name'])->withEnabledTasks($tasks);
         }
 
         $rows = $this->pdo->prepare(
@@ -64,7 +66,24 @@ final readonly class PermissionRepository
             $roleId,
             (int) $role['filter_locations'] === 1,
             (int) $role['filter_device_types'] === 1,
-        ), (string) $role['name'])->withRestrictions((int) $role['restrict_single_use'] === 1 ? [Restriction::SingleUseUsedOnly] : []);
+        ), (string) $role['name'])->withRestrictions((int) $role['restrict_single_use'] === 1 ? [Restriction::SingleUseUsedOnly] : [])->withEnabledTasks($tasks);
+    }
+
+    /**
+     * Für die Stadt freigeschaltete Aufgaben von Standorten (Phase 2): bestimmt, welche Bereiche es gibt
+     * (Area::requiredTasks).
+     *
+     * @return list<LocationTask>
+     */
+    private function enabledTasks(int $tenantId): array
+    {
+        $stmt = $this->pdo->prepare('SELECT task FROM fe_tenant_location_tasks WHERE tenant_id = ? AND enabled = 1');
+        $stmt->execute([$tenantId]);
+
+        return array_values(array_filter(array_map(
+            static fn (mixed $task): ?LocationTask => LocationTask::tryFrom((string) $task),
+            $stmt->fetchAll(\PDO::FETCH_COLUMN),
+        )));
     }
 
     /**
