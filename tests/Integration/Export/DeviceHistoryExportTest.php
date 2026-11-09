@@ -102,6 +102,22 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         );
     }
 
+    public function testOwnLabelsMatchTheJsonHistory(): void
+    {
+        $borrower = $this->createLocation($this->tenantId, ['name' => 'FF Nachbar', 'kind' => 'external']);
+        $this->insert('fe_tenant_location_tasks', ['tenant_id' => $this->tenantId, 'task' => 'borrower', 'enabled' => 1]);
+        $this->pdo()->prepare("UPDATE fe_locations SET task = 'borrower' WHERE id = ?")->execute([$borrower]);
+        $this->event('2026-06-15 08:00:00', ['event_type' => 'state_changed', 'from_location_id' => $this->g1, 'to_location_id' => $borrower], $this->userId);
+        $this->event('2026-06-15 08:01:00', ['event_type' => 'state_changed', 'from_status' => 'ready', 'to_status' => 'used'], $this->userId);
+        $this->event('2026-06-15 08:02:00', ['event_type' => 'state_changed', 'from_location_id' => $borrower, 'to_location_id' => $this->room, 'user_id' => null, 'actor_name' => 'Maier']);
+
+        $labels = self::column($this->rows('device-events/export?order=oldest'), 5);
+        $json = array_reverse(array_column(self::json($this->api('GET', 'devices/' . $this->device . '/events'))['events'], 'type_label'));
+
+        self::assertSame(['Verliehen', 'Benutzt gemeldet', 'Rückgabe'], $labels);
+        self::assertSame($json, $labels, 'CSV und JSON nennen jeden Eintrag gleich');
+    }
+
     public function testNewestFirstByDefaultAndIdWithinTheSameSecond(): void
     {
         // Gleiche Sekunde: die höhere ID ist neuer. Der letzte Eintrag hat den frühesten Zeitpunkt.
