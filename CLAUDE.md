@@ -2594,6 +2594,16 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Benutzer, Einladungscodes, Rollen, Einstellungen, eigene Einstellungen und `service`
   (`ToolRoutesTest`). Tests `McpWriteToolsTest`, `McpToolMatrixTest`, Browser
   `deviceDetails.spec.ts`, Unit `deviceHistory.spec.ts`, `notices.spec.ts`.
+- Schritt P2.12 (Werkzeuge für die Abläufe der Phase 2, Runde 12; Adapter wie M5/M6, `ToolRoutesTest::ALLOWED` um die
+  Routen ergänzt): `report_used` (`POST devices/{id}/used`, Aktion `device.used`, stabile `client_ref`), `swap_equipment`
+  (`POST devices/swap`, Aktion `device.swap`; `out_id`/`out_version`/`in_id`/`in_version`/`out_status`/`comment`, stabile
+  `client_ref`; Unterschreiten des Sollbestands bleibt ein Fehler `rule_violation` mit `details.stock.can_override` false, weil
+  `stock.override` über Claude wegfällt, G17), `lend_equipment` (`POST loans`, Bereich `loans` Ändern; `entries`,
+  `borrower_id`, `contact`, `return_by`, `comment`; Ergebnis wie die Sammelaktionen plus `borrower`), alle mit `readOnlyHint`
+  false und ohne `destructiveHint`; lesend `list_loans` (`GET loans`: Verleihe, `borrowers`, `in_returns`, `limit`/`offset`) und
+  `list_maintenance` (`GET maintenance`: Stufen `collection`/`workshop` mit `waiting_since`). Sichtbar nur, wenn die Rechte der
+  Rolle samt freigeschalteten Aufgaben der Stadt reichen (die Bereiche `loans`/`maintenance` gibt es sonst nicht). Alle Änderungen
+  stehen „über Claude“ im Verlauf. Tests `McpPhase2ToolsTest`, `McpToolMatrixTest`, `ToolRoutesTest`.
 
 ## Städte verwalten und Admins einladen
 - Nur Super-Admins, nur unter `service` (`Access::SuperAdmin`; Konten einer Stadt haben dort keine

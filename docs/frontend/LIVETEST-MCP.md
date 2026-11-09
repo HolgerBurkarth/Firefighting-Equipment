@@ -4,6 +4,19 @@ Nur in der Test-Stadt `https://www.prodad.de/firefighting/test/`, nie in echten 
 [`../MCP-KONZEPT.md`](../MCP-KONZEPT.md), Plan: [`../PLAN-MCP.md`](../PLAN-MCP.md). Je Schritt wird
 ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holger).
 
+## Runde 12: Werkzeuge für die Abläufe der Phase 2 (P2.12)
+
+Neu: `report_used`, `swap_equipment`, `lend_equipment` (Zugang „Ändern“, Rechte `device.used`, `device.swap`,
+Bereich `loans`), `list_loans`, `list_maintenance` (Lesen; nur in Städten mit freigeschalteten Aufgaben
+„Ausgeliehen an“/„Rückgabe“ bzw. Sammelstelle/Werkstatt). Ein bestehender Konnektor zeigt sie nach „Trennen“ und
+erneutem „Verbinden“. Ergebnisse stehen nach dem Deploy unten.
+
+- ☐ `tools/list` als Admin der Test-Stadt nennt die neuen Werkzeuge (nur die mit freigeschalteten Aufgaben, wenn sie an sind).
+- ☐ `report_used` an einer Testausrüstung (M90–M99): Status benutzt, Sammelstelle, Verlauf „Benutzt gemeldet · über Claude“.
+- ☐ `swap_equipment` mit einem Ersatz: beide „über Claude“, „Getauscht gegen …“ / „Als Ersatz für …“; unterschreitet der Tausch den Sollbestand, Fehler ohne „Trotzdem“ (`can_override` false).
+- ☐ `lend_equipment` an „Hattingen“, danach `list_loans` und Verlauf „Verliehen · über Claude“; `list_maintenance` zeigt die Sammelstelle.
+- ☐ Danach alles zurückgesetzt (Aufgaben abgeschaltet, Ausrüstung am Ausgangsort).
+
 ## Runde 7: Vermerk „über Claude“ in den Werkzeugen, Fehlerdetails, destructiveHint
 
 Vom Agenten nach dem Deploy (Build `5c5609a24eea`, 08.11.2026; Chrome als Admin der Test-Stadt, curl):

@@ -48,6 +48,9 @@ final class WriteTools
             self::assignCode(),
             self::retire(),
             self::reinstate(),
+            self::reportUsed(),
+            self::swap(),
+            self::lend(),
             self::previewImport(),
             self::applyImport(),
             ...self::locationTools(),
@@ -404,6 +407,147 @@ final class WriteTools
         );
     }
 
+    private static function reportUsed(): ToolDefinition
+    {
+        return new ToolDefinition(
+            'report_used',
+            'Benutzt melden',
+            'Eine Ausrüstung als benutzt melden (wie „Benutzt melden“ in der App): Status benutzt, sie kommt in die '
+            . 'Sammelstelle der Stadt, falls es eine gibt, sonst bleibt der Standort. Braucht die Version aus '
+            . 'get_equipment. Ein zweiter gleicher Aufruf bucht nicht doppelt.',
+            ReadTools::schema([
+                'id' => ReadTools::id('ID der Ausrüstung.'),
+                'version' => self::version(),
+                'comment' => self::comment(),
+            ], ['id', 'version']),
+            ['POST api/v1/devices/{id}/used'],
+            static function (ToolArguments $args, ToolApi $api): ToolResult {
+                $id = (int) $args->int('id');
+                $body = ['version' => (int) $args->int('version')];
+                self::addComment($args, $body);
+                $body['client_ref'] = $api->stableRef('used', $id, $body);
+                $response = $api->post('api/v1/devices/{id}/used', ['id' => $id], $body);
+                $result = is_array($response['result'] ?? null) ? $response['result'] : [];
+
+                return self::deviceResult(
+                    $response,
+                    (string) ($result['message'] ?? 'Als benutzt gemeldet.') . (($result['replayed'] ?? false) === true ? ' (Diese Meldung war schon angekommen.)' : ''),
+                    ['outcome' => $result['outcome'] ?? null, 'outcome_label' => $result['outcome_label'] ?? null],
+                );
+            },
+            readOnly: false,
+            requires: Requirement::action(Action::DeviceUsed),
+        );
+    }
+
+    private static function swap(): ToolDefinition
+    {
+        return new ToolDefinition(
+            'swap_equipment',
+            'Tauschen',
+            'Eine Ausrüstung gegen einsatzbereiten Ersatz tauschen (wie „Tauschen …“ in der App): die Ausrüstung geht '
+            . 'heraus (Status benutzt, defekt oder in Wartung; benutzt und defekt kommen in die Sammelstelle, wenn es '
+            . 'eine gibt), der Ersatz kommt an ihren bisherigen Standort. Beide werden zusammen gebucht und brauchen '
+            . 'die Version aus get_equipment. Würde der Sollbestand am Standort trotzdem unterschritten, lehnt die '
+            . 'Stadt den Tausch ab; über Claude lässt sich das nicht übergehen. Ein zweiter gleicher Aufruf bucht '
+            . 'nicht doppelt.',
+            ReadTools::schema([
+                'out_id' => ReadTools::id('ID der Ausrüstung, die herausgeht.'),
+                'out_version' => self::version(),
+                'in_id' => ReadTools::id('ID des einsatzbereiten Ersatzes.'),
+                'in_version' => self::version(),
+                'out_status' => ['type' => 'string', 'enum' => ['used', 'defective', 'maintenance'], 'description' => 'Status der herausgenommenen Ausrüstung: used (benutzt, Standard), defective (defekt), maintenance (in Wartung).'],
+                'comment' => self::comment(),
+            ], ['out_id', 'out_version', 'in_id', 'in_version']),
+            ['POST api/v1/devices/swap'],
+            static function (ToolArguments $args, ToolApi $api): ToolResult {
+                $outId = (int) $args->int('out_id');
+                $body = [
+                    'out' => ['id' => $outId, 'version' => (int) $args->int('out_version')],
+                    'in' => ['id' => (int) $args->int('in_id'), 'version' => (int) $args->int('in_version')],
+                ];
+                if ($args->has('out_status')) {
+                    $body['out_status'] = (string) $args->string('out_status');
+                }
+                self::addComment($args, $body);
+                $body['client_ref'] = $api->stableRef('swap', $outId, $body);
+                $response = $api->post('api/v1/devices/swap', [], $body);
+                $out = ToolFormat::equipmentDetail(is_array($response['out'] ?? null) ? $response['out'] : []);
+                $in = ToolFormat::equipmentDetail(is_array($response['in'] ?? null) ? $response['in'] : []);
+                $result = is_array($response['result'] ?? null) ? $response['result'] : [];
+
+                return ToolResult::ok(
+                    sprintf(
+                        'Getauscht: %s ist jetzt %s (%s), Ersatz %s steht in %s.%s',
+                        (string) $out['number'],
+                        (string) $out['status_label'],
+                        (string) $out['location'],
+                        (string) $in['number'],
+                        (string) $in['location'],
+                        ($result['replayed'] ?? false) === true ? ' (Dieser Tausch war schon angekommen.)' : '',
+                    ),
+                    ['equipment_out' => $out, 'equipment_in' => $in, 'outcome' => $result['outcome'] ?? null],
+                    ['equipment_out.note', 'equipment_out.serial_number', 'equipment_out.manufacturer', 'equipment_out.model', 'equipment_in.note', 'equipment_in.serial_number', 'equipment_in.manufacturer', 'equipment_in.model'],
+                );
+            },
+            readOnly: false,
+            requires: Requirement::action(Action::DeviceSwap),
+        );
+    }
+
+    private static function lend(): ToolDefinition
+    {
+        return new ToolDefinition(
+            'lend_equipment',
+            'Verleihen',
+            'Bis zu 50 Ausrüstungen an einen Leihnehmer verleihen (wie „Verleihen“ in der App): sie werden auf den '
+            . 'Standort des Leihnehmers gebucht (borrowers aus list_loans), der Status bleibt. Je Eintrag id und '
+            . 'version aus dem letzten Lesen; Teilerfolg möglich. Ansprechpartner und „Rückgabe bis“ sind freiwillig.',
+            ReadTools::schema([
+                'entries' => [
+                    'type' => 'array',
+                    'minItems' => 1,
+                    'maxItems' => DeviceBulkHandler::MAX_DEVICES,
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ReadTools::id('ID der Ausrüstung.'),
+                            'version' => self::version(),
+                        ],
+                        'required' => ['id', 'version'],
+                        'additionalProperties' => false,
+                    ],
+                    'description' => 'Ausrüstungen mit Version.',
+                ],
+                'borrower_id' => ReadTools::id('Leihnehmer: ID eines Standorts mit der Aufgabe „Ausgeliehen an“ (borrowers aus list_loans).'),
+                'contact' => self::field('Ansprechpartner beim Leihnehmer', 100),
+                'return_by' => self::date('Rückgabe bis JJJJ-MM-TT.'),
+                'comment' => self::comment(),
+            ], ['entries', 'borrower_id']),
+            ['POST api/v1/loans'],
+            static function (ToolArguments $args, ToolApi $api): ToolResult {
+                $body = [
+                    'devices' => array_map(static fn (array $e): array => ['id' => $e['id'], 'version' => $e['version']], self::entries($args)),
+                    'borrower_location_id' => (int) $args->int('borrower_id'),
+                ];
+                $contact = self::text($args, 'contact');
+                if ($contact !== null) {
+                    $body['contact'] = $contact;
+                }
+                $due = self::emptyToNull($args->string('return_by'));
+                if ($due !== null) {
+                    $body['due_back_on'] = $due;
+                }
+                self::addComment($args, $body);
+                $response = $api->post('api/v1/loans', [], $body);
+                $borrower = is_array($response['borrower'] ?? null) ? ToolFormat::name($response['borrower']) : null;
+
+                return self::bulkResult($response, sprintf('Verleih an „%s“', $borrower ?? '?'), ['borrower' => $borrower]);
+            },
+            readOnly: false,
+        );
+    }
+
     private static function previewImport(): ToolDefinition
     {
         return new ToolDefinition(
@@ -638,8 +782,9 @@ final class WriteTools
      * Ergebnis einer Sammelaktion: je Ausrüstung Ergebnis und Stand bzw. Fehler.
      *
      * @param array<array-key, mixed> $response
+     * @param array<string, mixed>    $extra
      */
-    private static function bulkResult(array $response, string $what): ToolResult
+    private static function bulkResult(array $response, string $what, array $extra = []): ToolResult
     {
         $results = [];
         foreach (is_array($response['results'] ?? null) ? $response['results'] : [] as $row) {
@@ -659,7 +804,7 @@ final class WriteTools
 
         return ToolResult::ok(
             sprintf('%s: %d geändert, %d unverändert, %d nicht möglich.', $what, (int) ($summary['applied'] ?? 0), (int) ($summary['unchanged'] ?? 0), (int) ($summary['errors'] ?? 0)),
-            ['results' => $results, 'summary' => $summary],
+            [...$extra, 'results' => $results, 'summary' => $summary],
         );
     }
 

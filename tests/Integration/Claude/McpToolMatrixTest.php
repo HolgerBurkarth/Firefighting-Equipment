@@ -36,7 +36,7 @@ final class McpToolMatrixTest extends McpToolsTestCase
 
     private const array ALL_WRITE = [
         'book_equipment', 'bulk_book_equipment', 'set_maintenance_date', 'bulk_set_maintenance_date', 'create_equipment',
-        'update_equipment', 'assign_code', 'retire_equipment', 'reinstate_equipment', 'preview_import', 'apply_import',
+        'update_equipment', 'assign_code', 'retire_equipment', 'reinstate_equipment', 'report_used', 'swap_equipment', 'preview_import', 'apply_import',
         'create_location', 'rename_location', 'lock_location', 'unlock_location', 'create_equipment_type',
         'rename_equipment_type', 'deactivate_equipment_type', 'activate_equipment_type', 'resolve_notice', 'reopen_notice',
     ];

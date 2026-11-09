@@ -112,3 +112,15 @@ Vom Agenten im Browser (Test-Stadt, Admin; ein Service Worker hielt anfangs die 
 - ☐ „Andere Standorte anzeigen“ mit Warnung (braucht Sollbestand an einem zweiten Fahrzeug), Hinweis mit Regel im Protokoll (braucht „Trotzdem buchen“), CSV-Import-Warnung (Datei), „Benutzt gemeldet“ in CSV und Mail (Mail), Auswahl speichern und danach Mails (Holger).
 - ☐ Tausch offline am iPhone (Flugmodus), Hinweis „Ersatz inzwischen woanders“ (Holger).
 - Zurückgesetzt: M90 HLF 20 / G1 einsatzbereit, M92 Lager Gerätehaus einsatzbereit.
+
+### Live-Prüfung Runde 11 durch Claude im Browser (Nachtrag, Test-Stadt, Build `43425f65a020`, 09.11.2026)
+
+- ☑ „Andere Standorte anzeigen“ mit Warnung: Sollbestand „mindestens 1 Live-Testtyp 2“ auf Live-Test Wagen (M90) und HLF 20 (M93); Tausch von M90 zeigt M93 unter „Von anderen Fahrzeugen“ mit „(Sollbestand dort unterschritten)“.
+- ☒ Ersatzliste nach direktem Öffnen der Seite (`geraete/134` neu geladen): veralteter Stand aus der Offline-Kopie, M92 stand angeblich auf HLF 20 / G1 mit Warnung, obwohl es im Lager Gerätehaus stand; auf der Seite gab es kein `GET devices`. → behoben in Runde 12 (Ersatzliste lädt beim Öffnen neu).
+- ☑ Doppeltipp-Schutz: Klick 150 ms nach dem Öffnen auf „Trotzdem buchen“ ignoriert, späterer Klick bucht.
+- ☑ Hinweis „Sollbestand unterschritten“ nennt die Regel („Live-Test Wagen: 0 von mindestens 1 Live-Testtyp 2 einsatzbereit“), mit Notiz erledigt.
+- ☑ CSV-Import-Vorschau (nicht übernommen): „Sollbestand unterschritten – HLF 20: 0 von mindestens 1 Live-Testtyp 2 einsatzbereit. Die Zeile wird trotzdem übernommen.“
+- ☑ CSV-Export der Historie enthält „Benutzt gemeldet“, „Getauscht gegen M92“, „Als Ersatz für M90“.
+- ☒ CSV-Export der Historie: Verleihe standen als „Umgebucht“ (M91, M92, M93 nach Hattingen), obwohl JSON und App „Verliehen“ zeigten. → Runde 12: im Code stimmen CSV und JSON überein (Test `testOwnLabelsMatchTheJsonHistory` grün), Ursache lokal nicht nachzustellen; live nach dem Deploy erneut zu prüfen.
+- ☑ Mail-Auswahl erscheint in den Einstellungen, sobald die Benachrichtigung an ist; danach wieder ausgeschaltet. Ankunft der Mails nicht geprüft (Holger).
+- Zurückgesetzt: beide Regeln entfernt, M90 HLF 20 / G1 einsatzbereit, M91 und M94 Lager Gerätehaus in Wartung, M92 Lager Gerätehaus einsatzbereit, M93 HLF 20 einsatzbereit, Benachrichtigung aus.
