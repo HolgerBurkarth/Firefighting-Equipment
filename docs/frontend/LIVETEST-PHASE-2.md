@@ -88,7 +88,7 @@ Geprüft mit freigeschalteten Aufgaben (danach alles zurückgesetzt: Abläufe ab
 
 ## Runde 10: P2.8 (Sollbestand bei Buchungen, Tausch; 09.11.2026)
 
-Noch nicht live geprüft (Build folgt nach dem Deploy der Runde).
+Build `cc9926f979eb`. Vom Agenten im Browser geprüft nur: Knopf „Tauschen …“ erscheint im Gerätedetail (M23), `POST devices/swap` mit demselben Gerät zweimal → 400 „nicht gegen sich selbst getauscht“ (☑). Die fachlichen Abläufe unten brauchen Testdaten (Sollbestand, Sammelstelle) und sind offen.
 
 - ☐ Sollbestand setzen (HLF 20: mindestens 2 Atemschutzmasken, 2 einsatzbereite am HLF); eine davon in Wartung setzen: Hinweis
   „Am Standort … blieben nur 1 von mindestens 2“, Knöpfe „Tauschen …“ und (Admin) „Trotzdem buchen …“.
