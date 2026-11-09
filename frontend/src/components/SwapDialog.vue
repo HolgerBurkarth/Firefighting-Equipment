@@ -6,7 +6,7 @@ import { fetchStock, type StockState } from '../api/stock';
 import { bookingQueue, deviceStore, locationStore, swapEquipment } from '../data';
 import { ClientRefKeeper, MAX_COMMENT_LENGTH, normalizeComment } from '../data/booking';
 import { actionTime, offlineBookingProblem, pendingDevice, queuedText } from '../data/bookingQueue';
-import { offlineData } from '../data/offline';
+import { offlineData, syncedAtText } from '../data/offline';
 import {
     SWAP_OUT_STATUSES,
     parseStockBlock,
@@ -55,6 +55,10 @@ const stock = ref<StockState | null>(null);
 /** Klicks auf „Tauschen“ in den ersten Zehntelsekunden nach dem Öffnen zählen nicht (Doppeltipp, wie ConfirmDialog). */
 const SUBMIT_GUARD_MS = 400;
 const armed = ref(false);
+/** Die Liste der Ausrüstung wird beim Öffnen vom Server geholt; bis dahin kein (womöglich alter) Stand. */
+const listLoading = ref(false);
+/** Die Auffrischung ist gescheitert oder es besteht keine Verbindung: die Vorschläge stammen aus der Kopie. */
+const listStale = ref(false);
 let armTimer: ReturnType<typeof setTimeout> | undefined;
 
 async function revealOthers(): Promise<void> {
@@ -71,6 +75,21 @@ onBeforeUnmount(() => {
     clearTimeout(armTimer);
 });
 
+/** Solange eine Verbindung besteht, immer der aktuelle Stand vom Server (nie ein alter aus der Offline-Kopie). */
+async function reloadList(): Promise<void> {
+    if (isOffline.value) {
+        listStale.value = true;
+        return;
+    }
+    listLoading.value = true;
+    await Promise.all([deviceStore.refresh('changed'), locationStore.refresh('changed')]);
+    if (!open.value) {
+        return;
+    }
+    listLoading.value = false;
+    listStale.value = deviceStore.state.error !== null || isOffline.value;
+}
+
 watch(open, (value) => {
     clearTimeout(armTimer);
     armed.value = false;
@@ -86,6 +105,11 @@ watch(open, (value) => {
         error.value = null;
         offlineProblem.value = null;
         confirmedBelow.value = false;
+        stock.value = null;
+        listStale.value = false;
+        void reloadList();
+    } else {
+        listLoading.value = false;
     }
 });
 
@@ -109,7 +133,12 @@ const replacementWarning = computed(
 const replacement = computed(
     () => deviceStore.state.devices.find((entry) => entry.id === replacementId.value) ?? null,
 );
-const canSubmit = computed(() => replacement.value !== null && armed.value);
+const canSubmit = computed(() => replacement.value !== null && armed.value && !listLoading.value);
+const staleText = computed(() =>
+    offlineData.syncedAt === null
+        ? 'Keine Verbindung – die Vorschläge stammen aus der gespeicherten Kopie.'
+        : `Keine Verbindung – die Vorschläge stammen aus dem Stand vom ${syncedAtText(offlineData.syncedAt)}.`,
+);
 
 const unsaved = computed(
     () => open.value && (replacementId.value !== null || comment.value.trim() !== ''),
@@ -235,37 +264,16 @@ function confirmBelow(): void {
                 aria-label="Ersatz suchen"
                 data-testid="swap-search"
             />
-            <p v-if="candidates.suggested.length === 0" class="hint" data-testid="swap-none">
-                Keine passende einsatzbereite Ausrüstung im Lager gefunden.
+            <p v-if="listLoading" class="hint" role="status" data-testid="swap-loading">
+                Wird geladen …
             </p>
-            <ul class="swap-list" data-testid="swap-candidates">
-                <li v-for="candidate in candidates.suggested" :key="candidate.device.id">
-                    <label class="swap-option">
-                        <input
-                            v-model="replacementId"
-                            type="radio"
-                            name="swap-replacement"
-                            :value="candidate.device.id"
-                        />
-                        <span class="identifier">{{ candidate.device.identifier }}</span>
-                        <span class="type">{{ candidate.device.deviceType.name }}</span>
-                        <span class="where">{{ candidate.device.location.path }}</span>
-                    </label>
-                </li>
-            </ul>
-            <button
-                v-if="!showOthers && candidates.others.length > 0"
-                class="btn"
-                type="button"
-                data-testid="swap-show-others"
-                @click="void revealOthers()"
-            >
-                Andere Standorte anzeigen ({{ candidates.others.length }})
-            </button>
-            <template v-if="showOthers && candidates.others.length > 0">
-                <p class="hint">Von anderen Fahrzeugen: Dort fehlt die Ausrüstung danach.</p>
-                <ul class="swap-list" data-testid="swap-others">
-                    <li v-for="candidate in candidates.others" :key="candidate.device.id">
+            <template v-else>
+                <p v-if="listStale" class="hint" data-testid="swap-stale">{{ staleText }}</p>
+                <p v-if="candidates.suggested.length === 0" class="hint" data-testid="swap-none">
+                    Keine passende einsatzbereite Ausrüstung im Lager gefunden.
+                </p>
+                <ul class="swap-list" data-testid="swap-candidates">
+                    <li v-for="candidate in candidates.suggested" :key="candidate.device.id">
                         <label class="swap-option">
                             <input
                                 v-model="replacementId"
@@ -276,16 +284,43 @@ function confirmBelow(): void {
                             <span class="identifier">{{ candidate.device.identifier }}</span>
                             <span class="type">{{ candidate.device.deviceType.name }}</span>
                             <span class="where">{{ candidate.device.location.path }}</span>
-                            <span v-if="candidate.belowMinimum" class="warn">
-                                (Sollbestand dort unterschritten)
-                            </span>
                         </label>
                     </li>
                 </ul>
+                <button
+                    v-if="!showOthers && candidates.others.length > 0"
+                    class="btn"
+                    type="button"
+                    data-testid="swap-show-others"
+                    @click="void revealOthers()"
+                >
+                    Andere Standorte anzeigen ({{ candidates.others.length }})
+                </button>
+                <template v-if="showOthers && candidates.others.length > 0">
+                    <p class="hint">Von anderen Fahrzeugen: Dort fehlt die Ausrüstung danach.</p>
+                    <ul class="swap-list" data-testid="swap-others">
+                        <li v-for="candidate in candidates.others" :key="candidate.device.id">
+                            <label class="swap-option">
+                                <input
+                                    v-model="replacementId"
+                                    type="radio"
+                                    name="swap-replacement"
+                                    :value="candidate.device.id"
+                                />
+                                <span class="identifier">{{ candidate.device.identifier }}</span>
+                                <span class="type">{{ candidate.device.deviceType.name }}</span>
+                                <span class="where">{{ candidate.device.location.path }}</span>
+                                <span v-if="candidate.belowMinimum" class="warn">
+                                    (Sollbestand dort unterschritten)
+                                </span>
+                            </label>
+                        </li>
+                    </ul>
+                </template>
+                <p v-if="replacementWarning" class="notice notice-error" data-testid="swap-warning">
+                    Achtung: Am Standort dieser Ausrüstung würde der Sollbestand unterschritten.
+                </p>
             </template>
-            <p v-if="replacementWarning" class="notice notice-error" data-testid="swap-warning">
-                Achtung: Am Standort dieser Ausrüstung würde der Sollbestand unterschritten.
-            </p>
         </fieldset>
 
         <fieldset class="field">
