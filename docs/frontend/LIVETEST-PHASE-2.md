@@ -10,8 +10,8 @@ Test-Stadt, kein Super-Admin-Konto) am 08.11.2026 nach dem Deploy.
   Treffer; `device-summary` `by_status` mit vier Einträgen (`used` 1); Geräteliste zeigt „● benutzt“;
   danach auf „in Wartung“ zurückgesetzt.
 - ☑ `X-Client-Api: 2` → 409 `client_outdated` (`min_client_api` 3), `3` → 200.
-- ☐ Farbe und Symbol des Status am iPhone und im Dunkelmodus ansehen (Holger).
-- ☐ Eine alte, offene App (Version 2) aktualisiert sich selbst (Holger, mit einem zweiten Gerät).
+- ☑ Farbe und Symbol des Status „benutzt“ am iPhone, hell und dunkel gut lesbar (Holger, 09.11.2026).
+- ☑ Eine alte, offene App (Version 2) aktualisiert sich selbst: entfällt, nicht mehr prüfbar (alle Geräte längst aktualisiert).
 
 ## P2.2 Standort-Aufgaben (Build `7e1a6873b531`)
 
@@ -37,8 +37,8 @@ Test-Stadt, kein Super-Admin-Konto) am 08.11.2026 nach dem Deploy.
   angelegt mit Suchen Ansehen, Umbuchen, Status setzen, Benutzt melden und der Einschränkung (geprüft von Claude
   im Browser, 09.11.2026). Diese Rolle bleibt für den Test am iPhone stehen, nicht löschen.
 - ☑ „Benutzt melden“ am Handy (Breite): M90 → Kleiderkammer · benutzt (geprüft von Claude im Browser, 09.11.2026).
-- ☐ Ein Einmalgerät am echten iPhone zeigt nur „Benutzt melden“ (Holger).
-- ☐ „Benutzt melden“ offline am iPhone (Warteschlange „M1 → benutzt gemeldet“, jetzt mit Rückfrage; Holger).
+- ☑ Ein Einmalgerät am echten iPhone zeigt nur „Benutzt melden“ (Holger, 09.11.2026): Konto „Holger (Test)“ mit Rolle „Live-Test Geräteträger“, Leiste nur „Suchen“ und „Profil“; M90 zeigt nur „Benutzt melden“; Rückfrage, „Abbrechen“ ändert nichts; HRT 13 zeigt die normale Umbuchen-Ansicht.
+- ☑ „Benutzt melden“ offline am iPhone (Flugmodus, Holger, 09.11.2026): Rückfrage „Es kommt in die Sammelstelle Kleiderkammer“, Eintrag in der Warteschlange, nach Verbindung angekommen; Aktionszeit vom iPhone übernommen (34 s vor Eingang).
 
 ## P2.4 Wartung (Build `e737f630f9d8`)
 
@@ -65,8 +65,7 @@ kann nur der Super-Admin freischalten; ohne sie gibt es den Bereich Verleih nich
 - ☐ Als Super-Admin „Ausgeliehen an“ und „Rückgabe“ freischalten, je einen Standort zuweisen; dann Seite „Verleih“:
   Verleihen mit Nummer, „Rückgabe bis“ überfällig rot, Kachel im Dashboard, roter Zähler im Menü (Holger; danach
   abschalten).
-- ☐ Aushang erzeugen, QR-Code mit dem Handy scannen, Ausrüstung ohne Anmeldung zurückgeben (Name, Zustand); Verlauf
-  zeigt „Rückgabe“ von „<Name> (ohne Anmeldung)“; Aushang drucken (Holger, iPhone).
+- ☑ Rückgabe ohne Anmeldung per QR-Code (Aushang am PC-Bildschirm mit dem iPhone gescannt, Holger, 09.11.2026): Seite ohne Anmeldung, Schlüssel sofort aus der Adresse, M92 „In Ordnung“ zurückgegeben; Verlauf „Rückgabe“ von „Holger IPhone (ohne Anmeldung)“, Hattingen → Ippingen. Alles danach zurückgesetzt (Aushang widerrufen, Aufgaben entfernt); Rolle ID 23 bleibt. Aushang drucken: offen.
 - ☐ „In der Rückgabe“: „In Ordnung ins Lager“ und „Benutzte und Defekte in die Sammelstelle“ (Holger).
 - ☐ Seite „Wartung“: gleiche Zeit sortiert natürlich nach Nummer (HRT 16 vor HRT 20), Rückfragen mit „Sie steht/Sie
   stehen“; Standort-Liste: Chip „Standard-Lager“; Rollen-Editor: Vorschau „Darf“ nennt „bei Einmalgeräten nur Benutzt
