@@ -24,3 +24,22 @@ Test-Stadt, kein Super-Admin-Konto) am 08.11.2026 nach dem Deploy.
 - ☐ „Standorte“ als Admin: im Fenster „Bearbeiten“ eines Raums erscheint „Aufgabe“, Lager wählen →
   Chip „Lager“ in der Zeile, Standard-Lager; Aufgabe wieder entfernen; danach die Aufgaben in der
   Test-Stadt wieder abschalten.
+
+## P2.3 Einmalgeräte und „Benutzt melden“ (Build `e737f630f9d8`, 09.11.2026)
+
+- ☑ Migration 0054 ausgeführt, `health` ok; `GET device-types` liefert `single_use`.
+- ☑ Typ „Live-Testtyp 2“ per `POST device-types/{id}/single-use` auf true und zurück auf false; die Geräte
+  tragen `device_type.single_use`.
+- ☑ M91 per `POST devices/{id}/used`: Status benutzt, Standort blieb (keine Sammelstelle eingerichtet);
+  danach auf „in Wartung“ zurückgesetzt.
+- ☐ Rolle „Geräteträger“ mit Einschränkung anlegen (Super-Admin, nur Holger): „3 · Einschränkungen“ im
+  Editor; am Handy ein Einmalgerät zeigt nur „Benutzt melden“.
+- ☐ „Benutzt melden“ offline am iPhone (Warteschlange „M1 → benutzt gemeldet“).
+
+## P2.4 Wartung (Build `e737f630f9d8`)
+
+- ☑ `GET maintenance` ohne freigeschaltete Aufgaben: 403 (Bereich fehlt, Menü ohne „Wartung“ – wie vor Phase 2).
+- ☐ Als Super-Admin Sammelstelle und Werkstatt freischalten, Standorte zuweisen (Lager als Standard); dann
+  Seite „Wartung“: Stufen, „seit“, „Zur Werkstatt …“, „Zurück ins Lager …“, Transportliste kopieren
+  (Holger; danach die Aufgaben wieder abschalten).
+
