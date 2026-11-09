@@ -45,6 +45,8 @@ final class ReadTools
             self::cityHistory(),
             self::listNotices(),
             self::getNotice(),
+            self::listLoans(),
+            self::listMaintenance(),
         ];
     }
 
@@ -440,6 +442,109 @@ final class ReadTools
                     sprintf('Hinweis %s: %s (%s).', (string) $item['id'], (string) $item['kind'], (string) $item['status_label']),
                     ['notice' => $item],
                     ['notice.booking.user', 'notice.booking.comment', 'notice.other.user', 'notice.history[].user', 'notice.history[].note'],
+                );
+            },
+        );
+    }
+
+    private static function listLoans(): ToolDefinition
+    {
+        return new ToolDefinition(
+            'list_loans',
+            'Verleih',
+            'Verliehene Ausrüstung wie die Seite „Verleih“: offene Verleihe nach Leihnehmer und „Rückgabe bis“ '
+            . '(überfällige gekennzeichnet), dazu die möglichen Leihnehmer (borrowers) und die Ausrüstung, die in '
+            . 'der Rückgabe liegt (in_returns). Die Seite gibt es nur in Städten mit freigeschalteter Aufgabe.',
+            self::schema([
+                'limit' => self::limit('Höchstens so viele Verleihe'),
+                'offset' => self::offset(),
+            ]),
+            ['GET api/v1/loans'],
+            static function (ToolArguments $args, ToolApi $api): ToolResult {
+                $limit = $args->int('limit') ?? self::DEFAULT_LIMIT;
+                $offset = $args->int('offset') ?? 0;
+                $data = $api->get('api/v1/loans');
+                $all = self::list($data['loans'] ?? []);
+                $loans = [];
+                foreach (array_slice($all, $offset, $limit) as $loan) {
+                    $loans[] = [
+                        'id' => $loan['id'] ?? null,
+                        'equipment' => ToolFormat::equipment(is_array($loan['device'] ?? null) ? $loan['device'] : []),
+                        'borrower' => ToolFormat::name($loan['borrower'] ?? null),
+                        'borrower_id' => is_array($loan['borrower'] ?? null) ? ($loan['borrower']['id'] ?? null) : null,
+                        'contact' => $loan['contact'] ?? null,
+                        'return_by' => $loan['due_back_on'] ?? null,
+                        'overdue' => $loan['overdue'] ?? false,
+                        'days_overdue' => $loan['days_overdue'] ?? 0,
+                        'comment' => $loan['comment'] ?? null,
+                        'lent_at' => ToolFormat::time($loan['lent_at'] ?? null),
+                        'lent_by' => ToolFormat::name($loan['lent_by'] ?? null),
+                    ];
+                }
+                $summary = is_array($data['summary'] ?? null) ? $data['summary'] : [];
+                $total = count($all);
+                $returns = array_map(ToolFormat::equipment(...), self::list($data['in_returns'] ?? []));
+
+                return ToolResult::ok(
+                    sprintf(
+                        '%d offene Verleihe, davon %d überfällig; %d Ausrüstungen in der Rückgabe. %s',
+                        (int) ($summary['open'] ?? $total),
+                        (int) ($summary['overdue'] ?? 0),
+                        count($returns),
+                        ToolFormat::pagingText($total, $offset, count($loans), 'offset'),
+                    ),
+                    [
+                        'loans' => $loans,
+                        'summary' => ['open' => $summary['open'] ?? null, 'overdue' => $summary['overdue'] ?? null],
+                        'paging' => ToolFormat::paging($total, $offset, count($loans)),
+                        'borrowers' => array_map(static fn (array $b): array => ['id' => $b['id'] ?? null, 'name' => $b['name'] ?? null], self::list($data['borrowers'] ?? [])),
+                        'in_returns' => array_slice($returns, 0, ToolFormat::MAX_LIST),
+                    ],
+                    ['loans[].contact', 'loans[].comment', 'loans[].borrower', 'loans[].lent_by', 'borrowers[].name'],
+                );
+            },
+        );
+    }
+
+    private static function listMaintenance(): ToolDefinition
+    {
+        return new ToolDefinition(
+            'list_maintenance',
+            'Wartung',
+            'Die Seite „Wartung“: Ausrüstung in der Sammelstelle (wartet auf die Werkstatt) und in der Werkstatt, '
+            . 'die am längsten wartende zuerst, mit dem Zeitpunkt der letzten Änderung (waiting_since). Dazu das '
+            . 'Standard-Lager. Die Seite gibt es nur in Städten mit freigeschalteter Aufgabe.',
+            self::schema([
+                'limit' => self::limit('Höchstens so viele je Stufe'),
+                'offset' => self::offset(),
+            ]),
+            ['GET api/v1/maintenance'],
+            static function (ToolArguments $args, ToolApi $api): ToolResult {
+                $limit = $args->int('limit') ?? self::DEFAULT_LIMIT;
+                $offset = $args->int('offset') ?? 0;
+                $data = $api->get('api/v1/maintenance');
+                $out = [];
+                $parts = [];
+                foreach (['collection' => 'Sammelstelle', 'workshop' => 'Werkstatt'] as $key => $fallback) {
+                    $stage = is_array($data[$key] ?? null) ? $data[$key] : [];
+                    $devices = self::list($stage['devices'] ?? []);
+                    $shown = array_map(static fn (array $d): array => [...ToolFormat::equipment($d), 'waiting_since' => ToolFormat::time($d['state_changed_at'] ?? null)], array_slice($devices, $offset, $limit));
+                    $total = (int) ($stage['total'] ?? count($devices));
+                    $label = is_string($stage['label'] ?? null) ? $stage['label'] : $fallback;
+                    $out[$key] = [
+                        'label' => $label,
+                        'locations' => array_map(static fn (array $l): array => ['id' => $l['id'] ?? null, 'name' => $l['name'] ?? null], self::list($stage['locations'] ?? [])),
+                        'equipment' => $shown,
+                        'paging' => ToolFormat::paging($total, $offset, count($shown)),
+                    ];
+                    $parts[] = sprintf('%s: %d', $label, $total);
+                }
+                $store = is_array($data['default_store'] ?? null) ? $data['default_store'] : null;
+                $out['default_store'] = $store === null ? null : ['id' => $store['id'] ?? null, 'name' => $store['name'] ?? null];
+
+                return ToolResult::ok(
+                    sprintf('Wartung – %s. Weitere mit offset (höchstens %d je Stufe).', implode(', ', $parts), ToolFormat::MAX_LIST),
+                    $out,
                 );
             },
         );

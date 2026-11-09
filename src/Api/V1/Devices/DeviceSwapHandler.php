@@ -76,21 +76,24 @@ final readonly class DeviceSwapHandler implements RequestHandler
             $change = new DeviceStateChange($locationId, $status, $process);
             [$clientRef, $occurredAt, $confirmedStale] = DeviceFields::bookingFields($context);
             // Der Tausch wird am ausgehenden Gerät quittiert; der Ersatz gehört zum Inhalt (Hash).
-            $hash = BookingRequest::hash($outId, $outVersion, $change, ($comment ?? '') . "\x1f" . $inId . ':' . $inVersion, $occurredAt);
+            $content = ($comment ?? '') . "\x1f" . $inId . ':' . $inVersion;
+            $hash = BookingRequest::hash($outId, $outVersion, $change, $content, $occurredAt);
+            // Wie bei /state: Ein Tausch aus der Warteschlange wiederholt auch denselben online gesendeten ohne Aktionszeit.
+            $onlineHash = BookingRequest::onlineHash($outId, $outVersion, $change, $content, $occurredAt);
             $booker = new DeviceBooker($tenant, $devices, new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo, $context->visibility()));
 
-            $previous = $booker->previous($clientRef, $user->id, $outId, $hash);
+            $previous = $booker->previous($clientRef, $user->id, $outId, $hash, $onlineHash);
             if ($previous !== null) {
                 return $this->replayed($devices, $tenant, $previous, $inId);
             }
 
             $stale = $occurredAt !== null && new ActionTimeGuard($this->clock, $this->offline)->check($occurredAt, $confirmedStale);
-            $booking = $clientRef === null ? null : new BookingRequest($clientRef, $occurredAt, $stale, $hash);
+            $booking = $clientRef === null ? null : new BookingRequest($clientRef, $occurredAt, $stale, $hash, $onlineHash);
             try {
                 [$out, $in, $swapId, $eventId, $noticeId] = $devices->swap($tenant, $user->id, $outId, $outVersion, $inId, $inVersion, $change, $comment, $stock, $booking);
             } catch (DuplicateClientRefException) {
                 // Dieselbe client_ref gleichzeitig verarbeitet: Die andere Anfrage hat gespeichert und benachrichtigt.
-                $previous = $booker->previous($clientRef, $user->id, $outId, $hash) ?? throw new \LogicException('Quittung fehlt.');
+                $previous = $booker->previous($clientRef, $user->id, $outId, $hash, $onlineHash) ?? throw new \LogicException('Quittung fehlt.');
 
                 return $this->replayed($devices, $tenant, $previous, $inId);
             }

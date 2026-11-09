@@ -651,4 +651,40 @@ test.describe('Offline-Modus: Tausch (Phase 2, P2.9)', () => {
             occurred_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/),
         });
     });
+
+    test('Verbindung bricht beim Tauschen ab: Warteschlange mit derselben Kennung', async ({
+        page,
+        apiRequests,
+    }) => {
+        await page.goto('/firefighting/test/suchen');
+        await expect.poll(() => storedDeviceIds(page)).toEqual([1, 2, 3, 4]);
+        await page.getByRole('searchbox').fill('M1');
+        await page.getByTestId('device-card').click();
+        await expect(page.getByText('Jetzt: HLF 20 / G1 · einsatzbereit')).toBeVisible();
+
+        await page.getByTestId('swap-open').click();
+        const dialog = page.getByTestId('form-dialog');
+        await dialog.getByRole('radio', { name: /M4/ }).check();
+        await dialog.getByRole('radio', { name: 'defekt' }).check();
+        // Die Verbindung bricht ab, bevor der Tausch gesendet wird: kein Streifen „Offline“, nur die Anfrage scheitert.
+        state.mode = 'offline';
+        await dialog.getByRole('button', { name: 'Tauschen', exact: true }).click();
+
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
+        await expect(page.getByTestId('queued-waiting')).toContainText('M1 ⇄ M4 · getauscht');
+        const first = apiRequests.filter((r) => r.path === 'api/v1/devices/swap');
+        expect(first).toHaveLength(1);
+        expect(first[0]?.body).not.toHaveProperty('occurred_at');
+        const ref = (first[0]?.body as { client_ref: string }).client_ref;
+
+        state.mode = 'online';
+        await page.evaluate(() => window.dispatchEvent(new Event('online')));
+        await expect(page.getByTestId('queued-done')).toBeVisible();
+        const sent = apiRequests.filter((r) => r.path === 'api/v1/devices/swap');
+        expect(sent).toHaveLength(2);
+        expect(sent[1]?.body).toMatchObject({
+            client_ref: ref,
+            occurred_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/),
+        });
+    });
 });

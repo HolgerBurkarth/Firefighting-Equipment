@@ -8,6 +8,18 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Tausch: online gesendet, dann aus der Warteschlange wiederholt (Runde 12)“
+
+`POST devices/swap` vergleicht eine Wiederholung mit `client_ref` und Aktionszeit (`occurred_at`) jetzt auch mit
+einem schon gespeicherten Tausch derselben `client_ref` OHNE Aktionszeit (`BookingRequest::onlineHash`, wie
+`POST devices/{id}/state`). Vorher war das ein `client_ref_conflict`. Es kam kein Feld hinzu.
+
+- Zweck: Die App sendet den Tausch jetzt online mit `client_ref`; bricht die Verbindung ab, legt sie ihn mit derselben
+  `client_ref` und der Zeit des ersten Versuchs in die Warteschlange. Kam der erste Versuch doch an, wirkt er nicht doppelt.
+- Tests: `StockSwapTest::testQueuedSwapRepeatsTheSameSwapSentOnline`.
+- Zusätzlich nur Test: `DeviceHistoryExportTest::testOwnLabelsMatchTheJsonHistory` (CSV nennt „Verliehen“, „Benutzt gemeldet“,
+  „Rückgabe“ wie das JSON).
+
 ## 2026-11-09 – „Sollbestand bei Buchungen und Tausch (Phase 2, Runde 10, P2.8)“
 
 - Neu: `POST devices/swap` (Aktion `device.swap`): `{out {id, version}, in {id, version}, out_status? (used|defective|maintenance),

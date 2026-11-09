@@ -2594,6 +2594,16 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Benutzer, Einladungscodes, Rollen, Einstellungen, eigene Einstellungen und `service`
   (`ToolRoutesTest`). Tests `McpWriteToolsTest`, `McpToolMatrixTest`, Browser
   `deviceDetails.spec.ts`, Unit `deviceHistory.spec.ts`, `notices.spec.ts`.
+- Schritt P2.12 (Werkzeuge für die Abläufe der Phase 2, Runde 12; Adapter wie M5/M6, `ToolRoutesTest::ALLOWED` um die
+  Routen ergänzt): `report_used` (`POST devices/{id}/used`, Aktion `device.used`, stabile `client_ref`), `swap_equipment`
+  (`POST devices/swap`, Aktion `device.swap`; `out_id`/`out_version`/`in_id`/`in_version`/`out_status`/`comment`, stabile
+  `client_ref`; Unterschreiten des Sollbestands bleibt ein Fehler `rule_violation` mit `details.stock.can_override` false, weil
+  `stock.override` über Claude wegfällt, G17), `lend_equipment` (`POST loans`, Bereich `loans` Ändern; `entries`,
+  `borrower_id`, `contact`, `return_by`, `comment`; Ergebnis wie die Sammelaktionen plus `borrower`), alle mit `readOnlyHint`
+  false und ohne `destructiveHint`; lesend `list_loans` (`GET loans`: Verleihe, `borrowers`, `in_returns`, `limit`/`offset`) und
+  `list_maintenance` (`GET maintenance`: Stufen `collection`/`workshop` mit `waiting_since`). Sichtbar nur, wenn die Rechte der
+  Rolle samt freigeschalteten Aufgaben der Stadt reichen (die Bereiche `loans`/`maintenance` gibt es sonst nicht). Alle Änderungen
+  stehen „über Claude“ im Verlauf. Tests `McpPhase2ToolsTest`, `McpToolMatrixTest`, `ToolRoutesTest`.
 
 ## Städte verwalten und Admins einladen
 - Nur Super-Admins, nur unter `service` (`Access::SuperAdmin`; Konten einer Stadt haben dort keine
@@ -2843,7 +2853,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Sammelstelle für benutzte bzw. defekte Ausrüstung (auch außerhalb des Datenfilters, G4), sonst bleibt der Standort;
   der Ersatz „in“ muss einsatzbereit sein und kommt an den bisherigen Standort von „out“; beide in EINER Transaktion
   (gesperrt in der Reihenfolge der IDs), beide Ereignisse tragen dieselbe `swap_id`; die Prüfung gilt für beide zusammen.
-  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Status danach, Kommentar), in `DevicePage` der
+  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (beim Öffnen, auch nach einer Ablehnung, lädt er Ausrüstung und Standorte vom Server neu (`refresh('changed')`), bis dahin „Wird geladen …“ statt eines alten Stands; offline oder bei Fehler gilt die Kopie mit Hinweis `swap-stale` und ihrem Stand; Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Status danach, Kommentar), in `DevicePage` der
   Knopf „Tauschen …“ (`swap-open`, nur online) und bei 409 mit `details.stock` der Kasten `stock-block` mit „Tauschen …“
   und, mit `stock.override`, „Trotzdem buchen …“ (Rückfrage, sendet `confirmed_below_minimum`); `src/data/swap.ts`
   (`parseStockBlock`, `swapCandidates`: einsatzbereit, Typen der verletzten Regel zuerst). Offline (P2.9, Runde 11): `POST devices/swap`
@@ -2853,7 +2863,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `swap_replacement_moved` (`detail` nennt den Grund), unterschreitet er den Sollbestand, Hinweis `stock_below_minimum`; abgelehnt nur
   bei ausgesonderter Ausrüstung oder gesperrtem Ziel (409). Antwort zusätzlich `result` wie eine Buchung. App: Eintrag `swap` in der
   Warteschlange (`QUEUE_FORMAT` 3, `postQueuedSwap`), „Tauschen …“ auch offline (Streifen „Offline“ und Kopie nicht zu alt); scheitert
-  ein online gesendeter Tausch an der Verbindung, bleibt der Fehler (kein stilles Umleiten in die Warteschlange). Tests `StockSwapTest`, `NoticeKindTest`, Browser `swap.spec.ts`, Unit `swap.spec.ts`.
+  ein online gesendeter Tausch (er trägt eine `client_ref`) an der Verbindung, kommt er bei erlaubtem Offline-Buchen wie `/state` in die Warteschlange (gleiche `client_ref`, Aktionszeit des ersten Versuchs; der Server gleicht den Hash ohne Aktionszeit an, `BookingRequest::onlineHash`), sonst bleibt der Fehler. Tests `StockSwapTest`, `NoticeKindTest`, Browser `swap.spec.ts`, Unit `swap.spec.ts`.
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann

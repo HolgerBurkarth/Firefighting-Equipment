@@ -138,6 +138,7 @@ test.describe('Sollbestand: Tauschen statt Fehlermeldung', () => {
             in: { id: 9, version: 1 },
             out_status: 'defective',
             comment: 'Maske gerissen',
+            client_ref: expect.any(String),
         });
     });
 
@@ -208,5 +209,60 @@ test.describe('Sollbestand: Trotzdem buchen mit stock.override', () => {
         expect(bookings).toHaveLength(2);
         expect(bookings[0]).not.toHaveProperty('confirmed_below_minimum');
         expect(bookings[1]).toMatchObject({ status: 'maintenance', confirmed_below_minimum: true });
+    });
+});
+
+test.describe('Tauschen: Ersatzliste ist beim Öffnen aktuell', () => {
+    // Der Server kennt M9 im Lager; die erste Antwort (alter Stand, wie aus der Offline-Kopie) nennt noch das Fahrzeug.
+    const outdatedM9 = deviceJson(9, {
+        identifier: 'M9',
+        location: { id: 10, name: 'HLF 20', path: 'HLF 20 / G1' },
+    });
+    let listCalls = 0;
+    let moved = true;
+    test.use({
+        api: {
+            'GET api/v1/auth/me': me(['book.move', 'book.status', 'device.swap']),
+            'GET api/v1/devices': (request: MockRequest): MockResponse => {
+                listCalls += 1;
+                return devicesEndpoint([M1, moved ? M9 : outdatedM9])(request);
+            },
+            ...deviceDetail(M1),
+            ...LOCATIONS,
+        },
+    });
+
+    test.beforeEach(() => {
+        listCalls = 0;
+        moved = true;
+    });
+
+    test('Seite direkt geöffnet: „Wird geladen …“, dann der Stand vom Server', async ({ page }) => {
+        await page.goto('/firefighting/test/geraete/1');
+        await expect(
+            page.getByRole('heading', { level: 1, name: 'M1 · Atemschutzmaske' }),
+        ).toBeVisible();
+        await page.getByTestId('swap-open').click();
+        const dialog = page.getByTestId('form-dialog');
+        const options = dialog.getByTestId('swap-candidates').getByRole('listitem');
+        await expect(options).toHaveCount(1);
+        await expect(options.first()).toContainText('M9');
+        await expect(options.first()).toContainText('Lager');
+        await expect(dialog.getByTestId('swap-loading')).toHaveCount(0);
+        await expect(dialog.getByTestId('swap-stale')).toHaveCount(0);
+    });
+
+    test('alter Stand aus „Suchen“: beim Öffnen neu geladen', async ({ page }) => {
+        moved = false;
+        await openFromSearch(page);
+        await expect.poll(() => listCalls).toBeGreaterThanOrEqual(1);
+        // M9 ist inzwischen ins Lager gekommen; die Seite kennt noch den alten Stand.
+        moved = true;
+        const before = listCalls;
+        await page.getByTestId('swap-open').click();
+        const dialog = page.getByTestId('form-dialog');
+        await expect(dialog.getByTestId('swap-candidates').getByRole('listitem')).toHaveCount(1);
+        expect(listCalls).toBeGreaterThan(before);
+        await expect(dialog.getByTestId('swap-candidates')).toContainText('Lager');
     });
 });
