@@ -2853,7 +2853,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `swap_replacement_moved` (`detail` nennt den Grund), unterschreitet er den Sollbestand, Hinweis `stock_below_minimum`; abgelehnt nur
   bei ausgesonderter Ausrüstung oder gesperrtem Ziel (409). Antwort zusätzlich `result` wie eine Buchung. App: Eintrag `swap` in der
   Warteschlange (`QUEUE_FORMAT` 3, `postQueuedSwap`), „Tauschen …“ auch offline (Streifen „Offline“ und Kopie nicht zu alt); scheitert
-  ein online gesendeter Tausch an der Verbindung, bleibt der Fehler (kein stilles Umleiten in die Warteschlange). Tests `StockSwapTest`, `NoticeKindTest`, Browser `swap.spec.ts`, Unit `swap.spec.ts`.
+  ein online gesendeter Tausch (er trägt eine `client_ref`) an der Verbindung, kommt er bei erlaubtem Offline-Buchen wie `/state` in die Warteschlange (gleiche `client_ref`, Aktionszeit des ersten Versuchs; der Server gleicht den Hash ohne Aktionszeit an, `BookingRequest::onlineHash`), sonst bleibt der Fehler. Tests `StockSwapTest`, `NoticeKindTest`, Browser `swap.spec.ts`, Unit `swap.spec.ts`.
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann

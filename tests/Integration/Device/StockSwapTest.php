@@ -220,6 +220,30 @@ final class StockSwapTest extends DeviceApiTestCase
         self::assertSame('client_ref_conflict', self::json($other)['error']);
     }
 
+    public function testQueuedSwapRepeatsTheSameSwapSentOnline(): void
+    {
+        $this->collectionPoint();
+        $out = $this->createViaApi('M1', ['location_id' => $this->hlf]);
+        $in = $this->createViaApi('M9', ['location_id' => $this->room]);
+        $body = [
+            'out' => ['id' => $out['id'], 'version' => $out['version']],
+            'in' => ['id' => $in['id'], 'version' => $in['version']],
+            'client_ref' => 'c0c0c0c0-0000-4000-8000-000000000002',
+            'comment' => 'Maske gerissen',
+        ];
+
+        // Online gesendet, die Antwort kam nicht an: die App legt denselben Tausch mit der Zeit des ersten Versuchs in die Warteschlange.
+        $online = self::json($this->api('POST', 'devices/swap', $body));
+        $again = self::json($this->api('POST', 'devices/swap', [...$body, 'occurred_at' => self::ago(60)]));
+
+        self::assertSame(true, $again['result']['replayed']);
+        self::assertSame($online['swap_id'], $again['swap_id']);
+        self::assertSame(2, (int) $this->pdo()->query('SELECT COUNT(*) FROM fe_device_events WHERE swap_id IS NOT NULL')->fetchColumn(), 'nicht doppelt gebucht');
+
+        $other = $this->api('POST', 'devices/swap', [...$body, 'comment' => 'anders', 'occurred_at' => self::ago(60)]);
+        self::assertSame('client_ref_conflict', self::json($other)['error']);
+    }
+
     public function testOfflineSwapWithMovedReplacementIsBookedWithANotice(): void
     {
         $out = $this->createViaApi('M1', ['location_id' => $this->hlf]);

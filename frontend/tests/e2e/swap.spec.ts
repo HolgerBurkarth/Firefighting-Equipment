@@ -138,6 +138,7 @@ test.describe('Sollbestand: Tauschen statt Fehlermeldung', () => {
             in: { id: 9, version: 1 },
             out_status: 'defective',
             comment: 'Maske gerissen',
+            client_ref: expect.any(String),
         });
     });
 

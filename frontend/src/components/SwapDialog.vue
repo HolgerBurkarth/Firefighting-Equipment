@@ -172,8 +172,19 @@ async function submit(): Promise<void> {
         outStatus: outStatus.value,
         ...(text !== '' && { comment: text }),
         ...(confirmedBelow.value && { confirmedBelowMinimum: true }),
+        // Gleicher Inhalt = gleiche Kennung: Ein erneutes Senden wirkt nicht doppelt (wie beim Umbuchen).
+        clientRef: refs.refFor(swapContent(chosen, text)),
     });
     busy.value = false;
+    // Scheitert es an der Verbindung, kommt der Tausch (wenn offline gebucht werden darf) wie beim Umbuchen
+    // in die Warteschlange: gleiche Kennung, Aktionszeit des ersten Versuchs.
+    if (!result.ok && result.error.code === 'network' && queueProblem === null) {
+        await queueSwap(chosen, text, null);
+        return;
+    }
+    if (!result.ok && result.error.code === 'network' && offlineData.syncedAt !== null) {
+        offlineProblem.value = queueProblem;
+    }
     if (result.ok) {
         open.value = false;
         emit('swapped', result.data);
@@ -187,6 +198,18 @@ async function submit(): Promise<void> {
     error.value = result.error;
 }
 
+/** Inhalt des Tauschs für die Kennung (`ClientRefKeeper`): derselbe Inhalt behält Kennung und Zeit. */
+function swapContent(chosen: DeviceListItem, text: string): object {
+    return {
+        out: props.device.id,
+        outVersion: props.device.version,
+        in: chosen.id,
+        inVersion: chosen.version,
+        outStatus: outStatus.value,
+        comment: text,
+    };
+}
+
 /** Ohne Verbindung: der Tausch als eine Einheit in die Warteschlange (der Server bucht ihn, wie er ist). */
 async function queueSwap(
     chosen: DeviceListItem,
@@ -197,15 +220,7 @@ async function queueSwap(
         offlineProblem.value = queueProblem;
         return;
     }
-    const content = {
-        out: props.device.id,
-        outVersion: props.device.version,
-        in: chosen.id,
-        inVersion: chosen.version,
-        outStatus: outStatus.value,
-        comment: text,
-    };
-    const attempt = refs.attemptFor(content);
+    const attempt = refs.attemptFor(swapContent(chosen, text));
     const booking = {
         clientRef: attempt.ref,
         deviceId: props.device.id,
