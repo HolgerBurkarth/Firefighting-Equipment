@@ -107,7 +107,7 @@ final class DeviceHistoryExportTest extends ExportApiTestCase
         $borrower = $this->createLocation($this->tenantId, ['name' => 'FF Nachbar', 'kind' => 'external']);
         $this->insert('fe_tenant_location_tasks', ['tenant_id' => $this->tenantId, 'task' => 'borrower', 'enabled' => 1]);
         $this->pdo()->prepare("UPDATE fe_locations SET task = 'borrower' WHERE id = ?")->execute([$borrower]);
-        $this->event('2026-06-15 08:00:00', ['event_type' => 'state_changed', 'from_location_id' => $this->g1, 'to_location_id' => $borrower], $this->userId);
+        $this->event('2026-06-15 08:00:00', ['event_type' => 'state_changed', 'from_location_id' => $this->g1, 'to_location_id' => $borrower, 'action' => 'lent'], $this->userId);
         $this->event('2026-06-15 08:01:00', ['event_type' => 'state_changed', 'from_status' => 'ready', 'to_status' => 'used'], $this->userId);
         $this->event('2026-06-15 08:02:00', ['event_type' => 'state_changed', 'from_location_id' => $borrower, 'to_location_id' => $this->room, 'user_id' => null, 'actor_name' => 'Maier']);
 

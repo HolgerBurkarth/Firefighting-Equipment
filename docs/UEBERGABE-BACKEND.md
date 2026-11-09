@@ -8,6 +8,18 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Verleih dauerhaft im Verlauf speichern (Runde 13)“
+
+Neue Spalte `fe_device_events.action` (Migration 0065, reine Erweiterung, ASCII, NULL erlaubt, CHECK: nur `lent` und nur bei
+`state_changed`). `POST loans` setzt sie auf `lent`. Die Bezeichnung „Verliehen“ (`type_label` im Verlauf, „Letzte Aktivitäten“,
+CSV der Historie, Log-Mail, Claude-Werkzeuge) kommt jetzt aus diesem Wert und nicht mehr aus der heutigen Aufgabe des Standorts.
+Alte Einträge (NULL) heißen „Umgebucht“. Keine neuen JSON-Felder, keine Änderung an `X-Client-Api`.
+
+- Warum nur `lent`: Rückgabe, „Benutzt gemeldet“ und Tausch beruhen schon auf gespeicherten Angaben (Konto fehlt, Zielstatus, `swap_id`).
+- Tests: `LoanTest::testLentKeepsItsLabelWhenTheTaskIsSwitchedOffAndOldEntriesAreRebookings` (Verleih, Aufgabe abschalten → weiter
+  „Verliehen“ in Verlauf, Aktivitäten und CSV; Eintrag ohne Wert „Umgebucht“), `DeviceHistoryExportTest::testOwnLabelsMatchTheJsonHistory`.
+- Stelle: `CLAUDE.md`, „Verleih (Phase 2, P2.5 …)“.
+
 ## 2026-11-09 – „Tausch: online gesendet, dann aus der Warteschlange wiederholt (Runde 12)“
 
 `POST devices/swap` vergleicht eine Wiederholung mit `client_ref` und Aktionszeit (`occurred_at`) jetzt auch mit

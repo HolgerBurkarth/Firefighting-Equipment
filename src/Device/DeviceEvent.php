@@ -42,7 +42,7 @@ final readonly class DeviceEvent
         /** Kennung der Buchung vom Handy (client_ref), falls mitgesendet */
         public ?string $clientRef = null,
         public EventChannel $channel = EventChannel::App,
-        /** Buchung auf einen Standort mit der Aufgabe „Ausgeliehen an“ (Verleih, P2.5): Bezeichnung „Verliehen“ */
+        /** Verleih (P2.5): gespeicherte action = lent, nicht die heutige Aufgabe des Standorts; Bezeichnung „Verliehen“ */
         public bool $lent = false,
         /** Tausch (P2.8): Kennung, die beide Buchungen teilen; null = kein Tausch */
         public ?string $swapId = null,
