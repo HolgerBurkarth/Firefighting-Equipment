@@ -186,6 +186,88 @@ final class StockSwapTest extends DeviceApiTestCase
         self::assertSame(['Als Ersatz für M1', 'Getauscht gegen M9'], array_column($history, 'type_label'));
     }
 
+    private static function ago(int $seconds): string
+    {
+        return gmdate('Y-m-d\\TH:i:s\\Z', time() - $seconds);
+    }
+
+    public function testOfflineSwapIsBookedOnceAndReplayed(): void
+    {
+        $this->collectionPoint();
+        $out = $this->createViaApi('M1', ['location_id' => $this->hlf]);
+        $in = $this->createViaApi('M9', ['location_id' => $this->room]);
+        $body = [
+            'out' => ['id' => $out['id'], 'version' => $out['version']],
+            'in' => ['id' => $in['id'], 'version' => $in['version']],
+            'client_ref' => 'c0c0c0c0-0000-4000-8000-000000000001',
+            'occurred_at' => self::ago(120),
+        ];
+
+        $first = self::json($this->api('POST', 'devices/swap', $body));
+        self::assertSame(['applied', false], [$first['result']['outcome'], $first['result']['replayed']]);
+        self::assertSame(['used', 'Kiste'], [$first['out']['status'], $first['out']['location']['name']]);
+        self::assertSame(['ready', $this->hlf], [$first['in']['status'], $first['in']['location']['id']]);
+        $versionAfter = $first['out']['version'];
+
+        $again = self::json($this->api('POST', 'devices/swap', $body));
+        self::assertSame(true, $again['result']['replayed']);
+        self::assertSame($first['swap_id'], $again['swap_id']);
+        self::assertSame($versionAfter, $again['out']['version'], 'nichts noch einmal gebucht');
+        self::assertSame(2, (int) $this->pdo()->query('SELECT COUNT(*) FROM fe_device_events WHERE swap_id IS NOT NULL')->fetchColumn());
+
+        $other = $this->api('POST', 'devices/swap', [...$body, 'comment' => 'anders']);
+        self::assertSame(409, $other->statusCode());
+        self::assertSame('client_ref_conflict', self::json($other)['error']);
+    }
+
+    public function testOfflineSwapWithMovedReplacementIsBookedWithANotice(): void
+    {
+        $out = $this->createViaApi('M1', ['location_id' => $this->hlf]);
+        $in = $this->createViaApi('M9', ['location_id' => $this->room]);
+        // Der Ersatz wurde inzwischen von jemand anderem als defekt gemeldet (Version 2).
+        $moved = $this->api('POST', 'devices/' . $in['id'] . '/state', ['version' => $in['version'], 'status' => 'defective']);
+        self::assertSame(200, $moved->statusCode(), $moved->body());
+
+        $response = $this->api('POST', 'devices/swap', [
+            'out' => ['id' => $out['id'], 'version' => $out['version']],
+            'in' => ['id' => $in['id'], 'version' => $in['version']],
+            'client_ref' => 'c0c0c0c0-0000-4000-8000-000000000002',
+            'occurred_at' => self::ago(60),
+        ]);
+
+        self::assertSame(200, $response->statusCode(), $response->body());
+        $json = self::json($response);
+        self::assertSame($this->hlf, $json['in']['location']['id'], 'Wirklichkeit gewinnt: der Tausch ist gebucht');
+        self::assertNotNull($json['result']['notice_id']);
+        $row = $this->pdo()->query('SELECT kind, detail FROM fe_device_notices')->fetch();
+        self::assertSame('swap_replacement_moved', $row['kind']);
+        self::assertStringContainsString('M9', (string) $row['detail']);
+        self::assertSame(409, $this->api('POST', 'devices/swap', [
+            'out' => ['id' => $out['id'], 'version' => 99],
+            'in' => ['id' => $in['id'], 'version' => 99],
+        ])->statusCode(), 'online bleibt die Versionsprüfung');
+    }
+
+    public function testOfflineBookingBelowMinimumIsBookedWithANotice(): void
+    {
+        $a = $this->createViaApi('M1', ['location_id' => $this->hlf]);
+        $this->createViaApi('M2', ['location_id' => $this->hlf]);
+        $this->ruleOfTwo();
+
+        $response = $this->api('POST', 'devices/' . $a['id'] . '/state', [
+            'version' => $a['version'],
+            'location_id' => $this->room,
+            'client_ref' => 'c0c0c0c0-0000-4000-8000-000000000003',
+            'occurred_at' => self::ago(30),
+        ]);
+
+        self::assertSame(200, $response->statusCode(), $response->body());
+        self::assertSame($this->room, self::json($response)['device']['location']['id'], 'offline wird nicht abgelehnt');
+        $row = $this->pdo()->query('SELECT kind, detail FROM fe_device_notices')->fetch();
+        self::assertSame('stock_below_minimum', $row['kind']);
+        self::assertMatchesRegularExpression('/: 1 von mindestens 2 .+ einsatzbereit$/', (string) $row['detail']);
+    }
+
     public function testSwapWithoutCollectionPointKeepsTheLocation(): void
     {
         $out = $this->createViaApi('M1', ['location_id' => $this->hlf]);
