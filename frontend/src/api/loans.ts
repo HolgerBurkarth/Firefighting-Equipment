@@ -12,6 +12,11 @@ export interface LoanPlace {
     readonly name: string;
 }
 
+/** Standort mit der Aufgabe „Rückgabe“; `linkCreatedAt` = wann der gültige Schlüssel entstand (null = keiner). */
+export interface ReturnPlace extends LoanPlace {
+    readonly linkCreatedAt: string | null;
+}
+
 export interface Loan {
     readonly id: number;
     readonly device: DeviceListItem;
@@ -33,8 +38,10 @@ export interface LoanState {
     readonly loans: readonly Loan[];
     /** Ziele von „Verleihen“. */
     readonly borrowers: readonly LoanPlace[];
-    /** Standorte mit der Aufgabe „Rückgabe“. */
-    readonly returns: readonly LoanPlace[];
+    /** Standorte mit der Aufgabe „Rückgabe“ und der Stand ihres Aushangs. */
+    readonly returns: readonly ReturnPlace[];
+    /** Ausrüstung in der Rückgabe, am längsten wartende zuerst (P2.6). */
+    readonly inReturns: readonly DeviceListItem[];
     /** Anzeigenamen der Aufgaben in der Stadt. */
     readonly borrowerLabel: string;
     readonly returnsLabel: string;
@@ -57,6 +64,25 @@ function parsePlaces(json: unknown): LoanPlace[] | null {
             return null;
         }
         places.push(place);
+    }
+    return places;
+}
+
+function parseReturnPlaces(json: unknown): ReturnPlace[] | null {
+    if (!Array.isArray(json)) {
+        return null;
+    }
+    const places: ReturnPlace[] = [];
+    for (const entry of json) {
+        const place = parsePlace(entry);
+        const created = isRecord(entry) ? entry['link_created_at'] : undefined;
+        if (
+            place === null ||
+            (created !== null && created !== undefined && typeof created !== 'string')
+        ) {
+            return null;
+        }
+        places.push({ ...place, linkCreatedAt: created ?? null });
     }
     return places;
 }
@@ -108,7 +134,7 @@ export function parseLoans(json: unknown): LoanState | null {
         return null;
     }
     const borrowers = parsePlaces(json['borrowers']);
-    const returns = parsePlaces(json['returns']);
+    const returns = parseReturnPlaces(json['returns']);
     const labels = json['labels'];
     if (
         typeof json['today'] !== 'string' ||
@@ -130,6 +156,14 @@ export function parseLoans(json: unknown): LoanState | null {
         }
         loans.push(loan);
     }
+    const inReturns: DeviceListItem[] = [];
+    for (const entry of Array.isArray(json['in_returns']) ? json['in_returns'] : []) {
+        const device = parseDeviceListItem(entry);
+        if (device === null) {
+            return null;
+        }
+        inReturns.push(device);
+    }
     return {
         today: json['today'],
         open: json['summary']['open'],
@@ -137,6 +171,7 @@ export function parseLoans(json: unknown): LoanState | null {
         loans,
         borrowers,
         returns,
+        inReturns,
         borrowerLabel: labels['borrower'],
         returnsLabel: labels['returns'],
     };
@@ -174,6 +209,123 @@ export function postLend(
             ...(request.dueBackOn !== undefined && { due_back_on: request.dueBackOn }),
             ...(request.comment !== undefined && { comment: request.comment }),
         },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** POST loans/to-collection bzw. loans/to-store (Rückgaben bearbeiten, P2.6). */
+export function postProcessReturns(
+    kind: 'to-collection' | 'to-store',
+    entries: readonly LendEntry[],
+    comment?: string,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<BulkResponse>> {
+    return apiRequest(`loans/${kind}`, parseBulkResponse, {
+        method: 'POST',
+        body: {
+            devices: entries.map((entry) => ({ id: entry.id, version: entry.version })),
+            ...(comment !== undefined && { comment }),
+        },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+function parseKey(json: unknown): string | null {
+    return isRecord(json) && typeof json['key'] === 'string' ? json['key'] : null;
+}
+
+/** POST return-points/{id}/renew: neuer Schlüssel (der Klartext steht nur in dieser Antwort). */
+export function renewReturnKey(
+    locationId: number,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<string>> {
+    return apiRequest(`return-points/${String(locationId)}/renew`, parseKey, {
+        method: 'POST',
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/** POST return-points/{id}/revoke: Aushang ungültig machen. */
+export function revokeReturnKey(
+    locationId: number,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<boolean>> {
+    return apiRequest(
+        `return-points/${String(locationId)}/revoke`,
+        (json) => (isRecord(json) && json['revoked'] === true ? true : null),
+        { method: 'POST', ...(fetchFn && { fetchFn }) },
+    );
+}
+
+/** Zustand der zurückgegebenen Ausrüstung (Rückgabe ohne Anmeldung). */
+export type ReturnCondition = 'ok' | 'used' | 'defective';
+
+export interface ReturnFound {
+    readonly identifier: string;
+    readonly deviceType: string;
+    /** Name der Rückgabestelle. */
+    readonly location: string;
+}
+
+function parseReturnFound(json: unknown): ReturnFound | null {
+    return isRecord(json) &&
+        typeof json['identifier'] === 'string' &&
+        typeof json['device_type'] === 'string' &&
+        typeof json['location'] === 'string'
+        ? {
+              identifier: json['identifier'],
+              deviceType: json['device_type'],
+              location: json['location'],
+          }
+        : null;
+}
+
+/** POST returns/check (öffentlich, ohne Anmeldung): Nummer und Typ einer verliehenen Ausrüstung. */
+export function checkReturn(
+    key: string,
+    code: string,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<ReturnFound>> {
+    return apiRequest('returns/check', parseReturnFound, {
+        method: 'POST',
+        body: { key, code },
+        public: true,
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+export interface ReturnDone extends ReturnFound {
+    readonly statusLabel: string;
+}
+
+function parseReturnDone(json: unknown): ReturnDone | null {
+    const found = parseReturnFound(json);
+    return found !== null && isRecord(json) && typeof json['status_label'] === 'string'
+        ? { ...found, statusLabel: json['status_label'] }
+        : null;
+}
+
+/** POST returns (öffentlich, ohne Anmeldung): bucht die Ausrüstung in die Rückgabe. */
+export function postReturn(
+    request: {
+        readonly key: string;
+        readonly code: string;
+        readonly name: string;
+        readonly condition: ReturnCondition;
+        readonly comment?: string;
+    },
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<ReturnDone>> {
+    return apiRequest('returns', parseReturnDone, {
+        method: 'POST',
+        body: {
+            key: request.key,
+            code: request.code,
+            name: request.name,
+            condition: request.condition,
+            ...(request.comment !== undefined && { comment: request.comment }),
+        },
+        public: true,
         ...(fetchFn && { fetchFn }),
     });
 }

@@ -372,6 +372,26 @@ final readonly class LocationRepository
     }
 
     /**
+     * Die Sammelstelle für benutzte bzw. defekte Ausrüstung (Rückgaben bearbeiten, P2.6): aktiv, Aufgabe
+     * Sammelstelle, nimmt diese Art oder beide an, kleinste ID. Unabhängig vom Datenfilter.
+     *
+     * @param 'used'|'defective' $kind
+     *
+     * @return array{id: int, name: string}|null
+     */
+    public function collectionPointFor(Tenant $tenant, string $kind): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, name FROM fe_locations WHERE tenant_id = ? AND task = 'collection' AND active = 1"
+            . " AND collection_accepts IN (?, 'both') ORDER BY id LIMIT 1",
+        );
+        $stmt->execute([$tenant->id, $kind]);
+        $row = $stmt->fetch();
+
+        return is_array($row) ? ['id' => (int) $row['id'], 'name' => (string) $row['name']] : null;
+    }
+
+    /**
      * Wie {@see collectionPointForUsed()}, mit dem Namen (für die Rückfrage der App).
      *
      * @return array{id: int, name: string}|null

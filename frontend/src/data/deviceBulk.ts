@@ -8,7 +8,8 @@ import { commentLength, MIN_DEFECT_COMMENT_LENGTH } from './booking';
  * Auswahlen in Blöcken zu BULK_MAX_DEVICES nacheinander senden, Fortschritt und Ergebnis.
  */
 
-export type BulkAction = 'inspection-due' | 'state' | 'to-workshop' | 'back' | 'lend';
+export type BulkAction =
+    'inspection-due' | 'state' | 'to-workshop' | 'back' | 'lend' | 'to-collection' | 'to-store';
 
 /** Ergebnis eines Laufs über alle Blöcke. */
 export interface BulkRun {
@@ -80,6 +81,8 @@ const ACTION_LABELS: Readonly<Record<BulkAction, string>> = {
     'to-workshop': 'Zur Werkstatt',
     back: 'Zurück ins Lager',
     lend: 'Verleihen',
+    'to-collection': 'In die Sammelstelle',
+    'to-store': 'Ins Lager',
 };
 
 /** Zusammenfassung, z. B. „Prüfdatum: 10 Geräte geändert, 1 unverändert, 1 nicht möglich.“ */

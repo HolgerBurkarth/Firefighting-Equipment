@@ -31,7 +31,7 @@ import {
     type DeviceType,
 } from '../api/deviceTypes';
 import { fetchInspectionOverview, type InspectionOverview } from '../api/inspections';
-import { postLend, type LendRequest } from '../api/loans';
+import { postLend, postProcessReturns, type LendRequest } from '../api/loans';
 import { postBack, postToWorkshop } from '../api/maintenance';
 import {
     createInvitationCode as postInvitationCode,
@@ -347,6 +347,18 @@ export async function lendEquipment(
 ): Promise<BulkRun> {
     const entries = devices.map((device) => ({ id: device.id, version: device.version }));
     return afterBulk(await runInBlocks(entries, (block) => postLend(block, request), onProgress));
+}
+
+/** „Rückgaben bearbeiten“ (Phase 2, P2.6): in die Sammelstelle bzw. ins Standard-Lager. */
+export async function processReturns(
+    kind: 'to-collection' | 'to-store',
+    devices: readonly { readonly id: number; readonly version: number }[],
+    onProgress?: (done: number, total: number) => void,
+): Promise<BulkRun> {
+    const entries = devices.map((device) => ({ id: device.id, version: device.version }));
+    return afterBulk(
+        await runInBlocks(entries, (block) => postProcessReturns(kind, block), onProgress),
+    );
 }
 
 /** „Zur Werkstatt“ (Seite Wartung; Phase 2, P2.4): der Server bucht ins Ziel der Werkstatt. */

@@ -24,14 +24,14 @@ use FirefightingEquipment\Tenant\Tenant;
  */
 final readonly class DeviceEventRepository
 {
-    private const string SELECT = 'SELECT e.id, e.event_type, e.user_id, u.status AS user_status, u.display_name, u.name AS user_name,'
+    private const string SELECT = 'SELECT e.id, e.event_type, e.user_id, e.actor_name, u.status AS user_status, u.display_name, u.name AS user_name,'
         . ' e.from_location_id, fl.name AS from_name, fp.name AS from_parent,'
         . ' e.to_location_id, tl.name AS to_name, tp.name AS to_parent,'
         . ' e.from_status, e.to_status, e.from_due, e.to_due, e.field, e.old_value, e.new_value, e.comment, e.created_at,'
         . ' e.occurred_at, e.applied, e.not_applied_reason, e.channel, b.client_ref';
 
     private const string JOINS = ' FROM fe_device_events e'
-        . ' JOIN fe_users u ON u.id = e.user_id AND u.tenant_id = e.tenant_id'
+        . ' LEFT JOIN fe_users u ON u.id = e.user_id AND u.tenant_id = e.tenant_id'
         . ' LEFT JOIN fe_locations fl ON fl.id = e.from_location_id AND fl.tenant_id = e.tenant_id'
         . ' LEFT JOIN fe_locations fp ON fp.id = fl.parent_id AND fp.tenant_id = e.tenant_id'
         . ' LEFT JOIN fe_locations tl ON tl.id = e.to_location_id AND tl.tenant_id = e.tenant_id'
@@ -235,7 +235,7 @@ final readonly class DeviceEventRepository
         return new DeviceEvent(
             (int) $row['id'],
             DeviceEventType::from((string) $row['event_type']),
-            (int) $row['user_id'],
+            $row['user_id'] === null ? null : (int) $row['user_id'],
             self::userName($row),
             self::location($row, 'from'),
             self::location($row, 'to'),
@@ -269,6 +269,10 @@ final readonly class DeviceEventRepository
      */
     private static function userName(array $row): string
     {
+        if ($row['user_id'] === null) {
+            // Rückgabe ohne Anmeldung: der Überbringer nannte seinen Namen selbst.
+            return sprintf('%s (ohne Anmeldung)', (string) $row['actor_name']);
+        }
         $id = (int) $row['user_id'];
         if ($row['user_status'] === 'deleted') {
             return sprintf('Gelöschter Benutzer #%d', $id);

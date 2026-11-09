@@ -18,7 +18,8 @@ final readonly class DeviceEvent
     public function __construct(
         public int $id,
         public DeviceEventType $type,
-        public int $userId,
+        /** null = Rückgabe ohne Anmeldung (P2.6): userName nennt dann den Überbringer */
+        public ?int $userId,
         /** Anzeigename; anonymisierte Konten als „Gelöschter Benutzer #ID“ */
         public string $userName,
         public ?DeviceEventLocation $fromLocation,
@@ -103,6 +104,7 @@ final readonly class DeviceEvent
         }
 
         return match (true) {
+            $this->userId === null => 'Rückgabe',
             $this->toStatus === DeviceStatus::Retired => 'Ausgesondert',
             $this->fromStatus === DeviceStatus::Retired => 'Wieder aufgenommen',
             $this->toLocation !== null && $this->toStatus !== null => 'Umgebucht und Status geändert',

@@ -594,7 +594,7 @@ final readonly class DeviceRepository
             $device->locationId,
             $device->status,
             $device->stateChangedAt ?? $device->updatedAt,
-            $userId === false ? null : (int) $userId,
+            $userId === false || $userId === null ? null : (int) $userId,
         );
     }
 
@@ -614,6 +614,33 @@ final readonly class DeviceRepository
                 throw DeviceRuleViolationException::alreadyRetired($current->identifier);
             }
             $this->applyState($tenant, $userId, $current, $current->locationId, DeviceStatus::Retired, [], $comment);
+
+            return $id;
+        }, $tenant);
+    }
+
+    /**
+     * Rückgabe ohne Anmeldung (Phase 2, P2.6): bucht eine verliehene Ausrüstung in den Standort mit der
+     * Aufgabe „Rückgabe“ und setzt optional den Zustand (Status). Das Ereignis hat kein Konto, sondern den
+     * Namen des Überbringers. Der Ablauf gibt das Ziel vor (außerhalb jedes Datenfilters); $inTransaction
+     * prüft und schließt den Verleih in derselben Transaktion (Fehler rollt alles zurück).
+     *
+     * @param \Closure(Device): void $inTransaction
+     *
+     * @throws DeviceNotFoundException
+     * @throws DeviceRuleViolationException ausgesondert, Ziel gesperrt, nicht verliehen
+     * @throws InvalidDeviceValueException  Ziel unbekannt
+     */
+    public function returnLoaned(Tenant $tenant, int $id, int $locationId, ?DeviceStatus $status, string $actorName, ?string $comment, \Closure $inTransaction): Device
+    {
+        return $this->transaction(function () use ($tenant, $id, $locationId, $status, $actorName, $comment, $inTransaction): int {
+            $current = $this->lockDevice($tenant, $id);
+            if ($current->isRetired()) {
+                throw DeviceRuleViolationException::retiredNotMovable($current->identifier);
+            }
+            $this->lockActiveLocation($tenant, $locationId, true);
+            $inTransaction($current);
+            $this->applyState($tenant, null, $current, $locationId, $status ?? $current->status, [], $comment, null, $actorName);
 
             return $id;
         }, $tenant);
@@ -701,13 +728,14 @@ final readonly class DeviceRepository
      */
     private function applyState(
         Tenant $tenant,
-        int $userId,
+        ?int $userId,
         Device $current,
         int $locationId,
         DeviceStatus $status,
         array $fields,
         ?string $comment,
         ?ActionTime $occurredAt = null,
+        ?string $actorName = null,
     ): int {
         $set = implode('', array_map(static fn (string $f): string => ', ' . self::COLUMNS[$f] . ' = ?', array_keys($fields)));
         // state_version vor version: richtig, ob MariaDB die Zuweisungen nacheinander oder gleichzeitig
@@ -732,6 +760,7 @@ final readonly class DeviceRepository
             $statusChanged ? $status : null,
             $comment,
             $occurredAt,
+            $actorName,
         );
 
         return (int) $this->pdo->lastInsertId();

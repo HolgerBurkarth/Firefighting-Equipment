@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Api\V1\Loans;
 
 use FirefightingEquipment\Api\V1\Devices\DeviceJson;
+use FirefightingEquipment\Device\DeviceFilter;
 use FirefightingEquipment\Device\DeviceRepository;
+use FirefightingEquipment\Device\DeviceSort;
 use FirefightingEquipment\Device\Loan\LoanRepository;
+use FirefightingEquipment\Device\Loan\ReturnPointRepository;
 use FirefightingEquipment\Device\LocationRepository;
 use FirefightingEquipment\Device\LocationTask;
 use FirefightingEquipment\Device\LocationTaskRepository;
+use FirefightingEquipment\Device\SortDirection;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
@@ -22,7 +26,9 @@ use FirefightingEquipment\Time\SystemClock;
  * Antwort {today, summary {open, overdue}, shown, loans [{id, device (wie GET devices), borrower {id, name},
  * contact, due_back_on, overdue, days_overdue, comment, lent_at, lent_by {id, name}}], borrowers [{id, name}]}.
  * `borrowers` sind die aktiven Standorte mit der Aufgabe „Ausgeliehen an“ (Ziele für „Verleihen“),
- * `returns` die mit der Aufgabe „Rückgabe“. Sortiert nach Leihnehmer, dann „Rückgabe bis“; höchstens
+ * `returns` die mit der Aufgabe „Rückgabe“ ({id, name, link_created_at}: wann der gültige Schlüssel des
+ * Aushangs angelegt wurde, null = keiner); `in_returns` die Ausrüstung in der Rückgabe (Einträge wie GET
+ * devices, am längsten wartende zuerst, höchstens 200). Sortiert nach Leihnehmer, dann „Rückgabe bis“; höchstens
  * MAX_SHOWN, `summary` zählt alle. „Überfällig“ = „Rückgabe bis“ vor heute (Europe/Berlin).
  */
 final readonly class LoanListHandler implements RequestHandler
@@ -63,6 +69,17 @@ final readonly class LoanListHandler implements RequestHandler
                 'lent_by' => ['id' => (int) $row['lent_by_id'], 'name' => (string) $row['lent_by_name']],
             ];
         }
+        $since = new ReturnPointRepository($pdo)->activeSince($tenant);
+        $returnPlaces = array_map(
+            static fn (array $place): array => [...$place, 'link_created_at' => $since[$place['id']] ?? null],
+            $locations->withTask($tenant, LocationTask::Returns),
+        );
+        $inReturns = [];
+        foreach ($returnPlaces as $place) {
+            $page = $devices->list($tenant, new DeviceFilter(locationId: $place['id'], includeSublocations: true), DeviceSort::Identifier, SortDirection::Asc, 200, 0);
+            array_push($inReturns, ...$page->devices);
+        }
+        usort($inReturns, static fn (\FirefightingEquipment\Device\Device $a, \FirefightingEquipment\Device\Device $b): int => ($a->stateChangedAt ?? $a->updatedAt) <=> ($b->stateChangedAt ?? $b->updatedAt) ?: strnatcasecmp($a->identifier->value, $b->identifier->value) ?: $a->id <=> $b->id);
         $labels = [];
         foreach (new LocationTaskRepository($pdo)->list($tenant) as $task) {
             $labels[$task['task']->value] = $task['label'];
@@ -74,7 +91,8 @@ final readonly class LoanListHandler implements RequestHandler
             'shown' => count($items),
             'loans' => $items,
             'borrowers' => $locations->withTask($tenant, LocationTask::Borrower),
-            'returns' => $locations->withTask($tenant, LocationTask::Returns),
+            'returns' => $returnPlaces,
+            'in_returns' => array_map(DeviceJson::listItem(...), array_slice($inReturns, 0, 200)),
             'labels' => ['borrower' => $labels[LocationTask::Borrower->value] ?? LocationTask::Borrower->label(), 'returns' => $labels[LocationTask::Returns->value] ?? LocationTask::Returns->label()],
         ]);
     }

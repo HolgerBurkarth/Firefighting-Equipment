@@ -145,6 +145,13 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { public: true },
         });
         routes.push({
+            // Rückgabe ohne Anmeldung (Phase 2, P2.6): Link im QR-Code des Aushangs, rueckgabe#schluessel=….
+            path: '/rueckgabe',
+            name: 'return',
+            component: () => import('../pages/ReturnPage.vue'),
+            meta: { public: true },
+        });
+        routes.push({
             // Name wie AppUrls::VERIFY_EMAIL_PAGE (Link in der Mail).
             path: '/email-bestaetigen',
             name: 'email-verify',

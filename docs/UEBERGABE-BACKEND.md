@@ -8,6 +8,20 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Rückgabe ohne Anmeldung (Phase 2, Runde 9, P2.6)“
+
+- Migrationen 0056 (`fe_return_points`), 0057 (`public_return` in `fe_auth_attempts`), 0058 (`fe_device_events`:
+  `user_id` NULL erlaubt, neue Spalte `actor_name`, CHECK). Die Nummern im Plan (0059–0060) verschieben sich, weil
+  sie lückenlos sein müssen.
+- Neu (Admin, Bereich `loans` Ändern): `POST return-points/{id}/renew`, `POST return-points/{id}/revoke`,
+  `POST loans/to-collection`, `POST loans/to-store`. `GET loans` zusätzlich `returns[].link_created_at` und
+  `in_returns`.
+- Neu (ÖFFENTLICH, ohne Sitzung): `POST returns/check`, `POST returns`. Der geheime Schlüssel ist der Nachweis;
+  Bremse `public_return`. Der Verlauf nennt „<Name> (ohne Anmeldung)“: `user.id` ist dort `null`, `type_label`
+  „Rückgabe“ (die App liest nur `user.name`).
+- Tests: `ReturnTest`, `TenantRoutePermissionsTest`, `DeviceVisibilityTest`; Frontend `returnPage.spec.ts`,
+  `loans.spec.ts`, `returns.spec.ts`.
+
 ## 2026-11-09 – „Verleih (Phase 2, Runde 9, P2.5)“
 
 - Migration 0055: `fe_device_loans`. Neuer Bereich `loans` (nur mit Aufgabe „Ausgeliehen an“ oder „Rückgabe“;

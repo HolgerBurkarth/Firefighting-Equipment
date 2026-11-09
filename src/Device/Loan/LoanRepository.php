@@ -71,6 +71,51 @@ final readonly class LoanRepository
     }
 
     /**
+     * Arbeit für DeviceRepository::returnLoaned (Rückgabe, P2.6): der offene Verleih der Ausrüstung muss
+     * existieren und sie muss noch beim Leihnehmer stehen; er wird in derselben Transaktion geschlossen.
+     *
+     * @throws DeviceRuleViolationException die Ausrüstung ist nicht verliehen
+     */
+    public function returning(Tenant $tenant): \Closure
+    {
+        return function (Device $current) use ($tenant): void {
+            $stmt = $this->pdo->prepare('SELECT id, borrower_location_id FROM fe_device_loans WHERE tenant_id = ? AND device_id = ? AND returned_at IS NULL FOR UPDATE');
+            $stmt->execute([$tenant->id, $current->id]);
+            $open = $stmt->fetch();
+            if (!is_array($open) || (int) $open['borrower_location_id'] !== $current->locationId) {
+                throw DeviceRuleViolationException::because(sprintf('%s ist nicht verliehen.', $current->identifier->value));
+            }
+            $this->pdo->prepare('UPDATE fe_device_loans SET returned_at = UTC_TIMESTAMP() WHERE id = ?')->execute([(int) $open['id']]);
+        };
+    }
+
+    /**
+     * Die verliehene Ausrüstung zu einem Code (Nummer ohne Groß-/Kleinschreibung oder Scan-Code genau) –
+     * nur Nummer und Typ, mehr verrät die Rückgabe ohne Anmeldung nicht.
+     *
+     * @return array{id: int, identifier: string, device_type: string}|null
+     */
+    public function findLoaned(Tenant $tenant, string $code): ?array
+    {
+        $code = trim($code);
+        if ($code === '' || mb_strlen($code) > 200 || !mb_check_encoding($code, 'UTF-8')) {
+            return null;
+        }
+        $identifier = trim((string) preg_replace('/\s+/u', ' ', $code));
+        $stmt = $this->pdo->prepare(
+            'SELECT d.id, d.identifier, t.name AS type_name FROM fe_device_loans l'
+            . ' JOIN fe_devices d ON d.id = l.device_id AND d.tenant_id = l.tenant_id'
+            . ' JOIN fe_device_types t ON t.id = d.device_type_id AND t.tenant_id = d.tenant_id'
+            . " WHERE l.tenant_id = ? AND " . self::OPEN . " AND (d.identifier_key = REPLACE(LOWER(?), 'ẞ', 'ß') OR d.scan_code = ?)"
+            . ' ORDER BY d.id LIMIT 1',
+        );
+        $stmt->execute([$tenant->id, $identifier, $code]);
+        $row = $stmt->fetch();
+
+        return is_array($row) ? ['id' => (int) $row['id'], 'identifier' => (string) $row['identifier'], 'device_type' => (string) $row['type_name']] : null;
+    }
+
+    /**
      * Schließt den offenen Verleih einer Ausrüstung (Rückgabe, P2.6). Wiederholbar.
      */
     public function close(Tenant $tenant, int $deviceId): void

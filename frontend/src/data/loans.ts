@@ -88,3 +88,35 @@ export function lendProblem(
     }
     return null;
 }
+
+/**
+ * Link im QR-Code des Aushangs der Rückgabe: `…/rueckgabe#schluessel=<Schlüssel>`; der Schlüssel steht nur
+ * im Fragment und erreicht so nie die Server-Adresse (wie `#code=` bei der Registrierung).
+ */
+export function returnLink(key: string, baseUri: string = document.baseURI): string {
+    return new URL(`rueckgabe#schluessel=${key}`, baseUri).href;
+}
+
+/** Adresse zum Abtippen auf dem Aushang, ohne Schema und Schlüssel. */
+export function returnAddress(baseUri: string = document.baseURI): string {
+    const url = new URL('rueckgabe', baseUri);
+    return `${url.host}${url.pathname}`;
+}
+
+/** Zustand beim Zurückgeben, so heißen die Knöpfe auf der öffentlichen Seite. */
+export const RETURN_CONDITIONS = [
+    { value: 'ok', label: 'In Ordnung' },
+    { value: 'used', label: 'Benutzt' },
+    { value: 'defective', label: 'Defekt' },
+] as const;
+
+/** Problem der Eingabe auf der öffentlichen Rückgabeseite oder null. */
+export function returnProblem(code: string, name: string): string | null {
+    if (name.trim() === '') {
+        return 'Bitte geben Sie Ihren Namen ein.';
+    }
+    if (Array.from(name.trim()).length > 100) {
+        return 'Der Name darf höchstens 100 Zeichen lang sein.';
+    }
+    return code.trim() === '' ? 'Bitte geben Sie die Nummer der Ausrüstung ein.' : null;
+}

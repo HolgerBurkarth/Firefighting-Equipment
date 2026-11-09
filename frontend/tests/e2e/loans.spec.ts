@@ -320,3 +320,173 @@ test.describe('Ohne Leihnehmer und nur ansehen', () => {
         });
     });
 });
+
+/** Zustandsbehafteter Server der Rückgabe: Aushang erzeugen/widerrufen, „Rückgaben bearbeiten“. */
+function returnsServer() {
+    const key = 'K'.repeat(43);
+    let linkCreatedAt: string | null = null;
+    let waiting = [
+        deviceJson(21, {
+            identifier: 'HRT 16',
+            status: 'defective',
+            status_label: 'defekt',
+            location: { id: 90, name: 'Rückgabe', path: 'Rückgabe' },
+        }),
+        deviceJson(22, {
+            identifier: 'HRT 20',
+            location: { id: 90, name: 'Rückgabe', path: 'Rückgabe' },
+        }),
+        deviceJson(23, {
+            identifier: 'HRT 3',
+            status: 'used',
+            status_label: 'benutzt',
+            location: { id: 90, name: 'Rückgabe', path: 'Rückgabe' },
+        }),
+    ];
+    const posted: { path: string; body: unknown }[] = [];
+    const process =
+        (path: string) =>
+        (request: MockRequest): MockResponse => {
+            posted.push({ path, body: request.body });
+            const entries = (request.body as { devices: { id: number }[] }).devices;
+            const results = entries.map((entry) => {
+                const device = waiting.find((d) => d['id'] === entry.id) ?? {};
+                waiting = waiting.filter((d) => d['id'] !== entry.id);
+                return {
+                    id: entry.id,
+                    outcome: 'applied',
+                    replayed: false,
+                    device: fullDevice(device),
+                    error: null,
+                };
+            });
+            return {
+                status: 200,
+                body: {
+                    results,
+                    summary: {
+                        total: results.length,
+                        applied: results.length,
+                        unchanged: 0,
+                        errors: 0,
+                    },
+                    target: { id: 1, name: 'Ziel' },
+                },
+            };
+        };
+    return {
+        key,
+        posted,
+        api: {
+            'GET api/v1/loans': (): MockResponse => ({
+                status: 200,
+                body: {
+                    today: '2026-11-09',
+                    summary: { open: 0, overdue: 0 },
+                    shown: 0,
+                    loans: [],
+                    borrowers: [NACHBAR],
+                    returns: [{ id: 90, name: 'Rückgabe', link_created_at: linkCreatedAt }],
+                    in_returns: waiting,
+                    labels: { borrower: 'Ausgeliehen an', returns: 'Rückgabe' },
+                },
+            }),
+            'POST api/v1/return-points/90/renew': (): MockResponse => {
+                linkCreatedAt = '2026-11-09T09:00:00Z';
+                return { status: 200, body: { key } };
+            },
+            'POST api/v1/return-points/90/revoke': (): MockResponse => {
+                linkCreatedAt = null;
+                return { status: 200, body: { revoked: true } };
+            },
+            'POST api/v1/loans/to-store': process('to-store'),
+            'POST api/v1/loans/to-collection': process('to-collection'),
+        } as Record<string, (request: MockRequest) => MockResponse>,
+    };
+}
+
+test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
+    let returns = returnsServer();
+
+    test.use({
+        api: {
+            'GET api/v1/auth/me': admin(),
+            ...ADMIN_OVERVIEW,
+            ...delegate(() => returns.api),
+        },
+    });
+
+    test.beforeEach(async ({ page }) => {
+        returns = returnsServer();
+        await page.setViewportSize({ width: 1280, height: 900 });
+    });
+
+    test('Aushang erzeugen: Link mit Schlüssel im Fragment, danach erneuern und widerrufen', async ({
+        page,
+    }) => {
+        await page.goto('/firefighting/test/verleih');
+        const place = page.getByTestId('return-place');
+        await expect(place).toContainText('Rückgabe');
+        await expect(page.getByTestId('return-link-state')).toHaveText('Noch kein Aushang');
+
+        await place.getByTestId('renew-key').click();
+        const issued = page.getByTestId('issued-key');
+        await expect(issued).toBeVisible();
+        await expect(issued.getByTestId('issued-link')).toHaveText(
+            new RegExp(`/firefighting/test/rueckgabe#schluessel=${returns.key}$`),
+        );
+        await expect(issued.getByRole('img', { name: /QR-Code/ })).toBeVisible();
+        await expect(page.getByTestId('return-poster')).toHaveCount(1);
+        await expect(page.getByTestId('return-link-state')).toContainText('Aushang gültig seit');
+
+        await issued.getByRole('button', { name: 'Schließen' }).click();
+        await expect(page.getByTestId('issued-key')).toHaveCount(0);
+        await expect(page.getByTestId('return-poster')).toHaveCount(0);
+
+        await place.getByTestId('renew-key').click();
+        await expect(page.getByTestId('confirm-dialog')).toContainText(
+            'Der bisherige Aushang gilt danach nicht mehr.',
+        );
+        await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Abbrechen' }).click();
+        await place.getByTestId('revoke-key').click();
+        await page
+            .getByTestId('confirm-dialog')
+            .getByRole('button', { name: 'Ungültig machen' })
+            .click();
+        await expect(page.getByTestId('return-link-state')).toHaveText('Noch kein Aushang');
+    });
+
+    test('In der Rückgabe: Benutzte und Defekte in die Sammelstelle, der Rest ins Lager', async ({
+        page,
+    }) => {
+        await page.goto('/firefighting/test/verleih');
+        const list = page.getByTestId('in-returns');
+        await expect(list.getByTestId('return-device')).toHaveCount(3);
+        await expect(list.getByTestId('to-store')).toBeDisabled();
+
+        await list.getByLabel('HRT 16 auswählen').check();
+        await list.getByLabel('HRT 3 auswählen').check();
+        await list.getByTestId('to-collection').click();
+        await expect(page.getByTestId('confirm-dialog')).toContainText(
+            '2 Ausrüstungen in die Sammelstelle bringen?',
+        );
+        await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Bringen' }).click();
+        await expect(page.getByTestId('loan-result')).toHaveText(
+            'In die Sammelstelle: 2 Ausrüstungen geändert.',
+        );
+        await expect(list.getByTestId('return-device')).toHaveCount(1);
+
+        await list.getByLabel('HRT 20 auswählen').check();
+        await list.getByTestId('to-store').click();
+        await expect(page.getByTestId('confirm-dialog')).toContainText(
+            '1 Ausrüstung ins Lager bringen?',
+        );
+        await expect(page.getByTestId('confirm-dialog')).toContainText('Sie steht dann');
+        await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Bringen' }).click();
+        await expect(page.getByTestId('loan-result')).toHaveText(
+            'Ins Lager: 1 Ausrüstung geändert.',
+        );
+        await expect(list).toContainText('Zurzeit steht nichts in der Rückgabe.');
+        expect(returns.posted.map((entry) => entry.path)).toEqual(['to-collection', 'to-store']);
+    });
+});

@@ -104,6 +104,8 @@ final class DeviceVisibilityTest extends TestCase
             // Name der Sammelstelle für „Benutzt melden“ (der Ablauf gibt das Ziel vor, G4); keine Geräte.
             'src/Api/V1/Offline/ClientConfigHandler.php' => 1,
             // Super-Admin: Standorte und Typen als Auswahl für „Sieht nur …“ (ohne Geräte).
+            // Rückgabe ohne Anmeldung (P2.6): der Schlüssel des Aushangs gibt das Ziel vor, es gibt kein Konto und keinen Filter.
+            'src/Api/V1/Returns/PublicReturnHandler.php' => 1,
             'src/Api/V1/Roles/RoleHandler.php' => 2,
             // Antwort auf eine Buchung durch einen Ablauf (Benutzt melden, G4): das Gerät darf den Filter verlassen haben.
             'src/Device/DeviceRepository.php' => 1,

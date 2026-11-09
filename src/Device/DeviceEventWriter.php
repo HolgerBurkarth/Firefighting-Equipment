@@ -21,7 +21,7 @@ final class DeviceEventWriter
     public const int BATCH_ROWS = 500;
 
     private const array COLUMNS = [
-        'tenant_id', 'device_id', 'event_type', 'user_id', 'from_location_id', 'to_location_id', 'from_status',
+        'tenant_id', 'device_id', 'event_type', 'user_id', 'actor_name', 'from_location_id', 'to_location_id', 'from_status',
         'to_status', 'from_due', 'to_due', 'field', 'old_value', 'new_value', 'comment', 'occurred_at', 'applied',
         'not_applied_reason', 'channel',
     ];
@@ -68,17 +68,19 @@ final class DeviceEventWriter
      * Paar beide Werte (verschieden) oder keiner, mindestens ein Paar (chk_fe_device_events_state).
      *
      * @param ActionTime|null $occurredAt Aktionszeit auf dem Handy; null = Serverzeit (created_at)
+     * @param string|null     $actorName  Rückgabe ohne Anmeldung (P2.6): Name des Überbringers; dann ist $userId null
      */
     public function stateChanged(
         Tenant $tenant,
         int $deviceId,
-        int $userId,
+        ?int $userId,
         ?int $fromLocationId,
         ?int $toLocationId,
         ?DeviceStatus $fromStatus,
         ?DeviceStatus $toStatus,
         ?string $comment,
         ?ActionTime $occurredAt = null,
+        ?string $actorName = null,
     ): void {
         $this->insert($tenant, $deviceId, $userId, 'state_changed', [
             'from_location_id' => $fromLocationId,
@@ -86,6 +88,7 @@ final class DeviceEventWriter
             'from_status' => $fromStatus?->value,
             'to_status' => $toStatus?->value,
             'occurred_at' => $occurredAt?->sql(),
+            'actor_name' => $actorName,
         ], $comment);
     }
 
@@ -149,7 +152,7 @@ final class DeviceEventWriter
     /**
      * @param array<string, int|string|null> $values Spalten aus diesem Code, nie aus Eingaben
      */
-    private function insert(Tenant $tenant, int $deviceId, int $userId, string $type, array $values, ?string $comment): void
+    private function insert(Tenant $tenant, int $deviceId, ?int $userId, string $type, array $values, ?string $comment): void
     {
         $values = [
             'tenant_id' => $tenant->id,

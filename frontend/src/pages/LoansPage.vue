@@ -1,16 +1,31 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef, useTemplateRef } from 'vue';
 import type { ApiError } from '../api/client';
-import { fetchLoans, type LoanPlace, type LoanState } from '../api/loans';
+import type { DeviceListItem } from '../api/devices';
+import {
+    fetchLoans,
+    renewReturnKey,
+    revokeReturnKey,
+    type LoanPlace,
+    type LoanState,
+    type ReturnPlace,
+} from '../api/loans';
 import { allows } from '../api/permissions';
 import { currentPermissions } from '../auth/session';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import LendDialog from '../components/LendDialog.vue';
+import QrCode from '../components/QrCode.vue';
+import ReturnPoster from '../components/ReturnPoster.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import { processReturns } from '../data';
 import { bulkCounts, bulkErrorText, bulkResultText, type BulkRun } from '../data/deviceBulk';
-import { dueText, groupLoans, loansSummary } from '../data/loans';
 import { changeTimeText } from '../data/changeTime';
+import { dueText, groupLoans, loansSummary, returnAddress, returnLink } from '../data/loans';
 import { useNow } from '../runtime/now';
+import { copyText } from '../runtime/share';
+import { tenantState } from '../runtime/tenantState';
+import { useUnsavedInput } from '../runtime/unsavedInput';
 
 /**
  * Seite „Verleih“ (Phase 2, P2.5; Mockup „Verleih“): die offenen Verleihe nach Leihnehmer mit
@@ -48,19 +63,180 @@ onMounted(() => {
 const groups = computed(() => groupLoans(state.value?.loans ?? []));
 const lendPossible = computed(() => (state.value?.borrowers.length ?? 0) > 0);
 
-function onDone(run: BulkRun, borrower: LoanPlace | null): void {
+// --- Rückgabe (P2.6): Aushang der Rückgabestellen und „Rückgaben bearbeiten“ ---
+
+/** Frisch erzeugter Schlüssel: erscheint nur jetzt (in der Datenbank steht nur der Hash). */
+const issued = shallowRef<{ place: ReturnPlace; key: string } | null>(null);
+const keyError = shallowRef<ApiError | null>(null);
+const keyBusy = ref(false);
+const copied = ref<string | null>(null);
+useUnsavedInput(() => issued.value !== null);
+
+const tenantName = computed(() => tenantState.value.tenant?.name ?? 'Feuerwehr');
+const logoUrl = computed(
+    () => tenantState.value.tenant?.logoUrls?.['512'] ?? 'api/v1/app-icon/512',
+);
+const issuedLink = computed(() => (issued.value === null ? '' : returnLink(issued.value.key)));
+
+const keyConfirmOpen = ref(false);
+const keyConfirm = shallowRef<{ place: ReturnPlace; revoke: boolean } | null>(null);
+
+function askKey(place: ReturnPlace, revoke: boolean): void {
+    if (revoke || place.linkCreatedAt !== null) {
+        keyConfirm.value = { place, revoke };
+        keyConfirmOpen.value = true;
+        return;
+    }
+    void renew(place);
+}
+
+async function renew(place: ReturnPlace): Promise<void> {
+    keyBusy.value = true;
+    keyError.value = null;
+    copied.value = null;
+    const result = await renewReturnKey(place.id);
+    keyBusy.value = false;
+    if (result.ok) {
+        issued.value = { place, key: result.data };
+        await load();
+    } else {
+        keyError.value = result.error;
+    }
+}
+
+async function confirmKey(): Promise<void> {
+    const target = keyConfirm.value;
+    if (target === null) {
+        return;
+    }
+    if (!target.revoke) {
+        await renew(target.place);
+        return;
+    }
+    keyBusy.value = true;
+    keyError.value = null;
+    const result = await revokeReturnKey(target.place.id);
+    keyBusy.value = false;
+    if (result.ok) {
+        issued.value = null;
+        await load();
+    } else {
+        keyError.value = result.error;
+    }
+}
+
+const keyConfirmTitle = computed(() =>
+    keyConfirm.value?.revoke === true
+        ? `Aushang für „${keyConfirm.value.place.name}“ ungültig machen?`
+        : `Neuen Aushang für „${keyConfirm.value?.place.name ?? ''}“ erzeugen?`,
+);
+const keyConfirmText = computed(() =>
+    keyConfirm.value?.revoke === true
+        ? 'Der QR-Code des Aushangs funktioniert danach nicht mehr.'
+        : 'Der bisherige Aushang gilt danach nicht mehr. Der neue Link erscheint nur einmal.',
+);
+
+async function copyLink(): Promise<void> {
+    copied.value = (await copyText(issuedLink.value))
+        ? 'Link kopiert.'
+        : 'Kopieren geht hier nicht. Bitte den Link markieren und kopieren.';
+}
+
+function closeIssued(): void {
+    issued.value = null;
+    copied.value = null;
+}
+
+const pickedReturns = ref<number[]>([]);
+const processBusy = ref(false);
+const processProgress = ref('');
+const processConfirmOpen = ref(false);
+const processKind = ref<'to-collection' | 'to-store'>('to-store');
+useUnsavedInput(() => processBusy.value);
+
+const inReturns = computed(() => state.value?.inReturns ?? []);
+const pickedDevices = computed(() =>
+    inReturns.value.filter((device) => pickedReturns.value.includes(device.id)),
+);
+const allReturnsPicked = computed(
+    () => inReturns.value.length > 0 && pickedDevices.value.length === inReturns.value.length,
+);
+
+function toggleReturn(id: number): void {
+    pickedReturns.value = pickedReturns.value.includes(id)
+        ? pickedReturns.value.filter((entry) => entry !== id)
+        : [...pickedReturns.value, id];
+}
+
+function toggleAllReturns(): void {
+    pickedReturns.value = allReturnsPicked.value ? [] : inReturns.value.map((device) => device.id);
+}
+
+function askProcess(kind: 'to-collection' | 'to-store'): void {
+    processKind.value = kind;
+    processConfirmOpen.value = true;
+}
+
+const processTitle = computed(() => {
+    const count = pickedDevices.value.length;
+    const what = count === 1 ? '1 Ausrüstung' : `${String(count)} Ausrüstungen`;
+    return processKind.value === 'to-store'
+        ? `${what} ins Lager bringen?`
+        : `${what} in die Sammelstelle bringen?`;
+});
+const processText = computed(() => {
+    const they = pickedDevices.value.length === 1 ? 'Sie steht' : 'Sie stehen';
+    return processKind.value === 'to-store'
+        ? `${they} dann im Standard-Lager mit dem Status „einsatzbereit“.`
+        : 'Benutzte kommen in die Sammelstelle für Benutzte, defekte in die für Defekte; der Status bleibt.';
+});
+
+function showRun(text: string, run: BulkRun, devices: readonly DeviceListItem[] = []): void {
     const counts = bulkCounts(run);
-    const target = borrower === null ? '' : ` an „${borrower.name}“`;
-    resultText.value = `${bulkResultText('lend', run).replace(/\.$/, '')}${target}.`;
+    resultText.value = text;
     resultOk.value = counts.errors === 0 && run.error === null && run.unsent.length === 0;
     failures.value = run.results
         .filter((result) => result.outcome === 'error')
         .map((result) => ({
             id: result.id,
-            identifier: result.device?.identifier ?? `#${String(result.id)}`,
+            identifier:
+                result.device?.identifier ??
+                devices.find((device) => device.id === result.id)?.identifier ??
+                `#${String(result.id)}`,
             text: bulkErrorText(result),
         }));
+}
+
+async function runProcess(): Promise<void> {
+    const devices = pickedDevices.value;
+    if (devices.length === 0 || processBusy.value) {
+        return;
+    }
+    processBusy.value = true;
+    resultText.value = null;
+    failures.value = [];
+    const action = processKind.value;
+    const run = await processReturns(action, devices, (done, total) => {
+        processProgress.value = `${String(done)} von ${String(total)} gesendet …`;
+    });
+    processBusy.value = false;
+    processProgress.value = '';
+    showRun(bulkResultText(action, run), run, devices);
+    const done = new Set(
+        run.results.filter((result) => result.outcome !== 'error').map((result) => result.id),
+    );
+    pickedReturns.value = pickedReturns.value.filter((id) => !done.has(id));
     void load();
+}
+
+function onDone(run: BulkRun, borrower: LoanPlace | null): void {
+    const target = borrower === null ? '' : ` an „${borrower.name}“`;
+    showRun(`${bulkResultText('lend', run).replace(/\.$/, '')}${target}.`, run);
+    void load();
+}
+
+function printPoster(): void {
+    window.print();
 }
 </script>
 
@@ -149,8 +325,190 @@ function onDone(run: BulkRun, borrower: LoanPlace | null): void {
         <p v-if="state.loans.length < state.open" class="hint">
             Angezeigt werden die ersten {{ state.loans.length }} von {{ state.open }}.
         </p>
+
+        <section
+            v-if="state.returns.length > 0"
+            class="group"
+            data-testid="returns-section"
+            aria-labelledby="returns-title"
+        >
+            <h2 id="returns-title">{{ state.returnsLabel }}</h2>
+            <p class="hint">
+                Wer verliehene Ausrüstung zurückbringt, scannt den QR-Code des Aushangs und gibt sie
+                ohne Anmeldung zurück. Sie steht dann hier, bis sie weiterbewegt wird.
+            </p>
+            <ErrorNotice v-if="keyError !== null" :error="keyError" />
+            <ul class="loans">
+                <li
+                    v-for="place in state.returns"
+                    :key="place.id"
+                    class="loan"
+                    data-testid="return-place"
+                >
+                    <strong class="identifier">{{ place.name }}</strong>
+                    <span class="since" data-testid="return-link-state">{{
+                        place.linkCreatedAt === null
+                            ? 'Noch kein Aushang'
+                            : `Aushang gültig seit ${changeTimeText(place.linkCreatedAt, now)}`
+                    }}</span>
+                    <template v-if="canLend">
+                        <button
+                            class="btn"
+                            type="button"
+                            data-testid="renew-key"
+                            :disabled="keyBusy"
+                            @click="askKey(place, false)"
+                        >
+                            {{
+                                place.linkCreatedAt === null
+                                    ? 'Aushang erzeugen …'
+                                    : 'Aushang erneuern …'
+                            }}
+                        </button>
+                        <button
+                            v-if="place.linkCreatedAt !== null"
+                            class="btn"
+                            type="button"
+                            data-testid="revoke-key"
+                            :disabled="keyBusy"
+                            @click="askKey(place, true)"
+                        >
+                            Widerrufen …
+                        </button>
+                    </template>
+                </li>
+            </ul>
+
+            <div v-if="issued !== null" class="issued" data-testid="issued-key">
+                <p class="notice notice-info">
+                    Der Link für „{{ issued.place.name }}“ erscheint nur jetzt. Drucken Sie den
+                    Aushang oder kopieren Sie den Link, bevor Sie diese Ansicht schließen; sonst
+                    erzeugen Sie einfach einen neuen.
+                </p>
+                <div class="issued-body">
+                    <div class="issued-qr">
+                        <QrCode :value="issuedLink" label="QR-Code mit dem Link zur Rückgabe" />
+                    </div>
+                    <div class="issued-text">
+                        <p class="issued-link" data-testid="issued-link">{{ issuedLink }}</p>
+                        <div class="actions">
+                            <button class="btn btn-primary" type="button" @click="printPoster">
+                                Aushang drucken
+                            </button>
+                            <button class="btn" type="button" @click="copyLink">
+                                Link kopieren
+                            </button>
+                            <button class="btn" type="button" @click="closeIssued">
+                                Schließen
+                            </button>
+                        </div>
+                        <p v-if="copied !== null" class="hint" role="status">{{ copied }}</p>
+                    </div>
+                </div>
+                <ReturnPoster
+                    :tenant-name="tenantName"
+                    :logo-url="logoUrl"
+                    :place-name="issued.place.name"
+                    :link="issuedLink"
+                    :address="returnAddress()"
+                />
+            </div>
+        </section>
+
+        <section
+            v-if="state.returns.length > 0"
+            class="group"
+            data-testid="in-returns"
+            aria-labelledby="in-returns-title"
+        >
+            <h2 id="in-returns-title">
+                In der Rückgabe
+                <span class="count">{{ inReturns.length }}</span>
+            </h2>
+            <p v-if="inReturns.length === 0" class="hint">Zurzeit steht nichts in der Rückgabe.</p>
+            <template v-else>
+                <div v-if="canLend" class="actions">
+                    <button
+                        class="btn btn-primary"
+                        type="button"
+                        data-testid="to-store"
+                        :disabled="processBusy || pickedDevices.length === 0"
+                        @click="askProcess('to-store')"
+                    >
+                        In Ordnung ins Lager …
+                    </button>
+                    <button
+                        class="btn"
+                        type="button"
+                        data-testid="to-collection"
+                        :disabled="processBusy || pickedDevices.length === 0"
+                        @click="askProcess('to-collection')"
+                    >
+                        Benutzte und Defekte in die Sammelstelle …
+                    </button>
+                    <span v-if="processProgress !== ''" class="hint" role="status">{{
+                        processProgress
+                    }}</span>
+                </div>
+                <ul class="loans">
+                    <li v-if="canLend" class="loan">
+                        <label class="check">
+                            <input
+                                type="checkbox"
+                                :checked="allReturnsPicked"
+                                :disabled="processBusy"
+                                aria-label="Alle Ausrüstungen in der Rückgabe auswählen"
+                                @change="toggleAllReturns"
+                            />
+                            Alle auswählen
+                        </label>
+                    </li>
+                    <li
+                        v-for="device in inReturns"
+                        :key="device.id"
+                        class="loan"
+                        data-testid="return-device"
+                    >
+                        <input
+                            v-if="canLend"
+                            type="checkbox"
+                            :checked="pickedReturns.includes(device.id)"
+                            :disabled="processBusy"
+                            :aria-label="`${device.identifier} auswählen`"
+                            @change="toggleReturn(device.id)"
+                        />
+                        <RouterLink
+                            class="identifier"
+                            :to="{ name: 'device-details', params: { id: device.id } }"
+                            >{{ device.identifier }}</RouterLink
+                        >
+                        <span class="type">{{ device.deviceType.name }}</span>
+                        <StatusBadge :status="device.status" :label="device.statusLabel" />
+                        <span class="since">{{
+                            device.stateChangedAt === null
+                                ? '–'
+                                : changeTimeText(device.stateChangedAt, now)
+                        }}</span>
+                    </li>
+                </ul>
+            </template>
+        </section>
     </template>
 
+    <ConfirmDialog
+        v-model:open="keyConfirmOpen"
+        :title="keyConfirmTitle"
+        :description="keyConfirmText"
+        :confirm-label="keyConfirm?.revoke === true ? 'Ungültig machen' : 'Neuen Aushang erzeugen'"
+        @confirm="confirmKey"
+    />
+    <ConfirmDialog
+        v-model:open="processConfirmOpen"
+        :title="processTitle"
+        :description="processText"
+        confirm-label="Bringen"
+        @confirm="runProcess"
+    />
     <LendDialog
         v-if="state !== null"
         v-model:open="dialogOpen"
@@ -232,6 +590,45 @@ function onDone(run: BulkRun, borrower: LoanPlace | null): void {
 .since,
 .comment {
     color: var(--muted);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.issued {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.issued-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.issued-qr {
+    width: 220px;
+    max-width: 100%;
+}
+
+.issued-text {
+    display: flex;
+    flex: 1 1 260px;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.issued-link {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    overflow-wrap: anywhere;
 }
 
 .failures {

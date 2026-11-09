@@ -2783,6 +2783,30 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Rückgaben, `PAGE_RIGHTS.loans`), `LendDialog` (Nummer oder Scan-Code per Enter hinzufügen, Leihnehmer, Ansprechpartner,
   „Rückgabe bis“, Kommentar), `src/api/loans.ts`, `src/data/loans.ts`, `lendEquipment` in `src/data/index.ts`,
   Kachel „Verliehen“ im Dashboard (`AdminOverview.loans`, nur mit dem Bereich). Tests `loans.spec.ts` (Browser, Unit).
+- Rückgabe (Phase 2, P2.6, Runde 9; Plan 3.4): Migrationen 0056 `fe_return_points` (je Standort mit der Aufgabe
+  „Rückgabe“ höchstens ein gültiger Schlüssel, nur der SHA-256 gespeichert, `revoked_at`), 0057 Aktion
+  `public_return` in `fe_auth_attempts`, 0058 `fe_device_events.user_id` darf NULL sein und `actor_name`
+  (nur `state_changed`, genau dann gesetzt, wenn das Konto fehlt; G6). Schlüssel `ReturnKey` (32 Zufallsbytes,
+  base64url, 43 Zeichen). Admin (`loans` Ändern, G16): `POST return-points/{id}/renew {}` → `{key}` (Klartext nur in
+  dieser Antwort; der alte Schlüssel gilt nicht mehr), `POST return-points/{id}/revoke {}`; `GET loans` nennt je
+  Rückgabestelle `link_created_at` und die Ausrüstung dort (`in_returns`); „Rückgaben bearbeiten“: `POST
+  loans/to-collection` (benutzt → Sammelstelle, die Benutzte annimmt, defekt → die Defekte annimmt, Status bleibt;
+  sonst Fehler des Eintrags) und `POST loans/to-store` (Standard-Lager, einsatzbereit), nur für Ausrüstung in der
+  Rückgabe, Ziel auch außerhalb des Datenfilters, Antwort wie die Sammelaktionen plus `target`. ÖFFENTLICH (`Access::Public`,
+  keine Sitzung, kein Cookie): `POST returns/check {key, code}` → `{identifier, device_type, location}` (nur Nummer
+  und Typ einer VERLIEHENEN Ausrüstung, Nummer ohne Groß-/Kleinschreibung oder Scan-Code genau) und `POST returns
+  {key, code, name, condition (ok|used|defective), comment?}` → bucht in die Rückgabe, schließt den Verleih in
+  derselben Transaktion (`DeviceRepository::returnLoaned`, `LoanRepository::returning`), `condition` `ok` lässt den
+  Status, sonst `used`/`defective`; Verlauf „Rückgabe“ von „<Name> (ohne Anmeldung)“ (`DeviceEvent::$userId` null,
+  `type_label` „Rückgabe“, JSON `user.id` null; keine Mail „Log“). Ungültiger Schlüssel oder Code → 400 `invalid_request`
+  (gleiche Meldungen, zählt in die Bremse `PublicReturnThrottle`: 20 Fehlversuche je IP-Präfix in 15 Minuten, sonst
+  429). Bekannte Stelle von `DeviceVisibility::all()`: `PublicReturnHandler`. Tests `ReturnTest`. Frontend: öffentliche
+  Seite `ReturnPage` (`rueckgabe#schluessel=…`, `meta.public`, nur unter Städten; Schlüssel aus dem Fragment per
+  `takeFragmentParam`, übersteht ein Neuladen in sessionStorage `ff-return-key`; Nummer prüfen, Name, Zustand, Hinweis),
+  in `LoansPage` die Abschnitte „Rückgabe“ (Aushang erzeugen/erneuern/widerrufen, Link und QR-Code nur einmal,
+  `ReturnPoster` zum Drucken, `returnLink` in `src/data/loans.ts`) und „In der Rückgabe“ (Auswahl, „In Ordnung ins Lager“,
+  „Benutzte und Defekte in die Sammelstelle“, `processReturns`). Tests `returnPage.spec.ts`, `loans.spec.ts`, Unit
+  `returns.spec.ts`.
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann

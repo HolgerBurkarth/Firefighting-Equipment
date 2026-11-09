@@ -61,6 +61,10 @@ use FirefightingEquipment\Api\V1\Roles\PermissionCatalogHandler;
 use FirefightingEquipment\Api\V1\Roles\RoleAction;
 use FirefightingEquipment\Api\V1\Loans\LoanLendHandler;
 use FirefightingEquipment\Api\V1\Loans\LoanListHandler;
+use FirefightingEquipment\Api\V1\Returns\PublicReturnHandler;
+use FirefightingEquipment\Api\V1\Returns\ReturnPointHandler;
+use FirefightingEquipment\Api\V1\Returns\ReturnProcess;
+use FirefightingEquipment\Api\V1\Returns\ReturnProcessHandler;
 use FirefightingEquipment\Api\V1\Locations\LocationTasksHandler;
 use FirefightingEquipment\Api\V1\Maintenance\MaintenanceListHandler;
 use FirefightingEquipment\Api\V1\Maintenance\MaintenanceMove;
@@ -189,6 +193,9 @@ final class Routes
             ->add('POST', 'api/v1/auth/email/verify', Access::Public, new EmailVerifyHandler())
             ->add('POST', 'api/v1/auth/email/resend', Access::Public, self::withDuration(EmailResendHandler::class, $neutralDuration))
             ->add('POST', 'api/v1/auth/invitation/accept', Access::Public, new InvitationAcceptHandler())
+            // Rückgabe ohne Anmeldung (Phase 2, P2.6): der geheime Schlüssel des Aushangs ist der Nachweis.
+            ->add('POST', 'api/v1/returns/check', Access::Public, new PublicReturnHandler(check: true))
+            ->add('POST', 'api/v1/returns', Access::Public, new PublicReturnHandler(check: false))
             ->add('GET', 'api/v1/auth/notifications', $action(Action::MailLog), new NotificationSettingsHandler(update: false))
             ->add('POST', 'api/v1/auth/notifications', $action(Action::MailLog), new NotificationSettingsHandler(update: true))
             ->add('GET', 'api/v1/invitation-codes', $read(Area::Users), new InvitationCodeListHandler())
@@ -241,6 +248,10 @@ final class Routes
             ->add('POST', 'api/v1/devices/{id}/state', $book, new DeviceStateHandler($clock, $offline))
             ->add('GET', 'api/v1/loans', $read(Area::Loans), new LoanListHandler($clock))
             ->add('POST', 'api/v1/loans', $write(Area::Loans), new LoanLendHandler())
+            ->add('POST', 'api/v1/loans/to-collection', $write(Area::Loans), new ReturnProcessHandler(ReturnProcess::ToCollection))
+            ->add('POST', 'api/v1/loans/to-store', $write(Area::Loans), new ReturnProcessHandler(ReturnProcess::ToStore))
+            ->add('POST', 'api/v1/return-points/{id}/renew', $write(Area::Loans), new ReturnPointHandler(true))
+            ->add('POST', 'api/v1/return-points/{id}/revoke', $write(Area::Loans), new ReturnPointHandler(false))
             ->add('GET', 'api/v1/maintenance', $read(Area::Maintenance), new MaintenanceListHandler())
             ->add('POST', 'api/v1/maintenance/to-workshop', $write(Area::Maintenance), new MaintenanceMoveHandler(MaintenanceMove::ToWorkshop))
             ->add('POST', 'api/v1/maintenance/back', $write(Area::Maintenance), new MaintenanceMoveHandler(MaintenanceMove::Back))
