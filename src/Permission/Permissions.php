@@ -250,7 +250,7 @@ final readonly class Permissions
             Area::Users => AreaLevel::Read,
             Area::Locations, Area::DeviceTypes => AreaLevel::Write,
             // Die Orte der Wartung liegen außerhalb jedes Filters (Sammelstelle, Werkstatt, Lager).
-            Area::Maintenance => AreaLevel::Read,
+            Area::Maintenance, Area::Loans => AreaLevel::Read,
             default => null,
         };
     }

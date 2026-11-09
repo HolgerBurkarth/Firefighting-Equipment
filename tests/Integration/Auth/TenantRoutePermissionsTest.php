@@ -111,6 +111,8 @@ final class TenantRoutePermissionsTest extends AuthTestCase
             . ' device_type_id → device.edit, serial_number → device.edit, manufacturer → device.edit, model → device.edit,'
             . ' procured_on → device.edit, note → device.edit'],
         'POST api/v1/devices/{id}/inspection-due' => ['admin', 'due:write'],
+        'GET api/v1/loans' => ['admin', 'loans:read'],
+        'POST api/v1/loans' => ['admin', 'loans:write'],
         'GET api/v1/maintenance' => ['admin', 'maintenance:read'],
         'POST api/v1/maintenance/to-workshop' => ['admin', 'maintenance:write'],
         'POST api/v1/maintenance/back' => ['admin', 'maintenance:write'],
@@ -164,7 +166,7 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         parent::setUp();
 
         // Der Bereich „Wartung“ gilt nur in einer Stadt mit Sammelstelle oder Werkstatt (Phase 2, P2.4).
-        foreach (['collection', 'workshop'] as $task) {
+        foreach (['collection', 'workshop', 'borrower', 'returns'] as $task) {
             $this->insert('fe_tenant_location_tasks', ['tenant_id' => $this->tenant('immendingen')->id, 'task' => $task, 'enabled' => 1]);
         }
     }

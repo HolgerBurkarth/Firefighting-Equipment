@@ -84,9 +84,9 @@ export function permissionsJson(
 /** Rechte der Standard-Rollen, wie der Server sie in auth/me sendet (Admin: alles). */
 export const ADMIN_RIGHTS = permissionsJson(
     Object.fromEntries(
-        // Wartung gibt es nur in Städten mit Sammelstelle oder Werkstatt (Phase 2, P2.4).
+        // Wartung und Verleih gibt es nur in Städten mit den Aufgaben (Phase 2, P2.4/P2.5).
         CATALOG.areas
-            .filter((area) => area.key !== 'maintenance')
+            .filter((area) => area.key !== 'maintenance' && area.key !== 'loans')
             .map((area) => [area.key, area.levels.includes('write') ? 'write' : 'read']),
     ),
     CATALOG.action_groups.flatMap((group) => group.actions.map((action) => action.key)),

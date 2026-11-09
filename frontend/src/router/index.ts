@@ -225,6 +225,13 @@ export function createRoutes(base: AppBase): RouteRecordRaw[] {
             meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.maintenance, layout: 'admin' },
         });
         routes.push({
+            // Verleih und Rückgaben (Phase 2, P2.5).
+            path: '/verleih',
+            name: 'loans',
+            component: () => import('../pages/LoansPage.vue'),
+            meta: { roles: TENANT_ROLES, rights: PAGE_RIGHTS.loans, layout: 'admin' },
+        });
+        routes.push({
             // Nur positive Ganzzahlen ohne führende Null (wie die Platzhalter im Backend).
             path: '/geraete/:id([1-9]\\d{0,17})',
             name: 'device',

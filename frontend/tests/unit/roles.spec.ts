@@ -99,6 +99,7 @@ describe('Katalog und Grenzen wie im Backend', () => {
             'users',
             'settings',
             'maintenance',
+            'loans',
         ]);
         expect(parsed.levelLabels).toEqual({ read: 'Ansehen', write: 'Ändern' });
         expect(allActions(parsed)).toHaveLength(11);

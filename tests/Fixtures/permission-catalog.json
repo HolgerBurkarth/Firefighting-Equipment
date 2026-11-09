@@ -117,6 +117,16 @@
                 "write"
             ],
             "levels_with_filter": []
+        },
+        {
+            "key": "loans",
+            "label": "Verleih und Rückgaben",
+            "hint": "Ausrüstung verleihen, Verliehenes ansehen, Rückgaben bearbeiten",
+            "levels": [
+                "read",
+                "write"
+            ],
+            "levels_with_filter": []
         }
     ],
     "levels": [

@@ -100,7 +100,7 @@ describe('parsePermissions', () => {
 
     it('unbekannte Bereiche, Stufen und Aktionen geben kein Recht (neuerer Server)', () => {
         const parsed = parsePermissions(
-            permissionsJson({ loans: 'write', devices: 'admin', search: 'write' } as never, [
+            permissionsJson({ billing: 'write', devices: 'admin', search: 'write' } as never, [
                 'lend',
                 'book.move',
             ]),

@@ -516,7 +516,12 @@ final readonly class DeviceRepository
             $this->lockActiveLocation($tenant, $locationId, $change->process);
         }
 
-        return [BookingOutcome::Applied, null, $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment)];
+        $eventId = $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment);
+        if ($change->inTransaction !== null) {
+            ($change->inTransaction)($current);
+        }
+
+        return [BookingOutcome::Applied, null, $eventId];
     }
 
     /**

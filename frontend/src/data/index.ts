@@ -31,6 +31,7 @@ import {
     type DeviceType,
 } from '../api/deviceTypes';
 import { fetchInspectionOverview, type InspectionOverview } from '../api/inspections';
+import { postLend, type LendRequest } from '../api/loans';
 import { postBack, postToWorkshop } from '../api/maintenance';
 import {
     createInvitationCode as postInvitationCode,
@@ -336,6 +337,16 @@ export async function bulkChangeState(
     return afterBulk(
         await runInBlocks(entries, (block) => postBulkState(block, comment), onProgress),
     );
+}
+
+/** „Verleihen“ (Seite Verleih; Phase 2, P2.5): in Blöcken, je Ausrüstung die bekannte Version. */
+export async function lendEquipment(
+    devices: readonly { readonly id: number; readonly version: number }[],
+    request: LendRequest,
+    onProgress?: (done: number, total: number) => void,
+): Promise<BulkRun> {
+    const entries = devices.map((device) => ({ id: device.id, version: device.version }));
+    return afterBulk(await runInBlocks(entries, (block) => postLend(block, request), onProgress));
 }
 
 /** „Zur Werkstatt“ (Seite Wartung; Phase 2, P2.4): der Server bucht ins Ziel der Werkstatt. */

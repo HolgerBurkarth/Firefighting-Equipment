@@ -251,6 +251,17 @@ final readonly class LocationRepository
         return $this->transaction(function () use ($tenant, $id, $task, $defaultStore, $collectionAccepts): int {
             $row = $this->lockRow($tenant, $id, 'FOR UPDATE') ?? throw LocationNotFoundException::forId($id);
             $name = LocationName::fromString((string) $row['name']);
+            if ($task !== LocationTask::Borrower) {
+                // Verliehene Ausrüstung braucht den Leihnehmer (Phase 2, P2.5): erst zurückbuchen.
+                $open = $this->count(
+                    'SELECT COUNT(*) FROM fe_device_loans l JOIN fe_devices d ON d.id = l.device_id AND d.tenant_id = l.tenant_id'
+                    . " WHERE l.tenant_id = ? AND l.borrower_location_id = ? AND l.returned_at IS NULL AND d.status <> 'retired' AND d.location_id = l.borrower_location_id",
+                    [$tenant->id, $id],
+                );
+                if ($open > 0) {
+                    throw DeviceRuleViolationException::because(sprintf('Bei „%s“ %s noch verliehen. Bitte zuerst die Rückgabe buchen.', $name->value, $open === 1 ? 'ist 1 Ausrüstung' : sprintf('sind %d Ausrüstungen', $open)), ['loans' => $open]);
+                }
+            }
             if ($task !== null) {
                 if ($row['parent_id'] !== null) {
                     throw DeviceRuleViolationException::because(sprintf('Eine Aufgabe kann nur ein Standort der obersten Ebene haben; „%s“ ist ein Unterstandort.', $name->value));

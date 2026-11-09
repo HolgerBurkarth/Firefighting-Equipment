@@ -74,6 +74,9 @@ function badgeCount(badge: AdminMenuBadge | undefined): number {
     if (badge === undefined || overview === null || props.service) {
         return 0;
     }
+    if (badge === 'overdueLoans') {
+        return overview.loans?.overdue ?? 0;
+    }
     return badge === 'pendingUsers'
         ? (overview.pendingUsers ?? 0)
         : (overview.summary?.openNotices ?? 0);
@@ -82,6 +85,7 @@ function badgeCount(badge: AdminMenuBadge | undefined): number {
 const BADGE_LABELS: Readonly<Record<AdminMenuBadge, (n: number) => string>> = {
     pendingUsers: (n) => `${String(n)} warten auf Freischaltung`,
     openNotices: (n) => (n === 1 ? '1 offener Hinweis' : `${String(n)} offene Hinweise`),
+    overdueLoans: (n) => (n === 1 ? '1 Rückgabe überfällig' : `${String(n)} Rückgaben überfällig`),
 };
 
 /** Ungesendete Buchungen: erst fragen (KONZEPT.md, "Offline-Modus – Entscheidungen", 55). */

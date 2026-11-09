@@ -2277,7 +2277,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   offener App“, `page.clock`); die Browser-Tests prüfen `X-Client-Api` gegen
   `resources/client-api.json`.
 - Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank): `Area` (`dashboard`,
-  `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`, `maintenance` (seit P2.4); `maxLevel`:
+  `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`, `maintenance` (seit P2.4), `loans` (seit P2.5); `maxLevel`:
   `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`
   (`book.move`, `book.status`, `device.used` (seit P2.3, braucht `search` Ansehen, Gruppe „Buchen“), `device.create`, `device.edit`, `device.retire`, `device.code`,
   `devices.bulk`, `csv.import`, `csv.export` (seit Schritt 1.7a, braucht `devices` Ansehen, auch mit
@@ -2762,6 +2762,27 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `PAGE_RIGHTS.maintenance`), `src/api/maintenance.ts`, `src/data/maintenance.ts` („seit“, Transportliste
   nur zum Kopieren; CSV/Druck und „Wartungsdatum setzen“ siehe `docs/TODO-SPAETER.md` T20), `maintenanceToWorkshop`/
   `maintenanceBack` in `src/data/index.ts`. Tests `maintenance.spec.ts` (Browser, Unit).
+- Verleih (Phase 2, P2.5, Runde 9; Bereich `loans`, Seite „Verleih“): `Area::Loans` gibt es nur in einer Stadt mit
+  freigeschalteter Aufgabe „Ausgeliehen an“ oder „Rückgabe“ (`Area::requiredTasks`); F3: mit Datenfilter kein
+  Zugriff. Abweichung vom Plan: keine eigenen Aktionen `loan.lend`/`returns.process`, der Bereich Ändern genügt.
+  Migration 0055 `fe_device_loans` (je Ausrüstung eine Zeile: Leihnehmer, Ansprechpartner, `due_back_on`,
+  Kommentar, `lent_by`, `returned_at`; höchstens ein offener Verleih je Ausrüstung über `open_device_key` + UNIQUE;
+  der Plan nannte 0057, die Nummern müssen lückenlos sein). Verleih = Buchung auf einen aktiven Standort der
+  Ebene 1 mit der Aufgabe „Ausgeliehen an“ (Ereignis `state_changed`, Status bleibt) UND Eintrag in
+  derselben Transaktion (`DeviceStateChange::$inTransaction`, `LoanRepository::lending`); steht die Ausrüstung
+  schon bei einem Leihnehmer mit offenem Verleih → Fehler des Eintrags, wurde sie von Hand woandershin gebucht,
+  schließt der neue Verleih den alten. Offen = `returned_at` leer, nicht ausgesondert, noch am Standort des
+  Leihnehmers (`LoanRepository::OPEN`). `GET loans` (`loans` Ansehen, `LoanListHandler`): `{today, summary
+  {open, overdue}, shown, loans [{id, device (wie GET devices), borrower {id, name}, contact, due_back_on,
+  overdue, days_overdue, comment, lent_at, lent_by {id, name}}], borrowers, returns, labels}` nach Leihnehmer,
+  „Rückgabe bis“ (ohne zuletzt), höchstens 500; überfällig = vor heute (Europe/Berlin). `POST loans` (`loans`
+  Ändern, `LoanLendHandler`): `{devices: [{id, version}], borrower_location_id, contact?, due_back_on?, comment?}`,
+  höchstens 50, Antwort wie die Sammelaktionen plus `borrower`, danach eine Sammelmail „Log“. Die Aufgabe
+  „Ausgeliehen an“ lässt sich von einem Standort nicht entfernen, solange dort Ausrüstung verliehen ist (409).
+  Tests `LoanTest`. Frontend: `LoansPage` (`verleih`, Menü „Verleih“ mit rotem Zähler der überfälligen
+  Rückgaben, `PAGE_RIGHTS.loans`), `LendDialog` (Nummer oder Scan-Code per Enter hinzufügen, Leihnehmer, Ansprechpartner,
+  „Rückgabe bis“, Kommentar), `src/api/loans.ts`, `src/data/loans.ts`, `lendEquipment` in `src/data/index.ts`,
+  Kachel „Verliehen“ im Dashboard (`AdminOverview.loans`, nur mit dem Bereich). Tests `loans.spec.ts` (Browser, Unit).
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann

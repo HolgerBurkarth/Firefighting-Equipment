@@ -33,6 +33,8 @@ export const PAGE_RIGHTS = {
     users: (p) => allows(p, 'users'),
     // Nur in Städten mit Sammelstelle oder Werkstatt sendet der Server den Bereich (Phase 2, P2.4).
     maintenance: (p) => allows(p, 'maintenance'),
+    // Nur in Städten mit der Aufgabe „Ausgeliehen an“ oder „Rückgabe“ sendet der Server den Bereich (P2.5).
+    loans: (p) => allows(p, 'loans'),
     notices: logRead,
     notice: logRead,
     // Anzeigemodus, Passwort und Geräte für jede Konsole; Farbe und Logo nur mit `settings`.

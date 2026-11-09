@@ -44,6 +44,16 @@ final class DeviceText
     }
 
     /**
+     * Ansprechpartner eines Verleihs (eine Zeile, höchstens 100 Zeichen).
+     *
+     * @throws InvalidDeviceValueException
+     */
+    public static function contact(?string $value): ?string
+    {
+        return self::check($value, 'Der Ansprechpartner', self::MAX_LENGTH, false);
+    }
+
+    /**
      * Notiz beim Erledigen eines Hinweises (höchstens 500 Zeichen, Zeilenumbrüche erlaubt).
      *
      * @throws InvalidDeviceValueException

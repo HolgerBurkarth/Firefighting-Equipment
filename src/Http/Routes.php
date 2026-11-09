@@ -59,6 +59,8 @@ use FirefightingEquipment\Api\V1\OAuth\TokenHandler;
 use FirefightingEquipment\Api\V1\Offline\ClientConfigHandler;
 use FirefightingEquipment\Api\V1\Roles\PermissionCatalogHandler;
 use FirefightingEquipment\Api\V1\Roles\RoleAction;
+use FirefightingEquipment\Api\V1\Loans\LoanLendHandler;
+use FirefightingEquipment\Api\V1\Loans\LoanListHandler;
 use FirefightingEquipment\Api\V1\Locations\LocationTasksHandler;
 use FirefightingEquipment\Api\V1\Maintenance\MaintenanceListHandler;
 use FirefightingEquipment\Api\V1\Maintenance\MaintenanceMove;
@@ -237,6 +239,8 @@ final class Routes
             ->add('POST', 'api/v1/devices/{id}/fields', $deviceFields, new DeviceActionHandler(DeviceAction::UpdateFields))
             ->add('POST', 'api/v1/devices/{id}/inspection-due', $write(Area::Due), new DeviceActionHandler(DeviceAction::SetInspectionDue))
             ->add('POST', 'api/v1/devices/{id}/state', $book, new DeviceStateHandler($clock, $offline))
+            ->add('GET', 'api/v1/loans', $read(Area::Loans), new LoanListHandler($clock))
+            ->add('POST', 'api/v1/loans', $write(Area::Loans), new LoanLendHandler())
             ->add('GET', 'api/v1/maintenance', $read(Area::Maintenance), new MaintenanceListHandler())
             ->add('POST', 'api/v1/maintenance/to-workshop', $write(Area::Maintenance), new MaintenanceMoveHandler(MaintenanceMove::ToWorkshop))
             ->add('POST', 'api/v1/maintenance/back', $write(Area::Maintenance), new MaintenanceMoveHandler(MaintenanceMove::Back))

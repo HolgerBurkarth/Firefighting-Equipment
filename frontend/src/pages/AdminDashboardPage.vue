@@ -15,6 +15,7 @@ import {
     openItemsTile,
     readinessTile,
 } from '../data/dashboard';
+import { loansTile } from '../data/loans';
 import { useNow } from '../runtime/now';
 
 /**
@@ -64,7 +65,9 @@ const tiles = computed(() => {
             readiness: tileLink('devices', { name: 'devices' }),
             notReady: tileLink('devices', { name: 'devices', query: NOT_READY_QUERY }),
             inspection: tileLink('inspections', { name: 'inspections' }),
+            loans: tileLink('loans', { name: 'loans' }),
         },
+        loans: data.loans == null ? null : loansTile(data.loans),
     };
 });
 
@@ -144,6 +147,17 @@ onMounted(() => {
                 <span class="tile-label">Termine</span>
                 <span class="tile-value tile-value-maintenance">{{ tiles.inspection.value }}</span>
                 <span class="tile-detail">{{ tiles.inspection.detail }}</span>
+            </component>
+            <component
+                :is="tiles.links.loans.is"
+                v-if="tiles.loans !== null"
+                v-bind="tiles.links.loans.attrs"
+                class="tile tile-maintenance"
+                data-testid="tile-loans"
+            >
+                <span class="tile-label">Verliehen</span>
+                <span class="tile-value tile-value-maintenance">{{ tiles.loans.value }}</span>
+                <span class="tile-detail">{{ tiles.loans.detail }}</span>
             </component>
             <div class="tile tile-accent" data-testid="tile-open">
                 <span class="tile-label">Offene Hinweise</span>

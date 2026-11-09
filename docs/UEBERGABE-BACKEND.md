@@ -8,6 +8,15 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Verleih (Phase 2, Runde 9, P2.5)“
+
+- Migration 0055: `fe_device_loans`. Neuer Bereich `loans` (nur mit Aufgabe „Ausgeliehen an“ oder „Rückgabe“;
+  `permissions.areas`, Katalog-Datei). Keine neuen Aktionen (Abweichung vom Plan, Bereich Ändern genügt).
+- Neu: `GET loans`, `POST loans` (siehe `CLAUDE.md`, Standorte und Geräte, „Verleih“). Verleih bucht als
+  `state_changed` auf den Standort des Leihnehmers; `POST locations/{id}/task` verweigert das Entfernen der Aufgabe
+  „Ausgeliehen an“ bei offenem Verleih (409 `rule_violation`, `details {loans}`).
+- Tests: `LoanTest`, `TenantRoutePermissionsTest`, `RoleApiTest`, `PermissionsForClaudeTest`; Frontend `loans.spec.ts`.
+
 ## 2026-11-09 – „Korrekturen aus dem Live-Test Runde 8b (Runde 9)“
 
 - `GET client-config`: neues Feld `used_target` (`{id, name}` der Sammelstelle, in die „Benutzt melden“ bucht,

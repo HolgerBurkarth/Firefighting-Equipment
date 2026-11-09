@@ -21,6 +21,7 @@ enum Area: string
     case Users = 'users';
     case Settings = 'settings';
     case Maintenance = 'maintenance';
+    case Loans = 'loans';
 
     public function label(): string
     {
@@ -35,6 +36,7 @@ enum Area: string
             self::Users => 'Benutzer',
             self::Settings => 'Einstellungen der Stadt',
             self::Maintenance => 'Wartung',
+            self::Loans => 'Verleih und Rückgaben',
         };
     }
 
@@ -52,6 +54,7 @@ enum Area: string
             self::Users => 'Konten, Rollen zuweisen, Einladungscodes, Aushang',
             self::Settings => 'Farbe und Logo',
             self::Maintenance => 'Sammelstelle und Werkstatt: Ausrüstung zur Wartung bringen und zurückholen',
+            self::Loans => 'Ausrüstung verleihen, Verliehenes ansehen, Rückgaben bearbeiten',
         };
     }
 
@@ -65,6 +68,7 @@ enum Area: string
     {
         return match ($this) {
             self::Maintenance => [\FirefightingEquipment\Device\LocationTask::Collection, \FirefightingEquipment\Device\LocationTask::Workshop],
+            self::Loans => [\FirefightingEquipment\Device\LocationTask::Borrower, \FirefightingEquipment\Device\LocationTask::Returns],
             default => [],
         };
     }
