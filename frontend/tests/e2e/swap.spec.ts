@@ -23,6 +23,10 @@ const M9 = deviceJson(9, {
     identifier: 'M9',
     location: { id: 7, name: 'Lager', path: 'Lager' },
 });
+const M8 = deviceJson(8, {
+    identifier: 'M8',
+    location: { id: 20, name: 'LF 10', path: 'LF 10' },
+});
 const F5 = deviceJson(5, {
     identifier: 'F5',
     device_type: { id: 2, name: 'Funkgerät' },
@@ -82,7 +86,7 @@ test.describe('Sollbestand: Tauschen statt Fehlermeldung', () => {
     test.use({
         api: {
             'GET api/v1/auth/me': me(['book.move', 'book.status', 'device.swap']),
-            'GET api/v1/devices': devicesEndpoint([M1, M9, F5]),
+            'GET api/v1/devices': devicesEndpoint([M1, M9, M8, F5]),
             ...deviceDetail(M1),
             ...LOCATIONS,
             'POST api/v1/devices/1/state': () => stockError(false),
@@ -108,10 +112,14 @@ test.describe('Sollbestand: Tauschen statt Fehlermeldung', () => {
         await page.getByTestId('stock-swap').click();
         const dialog = page.getByTestId('form-dialog');
         await expect(dialog).toContainText('M1 tauschen');
-        // Zuerst die Typen der Regel (Atemschutzmaske), das Funkgerät danach.
+        // Nur die Typen der Regel (Atemschutzmaske), das Funkgerät F5 wird nicht angeboten.
         const options = dialog.getByTestId('swap-candidates').getByRole('listitem');
+        await expect(options).toHaveCount(1);
         await expect(options.first()).toContainText('M9');
-        await expect(options.last()).toContainText('F5');
+        // Ausrüstung eines anderen Fahrzeugs erst hinter „Andere Standorte anzeigen“.
+        await expect(dialog.getByTestId('swap-others')).toHaveCount(0);
+        await dialog.getByTestId('swap-show-others').click();
+        await expect(dialog.getByTestId('swap-others')).toContainText('M8');
         await expect(dialog.getByRole('button', { name: 'Tauschen', exact: true })).toBeDisabled();
 
         await dialog.getByRole('radio', { name: /M9/ }).check();

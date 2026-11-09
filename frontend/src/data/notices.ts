@@ -82,7 +82,11 @@ const KIND_EXPLANATIONS: Readonly<Partial<Record<string, string>>> = {
 };
 
 export function noticeExplanation(notice: Notice): string | null {
-    const text = KIND_EXPLANATIONS[notice.kind] ?? null;
+    const base = KIND_EXPLANATIONS[notice.kind] ?? null;
+    const text =
+        base !== null && notice.detail !== null
+            ? `${base} Unterschritten: ${notice.detail}.`
+            : base;
     if (notice.staleConfirmed && notice.kind !== 'stale_confirmed') {
         const stale =
             'Außerdem war die Buchung älter als erlaubt und wurde nach einer Rückfrage auf dem Handy gesendet.';

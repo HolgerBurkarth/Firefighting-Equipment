@@ -15,6 +15,7 @@ use FirefightingEquipment\Device\DeviceTypeRepository;
 use FirefightingEquipment\Device\LocationRepository;
 use FirefightingEquipment\Device\NewDevice;
 use FirefightingEquipment\Device\ScanCode;
+use FirefightingEquipment\Device\Stock\StockGuard;
 use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Time\GermanFormat;
@@ -170,7 +171,44 @@ final readonly class DeviceImportPlanner
             }
         }
 
-        return new DeviceImportPlan($file->hash, $rows, self::unknownValues($unknownTypes), self::unknownValues($unknownLocations));
+        return new DeviceImportPlan($file->hash, $this->withStockWarnings($tenant, $rows), self::unknownValues($unknownTypes), self::unknownValues($unknownLocations));
+    }
+
+    /**
+     * Sollbestand (P2.8): Ändern die bestehenden Zeilen zusammen Standort oder Status so, dass der Bestand einer Regel
+     * unter die Soll-Anzahl fällt, bekommen die Zeilen, die ihn verringern, eine Warnung (kein Fehler: der Import
+     * wird trotzdem übernommen). Neue Ausrüstung zählt nicht mit (vorsichtig: es kann zu viel gewarnt werden).
+     *
+     * @param list<ImportRowPlan> $rows
+     *
+     * @return list<ImportRowPlan>
+     */
+    private function withStockWarnings(Tenant $tenant, array $rows): array
+    {
+        $moves = [];
+        foreach ($rows as $index => $row) {
+            if ($row->result !== ImportResult::Changed || $row->device === null || ($row->locationId === null && $row->status === null)) {
+                continue;
+            }
+            $moves[$index] = [
+                'device' => $row->device,
+                'locationId' => $row->locationId ?? $row->device->locationId,
+                'status' => $row->status ?? $row->device->status,
+            ];
+        }
+        if ($moves === []) {
+            return $rows;
+        }
+        foreach (new StockGuard($this->pdo)->evaluate($tenant, $moves) as [$violation, $indexes]) {
+            foreach ($indexes as $index) {
+                $rows[$index] = $rows[$index]->withWarnings([sprintf(
+                    'Sollbestand unterschritten – %s. Die Zeile wird trotzdem übernommen.',
+                    $violation->detail(),
+                )]);
+            }
+        }
+
+        return $rows;
     }
 
     /**

@@ -390,4 +390,26 @@ final class DeviceImportPreviewTest extends ImportApiTestCase
         self::assertError(400, 'invalid_request', $body);
         self::assertSame('Der Inhalt der Anfrage ist zu groß (höchstens 3145728 Byte).', self::json($body)['message']);
     }
+
+    public function testStockBelowMinimumIsAWarningNotAnError(): void
+    {
+        $this->createViaApi('MA-01');
+        $this->createViaApi('MA-02');
+        $this->createViaApi('MA-03', ['location_id' => $this->room]);
+        $rule = $this->api('POST', 'locations/' . $this->g1 . '/stock-rules', ['rules' => [['min_count' => 2, 'device_type_ids' => [$this->typeId]]]]);
+        self::assertSame(200, $rule->statusCode(), $rule->body());
+
+        $preview = $this->previewOk(self::csv([
+            ['MA-01', '', '', 'defekt', '', '', '', '', '', ''],
+            ['MA-03', '', '', 'defekt', '', '', '', '', '', ''],
+        ]));
+
+        self::assertSame(['rows' => 2, 'new' => 0, 'changed' => 2, 'unchanged' => 0, 'skipped' => 0, 'errors' => 0, 'warnings' => 1], $preview['summary']);
+        self::assertSame(
+            ['Sollbestand unterschritten – HLF 20 / G1: 1 von mindestens 2 Atemschutzmaske einsatzbereit. Die Zeile wird trotzdem übernommen.'],
+            self::row($preview, 2)['warnings'],
+        );
+        self::assertSame([], self::row($preview, 3)['warnings'], 'MA-03 steht nicht am Standort mit Regel');
+        self::assertArrayHasKey('token', $preview, 'eine Warnung blockiert das Übernehmen nicht');
+    }
 }

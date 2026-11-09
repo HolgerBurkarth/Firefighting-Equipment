@@ -21,6 +21,56 @@ committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, 
   (nicht über Claude). Verleih, Wartung und Rückgaben werden ebenfalls geprüft (Fehler je Eintrag). Offline-Buchungen nicht (P2.9).
 - Tests: `StockSwapTest`, `TenantRoutePermissionsTest`, `NoticeKindTest`, `RoleApiTest`.
 
+## 2026-11-09 – „Mail-Auswahl je Person (Phase 2, Runde 11, P2.10)“
+
+- Migration 0064 `fe_user_mail_prefs` (neue Tabelle). `GET`/`POST auth/notifications`: Antwort zusätzlich `topics {selected: null|[…],
+  available: [{id, label, hint}]}` (Themen `defect_reported`, `used_reported`, `return_received`, `lent`, `notices`, `changes`,
+  `master_data`); `POST` nimmt optional `topics` (fehlt = unverändert, `null` = alle Themen, nicht leere Liste = nur diese, sonst 400).
+  `auth/me` bleibt unverändert. Die Log-Mails gehen nur noch an Konten, deren Auswahl zum Thema passt (ohne Auswahl alles).
+  Commit-Betreff: „Mail-Auswahl je Person: Themen der Benachrichtigung „Log“ (P2.10)“. Tests: `MailTopicTest`, `NotificationSettingsTest`,
+  `DeviceLogNotificationTest`, Browser `settings.spec.ts`.
+
+## 2026-11-09 – „Tausch und Unterschreitung offline (Phase 2, Runde 11, P2.9)“
+
+- `POST devices/swap` nimmt zusätzlich `client_ref`, `occurred_at`, `confirmed_stale` (wie `/state`; `occurred_at` nur mit `client_ref`).
+  Mit `client_ref` trägt die Antwort `result` (`DeviceBookingJson`), wiederholt gesendet `replayed: true` (`swap_id` dann ggf. `null`).
+  Mit `occurred_at`: keine Versionsprüfung („Wirklichkeit gewinnt“); der Tausch wird gebucht, auch wenn der Ersatz inzwischen nicht
+  mehr einsatzbereit oder anders gebucht war (Hinweis `swap_replacement_moved`, `detail` nennt den Grund) oder der Sollbestand
+  unterschritten wird (Hinweis `stock_below_minimum`); 409 nur bei ausgesonderter Ausrüstung oder gesperrtem Ziel, 422/409 wie bei
+  `/state` für die Aktionszeit. Offline-Buchungen über `/state` und `/used` werden bei Unterschreitung nicht abgelehnt, sondern mit
+  Hinweis `stock_below_minimum` gebucht. App-Warteschlange `QUEUE_FORMAT` 3. Commit-Betreff: „Tausch und Unterschreitung offline im
+  Backend: client_ref, Aktionszeit, Hinweise (P2.9)“ und „Tausch und Unterschreitung offline in der App (P2.9)“. Tests: `StockSwapTest`,
+  Browser `offline.spec.ts`, Unit `bookingQueue.spec.ts`.
+
+## 2026-11-09 – „Sollbestand im CSV-Import (Phase 2, Runde 11)“
+
+- `POST devices/import/preview` (und die erneute Prüfung beim Übernehmen): Zeilen, die zusammen den Sollbestand einer Regel
+  unterschreiten, tragen in `warnings` „Sollbestand unterschritten – <Regel>. Die Zeile wird trotzdem übernommen.“; zählt in
+  `summary.warnings`, blockiert nichts, das Kennzeichen (`token`) ändert sich nicht. Commit-Betreff: „CSV-Import warnt bei
+  unterschrittenem Sollbestand (Runde 11)“. Tests: `DeviceImportPreviewTest`.
+
+## 2026-11-09 – „Hinweis nennt die unterschrittene Regel (Phase 2, Runde 11)“
+
+- Neue Spalte `fe_device_notices.detail` (Migration 0063, reine Erweiterung). Hinweise tragen im JSON `detail` (String oder `null`);
+  bei `stock_below_minimum` z. B. „HLF 20 / G1: 1 von mindestens 2 Atemschutzmaske einsatzbereit“. Die Log-Mail zum Hinweis hat
+  dazu die Zeile „Sollbestand: …“. Commit-Betreff: „Hinweis „Sollbestand unterschritten“ nennt die Regel (Runde 11)“.
+  Tests: `StockSwapTest`, `DeviceLogNotificationTest`, Unit `notices.spec.ts`.
+
+## 2026-11-09 – „Tausch im Verlauf (Phase 2, Runde 11)“
+
+- Jeder Verlaufseintrag (`devices/{id}/events`, `device-events`) trägt `swap_id` (Kennung des Tauschs, sonst `null`). `type_label`:
+  die herausgenommene Ausrüstung „Getauscht gegen M92“, der Ersatz „Als Ersatz für M90“ (Vorrang vor „Benutzt gemeldet“); ist die
+  andere Ausrüstung für die Rolle unsichtbar (Datenfilter), „Getauscht gegen andere Ausrüstung“. Ebenso CSV „Ereignis“ und Log-Mail
+  (Betreff „2 Ausrüstungen – getauscht“, Zeile „Tausch: …“). Commit-Betreff: „Tausch im Verlauf: swap_id und eigene Bezeichnung (Runde 11)“.
+  Tests: `StockSwapTest`, `DeviceLogNotificationTest` (auch Betreff „benutzt gemeldet“), `DeviceEventListTest`.
+
+## 2026-11-09 – „Benutzt melden heißt „Benutzt gemeldet“ im Verlauf (Phase 2, Runde 10)“
+
+- `type_label` eines Verlaufseintrags (`devices/{id}/events`, `device-events`, CSV „Ereignis“, Log-Mail „Vorgang“ und Betreff): eine
+  Buchung mit Zielstatus „benutzt“ (Benutzt melden, auch Tausch) heißt „Benutzt gemeldet“ (statt „Umgebucht und Status
+  geändert“); Betreff der Log-Mail „<Nummer> benutzt gemeldet“. Nur die Bezeichnung, keine neuen Felder.
+  Commit-Betreff: „Benutzt melden heißt im Verlauf „Benutzt gemeldet“ (Runde 10)“. Tests: `DeviceEventTest`.
+
 ## 2026-11-09 – „Verleih heißt „Verliehen“ im Verlauf (Phase 2, Runde 10)“
 
 - `type_label` eines Verlaufseintrags (`devices/{id}/events`, `device-events`, CSV „Ereignis“, Log-Mail „Vorgang“ und Betreff): eine

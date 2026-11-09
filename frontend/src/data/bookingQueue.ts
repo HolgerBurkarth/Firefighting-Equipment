@@ -6,6 +6,7 @@ import type {
     BookingResponse,
     DeviceListItem,
     StateChangeRequest,
+    SwapRequest,
 } from '../api/devices';
 import type { LocalDb } from '../runtime/localDb';
 
@@ -33,6 +34,13 @@ export interface QueuedBooking {
     readonly statusLabel?: string;
     /** „Benutzt melden“ (Phase 2, P2.3, ab Format 2): Status benutzt, das Ziel gibt der Server vor. */
     readonly used?: boolean;
+    /** Tausch (P2.9): `deviceId` ist die Ausrüstung, die herausgeht; hier der Ersatz und der Status danach. */
+    readonly swap?: {
+        readonly inId: number;
+        readonly inVersion: number;
+        readonly inIdentifier: string;
+        readonly outStatus: NonNullable<SwapRequest['outStatus']>;
+    };
     readonly comment?: string;
     /** Aktionszeit auf dem Handy, `JJJJ-MM-TTTHH:MM:SSZ`. */
     readonly occurredAt: string;
@@ -64,9 +72,11 @@ export const DEFAULT_QUEUE_LIMITS: QueueLimits = { maxAgeDays: 7, queueMaxAgeDay
  * (`readStoredQueue`), sodass Buchungen eines Updates nicht verloren gehen. Format 1 = Einträge wie
  * `QueuedBooking`; davor lag die Liste ohne Hülle (gilt als Format 1). Format 2 (Phase 2, P2.3):
  * Einträge „Benutzt melden“ (`used`); Format 1 hat dieselben Einträge ohne dieses Feld und wird
- * unverändert übernommen.
+ * unverändert übernommen. Format 3 (Phase 2, P2.9): Einträge „Tausch“ (`swap`); ältere Formate haben
+ * keine solchen und werden unverändert übernommen. Eine App mit Format 2 würde einen Tausch als einfache
+ * Buchung senden, darum zeigt und überschreibt sie Format 3 nie.
  */
-export const QUEUE_FORMAT = 2;
+export const QUEUE_FORMAT = 3;
 
 export interface StoredQueue {
     readonly format: number;
@@ -138,6 +148,9 @@ export function offlineBookingProblem(
 
 /** Text einer Buchung: „M1 → HLF 20 / G2 · defekt“ (nur Geändertes). */
 export function queuedText(booking: QueuedBooking): string {
+    if (booking.swap !== undefined) {
+        return `${booking.identifier} ⇄ ${booking.swap.inIdentifier} · getauscht`;
+    }
     if (booking.used === true) {
         return `${booking.identifier} → benutzt gemeldet`;
     }
@@ -146,6 +159,12 @@ export function queuedText(booking: QueuedBooking): string {
     );
     return `${booking.identifier} → ${parts.join(' · ')}`;
 }
+
+const SWAP_STATUS = {
+    used: { status: 'used' as const, statusLabel: 'benutzt' },
+    defective: { status: 'defective' as const, statusLabel: 'defekt' },
+    maintenance: { status: 'maintenance' as const, statusLabel: 'in Wartung' },
+};
 
 /** Gerät mit dem gewünschten Stand (sofort in der lokalen Liste, Entscheidung 52). */
 export function pendingDevice(device: DeviceListItem, booking: QueuedBooking): DeviceListItem {
@@ -165,6 +184,7 @@ export function pendingDevice(device: DeviceListItem, booking: QueuedBooking): D
             statusLabel: booking.statusLabel ?? device.statusLabel,
         }),
         ...(booking.used === true && { status: 'used' as const, statusLabel: 'benutzt' }),
+        ...(booking.swap !== undefined && SWAP_STATUS[booking.swap.outStatus]),
         stateChangedAt: booking.occurredAt,
     };
 }
@@ -191,6 +211,8 @@ function problemText(code: string, message: string | null): string {
 export interface BookingQueueOptions {
     readonly db: LocalDb;
     readonly post: (id: number, request: StateChangeRequest) => Promise<ApiResult<BookingResponse>>;
+    /** Tausch aus der Warteschlange (P2.9); ohne diese Angabe bleibt ein Tausch wartend. */
+    readonly postSwap?: (request: SwapRequest) => Promise<ApiResult<BookingResponse>>;
     readonly now?: () => Date;
     /** Angekommene Buchung: Stand des Servers übernehmen (Liste, Kopie). */
     readonly onSent?: (response: BookingResponse) => void;
@@ -369,16 +391,28 @@ export class BookingQueue {
                     return;
                 }
                 this.set(next.clientRef, { state: 'sending' });
-                const result = await this.options.post(next.deviceId, {
-                    version: next.version,
-                    clientRef: next.clientRef,
-                    occurredAt: next.occurredAt,
-                    ...(next.locationId !== undefined && { locationId: next.locationId }),
-                    ...(next.status !== undefined && { status: next.status }),
-                    ...(next.used === true && { used: true }),
-                    ...(next.comment !== undefined && { comment: next.comment }),
-                    ...(next.confirmedStale === true && { confirmedStale: true }),
-                });
+                const swap = next.swap;
+                const result =
+                    swap !== undefined && this.options.postSwap !== undefined
+                        ? await this.options.postSwap({
+                              out: { id: next.deviceId, version: next.version },
+                              in: { id: swap.inId, version: swap.inVersion },
+                              outStatus: swap.outStatus,
+                              clientRef: next.clientRef,
+                              occurredAt: next.occurredAt,
+                              ...(next.comment !== undefined && { comment: next.comment }),
+                              ...(next.confirmedStale === true && { confirmedStale: true }),
+                          })
+                        : await this.options.post(next.deviceId, {
+                              version: next.version,
+                              clientRef: next.clientRef,
+                              occurredAt: next.occurredAt,
+                              ...(next.locationId !== undefined && { locationId: next.locationId }),
+                              ...(next.status !== undefined && { status: next.status }),
+                              ...(next.used === true && { used: true }),
+                              ...(next.comment !== undefined && { comment: next.comment }),
+                              ...(next.confirmedStale === true && { confirmedStale: true }),
+                          });
                 if (generation !== this.generation) {
                     return;
                 }

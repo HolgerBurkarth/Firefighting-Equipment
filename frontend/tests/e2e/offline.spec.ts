@@ -5,6 +5,7 @@ import {
     meBody,
     NETWORK_ERROR_CONSOLE,
     NOT_AUTHENTICATED,
+    permissionsJson,
     test,
     type MockRequest,
     type MockResponse,
@@ -532,5 +533,122 @@ test.describe('Offline-Modus: Browser meldet offline', () => {
         await expect(page.getByTestId('queued-done')).toBeVisible();
         await expect(page.getByTestId('offline-notice')).toBeHidden();
         expect(apiRequests.filter((r) => r.path === 'api/v1/devices/1/state')).toHaveLength(1);
+    });
+});
+
+test.describe('Offline-Modus: Tausch (Phase 2, P2.9)', () => {
+    const state: { mode: 'online' | 'offline' | 'expired' } = { mode: 'online' };
+    /** Ersatz im Lager (anderer Standort der Ebene 1 als M1, sonst bietet die Liste ihn nicht an). */
+    const M4 = deviceJson(4, {
+        identifier: 'M4',
+        location: { id: 30, name: 'Lager', path: 'Lager' },
+    });
+    const ALL = [...DEVICES, M4];
+    const base = switchable(state);
+
+    function whenOnline(answer: MockResponse | ((request: MockRequest) => MockResponse)) {
+        return (request: MockRequest): MockResponse =>
+            state.mode === 'offline'
+                ? 'abort'
+                : typeof answer === 'function'
+                  ? answer(request)
+                  : answer;
+    }
+
+    test.use({
+        api: {
+            ...base,
+            'GET api/v1/auth/me': whenOnline({
+                status: 200,
+                body: meBody(
+                    'user',
+                    'Gerd',
+                    permissionsJson({ search: 'read' }, [
+                        'book.move',
+                        'book.status',
+                        'device.swap',
+                    ]),
+                ),
+            }),
+            'GET api/v1/devices': whenOnline(devicesEndpoint(ALL)),
+            ...Object.fromEntries(
+                ALL.flatMap((device) =>
+                    Object.entries(deviceDetail(device)).map(
+                        ([key, answer]) => [key, whenOnline(answer)] as const,
+                    ),
+                ),
+            ),
+            'GET api/v1/client-config': CLIENT_CONFIG,
+            'POST api/v1/devices/swap': whenOnline((request) => {
+                const body = request.body as { out: { id: number }; in: { id: number } };
+                const gone = ALL.find((d) => d['id'] === body.out.id);
+                const back = ALL.find((d) => d['id'] === body.in.id);
+                return {
+                    status: 200,
+                    body: {
+                        out: { ...gone, version: 2, status: 'defective', status_label: 'defekt' },
+                        in: { ...back, version: 2, location: gone?.['location'] },
+                        swap_id: 'a'.repeat(32),
+                        result: {
+                            outcome: 'applied',
+                            outcome_label: 'übernommen',
+                            reason: null,
+                            reason_label: null,
+                            message: 'Übernommen.',
+                            stale_confirmed: false,
+                            client_ref: (request.body as Record<string, unknown>)['client_ref'],
+                            replayed: false,
+                            notice_id: null,
+                        },
+                    },
+                };
+            }),
+        },
+        allowedConsoleError: NETWORK_ERROR_CONSOLE,
+    });
+
+    test.beforeEach(() => {
+        state.mode = 'online';
+    });
+
+    test('ohne Verbindung als eine Einheit in die Warteschlange, bei online gesendet', async ({
+        page,
+        context,
+        apiRequests,
+    }) => {
+        await page.goto('/firefighting/test/suchen');
+        await expect.poll(() => storedDeviceIds(page)).toEqual([1, 2, 3, 4]);
+        await page.getByRole('searchbox').fill('M1');
+        await page.getByTestId('device-card').click();
+        await expect(page.getByText('Jetzt: HLF 20 / G1 · einsatzbereit')).toBeVisible();
+
+        state.mode = 'offline';
+        await context.setOffline(true);
+        await expect(page.getByTestId('offline-notice')).toContainText('Offline – angezeigt');
+        await page.getByTestId('swap-open').click();
+        const dialog = page.getByTestId('form-dialog');
+        await dialog.getByRole('radio', { name: /M4/ }).check();
+        await dialog.getByRole('radio', { name: 'defekt' }).check();
+        await dialog.getByRole('button', { name: 'Tauschen', exact: true }).click();
+
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
+        await expect(page.getByTestId('booking-notice')).toContainText(
+            'wird gesendet, sobald eine Verbindung besteht: M1 ⇄ M4 · getauscht',
+        );
+        await expect(page.getByTestId('queued-waiting')).toContainText('M1 ⇄ M4 · getauscht');
+        expect(apiRequests.filter((r) => r.path === 'api/v1/devices/swap')).toHaveLength(0);
+
+        state.mode = 'online';
+        await context.setOffline(false);
+        await expect(page.getByTestId('queued-done')).toBeVisible();
+        const sent = apiRequests.filter((r) => r.path === 'api/v1/devices/swap');
+        expect(sent).toHaveLength(1);
+        expect(sent[0]?.body).toMatchObject({
+            out: { id: 1, version: 1 },
+            in: { id: 4, version: 1 },
+            out_status: 'defective',
+            client_ref: expect.any(String),
+            occurred_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/),
+        });
     });
 });

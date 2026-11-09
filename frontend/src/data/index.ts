@@ -24,6 +24,7 @@ import {
     type ReinstateRequest,
     postSwap,
     type SwapRequest,
+    postQueuedSwap,
     type SwapResponse,
 } from '../api/devices';
 import {
@@ -129,8 +130,12 @@ export const noticeList = new NoticeList();
 export const bookingQueue = new BookingQueue({
     db: browserLocalDb(),
     post: (id, request) => postDeviceState(id, request),
+    postSwap: (request) => postQueuedSwap(request),
     onSent: (response) => {
         deviceStore.upsert(response.device);
+        if (response.partner !== undefined) {
+            deviceStore.upsert(response.partner);
+        }
     },
 });
 

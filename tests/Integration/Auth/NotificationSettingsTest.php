@@ -22,18 +22,44 @@ final class NotificationSettingsTest extends AuthTestCase
         $cookie = $this->loginCookie('immendingen', 'admin@example.org');
         $url = self::url('immendingen', 'auth/notifications');
 
-        self::assertSame(['notifications' => ['device_log' => false]], self::json($this->send('GET', $url, cookie: $cookie)));
+        self::assertSame(['device_log' => false], self::json($this->send('GET', $url, cookie: $cookie))['notifications']);
 
         $response = $this->send('POST', $url, ['device_log' => true], $cookie);
         self::assertSame(200, $response->statusCode(), $response->body());
-        self::assertSame(['notifications' => ['device_log' => true]], self::json($response));
-        self::assertSame(['notifications' => ['device_log' => true]], self::json($this->send('GET', $url, cookie: $cookie)));
+        self::assertSame(['device_log' => true], self::json($response)['notifications']);
+        self::assertSame(['device_log' => true], self::json($this->send('GET', $url, cookie: $cookie))['notifications']);
         self::assertSame(1, (int) $this->pdo()->query('SELECT notify_device_log FROM fe_users WHERE id = ' . $admin)->fetchColumn());
         self::assertTrue(self::json($this->send('GET', self::url('immendingen', 'auth/me'), cookie: $cookie))['user']['notifications']['device_log']);
 
         // Wiederholbar.
         self::assertSame(200, $this->send('POST', $url, ['device_log' => true], $cookie)->statusCode());
-        self::assertSame(['notifications' => ['device_log' => false]], self::json($this->send('POST', $url, ['device_log' => false], $cookie)));
+        self::assertSame(['device_log' => false], self::json($this->send('POST', $url, ['device_log' => false], $cookie))['notifications']);
+    }
+
+    public function testMailTopicsAreChosenPerPerson(): void
+    {
+        $admin = $this->account('immendingen', 'admin@example.org', ['role' => 'admin']);
+        $cookie = $this->loginCookie('immendingen', 'admin@example.org');
+        $url = self::url('immendingen', 'auth/notifications');
+
+        $initial = self::json($this->send('GET', $url, cookie: $cookie))['topics'];
+        self::assertNull($initial['selected'], 'ohne Auswahl gelten alle Themen');
+        self::assertSame(['defect_reported', 'used_reported', 'return_received', 'lent', 'notices', 'changes', 'master_data'], array_column($initial['available'], 'id'));
+
+        $response = $this->send('POST', $url, ['device_log' => true, 'topics' => ['lent', 'defect_reported', 'lent']], $cookie);
+        self::assertSame(200, $response->statusCode(), $response->body());
+        self::assertSame(['defect_reported', 'lent'], self::json($response)['topics']['selected'], 'ohne Wiederholung, in fester Reihenfolge der Datenbank');
+        self::assertSame(2, (int) $this->pdo()->query('SELECT COUNT(*) FROM fe_user_mail_prefs WHERE user_id = ' . $admin)->fetchColumn());
+
+        // Ohne "topics" bleibt die Auswahl, null stellt auf alle Themen zurück.
+        self::assertSame(['defect_reported', 'lent'], self::json($this->send('POST', $url, ['device_log' => true], $cookie))['topics']['selected']);
+        self::assertNull(self::json($this->send('POST', $url, ['device_log' => true, 'topics' => null], $cookie))['topics']['selected']);
+        self::assertSame(0, (int) $this->pdo()->query('SELECT COUNT(*) FROM fe_user_mail_prefs')->fetchColumn());
+
+        foreach ([[], 'lent', ['unbekannt'], [1], ['lent' => 'x']] as $bad) {
+            $rejected = $this->send('POST', $url, ['device_log' => true, 'topics' => $bad], $cookie);
+            self::assertSame(400, $rejected->statusCode(), json_encode($bad, JSON_THROW_ON_ERROR));
+        }
     }
 
     public function testSuperAdminSwitchesOwnNotificationEvenIfProtected(): void
@@ -44,7 +70,7 @@ final class NotificationSettingsTest extends AuthTestCase
         $response = $this->send('POST', self::url(null, 'auth/notifications'), ['device_log' => true], $cookie);
 
         self::assertSame(200, $response->statusCode(), $response->body());
-        self::assertSame(['notifications' => ['device_log' => true]], self::json($response));
+        self::assertSame(['device_log' => true], self::json($response)['notifications']);
         self::assertSame(1, (int) $this->pdo()->query('SELECT notify_device_log FROM fe_users WHERE id = ' . $chef)->fetchColumn());
     }
 

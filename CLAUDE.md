@@ -374,7 +374,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     `client_outdated` gilt bei `auth/me` als Störung (`isTransientError`: nie abmelden), der
     Verbindungshinweis und der graue Streifen entfallen dabei. Eine Buchung der Warteschlange mit
     `client_outdated` bleibt `waiting` (der Lauf endet), nach dem Update sendet sie die neue
-    Version. Gespeichert wird die Warteschlange mit Formatversion (`QUEUE_FORMAT` = 2 seit P2.3,
+    Version. Gespeichert wird die Warteschlange mit Formatversion (`QUEUE_FORMAT` = 3 seit P2.9 (Tausch), 2 seit P2.3,
     `{format, bookings}`, `readStoredQueue`: Liste ohne Hülle = Format 1, Format 1 und 2 werden gelesen;
     ein neueres Format zeigt und überschreibt eine alte App nie). Steigt `n` mit anderen Einträgen, steigt `QUEUE_FORMAT`,
     und `readStoredQueue` wandelt ältere Formate um. Tests: `client.spec.ts`, `appUpdate.spec.ts`
@@ -1257,7 +1257,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   mindestens 48 px), `ErrorNotice`, `MailHint` (Spam-Ordner, Absender zu den Kontakten),
   `BrandCard` (Logo 512 px oder Standard-Symbol, Name; unter `service` „Super-Admin“),
   `AccountPanel`, `ConfirmDialog` (Rückfrage über Reka UI `AlertDialog`, Fokus auf „Abbrechen“;
-  nie `window.confirm`). Anmeldeseite: Formular ausgeblendet bei `tenant_not_found`/`tenant_inactive`,
+  nie `window.confirm`; der bestätigende Knopf ist erst `CONFIRM_GUARD_MS` = 400 ms nach dem
+  Öffnen bedienbar (`disabled`), „Abbrechen“ und Escape gehen sofort: Schutz gegen Doppeltipp, Runde 11). Anmeldeseite: Formular ausgeblendet bei `tenant_not_found`/`tenant_inactive`,
   Passwort wird unverändert gesendet und nur bei `invalid_credentials` geleert, bei 429 Knopf mit
   Countdown bis `Retry-After`, bei `email_not_verified` „Bestätigungsmail erneut senden“.
 - Tokens und Einladungscodes aus Links (`#token=…`, `#code=…`) nur über `takeFragmentParam`
@@ -2835,18 +2836,24 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   bestätigt), `Override` (`confirmed_below_minimum: true` im Body von `/state` und `/used`), `Skip`. Abgelehnt: 409
   `rule_violation` mit `details.stock {location {id, name, path}, rule {id, min_count, types}, have (nach der Buchung),
   missing, can_override}`; mit Override gebucht, und hat die Buchung eine `client_ref`, legt `book()` den Hinweis
-  `stock_below_minimum` an (Mail an die Empfänger „Log“ wie sonst). Offline-Buchungen (`occurred_at`) und Sammelaktionen
-  der Liste werden nicht geprüft bzw. nur mit `Enforce` (Offline: P2.9, noch offen). `POST devices/swap` (Aktion
+  `stock_below_minimum` an (Mail an die Empfänger „Log“ wie sonst). Offline-Buchungen (`occurred_at`) werden seit P2.9
+  (Runde 11) nie abgelehnt: gebucht, dazu Hinweis `stock_below_minimum` mit `detail`; Sammelaktionen der Liste nur mit `Enforce`. `POST devices/swap` (Aktion
   `device.swap`, `DeviceSwapHandler`, `DeviceRepository::swap`): `{out {id, version}, in {id, version}, out_status?
   (used|defective|maintenance, Standard used), out_location_id?, comment?, confirmed_below_minimum?}`; „out“ geht in die
   Sammelstelle für benutzte bzw. defekte Ausrüstung (auch außerhalb des Datenfilters, G4), sonst bleibt der Standort;
   der Ersatz „in“ muss einsatzbereit sein und kommt an den bisherigen Standort von „out“; beide in EINER Transaktion
   (gesperrt in der Reihenfolge der IDs), beide Ereignisse tragen dieselbe `swap_id`; die Prüfung gilt für beide zusammen.
-  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (Ersatz suchen, Status danach, Kommentar), in `DevicePage` der
+  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Status danach, Kommentar), in `DevicePage` der
   Knopf „Tauschen …“ (`swap-open`, nur online) und bei 409 mit `details.stock` der Kasten `stock-block` mit „Tauschen …“
   und, mit `stock.override`, „Trotzdem buchen …“ (Rückfrage, sendet `confirmed_below_minimum`); `src/data/swap.ts`
-  (`parseStockBlock`, `swapCandidates`: einsatzbereit, Typen der verletzten Regel zuerst). Nicht gebaut: Tausch offline
-  (P2.9), Prüfung im CSV-Import. Tests `StockSwapTest`, `NoticeKindTest`, Browser `swap.spec.ts`, Unit `swap.spec.ts`.
+  (`parseStockBlock`, `swapCandidates`: einsatzbereit, Typen der verletzten Regel zuerst). Offline (P2.9, Runde 11): `POST devices/swap`
+  nimmt zusätzlich `client_ref`, `occurred_at`, `confirmed_stale` (`ActionTimeGuard` wie bei `/state`, Wiederholung über
+  `fe_device_bookings` am ausgehenden Gerät, der Ersatz gehört zum Hash). Mit `occurred_at`: keine Versionsprüfung, „Wirklichkeit
+  gewinnt“ – der Tausch wird gebucht; war der Ersatz inzwischen nicht mehr einsatzbereit oder anders gebucht, Hinweis
+  `swap_replacement_moved` (`detail` nennt den Grund), unterschreitet er den Sollbestand, Hinweis `stock_below_minimum`; abgelehnt nur
+  bei ausgesonderter Ausrüstung oder gesperrtem Ziel (409). Antwort zusätzlich `result` wie eine Buchung. App: Eintrag `swap` in der
+  Warteschlange (`QUEUE_FORMAT` 3, `postQueuedSwap`), „Tauschen …“ auch offline (Streifen „Offline“ und Kopie nicht zu alt); scheitert
+  ein online gesendeter Tausch an der Verbindung, bleibt der Fehler (kein stilles Umleiten in die Warteschlange). Tests `StockSwapTest`, `NoticeKindTest`, Browser `swap.spec.ts`, Unit `swap.spec.ts`.
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann
@@ -3078,7 +3085,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   der Quittung per LEFT JOIN). Reihenfolge bleibt nach Eingang (`id`); nicht übernommene Einträge
   heißen „Umbuchung nicht übernommen“, „Statusänderung nicht übernommen“ bzw. „Umbuchung und
   Statusänderung nicht übernommen“. `type_label` bei `state_changed` nach Inhalt: „Ausgesondert“, „Wieder aufgenommen“,
-  „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“; sonst „Angelegt“, „Importiert“,
+  „Getauscht gegen M92“ bzw. „Als Ersatz für M90“ (Tausch, Vorrang vor allem anderen, nennt die andere Ausrüstung nur, wenn die Rolle sie sehen darf; JSON `swap_id`), „Benutzt gemeldet“ (Zielstatus benutzt), „Umgebucht“, „Status geändert“, „Umgebucht und Status geändert“; sonst „Angelegt“, „Importiert“,
   „Wartungsdatum geändert“, „Stammdaten geändert“. Standorte erscheinen mit ihrem aktuellen Namen und
   Pfad (die Historie speichert nur die ID; nach dem Umbenennen steht dort der neue Name; bewusst so
   in Version 1, Namen zum Zeitpunkt bräuchten eine Migration).
@@ -3181,6 +3188,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`NoticeListHandler`, `NoticeActionHandler` mit `NoticeAction`, `NoticeJson`). Tests:
   `tests/Integration/Device/DeviceNoticeTest`, `DeviceNoticeSchemaTest`,
   `tests/Integration/Notification/DeviceNoticeNotificationTest`.
+- `detail` (Migration `0063`, JSON `notice.detail`, Mail-Zeile „Sollbestand: …“, App: `noticeExplanation` „Unterschritten: …“): bei
+  `stock_below_minimum` die unterschrittene Regel („HLF 20 / G1: 1 von mindestens 2 Atemschutzmaske einsatzbereit“,
+  `StockViolation::detail`), sonst `null`.
 - Tabellen: `fe_device_notices` (Migration `0027`; ein Hinweis je Quittung, `booking_id` eindeutig;
   `kind` `overwritten`, `history_only`, `not_applied_retired`, `not_applied_location_locked`,
   `stale_confirmed`; `stale_confirmed` auch bei den anderen Arten; Buchung: Konto, Aktionszeit,
@@ -3380,6 +3390,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   „4,00638E+12“) oder aus Ziffern, der ohne führende Nullen einem LÄNGEREN vorhandenen Scan-Code
   (desselben oder eines anderen nicht ausgesonderten Geräts) entspricht („4006381333931“ ↔
   „04006381333931“). Mehr als 15 Ziffern rundet Excel auf Nullen; das ist nicht erkennbar (README).
+  Sollbestand (Runde 11, `DeviceImportPlanner::withStockWarnings`): ändern die bestehenden Zeilen zusammen Standort oder Status so,
+  dass der Bestand einer Regel unter die Soll-Anzahl fällt, warnen genau die Zeilen, die ihn verringern („Sollbestand unterschritten –
+  HLF 20: 1 von mindestens 2 Atemschutzmaske einsatzbereit. Die Zeile wird trotzdem übernommen.“); neue Ausrüstung zählt nicht mit.
   Zusammenfassung
   `summary {rows, new, changed, unchanged, skipped, errors, warnings}` (Warnungen = Zeilen mit
   Warnung).
@@ -3408,6 +3421,16 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 ## Benachrichtigung „Log“
 - Eigene Einstellung über `GET`/`POST auth/notifications {device_log: bool}` (siehe "Anmeldung und
   Sitzungen im Code", `NotificationSettingsHandler`), auch in `auth/me` (`notifications`). Standard aus.
+- Mail-Auswahl je Person (Phase 2, P2.10, Runde 11): Themen `MailTopic` (`defect_reported`, `used_reported`, `return_received`, `lent`,
+  `notices`, `changes`, `master_data`; Zuordnung eines Eintrags in `MailTopic::forEvent`: Rückgabe ohne Anmeldung, Tausch/nicht übernommen
+  und sonstiges → `changes`, Verleih, Zielstatus defekt bzw. benutzt, alle anderen Arten → `master_data`; Hinweise → `notices`;
+  CSV-Import → `master_data`). Tabelle `fe_user_mail_prefs` (Migration 0064, `user_id` + `topic`, ohne `tenant_id`, damit auch
+  Super-Admins wählen können): eine Zeile = angehakt, OHNE Zeilen gelten alle Themen (G7: wer vorher eingeschaltet hatte, bekommt weiter
+  alles). `GET`/`POST auth/notifications` liefern zusätzlich `topics {selected: null|[…], available: [{id, label, hint}]}`; `POST` nimmt
+  `topics` (fehlt = unverändert, `null` = alle, nicht leere Liste bekannter Themen = nur diese; „keine“ = `device_log` false).
+  `DeviceLogNotifier::send` lässt Konten mit Auswahl aus, wenn keines der Themen der Mail dabei ist (Sammelmail: Vereinigung der
+  Themen); der Datenfilter gilt wie bisher. App: `NotificationSetting` mit „Alle Vorgänge“ / „Nur ausgewählte“ und „Auswahl
+  speichern“. Nicht gebaut (Mockup, G12/Plan): Erinnerungen, Filter nach Ausrüstungstypen, „Nur Wichtiges“.
 - Auslöser: jeder Vorgang, der in der Geräte-Historie protokolliert wird (Anlegen, CSV-Import,
   Umbuchen/Status, Aussondern, Wiederaufnehmen, Prüfdatum, Stammdaten). Ohne neues Ereignis (nichts
   geändert, Fehler, Versionskonflikt) keine Mail.

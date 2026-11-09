@@ -399,6 +399,16 @@ async function onSwapped(response: SwapResponse): Promise<void> {
     await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);
 }
 
+async function onSwapQueued(text: string): Promise<void> {
+    rememberDevice(deviceId);
+    setBookingNotice({
+        kind: 'info',
+        text: `Gespeichert – wird gesendet, sobald eine Verbindung besteht: ${text}`,
+    });
+    saved.value = true;
+    await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);
+}
+
 function onSwapConflict(latest: DeviceListItem): void {
     if (latest.id === deviceId) {
         device.value = latest;
@@ -795,14 +805,11 @@ async function submit(
                     class="btn"
                     type="button"
                     data-testid="swap-open"
-                    :disabled="saving || isOffline"
+                    :disabled="saving"
                     @click="openSwap"
                 >
                     Tauschen …
                 </button>
-                <p v-if="canSwap && isOffline" class="hint" data-testid="swap-offline">
-                    Tauschen geht nur mit Verbindung.
-                </p>
                 <button
                     v-if="canReportUsed"
                     class="btn"
@@ -837,6 +844,7 @@ async function submit(
             :type-ids="stockBlock?.typeIds ?? []"
             :return-focus="swapButton"
             @swapped="onSwapped"
+            @queued="onSwapQueued"
             @conflict="onSwapConflict"
         />
     </template>

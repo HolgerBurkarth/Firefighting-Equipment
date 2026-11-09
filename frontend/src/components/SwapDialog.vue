@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { ApiError } from '../api/client';
 import { conflictDevice, type DeviceListItem, type SwapResponse } from '../api/devices';
-import { deviceStore, swapEquipment } from '../data';
-import { MAX_COMMENT_LENGTH, normalizeComment } from '../data/booking';
+import { fetchStock, type StockState } from '../api/stock';
+import { bookingQueue, deviceStore, locationStore, swapEquipment } from '../data';
+import { ClientRefKeeper, MAX_COMMENT_LENGTH, normalizeComment } from '../data/booking';
+import { actionTime, offlineBookingProblem, pendingDevice, queuedText } from '../data/bookingQueue';
+import { offlineData } from '../data/offline';
 import {
     SWAP_OUT_STATUSES,
     parseStockBlock,
@@ -11,13 +14,15 @@ import {
     swapCandidates,
     type SwapOutStatus,
 } from '../data/swap';
+import { connectivity, isOffline } from '../runtime/connectivity';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 import FormDialog from './FormDialog.vue';
 
 /**
  * Tauschen (Phase 2, P2.8; Mockup „Handy-Tausch“): Die Ausrüstung geht heraus (Status benutzt, defekt oder in
  * Wartung; benutzt und defekt kommen in die Sammelstelle, wenn die Stadt eine hat), ein einsatzbereiter Ersatz
- * kommt an ihren bisherigen Standort. Beides bucht der Server in einer Transaktion. Nur mit Verbindung.
+ * kommt an ihren bisherigen Standort. Beides bucht der Server in einer Transaktion. Ohne Verbindung (Streifen "Offline")
+ * kommt der Tausch als eine Einheit in die Warteschlange (P2.9), sofern offline gebucht werden darf.
  * Vorschläge für den Ersatz: einsatzbereite Ausrüstung, zuerst die Typen der verletzten Regel bzw. der gleiche Typ.
  */
 const props = defineProps<{
@@ -30,6 +35,8 @@ const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{
     swapped: [response: SwapResponse];
     conflict: [device: DeviceListItem];
+    /** Ohne Verbindung in die Warteschlange gelegt: Text der Buchung. */
+    queued: [text: string];
 }>();
 
 const query = ref('');
@@ -39,25 +46,70 @@ const comment = ref('');
 const busy = ref(false);
 const error = ref<ApiError | null>(null);
 const confirmedBelow = ref(false);
+/** Grund, warum offline nicht getauscht werden kann (Kopie zu alt, nicht gespeichert). */
+const offlineProblem = ref<string | null>(null);
+const refs = new ClientRefKeeper();
+const showOthers = ref(false);
+/** Sollbestand der Stadt, erst geladen, wenn „Andere Standorte anzeigen“ gewählt wird (für die Warnung). */
+const stock = ref<StockState | null>(null);
+/** Klicks auf „Tauschen“ in den ersten Zehntelsekunden nach dem Öffnen zählen nicht (Doppeltipp, wie ConfirmDialog). */
+const SUBMIT_GUARD_MS = 400;
+const armed = ref(false);
+let armTimer: ReturnType<typeof setTimeout> | undefined;
+
+async function revealOthers(): Promise<void> {
+    showOthers.value = true;
+    if (stock.value === null) {
+        const result = await fetchStock();
+        if (result.ok) {
+            stock.value = result.data;
+        }
+    }
+}
+
+onBeforeUnmount(() => {
+    clearTimeout(armTimer);
+});
 
 watch(open, (value) => {
+    clearTimeout(armTimer);
+    armed.value = false;
     if (value) {
+        armTimer = setTimeout(() => {
+            armed.value = true;
+        }, SUBMIT_GUARD_MS);
+        showOthers.value = false;
         query.value = '';
         replacementId.value = null;
         outStatus.value = 'used';
         comment.value = '';
         error.value = null;
+        offlineProblem.value = null;
         confirmedBelow.value = false;
     }
 });
 
 const candidates = computed(() =>
-    swapCandidates(deviceStore.state.devices, props.device, query.value, props.typeIds ?? []),
+    swapCandidates(
+        deviceStore.state.devices,
+        props.device,
+        query.value,
+        props.typeIds ?? [],
+        locationStore.state.locations,
+        stock.value,
+    ),
+);
+const replacementWarning = computed(
+    () =>
+        showOthers.value &&
+        candidates.value.others.some(
+            (entry) => entry.device.id === replacementId.value && entry.belowMinimum,
+        ),
 );
 const replacement = computed(
     () => deviceStore.state.devices.find((entry) => entry.id === replacementId.value) ?? null,
 );
-const canSubmit = computed(() => replacement.value !== null);
+const canSubmit = computed(() => replacement.value !== null && armed.value);
 
 const unsaved = computed(
     () => open.value && (replacementId.value !== null || comment.value.trim() !== ''),
@@ -69,12 +121,22 @@ const stockBlock = computed(() => parseStockBlock(error.value?.details ?? null))
 
 async function submit(): Promise<void> {
     const chosen = replacement.value;
-    if (busy.value || chosen === null) {
+    if (busy.value || chosen === null || !armed.value) {
+        return;
+    }
+    const text = normalizeComment(comment.value);
+    offlineProblem.value = null;
+    const queueProblem = offlineBookingProblem(
+        offlineData.syncedAt,
+        bookingQueue.currentLimits,
+        new Date(),
+    );
+    if (isOffline.value && (queueProblem === null || connectivity.browserOffline)) {
+        await queueSwap(chosen, text, queueProblem);
         return;
     }
     busy.value = true;
     error.value = null;
-    const text = normalizeComment(comment.value);
     const result = await swapEquipment({
         out: { id: props.device.id, version: props.device.version },
         in: { id: chosen.id, version: chosen.version },
@@ -94,6 +156,53 @@ async function submit(): Promise<void> {
         emit('conflict', latest);
     }
     error.value = result.error;
+}
+
+/** Ohne Verbindung: der Tausch als eine Einheit in die Warteschlange (der Server bucht ihn, wie er ist). */
+async function queueSwap(
+    chosen: DeviceListItem,
+    text: string,
+    queueProblem: string | null,
+): Promise<void> {
+    if (queueProblem !== null) {
+        offlineProblem.value = queueProblem;
+        return;
+    }
+    const content = {
+        out: props.device.id,
+        outVersion: props.device.version,
+        in: chosen.id,
+        inVersion: chosen.version,
+        outStatus: outStatus.value,
+        comment: text,
+    };
+    const attempt = refs.attemptFor(content);
+    const booking = {
+        clientRef: attempt.ref,
+        deviceId: props.device.id,
+        identifier: props.device.identifier,
+        deviceTypeName: props.device.deviceType.name,
+        version: props.device.version,
+        occurredAt: actionTime(attempt.at),
+        swap: {
+            inId: chosen.id,
+            inVersion: chosen.version,
+            inIdentifier: chosen.identifier,
+            outStatus: outStatus.value,
+        },
+        ...(text !== '' && { comment: text }),
+    };
+    busy.value = true;
+    const added = await bookingQueue.add(booking);
+    busy.value = false;
+    if (!added) {
+        offlineProblem.value = 'Der Tausch ließ sich auf diesem Gerät nicht speichern.';
+        return;
+    }
+    const queued = { ...booking, state: 'waiting' as const };
+    deviceStore.upsert(pendingDevice(props.device, queued));
+    open.value = false;
+    emit('queued', queuedText(queued));
 }
 
 function confirmBelow(): void {
@@ -126,24 +235,57 @@ function confirmBelow(): void {
                 aria-label="Ersatz suchen"
                 data-testid="swap-search"
             />
-            <p v-if="candidates.length === 0" class="hint" data-testid="swap-none">
-                Keine einsatzbereite Ausrüstung gefunden.
+            <p v-if="candidates.suggested.length === 0" class="hint" data-testid="swap-none">
+                Keine passende einsatzbereite Ausrüstung im Lager gefunden.
             </p>
             <ul class="swap-list" data-testid="swap-candidates">
-                <li v-for="candidate in candidates" :key="candidate.id">
+                <li v-for="candidate in candidates.suggested" :key="candidate.device.id">
                     <label class="swap-option">
                         <input
                             v-model="replacementId"
                             type="radio"
                             name="swap-replacement"
-                            :value="candidate.id"
+                            :value="candidate.device.id"
                         />
-                        <span class="identifier">{{ candidate.identifier }}</span>
-                        <span class="type">{{ candidate.deviceType.name }}</span>
-                        <span class="where">{{ candidate.location.path }}</span>
+                        <span class="identifier">{{ candidate.device.identifier }}</span>
+                        <span class="type">{{ candidate.device.deviceType.name }}</span>
+                        <span class="where">{{ candidate.device.location.path }}</span>
                     </label>
                 </li>
             </ul>
+            <button
+                v-if="!showOthers && candidates.others.length > 0"
+                class="btn"
+                type="button"
+                data-testid="swap-show-others"
+                @click="void revealOthers()"
+            >
+                Andere Standorte anzeigen ({{ candidates.others.length }})
+            </button>
+            <template v-if="showOthers && candidates.others.length > 0">
+                <p class="hint">Von anderen Fahrzeugen: Dort fehlt die Ausrüstung danach.</p>
+                <ul class="swap-list" data-testid="swap-others">
+                    <li v-for="candidate in candidates.others" :key="candidate.device.id">
+                        <label class="swap-option">
+                            <input
+                                v-model="replacementId"
+                                type="radio"
+                                name="swap-replacement"
+                                :value="candidate.device.id"
+                            />
+                            <span class="identifier">{{ candidate.device.identifier }}</span>
+                            <span class="type">{{ candidate.device.deviceType.name }}</span>
+                            <span class="where">{{ candidate.device.location.path }}</span>
+                            <span v-if="candidate.belowMinimum" class="warn">
+                                (Sollbestand dort unterschritten)
+                            </span>
+                        </label>
+                    </li>
+                </ul>
+            </template>
+            <p v-if="replacementWarning" class="notice notice-error" data-testid="swap-warning">
+                Achtung: Am Standort dieser Ausrüstung würde der Sollbestand unterschritten.
+            </p>
         </fieldset>
 
         <fieldset class="field">
@@ -169,6 +311,15 @@ function confirmBelow(): void {
                 :maxlength="MAX_COMMENT_LENGTH"
             />
         </label>
+
+        <p
+            v-if="offlineProblem !== null"
+            class="notice notice-error"
+            role="alert"
+            data-testid="swap-offline-problem"
+        >
+            {{ offlineProblem }}
+        </p>
 
         <div
             v-if="stockBlock !== null"
@@ -210,5 +361,9 @@ function confirmBelow(): void {
 
 .where {
     color: var(--ink-muted);
+}
+
+.warn {
+    color: var(--status-defective-fg);
 }
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from 'vue';
 import {
     AlertDialogAction,
     AlertDialogCancel,
@@ -12,8 +13,12 @@ import {
 
 /**
  * Rückfrage vor einer Aktion mit Folgen (Reka UI AlertDialog, kein window.confirm). Der Fokus
- * steht beim Öffnen auf „Abbrechen“; Escape bricht ab.
+ * steht beim Öffnen auf „Abbrechen“; Escape bricht ab. Gegen Doppeltipp (am iPhone wurde so eine
+ * Rückfrage ungewollt bestätigt) ist der bestätigende Knopf in den ersten `CONFIRM_GUARD_MS` nach dem
+ * Öffnen gesperrt (`disabled`, Tests warten darauf); „Abbrechen“ und die Tastatur (Escape) gehen sofort.
  */
+const CONFIRM_GUARD_MS = 400;
+
 defineProps<{
     title: string;
     description: string;
@@ -22,6 +27,26 @@ defineProps<{
 }>();
 const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{ confirm: [] }>();
+
+const armed = ref(false);
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+watch(
+    open,
+    (isOpen) => {
+        clearTimeout(timer);
+        armed.value = false;
+        if (isOpen) {
+            timer = setTimeout(() => {
+                armed.value = true;
+            }, CONFIRM_GUARD_MS);
+        }
+    },
+    { immediate: true },
+);
+onBeforeUnmount(() => {
+    clearTimeout(timer);
+});
 </script>
 
 <template>
@@ -37,7 +62,11 @@ const emit = defineEmits<{ confirm: [] }>();
                     <AlertDialogCancel class="btn">{{
                         cancelLabel ?? 'Abbrechen'
                     }}</AlertDialogCancel>
-                    <AlertDialogAction class="btn confirm-action" @click="emit('confirm')">
+                    <AlertDialogAction
+                        class="btn confirm-action"
+                        :disabled="!armed"
+                        @click="emit('confirm')"
+                    >
                         {{ confirmLabel }}
                     </AlertDialogAction>
                 </div>

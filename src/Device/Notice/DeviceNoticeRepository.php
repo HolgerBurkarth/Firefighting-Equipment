@@ -22,7 +22,7 @@ use FirefightingEquipment\Tenant\Tenant;
  */
 final readonly class DeviceNoticeRepository
 {
-    private const string SELECT = 'SELECT n.id, n.kind, n.status, n.stale_confirmed, n.device_id, d.identifier AS device_identifier,'
+    private const string SELECT = 'SELECT n.id, n.kind, n.status, n.stale_confirmed, n.detail, n.device_id, d.identifier AS device_identifier,'
         . ' d.device_type_id AS device_type_id, d.location_id AS device_location_id,'
         . ' t.name AS type_name, b.client_ref, n.event_id, n.occurred_at, n.requested_status, n.other_occurred_at, n.other_status,'
         . ' n.created_at, n.updated_at, e.comment AS booking_comment,'
@@ -54,9 +54,9 @@ final readonly class DeviceNoticeRepository
     public function create(Tenant $tenant, NewNotice $notice): int
     {
         $this->pdo->prepare(
-            'INSERT INTO fe_device_notices (tenant_id, device_id, booking_id, event_id, kind, stale_confirmed, user_id, occurred_at,'
+            'INSERT INTO fe_device_notices (tenant_id, device_id, booking_id, event_id, kind, stale_confirmed, detail, user_id, occurred_at,'
             . ' requested_location_id, requested_status, other_user_id, other_occurred_at, other_location_id, other_status, status,'
-            . ' created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
+            . ' created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
         )->execute([
             $tenant->id,
             $notice->deviceId,
@@ -64,6 +64,7 @@ final readonly class DeviceNoticeRepository
             $notice->eventId,
             $notice->kind->value,
             $notice->staleConfirmed ? 1 : 0,
+            $notice->detail,
             $notice->userId,
             $notice->occurredAt->sql(),
             $notice->requested->locationId,
@@ -257,6 +258,7 @@ final readonly class DeviceNoticeRepository
             $row['booking_comment'] === null ? null : (string) $row['booking_comment'],
             (int) $row['device_type_id'],
             (int) $row['device_location_id'],
+            $row['detail'] === null ? null : (string) $row['detail'],
         );
     }
 

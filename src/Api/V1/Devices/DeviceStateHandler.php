@@ -17,15 +17,13 @@ use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\LocationRepository;
 use FirefightingEquipment\Device\SingleUseGuard;
 use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
-use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
 use FirefightingEquipment\Notification\DeviceLogNotifier;
-use FirefightingEquipment\Offline\ActionTime;
+use FirefightingEquipment\Offline\ActionTimeGuard;
 use FirefightingEquipment\Offline\OfflineSettings;
 use FirefightingEquipment\Time\Clock;
-use FirefightingEquipment\Time\GermanFormat;
 use FirefightingEquipment\Time\SystemClock;
 
 /**
@@ -84,7 +82,7 @@ final readonly class DeviceStateHandler implements RequestHandler
                 return self::response($previous);
             }
 
-            $stale = $occurredAt !== null && $this->checkActionTime($occurredAt, $confirmedStale);
+            $stale = $occurredAt !== null && new ActionTimeGuard($this->clock, $this->offline)->check($occurredAt, $confirmedStale);
             $result = $booker->book($userId, $deviceId, $version, $change, $comment, new BookingRequest($clientRef, $occurredAt, $stale, $hash, $onlineHash));
             if ($result->replayed) {
                 // Dieselbe client_ref gleichzeitig verarbeitet: Die andere Anfrage hat gespeichert und benachrichtigt.
@@ -102,49 +100,6 @@ final readonly class DeviceStateHandler implements RequestHandler
         }
 
         return self::response($result);
-    }
-
-    /**
-     * Prüft die Aktionszeit einer Offline-Buchung gegen die Serverzeit: mehr als
-     * MAX_CLOCK_SKEW_SECONDS in der Zukunft → 422 clock_implausible (genau die Grenze ist erlaubt);
-     * älter als offline.queue_max_age_days (genau die Grenze ist erlaubt) ohne confirmed_stale →
-     * 409 stale_action.
-     *
-     * @return bool alte Buchung, nach Rückfrage gesendet
-     *
-     * @throws HttpException
-     */
-    private function checkActionTime(ActionTime $occurredAt, bool $confirmedStale): bool
-    {
-        $now = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
-        $maxSkew = OfflineSettings::MAX_CLOCK_SKEW_SECONDS;
-        if ($occurredAt->value->getTimestamp() - $now->getTimestamp() > $maxSkew) {
-            throw HttpException::clockImplausible(
-                sprintf(
-                    'Die Aktionszeit der Buchung (%s) liegt mehr als %d Minuten in der Zukunft. Bitte Datum und Uhrzeit des Geräts prüfen.',
-                    GermanFormat::dateTime($occurredAt->value),
-                    intdiv($maxSkew, 60),
-                ),
-                ['server_time' => ActionTime::format($now), 'occurred_at' => ActionTime::format($occurredAt->value), 'max_skew_seconds' => $maxSkew],
-            );
-        }
-
-        $days = $this->offline->config()->queueMaxAgeDays;
-        if ($occurredAt->value >= $now->modify(sprintf('-%d days', $days))) {
-            return false;
-        }
-        if (!$confirmedStale) {
-            throw HttpException::staleAction(
-                sprintf(
-                    'Die Buchung ist älter als %d Tage (Aktionszeit %s). Soll sie trotzdem gesendet werden? Dann erneut mit "confirmed_stale": true senden.',
-                    $days,
-                    GermanFormat::dateTime($occurredAt->value),
-                ),
-                ['occurred_at' => ActionTime::format($occurredAt->value), 'queue_max_age_days' => $days, 'server_time' => ActionTime::format($now)],
-            );
-        }
-
-        return true;
     }
 
     private static function response(BookingResult $result): JsonResponse

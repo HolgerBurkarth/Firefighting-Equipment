@@ -49,6 +49,8 @@ final class DeviceEventTest extends TestCase
         yield 'Umbuchung' => [true, null, null, 'Umgebucht'];
         yield 'Status' => [false, DeviceStatus::Ready, DeviceStatus::Defective, 'Status geändert'];
         yield 'beides' => [true, DeviceStatus::Ready, DeviceStatus::Maintenance, 'Umgebucht und Status geändert'];
+        yield 'Benutzt gemeldet mit Sammelstelle' => [true, DeviceStatus::Ready, DeviceStatus::Used, 'Benutzt gemeldet'];
+        yield 'Benutzt gemeldet ohne Sammelstelle' => [false, DeviceStatus::Ready, DeviceStatus::Used, 'Benutzt gemeldet'];
         yield 'Aussondern' => [false, DeviceStatus::Defective, DeviceStatus::Retired, 'Ausgesondert'];
         yield 'Wiederaufnahme' => [false, DeviceStatus::Retired, DeviceStatus::Ready, 'Wieder aufgenommen'];
         yield 'Wiederaufnahme mit Umbuchung' => [true, DeviceStatus::Retired, DeviceStatus::Ready, 'Wieder aufgenommen'];

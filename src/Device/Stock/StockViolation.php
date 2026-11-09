@@ -41,6 +41,18 @@ final readonly class StockViolation
         );
     }
 
+    /** Kurzform für den Hinweis: „HLF 20: 1 von mindestens 2 Atemschutzmaske oder Funkgerät einsatzbereit“. */
+    public function detail(): string
+    {
+        return sprintf(
+            '%s: %d von mindestens %d %s einsatzbereit',
+            $this->locationPath,
+            $this->have,
+            $this->minCount,
+            implode(' oder ', array_column($this->types, 'name')),
+        );
+    }
+
     /**
      * @return array<string, mixed> Angaben für details der Fehlerantwort (stock)
      */

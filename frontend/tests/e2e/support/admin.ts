@@ -230,6 +230,7 @@ export function noticeJson(
         status: 'open',
         status_label: 'offen',
         stale_confirmed: false,
+        detail: null,
         created_at: '2026-10-30T09:00:00Z',
         updated_at: '2026-10-30T09:00:00Z',
         device: { id: 1, identifier: 'M1', device_type: 'Atemschutzmaske' },

@@ -28,7 +28,15 @@ final readonly class DeviceEventRepository
         . ' e.from_location_id, fl.name AS from_name, fp.name AS from_parent,'
         . ' e.to_location_id, tl.name AS to_name, tp.name AS to_parent, (tl.task = \'borrower\') AS to_borrower,'
         . ' e.from_status, e.to_status, e.from_due, e.to_due, e.field, e.old_value, e.new_value, e.comment, e.created_at,'
-        . ' e.occurred_at, e.applied, e.not_applied_reason, e.channel, b.client_ref';
+        . ' e.occurred_at, e.applied, e.not_applied_reason, e.channel, b.client_ref, e.swap_id,'
+        // Tausch (P2.8): die andere Ausrüstung (Nummer, Typ und Standort für den Datenfilter) und ob dies die herausgenommene ist
+        . ' IF(e.swap_id IS NULL, NULL, (SELECT sd.identifier FROM fe_device_events se JOIN fe_devices sd ON sd.id = se.device_id AND sd.tenant_id = se.tenant_id'
+        . ' WHERE se.tenant_id = e.tenant_id AND se.swap_id = e.swap_id AND se.device_id <> e.device_id ORDER BY se.id LIMIT 1)) AS swap_partner,'
+        . ' IF(e.swap_id IS NULL, NULL, (SELECT sd.device_type_id FROM fe_device_events se JOIN fe_devices sd ON sd.id = se.device_id AND sd.tenant_id = se.tenant_id'
+        . ' WHERE se.tenant_id = e.tenant_id AND se.swap_id = e.swap_id AND se.device_id <> e.device_id ORDER BY se.id LIMIT 1)) AS swap_partner_type,'
+        . ' IF(e.swap_id IS NULL, NULL, (SELECT sd.location_id FROM fe_device_events se JOIN fe_devices sd ON sd.id = se.device_id AND sd.tenant_id = se.tenant_id'
+        . ' WHERE se.tenant_id = e.tenant_id AND se.swap_id = e.swap_id AND se.device_id <> e.device_id ORDER BY se.id LIMIT 1)) AS swap_partner_location,'
+        . ' IF(e.swap_id IS NULL, 0, e.id = (SELECT MIN(se2.id) FROM fe_device_events se2 WHERE se2.tenant_id = e.tenant_id AND se2.swap_id = e.swap_id)) AS swap_out';
 
     private const string JOINS = ' FROM fe_device_events e'
         . ' LEFT JOIN fe_users u ON u.id = e.user_id AND u.tenant_id = e.tenant_id'
@@ -224,7 +232,14 @@ final readonly class DeviceEventRepository
      */
     private function event(array $row): DeviceEvent
     {
-        return self::hydrate($row)->maskedFor($this->visibility);
+        $event = self::hydrate($row)->maskedFor($this->visibility);
+        // Die andere Ausrüstung eines Tauschs nennt nur, wer sie auch sehen darf.
+        if ($event->swapId !== null && $event->swapPartner !== null
+            && !$this->visibility->allows((int) $row['swap_partner_type'], (int) $row['swap_partner_location'])) {
+            return $event->withoutSwapPartner();
+        }
+
+        return $event;
     }
 
     /**
@@ -254,6 +269,9 @@ final readonly class DeviceEventRepository
             $row['client_ref'] === null ? null : (string) $row['client_ref'],
             EventChannel::from((string) $row['channel']),
             (int) ($row['to_borrower'] ?? 0) === 1,
+            $row['swap_id'] === null ? null : (string) $row['swap_id'],
+            $row['swap_partner'] === null ? null : (string) $row['swap_partner'],
+            (int) ($row['swap_out'] ?? 0) === 1,
         );
     }
 

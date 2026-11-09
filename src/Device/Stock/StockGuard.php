@@ -26,11 +26,24 @@ final readonly class StockGuard
     }
 
     /**
-     * @param list<array{device: Device, locationId: int, status: DeviceStatus}> $moves die geplanten Änderungen
+     * @param array<int, array{device: Device, locationId: int, status: DeviceStatus}> $moves die geplanten Änderungen
      *
      * @return list<StockViolation> je unterschrittener Regel eine
      */
     public function violations(Tenant $tenant, array $moves): array
+    {
+        return array_map(static fn (array $entry): StockViolation => $entry[0], $this->evaluate($tenant, $moves));
+    }
+
+    /**
+     * Wie violations(), dazu je Regel die Nummern (Schlüssel von $moves) der Änderungen, die ihren Bestand verringern
+     * (CSV-Import: Warnung in genau diesen Zeilen).
+     *
+     * @param array<int, array{device: Device, locationId: int, status: DeviceStatus}> $moves
+     *
+     * @return list<array{StockViolation, list<int>}>
+     */
+    public function evaluate(Tenant $tenant, array $moves): array
     {
         $locationIds = [];
         foreach ($moves as $move) {
@@ -52,17 +65,21 @@ final readonly class StockGuard
         $violations = [];
         foreach ($this->rules($tenant, array_keys($scopeIds)) as $rule) {
             $delta = 0;
-            foreach ($moves as $move) {
+            $reducing = [];
+            foreach ($moves as $index => $move) {
                 $before = $this->counts($rule, $move['device']->deviceTypeId, $move['device']->locationId, $move['device']->status, $parents);
                 $after = $this->counts($rule, $move['device']->deviceTypeId, $move['locationId'], $move['status'], $parents);
                 $delta += ($after ? 1 : 0) - ($before ? 1 : 0);
+                if ($before && !$after) {
+                    $reducing[] = $index;
+                }
             }
             if ($delta >= 0) {
                 continue;
             }
             $left = $this->have($tenant, $rule) + $delta;
             if ($left < $rule['min_count']) {
-                $violations[] = new StockViolation(
+                $violations[] = [new StockViolation(
                     $rule['location_id'],
                     $rule['location_name'],
                     $rule['location_path'],
@@ -70,7 +87,7 @@ final readonly class StockGuard
                     $rule['min_count'],
                     $rule['types'],
                     $left,
-                );
+                ), $reducing];
             }
         }
 

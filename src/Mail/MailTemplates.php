@@ -514,13 +514,18 @@ final class MailTemplates
         $lines = [
             'Hinweis: ' . $notice->kind->label(),
             'Ausrüstung: ' . self::logValue($notice->deviceIdentifier) . ' (' . $notice->deviceTypeName . ')',
+        ];
+        if ($notice->detail !== null) {
+            $lines[] = 'Sollbestand: ' . self::logValue($notice->detail);
+        }
+        array_push($lines,
             '',
             'Buchung vom Handy:',
             'Wer: ' . self::noticeUser($notice->user),
             'Aktionszeit: ' . self::when($notice->occurredAt),
             'Eingang: ' . self::when($notice->createdAt),
             'Gewünscht: ' . implode(', ', $wanted),
-        ];
+        );
         if ($comment !== null) {
             $lines[] = 'Kommentar: ' . self::logValue($comment);
         }
@@ -700,6 +705,12 @@ final class MailTemplates
                 if ($event->fromStatus === DeviceStatus::Retired) {
                     return 'wieder aufgenommen';
                 }
+                if ($event->swapId !== null) {
+                    return mb_lcfirst($event->label());
+                }
+                if ($event->label() === 'Benutzt gemeldet') {
+                    return 'benutzt gemeldet';
+                }
                 $parts = [];
                 if ($event->toLocation !== null) {
                     $parts[] = $event->label() === 'Verliehen' ? 'verliehen' : 'umgebucht';
@@ -724,6 +735,7 @@ final class MailTemplates
     private static function bulkReason(array $events): string
     {
         $moved = false;
+        $swapOnly = true;
         $lentOnly = true;
         $statuses = [];
         foreach ($events as $event) {
@@ -731,10 +743,14 @@ final class MailTemplates
                 continue;
             }
             $moved = $moved || $event->toLocation !== null;
+            $swapOnly = $swapOnly && $event->swapId !== null;
             $lentOnly = $lentOnly && $event->label() === 'Verliehen';
             if ($event->toStatus !== null) {
                 $statuses[$event->toStatus->value] = $event->toStatus;
             }
+        }
+        if ($moved && $swapOnly) {
+            return 'getauscht';
         }
         $parts = [];
         if ($moved) {
@@ -757,6 +773,9 @@ final class MailTemplates
             $lines[] = 'Standort: ' . ($event->toLocation?->path() ?? '–');
             $lines[] = 'Status: ' . ($event->toStatus?->label() ?? '–');
         } elseif ($event->type === DeviceEventType::StateChanged) {
+            if ($event->swapId !== null) {
+                $lines[] = 'Tausch: ' . $event->label();
+            }
             if ($event->toLocation !== null) {
                 $lines[] = 'Standort: ' . ($event->fromLocation?->path() ?? '–') . ' → ' . $event->toLocation->path();
             }
