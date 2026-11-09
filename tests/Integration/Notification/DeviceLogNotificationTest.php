@@ -113,6 +113,27 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         self::assertStringContainsString('Tausch: Als Ersatz für MA-01', $this->mailer->sent[0]->text);
     }
 
+    public function testStockNoticeMailNamesTheRule(): void
+    {
+        $a = $this->createViaApi('MA-01');
+        $this->createViaApi('MA-02');
+        $rule = $this->api('POST', 'locations/' . $this->g1 . '/stock-rules', ['rules' => [['min_count' => 2, 'device_type_ids' => [$this->typeId]]]]);
+        self::assertSame(200, $rule->statusCode(), $rule->body());
+        $this->mailer->sent = [];
+
+        $response = $this->api('POST', 'devices/' . $a['id'] . '/state', [
+            'version' => 1, 'location_id' => $this->room, 'confirmed_below_minimum' => true, 'client_ref' => 'b0b0b0b0-0000-4000-8000-000000000001',
+        ]);
+        self::assertSame(200, $response->statusCode(), $response->body());
+
+        $notice = array_values(array_filter($this->mailer->sent, static fn (MailMessage $m): bool => str_contains($m->subject, 'Hinweis')));
+        self::assertNotEmpty($notice);
+        self::assertStringContainsString('Hinweis: Sollbestand unterschritten', $notice[0]->text);
+        self::assertStringContainsString("
+Sollbestand: HLF 20 / G1: 1 von mindestens 2 Atemschutzmaske einsatzbereit
+", $notice[0]->text);
+    }
+
     public function testSubjectsOfAllActions(): void
     {
         $id = $this->createViaApi('MA-01')['id'];

@@ -48,6 +48,8 @@ export interface Notice {
     readonly statusLabel: string;
     /** Die Buchung war älter als erlaubt und wurde nach Rückfrage gesendet. */
     readonly staleConfirmed: boolean;
+    /** Einzelheit, bei `stock_below_minimum` die unterschrittene Regel; fehlt bei älteren Antworten. */
+    readonly detail: string | null;
     /** Eingang der Buchung = Anlegen des Hinweises, UTC `…Z`. */
     readonly createdAt: string;
     readonly updatedAt: string;
@@ -171,6 +173,7 @@ export function parseNotice(json: unknown): Notice | null {
     const kindLabel = json['kind_label'];
     const statusLabel = json['status_label'];
     const staleConfirmed = json['stale_confirmed'];
+    const detail = json['detail'] ?? null;
     const createdAt = json['created_at'];
     const updatedAt = json['updated_at'];
     const booking = parseBooking(json['booking']);
@@ -190,6 +193,7 @@ export function parseNotice(json: unknown): Notice | null {
         (status !== 'open' && status !== 'resolved') ||
         typeof statusLabel !== 'string' ||
         typeof staleConfirmed !== 'boolean' ||
+        (detail !== null && typeof detail !== 'string') ||
         !isUtcTime(createdAt) ||
         !isUtcTime(updatedAt) ||
         !isId(device['id']) ||
@@ -207,6 +211,7 @@ export function parseNotice(json: unknown): Notice | null {
         status,
         statusLabel,
         staleConfirmed,
+        detail,
         createdAt,
         updatedAt,
         device: {

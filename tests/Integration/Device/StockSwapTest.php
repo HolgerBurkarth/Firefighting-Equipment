@@ -113,6 +113,12 @@ final class StockSwapTest extends DeviceApiTestCase
         self::assertSame($this->room, self::json($response)['device']['location']['id']);
         self::assertNotNull(self::json($response)['result']['notice_id']);
         self::assertSame(['stock_below_minimum', 'open'], array_values((array) $this->pdo()->query('SELECT kind, status FROM fe_device_notices')->fetch(\PDO::FETCH_NUM)));
+
+        // Der Hinweis nennt die unterschrittene Regel (Protokoll und JSON).
+        $detail = (string) $this->pdo()->query('SELECT detail FROM fe_device_notices')->fetchColumn();
+        self::assertMatchesRegularExpression('/^.+: 1 von mindestens 2 .+ einsatzbereit$/', $detail);
+        $notice = self::json($this->api('GET', 'notices/' . self::json($response)['result']['notice_id']))['notice'];
+        self::assertSame($detail, $notice['detail']);
     }
 
     public function testBookingsThatDoNotReduceTheStockAreAlwaysAllowed(): void

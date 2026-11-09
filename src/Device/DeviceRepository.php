@@ -458,7 +458,7 @@ final readonly class DeviceRepository
         /** @var array{BookingOutcome, ?BookingReason, ?int, ?int} $result */
         $result = $this->atomically(function () use ($tenant, $userId, $id, $expectedVersion, $change, $comment, $booking): array {
             $before = null;
-            $below = false;
+            $below = null;
             if ($booking?->occurredAt !== null) {
                 $current = $this->lockDevice($tenant, $id);
                 $before = $this->stateSnapshot($tenant, $current);
@@ -478,11 +478,11 @@ final readonly class DeviceRepository
 
             // Hinweis an die Admins: nur Offline-Buchungen mit besonderem Ergebnis oder nach Rückfrage.
             // Online nur, wenn die Buchung mit stock.override den Sollbestand unterschritten hat (P2.8).
-            $kind = $below ? NoticeKind::StockBelowMinimum : NoticeKind::forResult($reason, $booking->staleConfirmed);
-            $at = $booking->occurredAt ?? ($below ? ActionTime::fromString(gmdate('Y-m-d\TH:i:s\Z')) : null);
+            $kind = $below !== null ? NoticeKind::StockBelowMinimum : NoticeKind::forResult($reason, $booking->staleConfirmed);
+            $at = $booking->occurredAt ?? ($below !== null ? ActionTime::fromString(gmdate('Y-m-d\TH:i:s\Z')) : null);
             $noticeId = $kind === null || $at === null || $before === null ? null : new DeviceNoticeRepository($this->pdo, $this->visibility)->create(
                 $tenant,
-                new NewNotice($kind, $booking->staleConfirmed, $id, $bookingId, $eventId, $userId, $at, $change, $before),
+                new NewNotice($kind, $booking->staleConfirmed, $id, $bookingId, $eventId, $userId, $at, $change, $before, $below),
             );
 
             return [$outcome, $reason, $eventId, $noticeId];
@@ -504,7 +504,7 @@ final readonly class DeviceRepository
     /**
      * Buchung ohne Aktionszeit (Version bereits geprüft): wie bisher, Fehler als Ausnahme.
      *
-     * @return array{BookingOutcome, ?BookingReason, ?int, bool} Ergebnis, Grund, Ereignis, Sollbestand mit stock.override unterschritten
+     * @return array{BookingOutcome, ?BookingReason, ?int, ?string} Ergebnis, Grund, Ereignis, unterschrittene Regel (Sollbestand mit stock.override unterschritten)
      *
      * @throws DeviceRuleViolationException ausgesondert, Ziel-Standort gesperrt, Sollbestand unterschritten
      * @throws InvalidDeviceValueException  Ziel-Standort unbekannt oder fremd
@@ -518,20 +518,20 @@ final readonly class DeviceRepository
         $locationId = $change->locationId ?? $current->locationId;
         $status = $change->status ?? $current->status;
         if ($locationId === $current->locationId && $status === $current->status) {
-            return [BookingOutcome::Unchanged, null, null, false];
+            return [BookingOutcome::Unchanged, null, null, null];
         }
         if ($locationId !== $current->locationId) {
             $this->lockActiveLocation($tenant, $locationId, $change->process);
         }
 
-        $below = false;
+        $below = null;
         if ($change->stock !== StockMode::Skip) {
             $violations = new StockGuard($this->pdo)->violations($tenant, [['device' => $current, 'locationId' => $locationId, 'status' => $status]]);
             if ($violations !== []) {
                 if ($change->stock !== StockMode::Override) {
                     throw self::stockBelowMinimum($violations[0], $change->stock === StockMode::Ask);
                 }
-                $below = true;
+                $below = $violations[0]->detail();
             }
         }
 

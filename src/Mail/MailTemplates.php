@@ -514,13 +514,18 @@ final class MailTemplates
         $lines = [
             'Hinweis: ' . $notice->kind->label(),
             'Ausrüstung: ' . self::logValue($notice->deviceIdentifier) . ' (' . $notice->deviceTypeName . ')',
+        ];
+        if ($notice->detail !== null) {
+            $lines[] = 'Sollbestand: ' . self::logValue($notice->detail);
+        }
+        array_push($lines,
             '',
             'Buchung vom Handy:',
             'Wer: ' . self::noticeUser($notice->user),
             'Aktionszeit: ' . self::when($notice->occurredAt),
             'Eingang: ' . self::when($notice->createdAt),
             'Gewünscht: ' . implode(', ', $wanted),
-        ];
+        );
         if ($comment !== null) {
             $lines[] = 'Kommentar: ' . self::logValue($comment);
         }

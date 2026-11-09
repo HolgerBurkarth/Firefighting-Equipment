@@ -21,6 +21,13 @@ committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, 
   (nicht über Claude). Verleih, Wartung und Rückgaben werden ebenfalls geprüft (Fehler je Eintrag). Offline-Buchungen nicht (P2.9).
 - Tests: `StockSwapTest`, `TenantRoutePermissionsTest`, `NoticeKindTest`, `RoleApiTest`.
 
+## 2026-11-09 – „Hinweis nennt die unterschrittene Regel (Phase 2, Runde 11)“
+
+- Neue Spalte `fe_device_notices.detail` (Migration 0063, reine Erweiterung). Hinweise tragen im JSON `detail` (String oder `null`);
+  bei `stock_below_minimum` z. B. „HLF 20 / G1: 1 von mindestens 2 Atemschutzmaske einsatzbereit“. Die Log-Mail zum Hinweis hat
+  dazu die Zeile „Sollbestand: …“. Commit-Betreff: „Hinweis „Sollbestand unterschritten“ nennt die Regel (Runde 11)“.
+  Tests: `StockSwapTest`, `DeviceLogNotificationTest`, Unit `notices.spec.ts`.
+
 ## 2026-11-09 – „Tausch im Verlauf (Phase 2, Runde 11)“
 
 - Jeder Verlaufseintrag (`devices/{id}/events`, `device-events`) trägt `swap_id` (Kennung des Tauschs, sonst `null`). `type_label`:

@@ -3182,6 +3182,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`NoticeListHandler`, `NoticeActionHandler` mit `NoticeAction`, `NoticeJson`). Tests:
   `tests/Integration/Device/DeviceNoticeTest`, `DeviceNoticeSchemaTest`,
   `tests/Integration/Notification/DeviceNoticeNotificationTest`.
+- `detail` (Migration `0063`, JSON `notice.detail`, Mail-Zeile „Sollbestand: …“, App: `noticeExplanation` „Unterschritten: …“): bei
+  `stock_below_minimum` die unterschrittene Regel („HLF 20 / G1: 1 von mindestens 2 Atemschutzmaske einsatzbereit“,
+  `StockViolation::detail`), sonst `null`.
 - Tabellen: `fe_device_notices` (Migration `0027`; ein Hinweis je Quittung, `booking_id` eindeutig;
   `kind` `overwritten`, `history_only`, `not_applied_retired`, `not_applied_location_locked`,
   `stale_confirmed`; `stale_confirmed` auch bei den anderen Arten; Buchung: Konto, Aktionszeit,

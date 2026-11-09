@@ -48,6 +48,8 @@ final readonly class DeviceNotice
         /** aktueller Gerätetyp und Standort des Geräts (für den Datenfilter der Empfänger) */
         public int $deviceTypeId = 0,
         public int $deviceLocationId = 0,
+        /** Einzelheit, bei stock_below_minimum die unterschrittene Regel */
+        public ?string $detail = null,
     ) {
     }
 
@@ -91,6 +93,7 @@ final readonly class DeviceNotice
             $this->comment,
             $this->deviceTypeId,
             $this->deviceLocationId,
+            $this->detail,
         );
     }
 }

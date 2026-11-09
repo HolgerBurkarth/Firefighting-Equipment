@@ -33,6 +33,7 @@ final class NoticeJson
             'status' => $notice->status->value,
             'status_label' => $notice->status->label(),
             'stale_confirmed' => $notice->staleConfirmed,
+            'detail' => $notice->detail,
             'created_at' => AuthJson::time($notice->createdAt),
             'updated_at' => AuthJson::time($notice->updatedAt),
             'device' => ['id' => $notice->deviceId, 'identifier' => $notice->deviceIdentifier, 'device_type' => $notice->deviceTypeName],

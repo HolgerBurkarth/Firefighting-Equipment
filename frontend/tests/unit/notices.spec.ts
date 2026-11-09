@@ -320,6 +320,16 @@ describe('Texte und Filter des Protokolls', () => {
         const stale = notice(1, { kind: 'stale_confirmed', stale_confirmed: true });
         expect(noticeExplanation(stale)).not.toContain('Außerdem');
         expect(noticeExplanation(notice(1, { kind: 'unbekannt' }))).toBeNull();
+        expect(
+            noticeExplanation(
+                notice(1, {
+                    kind: 'stock_below_minimum',
+                    detail: 'Live-Test Wagen: 1 von mindestens 2 Live-Testtyp 2 einsatzbereit',
+                }),
+            ),
+        ).toContain(
+            'Unterschritten: Live-Test Wagen: 1 von mindestens 2 Live-Testtyp 2 einsatzbereit.',
+        );
         expect(otherStateHeading(notice(1))).toBe('Überschriebener Stand');
         expect(otherStateHeading(notice(1, { kind: 'history_only' }))).toBe('Stand beim Eingang');
     });

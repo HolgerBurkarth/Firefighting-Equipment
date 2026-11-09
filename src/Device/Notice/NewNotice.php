@@ -24,6 +24,8 @@ final readonly class NewNotice
         public DeviceStateChange $requested,
         /** Stand beim Eingang der Buchung (bei overwritten der überschriebene) */
         public DeviceStateSnapshot $other,
+        /** Einzelheit, z. B. die unterschrittene Regel des Sollbestands */
+        public ?string $detail = null,
     ) {
     }
 }
