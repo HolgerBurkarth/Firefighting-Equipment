@@ -124,3 +124,14 @@ Vom Agenten im Browser (Test-Stadt, Admin; ein Service Worker hielt anfangs die 
 - ☒ CSV-Export der Historie: Verleihe standen als „Umgebucht“ (M91, M92, M93 nach Hattingen), obwohl JSON und App „Verliehen“ zeigten. → Runde 12: im Code stimmen CSV und JSON überein (Test `testOwnLabelsMatchTheJsonHistory` grün), Ursache lokal nicht nachzustellen; live nach dem Deploy erneut zu prüfen.
 - ☑ Mail-Auswahl erscheint in den Einstellungen, sobald die Benachrichtigung an ist; danach wieder ausgeschaltet. Ankunft der Mails nicht geprüft (Holger).
 - Zurückgesetzt: beide Regeln entfernt, M90 HLF 20 / G1 einsatzbereit, M91 und M94 Lager Gerätehaus in Wartung, M92 Lager Gerätehaus einsatzbereit, M93 HLF 20 einsatzbereit, Benachrichtigung aus.
+
+## Runde 12: Ersatzliste, Tausch ohne Verbindung, CSV-Bezeichnungen, Claude-Werkzeuge (Build `d5640808c82b`, 09.11.2026)
+
+Vom Agenten im Browser (Test-Stadt, Admin; `health` ok, keine Migration):
+
+- ☑ Ersatzliste nach direktem Öffnen (`geraete/134` neu geladen, „Tauschen …“): erst „Wird geladen …“, dann der Stand vom Server (nur M92, Lager Gerätehaus); die Seite fragt `GET devices` und `GET locations` beim Öffnen. Dialog ohne Buchung geschlossen.
+- ☑ Ursache des Befunds „Verleih steht im CSV als Umgebucht“: Die Bezeichnung „Verliehen“ wird beim Lesen aus der AKTUELLEN Aufgabe des Standorts gebildet. Nach dem Abschalten der Aufgabe „Ausgeliehen an“ (Rücksetzen nach dem Test) heißen alte Verleihe überall „Umgebucht“, im CSV wie im JSON und in der App (geprüft: `device-events` und Export zeigen für M91–M93 beide „Umgebucht“). CSV und JSON stimmen im Code überein (Test `testOwnLabelsMatchTheJsonHistory`). Offen als Frage an Holger: Soll der Verleih dauerhaft am Eintrag gespeichert werden (Migration)?
+- ☑ Export enthält weiter „Benutzt gemeldet“, „Getauscht gegen M92“, „Als Ersatz für M90“, „Rückgabe“.
+- ☐ Tausch bei Verbindungsabbruch in die Warteschlange (Flugmodus nach dem Antippen von „Tauschen“), nur am iPhone (Holger); im Browser-Test abgedeckt.
+- ☐ Claude-Werkzeuge `report_used`, `swap_equipment`, `lend_equipment`, `list_loans`, `list_maintenance`: Konnektor trennen und neu verbinden, dann Liste in `LIVETEST-MCP.md`, „Runde 12“ (Holger mit Claude im Chat).
+- Nichts verändert (nur gelesen, Dialog ohne Buchung geschlossen).
