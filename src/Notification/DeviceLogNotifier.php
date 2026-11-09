@@ -66,6 +66,8 @@ final readonly class DeviceLogNotifier
         private float $timeBudgetSeconds = self::TIME_BUDGET_SECONDS,
         /** Weg der Änderung („Wer: … (über Claude)“ beim CSV-Import) */
         private EventChannel $channel = EventChannel::App,
+        /** Mail-Auswahl der Empfänger (P2.10); null = alle Themen für alle */
+        private ?MailPreferenceRepository $preferences = null,
     ) {
     }
 
@@ -83,6 +85,7 @@ final readonly class DeviceLogNotifier
             new DeviceNoticeRepository($pdo, DeviceVisibility::all()),
             $context->channel() === EventChannel::Claude ? self::CLAUDE_TIME_BUDGET_SECONDS : self::TIME_BUDGET_SECONDS,
             $context->channel(),
+            new MailPreferenceRepository($pdo),
         );
     }
 
@@ -123,6 +126,7 @@ final readonly class DeviceLogNotifier
                 self::masked($events, $v),
                 self::linkFor($recipient, $url),
             ),
+            topics: MailTopic::forEvents($events),
         );
     }
 
@@ -181,6 +185,7 @@ final readonly class DeviceLogNotifier
 
                 return MailTemplates::deviceBulkLog($recipient, $tenant, $visible, self::linkFor($recipient, $listUrl));
             },
+            topics: MailTopic::forEvents(array_merge(...array_map(static fn (array $entry): array => $entry[1], $entries))),
         );
     }
 
@@ -215,6 +220,7 @@ final readonly class DeviceLogNotifier
                 self::linkFor($recipient, $url),
             ),
             self::NOTICE_PURPOSE,
+            [MailTopic::Notices],
         );
     }
 
@@ -251,6 +257,7 @@ final readonly class DeviceLogNotifier
                 self::MAX_IMPORT_LINES,
                 $channel,
             ),
+            topics: [MailTopic::MasterData],
         );
     }
 
@@ -282,14 +289,22 @@ final readonly class DeviceLogNotifier
     /**
      * @param \Closure(DeviceVisibility): bool         $sees  ob der Empfänger etwas sieht
      * @param \Closure(User, DeviceVisibility): MailMessage $build
+     * @param list<MailTopic> $topics Themen der Mail: wer eine Auswahl getroffen hat, bekommt sie nur zu einem davon (leer = immer)
      */
-    private function send(Tenant $tenant, User $actor, \Closure $sees, \Closure $build, string $purpose = self::PURPOSE): int
+    private function send(Tenant $tenant, User $actor, \Closure $sees, \Closure $build, string $purpose = self::PURPOSE, array $topics = []): int
     {
         $started = microtime(true);
         try {
             $recipients = [];
-            foreach ($this->users->listDeviceLogRecipients($tenant) as $user) {
-                if ($user->id === $actor->id) {
+            $candidates = array_values(array_filter(
+                $this->users->listDeviceLogRecipients($tenant),
+                static fn (User $user): bool => $user->id !== $actor->id,
+            ));
+            $chosen = $topics === [] || $this->preferences === null
+                ? []
+                : $this->preferences->topicsForUsers(array_map(static fn (User $user): int => $user->id, $candidates));
+            foreach ($candidates as $user) {
+                if (isset($chosen[$user->id]) && !array_any($topics, static fn (MailTopic $topic): bool => in_array($topic, $chosen[$user->id], true))) {
                     continue;
                 }
                 $visibility = $user->tenantId === null

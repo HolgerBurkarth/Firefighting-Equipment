@@ -116,6 +116,21 @@ function settingsServer(respond: Respond = () => null) {
     let accent: string | null = null;
     let logo: number | null = null;
     let deviceLog = false;
+    let topics: string[] | null = null;
+    const notificationBody = () => ({
+        notifications: { device_log: deviceLog },
+        topics: {
+            selected: topics,
+            available: [
+                {
+                    id: 'defect_reported',
+                    label: 'Defekt gemeldet',
+                    hint: 'Eine Ausrüstung wird defekt.',
+                },
+                { id: 'lent', label: 'Ausrüstung verliehen', hint: 'Verleih an einen Leihnehmer.' },
+            ],
+        },
+    });
     const tenant = (): MockResponse => ({
         status: 200,
         body: tenantBody(accent, logo === null ? null : `v${String(logo)}`),
@@ -146,15 +161,19 @@ function settingsServer(respond: Respond = () => null) {
         },
         'GET api/v1/auth/notifications': () => ({
             status: 200,
-            body: { notifications: { device_log: deviceLog } },
+            body: notificationBody(),
         }),
         'POST api/v1/auth/notifications': (request) => {
             const replaced = respond(request);
             if (replaced !== null) {
                 return replaced;
             }
-            deviceLog = (request.body as { device_log: boolean }).device_log;
-            return { status: 200, body: { notifications: { device_log: deviceLog } } };
+            const body = request.body as { device_log: boolean; topics?: string[] | null };
+            deviceLog = body.device_log;
+            if (body.topics !== undefined) {
+                topics = body.topics;
+            }
+            return { status: 200, body: notificationBody() };
         },
     };
     return handlers;
@@ -434,6 +453,46 @@ test.describe('Einstellungen', () => {
         expect(bodies(apiRequests, 'POST api/v1/auth/notifications')).toEqual([
             { device_log: true },
             { device_log: false },
+        ]);
+    });
+
+    test('Mail-Auswahl: alle Vorgänge oder nur ausgewählte', async ({ page, apiRequests }) => {
+        await page.goto(SETTINGS);
+        const toggle = page.getByRole('checkbox', {
+            name: /Mail bei jeder Änderung an der Ausrüstung/,
+        });
+        await expect(page.getByTestId('mail-topics')).toHaveCount(0);
+        await toggle.check();
+        const topicBox = page.getByTestId('mail-topics');
+        await expect(topicBox).toBeVisible();
+        await expect(topicBox.getByRole('radio', { name: 'Alle Vorgänge' })).toBeChecked();
+        await expect(page.getByTestId('save-topics')).toBeDisabled();
+
+        await topicBox.getByRole('radio', { name: 'Nur ausgewählte' }).check();
+        await expect(page.getByRole('alert')).toContainText('Bitte mindestens ein Thema wählen');
+        await expect(page.getByTestId('save-topics')).toBeDisabled();
+        await page.getByTestId('topic-lent').check();
+        await page.getByTestId('save-topics').click();
+        await expect(
+            page.getByRole('status').filter({ hasText: 'nur zu den gewählten' }),
+        ).toBeVisible();
+
+        await page.reload();
+        await expect(
+            page.getByTestId('mail-topics').getByRole('radio', { name: 'Nur ausgewählte' }),
+        ).toBeChecked();
+        await expect(page.getByTestId('topic-lent')).toBeChecked();
+        await expect(page.getByTestId('topic-defect_reported')).not.toBeChecked();
+
+        await page.getByRole('radio', { name: 'Alle Vorgänge' }).check();
+        await page.getByTestId('save-topics').click();
+        await expect(
+            page.getByRole('status').filter({ hasText: 'zu allen Vorgängen' }),
+        ).toBeVisible();
+        expect(bodies(apiRequests, 'POST api/v1/auth/notifications')).toEqual([
+            { device_log: true },
+            { device_log: true, topics: ['lent'] },
+            { device_log: true, topics: null },
         ]);
     });
 

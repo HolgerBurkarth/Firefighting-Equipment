@@ -16,6 +16,8 @@ use FirefightingEquipment\Permission\DeviceVisibility;
 use FirefightingEquipment\Permission\PermissionRepository;
 use FirefightingEquipment\User\UserRepository;
 use FirefightingEquipment\Notification\DeviceLogNotifier;
+use FirefightingEquipment\Notification\MailPreferenceRepository;
+use FirefightingEquipment\Notification\MailTopic;
 use FirefightingEquipment\Tests\Integration\Device\FilteredRoles;
 use FirefightingEquipment\Tests\Integration\Import\ImportApiTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -132,6 +134,38 @@ final class DeviceLogNotificationTest extends ImportApiTestCase
         self::assertStringContainsString("
 Sollbestand: HLF 20 / G1: 1 von mindestens 2 Atemschutzmaske einsatzbereit
 ", $notice[0]->text);
+    }
+
+    public function testMailTopicsLimitWhoGetsWhichMail(): void
+    {
+        $logAdmin = (int) $this->pdo()->query("SELECT id FROM fe_users WHERE email = 'log-admin@example.org'")->fetchColumn();
+        $chef = (int) $this->pdo()->query("SELECT id FROM fe_users WHERE email = 'chef@example.org'")->fetchColumn();
+        $preferences = new MailPreferenceRepository($this->pdo());
+        $preferences->save($logAdmin, [MailTopic::Lent, MailTopic::Notices]);
+        $preferences->save($chef, [MailTopic::DefectReported]);
+        $device = $this->createViaApi('MA-01');
+
+        // Defekt gemeldet: nur der Super-Admin mit diesem Thema.
+        $this->mailer->sent = [];
+        $this->api('POST', 'devices/' . $device['id'] . '/state', ['version' => 1, 'status' => 'defective']);
+        self::assertSame(['chef@example.org'], $this->recipients());
+
+        // Umbuchen: Thema „Sonstige“, das niemand gewählt hat.
+        $this->mailer->sent = [];
+        $this->api('POST', 'devices/' . $device['id'] . '/state', ['version' => 2, 'location_id' => $this->room]);
+        self::assertSame([], $this->recipients());
+
+        // Wartungsdatum: Stammdaten-Thema, ebenfalls niemand.
+        $this->mailer->sent = [];
+        $this->api('POST', 'devices/' . $device['id'] . '/inspection-due', ['version' => 3, 'next_inspection_due' => '2027-03-01']);
+        self::assertSame([], $this->recipients());
+
+        // Wer nichts gewählt hat (Admin des Tests), bekommt weiter alles.
+        $this->mailer->sent = [];
+        $this->api('POST', 'devices/' . $device['id'] . '/state', ['version' => 4, 'status' => 'ready'], $this->user);
+        self::assertContains('admin@example.org', $this->recipients());
+        self::assertNotContains('log-admin@example.org', $this->recipients());
+        self::assertNotContains('chef@example.org', $this->recipients());
     }
 
     public function testSubjectsOfAllActions(): void

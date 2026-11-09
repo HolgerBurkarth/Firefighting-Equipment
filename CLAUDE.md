@@ -3421,6 +3421,16 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 ## Benachrichtigung „Log“
 - Eigene Einstellung über `GET`/`POST auth/notifications {device_log: bool}` (siehe "Anmeldung und
   Sitzungen im Code", `NotificationSettingsHandler`), auch in `auth/me` (`notifications`). Standard aus.
+- Mail-Auswahl je Person (Phase 2, P2.10, Runde 11): Themen `MailTopic` (`defect_reported`, `used_reported`, `return_received`, `lent`,
+  `notices`, `changes`, `master_data`; Zuordnung eines Eintrags in `MailTopic::forEvent`: Rückgabe ohne Anmeldung, Tausch/nicht übernommen
+  und sonstiges → `changes`, Verleih, Zielstatus defekt bzw. benutzt, alle anderen Arten → `master_data`; Hinweise → `notices`;
+  CSV-Import → `master_data`). Tabelle `fe_user_mail_prefs` (Migration 0064, `user_id` + `topic`, ohne `tenant_id`, damit auch
+  Super-Admins wählen können): eine Zeile = angehakt, OHNE Zeilen gelten alle Themen (G7: wer vorher eingeschaltet hatte, bekommt weiter
+  alles). `GET`/`POST auth/notifications` liefern zusätzlich `topics {selected: null|[…], available: [{id, label, hint}]}`; `POST` nimmt
+  `topics` (fehlt = unverändert, `null` = alle, nicht leere Liste bekannter Themen = nur diese; „keine“ = `device_log` false).
+  `DeviceLogNotifier::send` lässt Konten mit Auswahl aus, wenn keines der Themen der Mail dabei ist (Sammelmail: Vereinigung der
+  Themen); der Datenfilter gilt wie bisher. App: `NotificationSetting` mit „Alle Vorgänge“ / „Nur ausgewählte“ und „Auswahl
+  speichern“. Nicht gebaut (Mockup, G12/Plan): Erinnerungen, Filter nach Ausrüstungstypen, „Nur Wichtiges“.
 - Auslöser: jeder Vorgang, der in der Geräte-Historie protokolliert wird (Anlegen, CSV-Import,
   Umbuchen/Status, Aussondern, Wiederaufnehmen, Prüfdatum, Stammdaten). Ohne neues Ereignis (nichts
   geändert, Fehler, Versionskonflikt) keine Mail.

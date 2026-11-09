@@ -155,6 +155,45 @@ export function changePassword(
 export interface NotificationSettings {
     /** Mail „Log“ bei jedem Vorgang der Geräte-Historie (eigene ausgenommen). */
     readonly deviceLog: boolean;
+    /** Mail-Auswahl (Phase 2, P2.10); fehlt bei älteren Antworten. */
+    readonly topics?: MailTopics;
+}
+
+export interface MailTopic {
+    readonly id: string;
+    readonly label: string;
+    readonly hint: string;
+}
+
+export interface MailTopics {
+    /** Die gewählten Themen; null = keine Auswahl, also alle Themen. */
+    readonly selected: readonly string[] | null;
+    readonly available: readonly MailTopic[];
+}
+
+function parseTopics(json: unknown): MailTopics | null {
+    if (!isRecord(json) || !Array.isArray(json['available'])) {
+        return null;
+    }
+    const available: MailTopic[] = [];
+    for (const entry of json['available']) {
+        if (
+            !isRecord(entry) ||
+            typeof entry['id'] !== 'string' ||
+            typeof entry['label'] !== 'string' ||
+            typeof entry['hint'] !== 'string'
+        ) {
+            return null;
+        }
+        available.push({ id: entry['id'], label: entry['label'], hint: entry['hint'] });
+    }
+    const selected = json['selected'];
+    if (selected === null) {
+        return { selected: null, available };
+    }
+    return Array.isArray(selected) && selected.every((id) => typeof id === 'string')
+        ? { selected, available }
+        : null;
 }
 
 export function parseNotifications(json: unknown): NotificationSettings | null {
@@ -162,7 +201,14 @@ export function parseNotifications(json: unknown): NotificationSettings | null {
         return null;
     }
     const deviceLog = json['notifications']['device_log'];
-    return typeof deviceLog === 'boolean' ? { deviceLog } : null;
+    if (typeof deviceLog !== 'boolean') {
+        return null;
+    }
+    if (json['topics'] === undefined) {
+        return { deviceLog };
+    }
+    const topics = parseTopics(json['topics']);
+    return topics === null ? null : { deviceLog, topics };
 }
 
 /** GET auth/notifications (Admins unter ihrer Stadt, Super-Admins unter service). */
@@ -180,6 +226,21 @@ export function saveNotifications(
     return apiRequest('auth/notifications', parseNotifications, {
         method: 'POST',
         body: { device_log: deviceLog },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
+/**
+ * Mail-Auswahl speichern (Phase 2, P2.10; die Benachrichtigung bleibt eingeschaltet): null = alle Themen, sonst nur
+ * diese.
+ */
+export function saveMailTopics(
+    topics: readonly string[] | null,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<NotificationSettings>> {
+    return apiRequest('auth/notifications', parseNotifications, {
+        method: 'POST',
+        body: { device_log: true, topics },
         ...(fetchFn && { fetchFn }),
     });
 }

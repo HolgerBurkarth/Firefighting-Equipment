@@ -21,6 +21,15 @@ committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, 
   (nicht über Claude). Verleih, Wartung und Rückgaben werden ebenfalls geprüft (Fehler je Eintrag). Offline-Buchungen nicht (P2.9).
 - Tests: `StockSwapTest`, `TenantRoutePermissionsTest`, `NoticeKindTest`, `RoleApiTest`.
 
+## 2026-11-09 – „Mail-Auswahl je Person (Phase 2, Runde 11, P2.10)“
+
+- Migration 0064 `fe_user_mail_prefs` (neue Tabelle). `GET`/`POST auth/notifications`: Antwort zusätzlich `topics {selected: null|[…],
+  available: [{id, label, hint}]}` (Themen `defect_reported`, `used_reported`, `return_received`, `lent`, `notices`, `changes`,
+  `master_data`); `POST` nimmt optional `topics` (fehlt = unverändert, `null` = alle Themen, nicht leere Liste = nur diese, sonst 400).
+  `auth/me` bleibt unverändert. Die Log-Mails gehen nur noch an Konten, deren Auswahl zum Thema passt (ohne Auswahl alles).
+  Commit-Betreff: „Mail-Auswahl je Person: Themen der Benachrichtigung „Log“ (P2.10)“. Tests: `MailTopicTest`, `NotificationSettingsTest`,
+  `DeviceLogNotificationTest`, Browser `settings.spec.ts`.
+
 ## 2026-11-09 – „Tausch und Unterschreitung offline (Phase 2, Runde 11, P2.9)“
 
 - `POST devices/swap` nimmt zusätzlich `client_ref`, `occurred_at`, `confirmed_stale` (wie `/state`; `occurred_at` nur mit `client_ref`).

@@ -70,6 +70,26 @@ describe('Benachrichtigung „Log“ (auth/notifications)', () => {
             deviceLog: true,
         });
         expect(parseNotifications({ notifications: { device_log: 1 } })).toBeNull();
+        const topics = {
+            selected: ['lent'],
+            available: [{ id: 'lent', label: 'Verliehen', hint: 'Verleih.' }],
+        };
+        expect(parseNotifications({ notifications: { device_log: true }, topics })).toEqual({
+            deviceLog: true,
+            topics,
+        });
+        expect(
+            parseNotifications({
+                notifications: { device_log: true },
+                topics: { ...topics, selected: null },
+            }),
+        ).toMatchObject({ topics: { selected: null } });
+        expect(
+            parseNotifications({
+                notifications: { device_log: true },
+                topics: { selected: [1], available: [] },
+            }),
+        ).toBeNull();
         expect(parseNotifications({ device_log: true })).toBeNull();
         expect(parseNotifications(null)).toBeNull();
     });
