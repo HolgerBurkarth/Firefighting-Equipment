@@ -49,3 +49,25 @@ Test-Stadt, kein Super-Admin-Konto) am 08.11.2026 nach dem Deploy.
   danach zurückgesetzt, Wartung 403, M90 wieder HLF 20 / G1, einsatzbereit (geprüft von Claude im Browser,
   09.11.2026).
 
+
+## Runde 9: P2.5 bis P2.7 und Korrekturen (Build `715e960ad7be`, 09.11.2026)
+
+Vom Agenten im Browser (Admin der Test-Stadt, kein Super-Admin-Konto). Die Aufgaben „Ausgeliehen an“ und „Rückgabe“
+kann nur der Super-Admin freischalten; ohne sie gibt es den Bereich Verleih nicht (wie vor Phase 2).
+
+- ☑ Migrationen 0055–0060 ausgeführt, `health` ok, `build.json` = `715e960ad7be`.
+- ☑ `GET loans` ohne freigeschaltete Aufgabe: 403. `POST returns/check` mit erfundenem Schlüssel: 400 „Dieser
+  Rückgabe-Link gilt nicht (mehr)“, ohne Anmeldung erreichbar.
+- ☑ Sollbestand: Regel „mindestens 99 Atemschutzgerät“ an HLF 20 gesetzt; „Standorte“ zeigt das Panel „Sollbestand“
+  mit „außer Betrieb“ und „6 vorhanden, 93 fehlen“; danach alle Regeln entfernt (`stock` null).
+- ☑ „Benutzt melden“ an M90: Rückfrage „M90 als benutzt melden?“, Fokus auf „Abbrechen“, Abbrechen ändert nichts. (Direkt
+  geöffnet, ohne vorherige Synchronisierung: Text „falls es eine gibt – sonst bleibt der Standort“.)
+- ☐ Als Super-Admin „Ausgeliehen an“ und „Rückgabe“ freischalten, je einen Standort zuweisen; dann Seite „Verleih“:
+  Verleihen mit Nummer, „Rückgabe bis“ überfällig rot, Kachel im Dashboard, roter Zähler im Menü (Holger; danach
+  abschalten).
+- ☐ Aushang erzeugen, QR-Code mit dem Handy scannen, Ausrüstung ohne Anmeldung zurückgeben (Name, Zustand); Verlauf
+  zeigt „Rückgabe“ von „<Name> (ohne Anmeldung)“; Aushang drucken (Holger, iPhone).
+- ☐ „In der Rückgabe“: „In Ordnung ins Lager“ und „Benutzte und Defekte in die Sammelstelle“ (Holger).
+- ☐ Seite „Wartung“: gleiche Zeit sortiert natürlich nach Nummer (HRT 16 vor HRT 20), Rückfragen mit „Sie steht/Sie
+  stehen“; Standort-Liste: Chip „Standard-Lager“; Rollen-Editor: Vorschau „Darf“ nennt „bei Einmalgeräten nur Benutzt
+  melden“ (Holger, braucht freigeschaltete Aufgaben bzw. Super-Admin).
