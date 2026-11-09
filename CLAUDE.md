@@ -1257,7 +1257,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   mindestens 48 px), `ErrorNotice`, `MailHint` (Spam-Ordner, Absender zu den Kontakten),
   `BrandCard` (Logo 512 px oder Standard-Symbol, Name; unter `service` „Super-Admin“),
   `AccountPanel`, `ConfirmDialog` (Rückfrage über Reka UI `AlertDialog`, Fokus auf „Abbrechen“;
-  nie `window.confirm`). Anmeldeseite: Formular ausgeblendet bei `tenant_not_found`/`tenant_inactive`,
+  nie `window.confirm`; Klicks und Taps auf die Knöpfe zählen erst `CONFIRM_GUARD_MS` = 400 ms nach dem
+  Öffnen, bis dahin `aria-disabled`, Tastatur sofort: Schutz gegen Doppeltipp, Runde 11). Anmeldeseite: Formular ausgeblendet bei `tenant_not_found`/`tenant_inactive`,
   Passwort wird unverändert gesendet und nur bei `invalid_credentials` geleert, bei 429 Knopf mit
   Countdown bis `Retry-After`, bei `email_not_verified` „Bestätigungsmail erneut senden“.
 - Tokens und Einladungscodes aus Links (`#token=…`, `#code=…`) nur über `takeFragmentParam`
@@ -2842,7 +2843,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Sammelstelle für benutzte bzw. defekte Ausrüstung (auch außerhalb des Datenfilters, G4), sonst bleibt der Standort;
   der Ersatz „in“ muss einsatzbereit sein und kommt an den bisherigen Standort von „out“; beide in EINER Transaktion
   (gesperrt in der Reihenfolge der IDs), beide Ereignisse tragen dieselbe `swap_id`; die Prüfung gilt für beide zusammen.
-  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (Ersatz suchen, Status danach, Kommentar), in `DevicePage` der
+  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Status danach, Kommentar), in `DevicePage` der
   Knopf „Tauschen …“ (`swap-open`, nur online) und bei 409 mit `details.stock` der Kasten `stock-block` mit „Tauschen …“
   und, mit `stock.override`, „Trotzdem buchen …“ (Rückfrage, sendet `confirmed_below_minimum`); `src/data/swap.ts`
   (`parseStockBlock`, `swapCandidates`: einsatzbereit, Typen der verletzten Regel zuerst). Nicht gebaut: Tausch offline

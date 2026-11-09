@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { ApiError } from '../api/client';
 import { conflictDevice, type DeviceListItem, type SwapResponse } from '../api/devices';
-import { deviceStore, swapEquipment } from '../data';
+import { fetchStock, type StockState } from '../api/stock';
+import { deviceStore, locationStore, swapEquipment } from '../data';
 import { MAX_COMMENT_LENGTH, normalizeComment } from '../data/booking';
 import {
     SWAP_OUT_STATUSES,
@@ -39,9 +40,36 @@ const comment = ref('');
 const busy = ref(false);
 const error = ref<ApiError | null>(null);
 const confirmedBelow = ref(false);
+const showOthers = ref(false);
+/** Sollbestand der Stadt, erst geladen, wenn „Andere Standorte anzeigen“ gewählt wird (für die Warnung). */
+const stock = ref<StockState | null>(null);
+/** Klicks auf „Tauschen“ in den ersten Zehntelsekunden nach dem Öffnen zählen nicht (Doppeltipp, wie ConfirmDialog). */
+const SUBMIT_GUARD_MS = 400;
+const armed = ref(false);
+let armTimer: ReturnType<typeof setTimeout> | undefined;
+
+async function revealOthers(): Promise<void> {
+    showOthers.value = true;
+    if (stock.value === null) {
+        const result = await fetchStock();
+        if (result.ok) {
+            stock.value = result.data;
+        }
+    }
+}
+
+onBeforeUnmount(() => {
+    clearTimeout(armTimer);
+});
 
 watch(open, (value) => {
+    clearTimeout(armTimer);
+    armed.value = false;
     if (value) {
+        armTimer = setTimeout(() => {
+            armed.value = true;
+        }, SUBMIT_GUARD_MS);
+        showOthers.value = false;
         query.value = '';
         replacementId.value = null;
         outStatus.value = 'used';
@@ -52,12 +80,26 @@ watch(open, (value) => {
 });
 
 const candidates = computed(() =>
-    swapCandidates(deviceStore.state.devices, props.device, query.value, props.typeIds ?? []),
+    swapCandidates(
+        deviceStore.state.devices,
+        props.device,
+        query.value,
+        props.typeIds ?? [],
+        locationStore.state.locations,
+        stock.value,
+    ),
+);
+const replacementWarning = computed(
+    () =>
+        showOthers.value &&
+        candidates.value.others.some(
+            (entry) => entry.device.id === replacementId.value && entry.belowMinimum,
+        ),
 );
 const replacement = computed(
     () => deviceStore.state.devices.find((entry) => entry.id === replacementId.value) ?? null,
 );
-const canSubmit = computed(() => replacement.value !== null);
+const canSubmit = computed(() => replacement.value !== null && armed.value);
 
 const unsaved = computed(
     () => open.value && (replacementId.value !== null || comment.value.trim() !== ''),
@@ -69,7 +111,7 @@ const stockBlock = computed(() => parseStockBlock(error.value?.details ?? null))
 
 async function submit(): Promise<void> {
     const chosen = replacement.value;
-    if (busy.value || chosen === null) {
+    if (busy.value || chosen === null || !armed.value) {
         return;
     }
     busy.value = true;
@@ -126,24 +168,57 @@ function confirmBelow(): void {
                 aria-label="Ersatz suchen"
                 data-testid="swap-search"
             />
-            <p v-if="candidates.length === 0" class="hint" data-testid="swap-none">
-                Keine einsatzbereite Ausrüstung gefunden.
+            <p v-if="candidates.suggested.length === 0" class="hint" data-testid="swap-none">
+                Keine passende einsatzbereite Ausrüstung im Lager gefunden.
             </p>
             <ul class="swap-list" data-testid="swap-candidates">
-                <li v-for="candidate in candidates" :key="candidate.id">
+                <li v-for="candidate in candidates.suggested" :key="candidate.device.id">
                     <label class="swap-option">
                         <input
                             v-model="replacementId"
                             type="radio"
                             name="swap-replacement"
-                            :value="candidate.id"
+                            :value="candidate.device.id"
                         />
-                        <span class="identifier">{{ candidate.identifier }}</span>
-                        <span class="type">{{ candidate.deviceType.name }}</span>
-                        <span class="where">{{ candidate.location.path }}</span>
+                        <span class="identifier">{{ candidate.device.identifier }}</span>
+                        <span class="type">{{ candidate.device.deviceType.name }}</span>
+                        <span class="where">{{ candidate.device.location.path }}</span>
                     </label>
                 </li>
             </ul>
+            <button
+                v-if="!showOthers && candidates.others.length > 0"
+                class="btn"
+                type="button"
+                data-testid="swap-show-others"
+                @click="void revealOthers()"
+            >
+                Andere Standorte anzeigen ({{ candidates.others.length }})
+            </button>
+            <template v-if="showOthers && candidates.others.length > 0">
+                <p class="hint">Von anderen Fahrzeugen: Dort fehlt die Ausrüstung danach.</p>
+                <ul class="swap-list" data-testid="swap-others">
+                    <li v-for="candidate in candidates.others" :key="candidate.device.id">
+                        <label class="swap-option">
+                            <input
+                                v-model="replacementId"
+                                type="radio"
+                                name="swap-replacement"
+                                :value="candidate.device.id"
+                            />
+                            <span class="identifier">{{ candidate.device.identifier }}</span>
+                            <span class="type">{{ candidate.device.deviceType.name }}</span>
+                            <span class="where">{{ candidate.device.location.path }}</span>
+                            <span v-if="candidate.belowMinimum" class="warn">
+                                (Sollbestand dort unterschritten)
+                            </span>
+                        </label>
+                    </li>
+                </ul>
+            </template>
+            <p v-if="replacementWarning" class="notice notice-error" data-testid="swap-warning">
+                Achtung: Am Standort dieser Ausrüstung würde der Sollbestand unterschritten.
+            </p>
         </fieldset>
 
         <fieldset class="field">
@@ -210,5 +285,9 @@ function confirmBelow(): void {
 
 .where {
     color: var(--ink-muted);
+}
+
+.warn {
+    color: var(--status-defective-fg);
 }
 </style>
