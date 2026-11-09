@@ -3,8 +3,10 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { ApiError } from '../api/client';
 import { conflictDevice, type DeviceListItem, type SwapResponse } from '../api/devices';
 import { fetchStock, type StockState } from '../api/stock';
-import { deviceStore, locationStore, swapEquipment } from '../data';
-import { MAX_COMMENT_LENGTH, normalizeComment } from '../data/booking';
+import { bookingQueue, deviceStore, locationStore, swapEquipment } from '../data';
+import { ClientRefKeeper, MAX_COMMENT_LENGTH, normalizeComment } from '../data/booking';
+import { actionTime, offlineBookingProblem, pendingDevice, queuedText } from '../data/bookingQueue';
+import { offlineData } from '../data/offline';
 import {
     SWAP_OUT_STATUSES,
     parseStockBlock,
@@ -12,13 +14,15 @@ import {
     swapCandidates,
     type SwapOutStatus,
 } from '../data/swap';
+import { connectivity, isOffline } from '../runtime/connectivity';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 import FormDialog from './FormDialog.vue';
 
 /**
  * Tauschen (Phase 2, P2.8; Mockup „Handy-Tausch“): Die Ausrüstung geht heraus (Status benutzt, defekt oder in
  * Wartung; benutzt und defekt kommen in die Sammelstelle, wenn die Stadt eine hat), ein einsatzbereiter Ersatz
- * kommt an ihren bisherigen Standort. Beides bucht der Server in einer Transaktion. Nur mit Verbindung.
+ * kommt an ihren bisherigen Standort. Beides bucht der Server in einer Transaktion. Ohne Verbindung (Streifen "Offline")
+ * kommt der Tausch als eine Einheit in die Warteschlange (P2.9), sofern offline gebucht werden darf.
  * Vorschläge für den Ersatz: einsatzbereite Ausrüstung, zuerst die Typen der verletzten Regel bzw. der gleiche Typ.
  */
 const props = defineProps<{
@@ -31,6 +35,8 @@ const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{
     swapped: [response: SwapResponse];
     conflict: [device: DeviceListItem];
+    /** Ohne Verbindung in die Warteschlange gelegt: Text der Buchung. */
+    queued: [text: string];
 }>();
 
 const query = ref('');
@@ -40,6 +46,9 @@ const comment = ref('');
 const busy = ref(false);
 const error = ref<ApiError | null>(null);
 const confirmedBelow = ref(false);
+/** Grund, warum offline nicht getauscht werden kann (Kopie zu alt, nicht gespeichert). */
+const offlineProblem = ref<string | null>(null);
+const refs = new ClientRefKeeper();
 const showOthers = ref(false);
 /** Sollbestand der Stadt, erst geladen, wenn „Andere Standorte anzeigen“ gewählt wird (für die Warnung). */
 const stock = ref<StockState | null>(null);
@@ -75,6 +84,7 @@ watch(open, (value) => {
         outStatus.value = 'used';
         comment.value = '';
         error.value = null;
+        offlineProblem.value = null;
         confirmedBelow.value = false;
     }
 });
@@ -114,9 +124,19 @@ async function submit(): Promise<void> {
     if (busy.value || chosen === null || !armed.value) {
         return;
     }
+    const text = normalizeComment(comment.value);
+    offlineProblem.value = null;
+    const queueProblem = offlineBookingProblem(
+        offlineData.syncedAt,
+        bookingQueue.currentLimits,
+        new Date(),
+    );
+    if (isOffline.value && (queueProblem === null || connectivity.browserOffline)) {
+        await queueSwap(chosen, text, queueProblem);
+        return;
+    }
     busy.value = true;
     error.value = null;
-    const text = normalizeComment(comment.value);
     const result = await swapEquipment({
         out: { id: props.device.id, version: props.device.version },
         in: { id: chosen.id, version: chosen.version },
@@ -136,6 +156,53 @@ async function submit(): Promise<void> {
         emit('conflict', latest);
     }
     error.value = result.error;
+}
+
+/** Ohne Verbindung: der Tausch als eine Einheit in die Warteschlange (der Server bucht ihn, wie er ist). */
+async function queueSwap(
+    chosen: DeviceListItem,
+    text: string,
+    queueProblem: string | null,
+): Promise<void> {
+    if (queueProblem !== null) {
+        offlineProblem.value = queueProblem;
+        return;
+    }
+    const content = {
+        out: props.device.id,
+        outVersion: props.device.version,
+        in: chosen.id,
+        inVersion: chosen.version,
+        outStatus: outStatus.value,
+        comment: text,
+    };
+    const attempt = refs.attemptFor(content);
+    const booking = {
+        clientRef: attempt.ref,
+        deviceId: props.device.id,
+        identifier: props.device.identifier,
+        deviceTypeName: props.device.deviceType.name,
+        version: props.device.version,
+        occurredAt: actionTime(attempt.at),
+        swap: {
+            inId: chosen.id,
+            inVersion: chosen.version,
+            inIdentifier: chosen.identifier,
+            outStatus: outStatus.value,
+        },
+        ...(text !== '' && { comment: text }),
+    };
+    busy.value = true;
+    const added = await bookingQueue.add(booking);
+    busy.value = false;
+    if (!added) {
+        offlineProblem.value = 'Der Tausch ließ sich auf diesem Gerät nicht speichern.';
+        return;
+    }
+    const queued = { ...booking, state: 'waiting' as const };
+    deviceStore.upsert(pendingDevice(props.device, queued));
+    open.value = false;
+    emit('queued', queuedText(queued));
 }
 
 function confirmBelow(): void {
@@ -244,6 +311,15 @@ function confirmBelow(): void {
                 :maxlength="MAX_COMMENT_LENGTH"
             />
         </label>
+
+        <p
+            v-if="offlineProblem !== null"
+            class="notice notice-error"
+            role="alert"
+            data-testid="swap-offline-problem"
+        >
+            {{ offlineProblem }}
+        </p>
 
         <div
             v-if="stockBlock !== null"

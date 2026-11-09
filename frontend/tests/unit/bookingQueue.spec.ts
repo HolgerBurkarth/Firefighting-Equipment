@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ApiError, ApiResult } from '../../src/api/client';
-import type { BookingResponse, DeviceListItem, StateChangeRequest } from '../../src/api/devices';
+import type {
+    BookingResponse,
+    DeviceListItem,
+    StateChangeRequest,
+    SwapRequest,
+} from '../../src/api/devices';
 import {
     actionTime,
     BookingQueue,
@@ -91,6 +96,60 @@ function queue(answers: ApiResult<BookingResponse>[], db = new MemoryDb()) {
     });
     return { q, requests, sent, db };
 }
+
+describe('BookingQueue: Tausch (P2.9)', () => {
+    const swapBooking = (): Omit<QueuedBooking, 'state'> => ({
+        clientRef: '0b4d2a7c-1f3e-4c5a-9b8d-7e6f5a4b3c2d',
+        deviceId: 4,
+        identifier: 'M4',
+        deviceTypeName: 'Atemschutzmaske',
+        version: 3,
+        occurredAt: '2026-10-31T11:00:00Z',
+        swap: { inId: 9, inVersion: 5, inIdentifier: 'M9', outStatus: 'defective' },
+        comment: 'Maske gerissen',
+    });
+
+    it('geht als eine Einheit über postSwap und übernimmt beide Geräte', async () => {
+        const swaps: SwapRequest[] = [];
+        const sent: BookingResponse[] = [];
+        const partner = { ...device(), id: 9, identifier: 'M9' };
+        const q = new BookingQueue({
+            db: new MemoryDb(),
+            now: () => NOW,
+            post: () => Promise.reject(new Error('Ein Tausch geht nicht als einfache Buchung.')),
+            postSwap: (request) => {
+                swaps.push(request);
+                return Promise.resolve({ ok: true, status: 200, data: { ...response(), partner } });
+            },
+            onSent: (r) => sent.push(r),
+        });
+        await q.use('test:7');
+        await q.add(swapBooking());
+        await q.send();
+
+        expect(swaps).toEqual([
+            {
+                out: { id: 4, version: 3 },
+                in: { id: 9, version: 5 },
+                outStatus: 'defective',
+                clientRef: '0b4d2a7c-1f3e-4c5a-9b8d-7e6f5a4b3c2d',
+                occurredAt: '2026-10-31T11:00:00Z',
+                comment: 'Maske gerissen',
+            },
+        ]);
+        expect(q.state.bookings[0]?.state).toBe('done');
+        expect(sent[0]?.partner?.identifier).toBe('M9');
+    });
+
+    it('Text und lokaler Stand', () => {
+        const queued: QueuedBooking = { ...swapBooking(), state: 'waiting' };
+        expect(queuedText(queued)).toBe('M4 ⇄ M9 · getauscht');
+        expect(pendingDevice(device(), queued)).toMatchObject({
+            status: 'defective',
+            statusLabel: 'defekt',
+        });
+    });
+});
 
 describe('BookingQueue', () => {
     it('sendet mit Aktionszeit und client_ref, merkt sich das Ergebnis', async () => {

@@ -317,6 +317,8 @@ export interface BookingResult {
 export interface BookingResponse {
     readonly device: DeviceListItem;
     readonly result: BookingResult;
+    /** Nur bei einem Tausch aus der Warteschlange: der Ersatz mit seinem Stand danach. */
+    readonly partner?: DeviceListItem;
 }
 
 export function parseBookingResponse(json: unknown): BookingResponse | null {
@@ -421,12 +423,17 @@ export interface SwapRequest {
     readonly outStatus?: 'used' | 'defective' | 'maintenance';
     readonly comment?: string;
     readonly confirmedBelowMinimum?: boolean;
+    /** Aus der Warteschlange (Phase 2, P2.9): Kennung gegen doppelte Wirkung, Aktionszeit, Rückfrage bei alten Buchungen. */
+    readonly clientRef?: string;
+    readonly occurredAt?: string;
+    readonly confirmedStale?: boolean;
 }
 
 export interface SwapResponse {
     readonly out: DeviceListItem;
     readonly in: DeviceListItem;
-    readonly swapId: string;
+    /** null: derselbe Tausch war schon angekommen und wurde nur wiederholt. */
+    readonly swapId: string | null;
 }
 
 export function parseSwapResponse(json: unknown): SwapResponse | null {
@@ -435,8 +442,8 @@ export function parseSwapResponse(json: unknown): SwapResponse | null {
     }
     const out = parseDeviceListItem(json['out']);
     const replacement = parseDeviceListItem(json['in']);
-    const swapId = json['swap_id'];
-    return out === null || replacement === null || typeof swapId !== 'string'
+    const swapId = json['swap_id'] ?? null;
+    return out === null || replacement === null || !(swapId === null || typeof swapId === 'string')
         ? null
         : { out, in: replacement, swapId };
 }
@@ -453,9 +460,46 @@ export function postSwap(
             ...(request.outStatus !== undefined && { out_status: request.outStatus }),
             ...(request.comment !== undefined && { comment: request.comment }),
             ...(request.confirmedBelowMinimum === true && { confirmed_below_minimum: true }),
+            ...(request.clientRef !== undefined && { client_ref: request.clientRef }),
+            ...(request.occurredAt !== undefined && { occurred_at: request.occurredAt }),
+            ...(request.confirmedStale === true && { confirmed_stale: true }),
         },
         ...(fetchFn && { fetchFn }),
     });
+}
+
+/**
+ * Tausch aus der Warteschlange (mit `clientRef` und `occurredAt`): die Antwort trägt ein Ergebnis wie eine
+ * Buchung; `device` ist die herausgenommene Ausrüstung, `partner` der Ersatz.
+ */
+export function postQueuedSwap(
+    request: SwapRequest,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<BookingResponse>> {
+    return apiRequest(
+        'devices/swap',
+        (json) => {
+            if (!isRecord(json)) {
+                return null;
+            }
+            const booking = parseBookingResponse({ device: json['out'], result: json['result'] });
+            const partner = parseDeviceListItem(json['in']);
+            return booking === null || partner === null ? null : { ...booking, partner };
+        },
+        {
+            method: 'POST',
+            body: {
+                out: request.out,
+                in: request.in,
+                ...(request.outStatus !== undefined && { out_status: request.outStatus }),
+                ...(request.comment !== undefined && { comment: request.comment }),
+                ...(request.clientRef !== undefined && { client_ref: request.clientRef }),
+                ...(request.occurredAt !== undefined && { occurred_at: request.occurredAt }),
+                ...(request.confirmedStale === true && { confirmed_stale: true }),
+            },
+            ...(fetchFn && { fetchFn }),
+        },
+    );
 }
 
 /** Aktueller Stand aus 409 version_conflict (`details.device`), sonst null. */
