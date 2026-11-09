@@ -132,6 +132,39 @@ test.describe('Geräteträger: Einmalgeräte nur benutzt melden', () => {
         expect(apiRequests.filter((r) => r.path === 'api/v1/devices/2/state')).toHaveLength(0);
     });
 
+    test('Doppeltipp-Schutz: Klicks in den ersten 400 ms zählen nicht, Escape sofort', async ({
+        page,
+        apiRequests,
+    }) => {
+        await page.clock.install();
+        await openFromSearch(page, 'M2', 'M2 · Einmalfilter');
+        await page.getByTestId('report-used').click();
+        const dialog = page.getByTestId('confirm-dialog');
+        const confirm = dialog.getByRole('button', { name: 'Benutzt melden' });
+        await expect(dialog).toBeVisible();
+        await expect(confirm).toHaveAttribute('aria-disabled', 'true');
+        // Ein zweiter Tipp direkt nach dem Öffnen (force: Playwright wartet sonst auf aria-disabled).
+        // eslint-disable-next-line playwright/no-force-option -- ein Tipp, den Playwright sonst abwarten würde
+        await confirm.click({ force: true });
+        // eslint-disable-next-line playwright/no-force-option -- wie oben
+        await dialog.getByRole('button', { name: 'Abbrechen' }).click({ force: true });
+        await expect(dialog).toBeVisible();
+        expect(usedRequests(apiRequests, 2)).toHaveLength(0);
+
+        await page.clock.runFor(450);
+        await expect(confirm).toHaveAttribute('aria-disabled', 'false');
+        await confirm.click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
+        expect(usedRequests(apiRequests, 2)).toHaveLength(1);
+
+        // Die Tastatur ist sofort bedienbar.
+        await openFromSearch(page, 'M2', 'M2 · Einmalfilter');
+        await page.getByTestId('report-used').click();
+        await expect(dialog).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(dialog).toHaveCount(0);
+    });
+
     test('Kommentar geht mit', async ({ page, apiRequests }) => {
         await openFromSearch(page, 'M2', 'M2 · Einmalfilter');
         await page.getByLabel('Kommentar (optional)').fill('Einsatz Waldbrand');

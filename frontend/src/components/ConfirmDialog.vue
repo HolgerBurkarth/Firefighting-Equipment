@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from 'vue';
 import {
     AlertDialogAction,
     AlertDialogCancel,
@@ -12,8 +13,12 @@ import {
 
 /**
  * Rückfrage vor einer Aktion mit Folgen (Reka UI AlertDialog, kein window.confirm). Der Fokus
- * steht beim Öffnen auf „Abbrechen“; Escape bricht ab.
+ * steht beim Öffnen auf „Abbrechen“; Escape bricht ab. Gegen Doppeltipp (am iPhone wurde so eine
+ * Rückfrage ungewollt bestätigt) nehmen die Knöpfe in den ersten `CONFIRM_GUARD_MS` nach dem
+ * Öffnen keine Klicks an (`aria-disabled`, damit Tests warten); die Tastatur bleibt sofort bedienbar.
  */
+const CONFIRM_GUARD_MS = 400;
+
 defineProps<{
     title: string;
     description: string;
@@ -22,6 +27,34 @@ defineProps<{
 }>();
 const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{ confirm: [] }>();
+
+const armed = ref(false);
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+watch(
+    open,
+    (isOpen) => {
+        clearTimeout(timer);
+        armed.value = false;
+        if (isOpen) {
+            timer = setTimeout(() => {
+                armed.value = true;
+            }, CONFIRM_GUARD_MS);
+        }
+    },
+    { immediate: true },
+);
+onBeforeUnmount(() => {
+    clearTimeout(timer);
+});
+
+/** Klicks (Maus und Touch), nicht Tastatur: Enter/Leertaste lösen `detail` 0 aus. */
+function guardClick(event: MouseEvent): void {
+    if (!armed.value && event.detail > 0) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+}
 </script>
 
 <template>
@@ -33,11 +66,15 @@ const emit = defineEmits<{ confirm: [] }>();
                 <AlertDialogDescription class="confirm-description">
                     {{ description }}
                 </AlertDialogDescription>
-                <div class="confirm-actions">
-                    <AlertDialogCancel class="btn">{{
+                <div class="confirm-actions" @click.capture="guardClick">
+                    <AlertDialogCancel class="btn" :aria-disabled="!armed">{{
                         cancelLabel ?? 'Abbrechen'
                     }}</AlertDialogCancel>
-                    <AlertDialogAction class="btn confirm-action" @click="emit('confirm')">
+                    <AlertDialogAction
+                        class="btn confirm-action"
+                        :aria-disabled="!armed"
+                        @click="emit('confirm')"
+                    >
                         {{ confirmLabel }}
                     </AlertDialogAction>
                 </div>
