@@ -35,6 +35,8 @@ final readonly class Permissions
         private DeviceVisibility $visibility,
         private ?string $revision = null,
         private ?string $roleName = null,
+        /** @var list<Restriction> */
+        private array $restrictions = [],
     ) {
     }
 
@@ -137,7 +139,39 @@ final readonly class Permissions
             throw new \LogicException('Die Rolle Admin hat keinen Datenfilter.');
         }
 
-        return new self($this->all, $this->areas, $this->actions, $visibility, $roleId . ':' . $roleVersion, $roleName);
+        return new self($this->all, $this->areas, $this->actions, $visibility, $roleId . ':' . $roleVersion, $roleName, $this->restrictions);
+    }
+
+    /**
+     * Dieselben Rechte mit den Einschränkungen der Rolle (Phase 2); die Rolle Admin hat keine.
+     *
+     * @param list<Restriction> $restrictions
+     */
+    public function withRestrictions(array $restrictions): self
+    {
+        if ($this->all && $restrictions !== []) {
+            throw new \LogicException('Die Rolle Admin hat keine Einschränkungen.');
+        }
+
+        return new self($this->all, $this->areas, $this->actions, $this->visibility, $this->revision, $this->roleName, array_values(array_filter(
+            Restriction::cases(),
+            static fn (Restriction $r): bool => in_array($r, $restrictions, true),
+        )));
+    }
+
+    /**
+     * Einschränkungen der Rolle in der Reihenfolge des Katalogs.
+     *
+     * @return list<Restriction>
+     */
+    public function restrictions(): array
+    {
+        return $this->restrictions;
+    }
+
+    public function restricted(Restriction $restriction): bool
+    {
+        return in_array($restriction, $this->restrictions, true);
     }
 
     /**
@@ -159,7 +193,7 @@ final readonly class Permissions
             ? array_values(array_filter($this->actions(), static fn (Action $a): bool => $a !== Action::MailLog))
             : [];
 
-        return new self(false, $areas, $actions, $this->visibility, $this->revision, $this->roleName);
+        return new self(false, $areas, $actions, $this->visibility, $this->revision, $this->roleName, $this->restrictions);
     }
 
     /** Name der Rolle, aus der die Rechte stammen (Liste „Konto wechseln“); null ohne Rolle. */

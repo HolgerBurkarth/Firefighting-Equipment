@@ -9,6 +9,8 @@ export interface DeviceType {
     readonly active: boolean;
     /** Nicht ausgesonderte Geräte dieses Typs. */
     readonly deviceCount: number;
+    /** Einmalgerät: wird nach dem Einsatz ersetzt statt gewartet (Phase 2, P2.3); fehlt = nein. */
+    readonly singleUse?: true;
 }
 
 export function parseDeviceType(json: unknown): DeviceType | null {
@@ -27,7 +29,13 @@ export function parseDeviceType(json: unknown): DeviceType | null {
     ) {
         return null;
     }
-    return { id, name, active, deviceCount };
+    return {
+        id,
+        name,
+        active,
+        deviceCount,
+        ...(json['single_use'] === true && { singleUse: true as const }),
+    };
 }
 
 export function parseDeviceTypeList(json: unknown): readonly DeviceType[] | null {
@@ -95,4 +103,17 @@ export function setDeviceTypeActive(
         parseDeviceTypeResponse,
         { method: 'POST', ...(fetchFn && { fetchFn }) },
     );
+}
+
+/** POST device-types/{id}/single-use (Admin, wiederholbar): als Einmalgerät markieren oder nicht. */
+export function setDeviceTypeSingleUse(
+    id: number,
+    singleUse: boolean,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<DeviceType>> {
+    return apiRequest(`device-types/${String(id)}/single-use`, parseDeviceTypeResponse, {
+        method: 'POST',
+        body: { single_use: singleUse },
+        ...(fetchFn && { fetchFn }),
+    });
 }

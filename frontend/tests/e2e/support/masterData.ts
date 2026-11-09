@@ -193,11 +193,13 @@ export function deviceTypeJson(
     name: string,
     deviceCount = 0,
     active = true,
+    singleUse = false,
 ): Record<string, unknown> {
     return {
         id,
         name,
         active,
+        single_use: singleUse,
         device_count: deviceCount,
         created_at: '2026-10-01T08:00:00Z',
         updated_at: '2026-10-01T08:00:00Z',
@@ -210,6 +212,7 @@ export interface TestDeviceType {
     readonly name: string;
     readonly count?: number;
     readonly active?: boolean;
+    readonly singleUse?: boolean;
 }
 
 /**
@@ -223,15 +226,22 @@ export function deviceTypeServer(
     let types = [...initial];
     let nextId = 900;
     const json = (type: TestDeviceType): Record<string, unknown> =>
-        deviceTypeJson(type.id, type.name, type.count ?? 0, type.active ?? true);
+        deviceTypeJson(
+            type.id,
+            type.name,
+            type.count ?? 0,
+            type.active ?? true,
+            type.singleUse ?? false,
+        );
     const action = (request: MockRequest): MockResponse => {
         const replaced = respond(request);
         if (replaced !== null) {
             return replaced;
         }
-        const match = /^api\/v1\/device-types\/(\d+)\/(rename|activate|deactivate)$/.exec(
-            request.path,
-        );
+        const match =
+            /^api\/v1\/device-types\/(\d+)\/(rename|activate|deactivate|single-use)$/.exec(
+                request.path,
+            );
         if (match === null) {
             throw new Error(`Unerwartet: ${request.path}`);
         }
@@ -242,7 +252,9 @@ export function deviceTypeServer(
                 ? type
                 : match[2] === 'rename'
                   ? { ...type, name: String(sent['name']).trim() }
-                  : { ...type, active: match[2] === 'activate' },
+                  : match[2] === 'single-use'
+                    ? { ...type, singleUse: sent['single_use'] === true }
+                    : { ...type, active: match[2] === 'activate' },
         );
         const changed = types.find((type) => type.id === id);
         if (changed === undefined) {
@@ -270,7 +282,7 @@ export function deviceTypeServer(
         },
     };
     for (const type of initial) {
-        for (const path of ['rename', 'activate', 'deactivate']) {
+        for (const path of ['rename', 'activate', 'deactivate', 'single-use']) {
             api[`POST api/v1/device-types/${String(type.id)}/${path}`] = action;
         }
     }

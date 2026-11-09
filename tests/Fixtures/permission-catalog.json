@@ -140,6 +140,15 @@
                         "level": "read"
                     },
                     "with_filter": true
+                },
+                {
+                    "key": "device.used",
+                    "label": "Benutzt melden",
+                    "requires": {
+                        "area": "search",
+                        "level": "read"
+                    },
+                    "with_filter": true
                 }
             ]
         },
@@ -226,6 +235,13 @@
                     "with_filter": true
                 }
             ]
+        }
+    ],
+    "restrictions": [
+        {
+            "key": "single_use_used_only",
+            "label": "Bei Einmalgeräten nur „Benutzt melden“",
+            "hint": "Einmalgeräte darf diese Rolle nicht umbuchen und nicht auf einen anderen Status setzen, nur als benutzt melden."
         }
     ]
 }

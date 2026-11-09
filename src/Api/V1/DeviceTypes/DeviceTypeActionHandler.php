@@ -35,6 +35,7 @@ final readonly class DeviceTypeActionHandler implements RequestHandler
                 DeviceTypeAction::Rename => $types->rename($tenant, $context->param('id'), self::name($context)),
                 DeviceTypeAction::Deactivate => $types->setActive($tenant, $context->param('id'), false),
                 DeviceTypeAction::Activate => $types->setActive($tenant, $context->param('id'), true),
+                DeviceTypeAction::SetSingleUse => $types->setSingleUse($tenant, $context->param('id'), $context->boolField('single_use')),
             };
         } catch (DeviceException $e) {
             throw DeviceErrors::http($e);

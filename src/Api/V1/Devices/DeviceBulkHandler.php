@@ -15,6 +15,7 @@ use FirefightingEquipment\Device\DeviceDate;
 use FirefightingEquipment\Device\DeviceEventRecorder;
 use FirefightingEquipment\Device\DeviceException;
 use FirefightingEquipment\Device\DeviceRepository;
+use FirefightingEquipment\Device\SingleUseGuard;
 use FirefightingEquipment\Device\DeviceStateChange;
 use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
 use FirefightingEquipment\Http\HttpException;
@@ -78,10 +79,11 @@ final readonly class DeviceBulkHandler implements RequestHandler
                     $device = $devices->setInspectionDue($tenant, $user->id, $id, $entry['version'], $entry['due'], $comment);
                     [$outcome, $replayed] = [$recorder->ids() === [] ? BookingOutcome::Unchanged : BookingOutcome::Applied, false];
                 } else {
+                    SingleUseGuard::check($context->permissions(), $devices, $tenant, $id);
                     [$device, $outcome, $replayed] = $this->book($booker, $user->id, $entry, $comment);
                 }
-            } catch (DeviceException $e) {
-                $error = DeviceErrors::http($e);
+            } catch (HttpException | DeviceException $e) {
+                $error = $e instanceof HttpException ? $e : DeviceErrors::http($e);
                 $results[] = self::result($id, 'error', false, $devices->find($tenant, $id), $error);
                 ++$counts['errors'];
                 continue;

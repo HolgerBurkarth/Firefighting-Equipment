@@ -100,7 +100,10 @@ describe('Katalog und Grenzen wie im Backend', () => {
             'settings',
         ]);
         expect(parsed.levelLabels).toEqual({ read: 'Ansehen', write: 'Ändern' });
-        expect(allActions(parsed)).toHaveLength(10);
+        expect(allActions(parsed)).toHaveLength(11);
+        expect(parsed.restrictions.map((restriction) => restriction.key)).toEqual([
+            'single_use_used_only',
+        ]);
     });
 
     it('Länge von Name und Kurzbeschreibung wie RoleDraft', () => {
@@ -160,6 +163,7 @@ describe('Formular', () => {
                     locationsMode: 'some',
                     locations: [9, 2],
                     deviceTypes: [5],
+                    restrictions: ['single_use_used_only', 'unbekannt'],
                 }),
                 catalog(),
             ),
@@ -170,6 +174,7 @@ describe('Formular', () => {
             actions: ['book.move', 'device.edit'],
             locations: [2, 9],
             deviceTypes: null,
+            restrictions: ['single_use_used_only'],
         });
     });
 

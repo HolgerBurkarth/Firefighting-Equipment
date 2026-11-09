@@ -85,6 +85,7 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'POST api/v1/device-types/{id}/rename' => ['admin', 'device_types:write'],
         'POST api/v1/device-types/{id}/deactivate' => ['admin', 'device_types:write'],
         'POST api/v1/device-types/{id}/activate' => ['admin', 'device_types:write'],
+        'POST api/v1/device-types/{id}/single-use' => ['admin', 'device_types:write'],
         'GET api/v1/locations' => ['authenticated', 'locations:read | search:read | devices:read'],
         'POST api/v1/locations' => ['admin', 'locations:write'],
         'GET api/v1/locations/{id}' => ['authenticated', 'locations:read | search:read | devices:read'],
@@ -110,6 +111,7 @@ final class TenantRoutePermissionsTest extends AuthTestCase
             . ' device_type_id → device.edit, serial_number → device.edit, manufacturer → device.edit, model → device.edit,'
             . ' procured_on → device.edit, note → device.edit'],
         'POST api/v1/devices/{id}/inspection-due' => ['admin', 'due:write'],
+        'POST api/v1/devices/{id}/used' => ['admin', 'device.used'],
         'POST api/v1/devices/{id}/state' => ['authenticated', 'book.move | book.status; Felder: location_id → book.move, status → book.status'],
         'POST api/v1/devices/{id}/retire' => ['admin', 'device.retire'],
         'POST api/v1/devices/{id}/reinstate' => ['admin', 'device.retire; Felder: identifier → device.edit, device_type_id → device.edit, scan_code → device.code'],

@@ -42,7 +42,7 @@ import {
 } from '../data/recentLocations';
 import { closeQueryView, returnTo } from '../router/back';
 import { useUnsavedInput } from '../runtime/unsavedInput';
-import { can } from '../api/permissions';
+import { can, restricted } from '../api/permissions';
 import { canOpenRoute } from '../auth/redirect';
 import { currentPermissions, session } from '../auth/session';
 
@@ -56,6 +56,20 @@ const showsDetailLink = computed(
 /** Umbuchen bzw. Status setzen nur mit der Aktion der Rolle (Plan Phase 1, Schritt 1.7b). */
 const canMove = computed(() => can(currentPermissions.value, 'book.move'));
 const canSetStatus = computed(() => can(currentPermissions.value, 'book.status'));
+/** „Benutzt melden“ (Phase 2, P2.3): Status benutzt, das Ziel (Sammelstelle) gibt der Server vor. */
+const canReportUsed = computed(() => can(currentPermissions.value, 'device.used'));
+/**
+ * Einschränkung „Bei Einmalgeräten nur benutzt melden“: Bei einem Einmalgerät gibt es dann weder
+ * Standort noch Status, nur „Benutzt melden“ (der Server lehnt anderes mit 403 restricted_action ab).
+ */
+const usedOnly = computed(
+    () =>
+        restricted(currentPermissions.value, 'single_use_used_only') &&
+        device.value?.deviceType.singleUse === true,
+);
+const showMove = computed(() => canMove.value && !usedOnly.value);
+const showStatus = computed(() => canSetStatus.value && !usedOnly.value);
+const alreadyUsed = computed(() => device.value?.status === 'used');
 
 /**
  * Die Standortwahl ist eine Ansicht dieser Seite, geöffnet über `?standortwahl=1`: Eingaben bleiben
@@ -265,6 +279,7 @@ async function saveOffline(
         version: number;
         locationId?: number;
         status?: BookableStatus;
+        used?: boolean;
         comment?: string;
     },
 ): Promise<void> {
@@ -294,6 +309,7 @@ async function saveOffline(
             status: content.status,
             statusLabel: STATUS_LABELS[content.status],
         }),
+        ...(content.used === true && { used: true, statusLabel: 'benutzt' }),
         ...(content.comment !== undefined && { comment: content.comment }),
     };
     saving.value = true;
@@ -331,13 +347,43 @@ async function save(): Promise<void> {
         return;
     }
     const text = normalizeComment(comment.value);
-    const content = {
+    await submit(current, {
         deviceId,
         version: current.version,
         ...(changesLocation.value && locationId.value !== null && { locationId: locationId.value }),
         ...(changesStatus.value && status.value !== null && { status: status.value }),
         ...(text !== '' && { comment: text }),
-    };
+    });
+}
+
+/** „Benutzt melden“: wie Speichern, online und offline (Warteschlange). */
+async function reportUsed(): Promise<void> {
+    const current = device.value;
+    if (current === null || saving.value || alreadyUsed.value) {
+        return;
+    }
+    conflict.value = false;
+    saveError.value = null;
+    const text = normalizeComment(comment.value);
+    await submit(current, {
+        deviceId,
+        version: current.version,
+        used: true,
+        ...(text !== '' && { comment: text }),
+    });
+}
+
+async function submit(
+    current: DeviceListItem,
+    content: {
+        deviceId: number;
+        version: number;
+        locationId?: number;
+        status?: BookableStatus;
+        used?: boolean;
+        comment?: string;
+    },
+): Promise<void> {
     // Offline (Streifen): gleich in die Warteschlange (KONZEPT.md, "Offline-Modus – Entscheidungen",
     // 52), sofern offline gebucht werden darf; meldet der Browser offline, sonst gleich der Grund.
     // Online und nach einer nur gescheiterten Anfrage wie bisher senden; scheitert es an der
@@ -448,7 +494,7 @@ async function save(): Promise<void> {
             </RouterLink>
         </div>
 
-        <div v-else-if="!canMove && !canSetStatus" class="device-content">
+        <div v-else-if="!canMove && !canSetStatus && !canReportUsed" class="device-content">
             <div class="notice notice-info" role="status" data-testid="device-view-only">
                 <p>Sie dürfen diese Ausrüstung nur ansehen, nicht umbuchen.</p>
             </div>
@@ -478,7 +524,7 @@ async function save(): Promise<void> {
                     </p>
                 </div>
 
-                <section v-if="canMove" class="device-section" aria-labelledby="location-heading">
+                <section v-if="showMove" class="device-section" aria-labelledby="location-heading">
                     <h2 id="location-heading" class="device-heading">Standort</h2>
                     <button
                         v-for="choice in locationChoices"
@@ -539,11 +585,7 @@ async function save(): Promise<void> {
                     </button>
                 </section>
 
-                <section
-                    v-if="canSetStatus"
-                    class="device-section"
-                    aria-labelledby="status-heading"
-                >
+                <section v-if="showStatus" class="device-section" aria-labelledby="status-heading">
                     <h2 id="status-heading" class="device-heading">Status</h2>
                     <div class="status-choices">
                         <button
@@ -610,7 +652,18 @@ async function save(): Promise<void> {
             </div>
 
             <div class="device-footer">
-                <p v-if="nothingChanged" class="notice notice-info" role="status">
+                <p
+                    v-if="usedOnly"
+                    class="notice notice-info"
+                    role="status"
+                    data-testid="used-only-hint"
+                >
+                    Das ist ein Einmalgerät: Sie können es nur als benutzt melden.
+                </p>
+                <p v-if="alreadyUsed && canReportUsed" class="notice notice-info" role="status">
+                    Diese Ausrüstung ist schon als benutzt gemeldet.
+                </p>
+                <p v-if="nothingChanged && !usedOnly" class="notice notice-info" role="status">
                     Bitte wählen Sie einen anderen Standort oder Status.
                 </p>
                 <ErrorNotice v-if="saveError !== null" :error="saveError" />
@@ -622,8 +675,24 @@ async function save(): Promise<void> {
                 >
                     {{ offlineProblem }}
                 </p>
-                <button class="btn btn-primary" type="submit" :disabled="saving || !hasChanges">
+                <button
+                    v-if="!usedOnly"
+                    class="btn btn-primary"
+                    type="submit"
+                    :disabled="saving || !hasChanges"
+                >
                     {{ saving ? 'Wird gespeichert …' : 'Speichern' }}
+                </button>
+                <button
+                    v-if="canReportUsed"
+                    class="btn"
+                    :class="{ 'btn-primary': usedOnly }"
+                    type="button"
+                    data-testid="report-used"
+                    :disabled="saving || alreadyUsed"
+                    @click="reportUsed"
+                >
+                    {{ saving && usedOnly ? 'Wird gespeichert …' : 'Benutzt melden' }}
                 </button>
             </div>
         </form>

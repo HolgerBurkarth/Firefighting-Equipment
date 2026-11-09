@@ -74,6 +74,14 @@ final class HttpException extends \RuntimeException
         return new self('forbidden', 'Für diese Aktion fehlt die Berechtigung.', 403);
     }
 
+    /**
+     * Die Rolle darf Einmalgeräte nur als benutzt melden (Einschränkung single_use_used_only).
+     */
+    public static function restrictedAction(): self
+    {
+        return new self('restricted_action', 'Für Einmalgeräte ist nur „Benutzt melden“ erlaubt.', 403);
+    }
+
     public static function originNotAllowed(): self
     {
         return new self('origin_not_allowed', 'Anfragen von dieser Herkunft sind nicht erlaubt.', 403);

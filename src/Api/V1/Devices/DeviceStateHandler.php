@@ -12,6 +12,10 @@ use FirefightingEquipment\Device\Booking\DeviceBookingRepository;
 use FirefightingEquipment\Device\DeviceEventRecorder;
 use FirefightingEquipment\Device\DeviceException;
 use FirefightingEquipment\Device\DeviceRepository;
+use FirefightingEquipment\Device\DeviceStateChange;
+use FirefightingEquipment\Device\DeviceStatus;
+use FirefightingEquipment\Device\LocationRepository;
+use FirefightingEquipment\Device\SingleUseGuard;
 use FirefightingEquipment\Device\Notice\DeviceNoticeRepository;
 use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\JsonResponse;
@@ -25,6 +29,11 @@ use FirefightingEquipment\Time\GermanFormat;
 use FirefightingEquipment\Time\SystemClock;
 
 /**
+ * POST api/v1/devices/{id}/used {version, comment?, client_ref?, occurred_at?, confirmed_stale?} (Phase 2,
+ * P2.3, Aktion device.used): „Benutzt melden“. Status benutzt; gibt es eine Sammelstelle, die benutzte
+ * Ausrüstung annimmt, ist sie das Ziel (auch außerhalb des Datenfilters, G4), sonst bleibt der Standort.
+ * Sonst wie /state (Wiederholung, Aktionszeit, Antwort).
+ *
  * POST api/v1/devices/{id}/state {version, location_id?, status?, comment?, client_ref?,
  * occurred_at?, confirmed_stale?} (angemeldet): Umbuchen und/oder Status setzen. Antwort
  * {"device": …, "result": {…}} (DeviceBookingJson), immer 200.
@@ -42,6 +51,7 @@ final readonly class DeviceStateHandler implements RequestHandler
     public function __construct(
         private Clock $clock = new SystemClock(),
         private OfflineSettings $offline = new OfflineSettings(),
+        private bool $used = false,
     ) {
     }
 
@@ -52,11 +62,18 @@ final readonly class DeviceStateHandler implements RequestHandler
         $deviceId = $context->param('id');
         $pdo = $context->db->get();
         $recorder = new DeviceEventRecorder();
-        $booker = new DeviceBooker($tenant, new DeviceRepository($pdo, $context->visibility(), $recorder, $context->channel()), new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo, $context->visibility()));
+        $devices = new DeviceRepository($pdo, $context->visibility(), $recorder, $context->channel());
+        $booker = new DeviceBooker($tenant, $devices, new DeviceBookingRepository($pdo), new DeviceNoticeRepository($pdo, $context->visibility()));
 
         try {
             $version = DeviceFields::version($context);
-            $change = DeviceFields::stateChange($context);
+            if ($this->used) {
+                DeviceFields::rejectUnknown($context, ['version', 'comment', 'client_ref', 'occurred_at', 'confirmed_stale']);
+                $change = new DeviceStateChange(new LocationRepository($pdo, $context->visibility())->collectionPointForUsed($tenant), DeviceStatus::Used, true);
+            } else {
+                $change = DeviceFields::stateChange($context);
+                SingleUseGuard::check($context->permissions(), $devices, $tenant, $deviceId);
+            }
             $comment = DeviceFields::comment($context);
             [$clientRef, $occurredAt, $confirmedStale] = DeviceFields::bookingFields($context);
             $hash = BookingRequest::hash($deviceId, $version, $change, $comment, $occurredAt);

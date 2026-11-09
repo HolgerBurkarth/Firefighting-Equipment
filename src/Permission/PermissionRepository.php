@@ -29,7 +29,7 @@ final readonly class PermissionRepository
     public function forTenantUser(int $tenantId, int $userId): Permissions
     {
         $stmt = $this->pdo->prepare(
-            'SELECT r.id, r.name, r.system_key, r.version, r.filter_locations, r.filter_device_types FROM fe_users u'
+            'SELECT r.id, r.name, r.system_key, r.version, r.filter_locations, r.filter_device_types, r.restrict_single_use FROM fe_users u'
             . ' JOIN fe_roles r ON r.id = u.role_id AND r.tenant_id = u.tenant_id WHERE u.id = ? AND u.tenant_id = ?',
         );
         $stmt->execute([$userId, $tenantId]);
@@ -64,7 +64,7 @@ final readonly class PermissionRepository
             $roleId,
             (int) $role['filter_locations'] === 1,
             (int) $role['filter_device_types'] === 1,
-        ), (string) $role['name']);
+        ), (string) $role['name'])->withRestrictions((int) $role['restrict_single_use'] === 1 ? [Restriction::SingleUseUsedOnly] : []);
     }
 
     /**

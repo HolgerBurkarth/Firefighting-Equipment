@@ -10,6 +10,7 @@ use FirefightingEquipment\Permission\ActionGroup;
 use FirefightingEquipment\Permission\Area;
 use FirefightingEquipment\Permission\AreaLevel;
 use FirefightingEquipment\Permission\Permissions;
+use FirefightingEquipment\Permission\Restriction;
 use FirefightingEquipment\Role\Role;
 use FirefightingEquipment\Role\RoleUsage;
 use FirefightingEquipment\Role\SystemRole;
@@ -57,6 +58,7 @@ final class RoleJson
             'actions' => array_map(static fn (Action $action): string => $action->value, $actions),
             'locations' => $role->filterLocations ? $role->locationIds : null,
             'device_types' => $role->filterDeviceTypes ? $role->deviceTypeIds : null,
+            'restrictions' => !$isAdmin && $role->restrictSingleUse ? [Restriction::SingleUseUsedOnly->value] : [],
             'version' => $role->version,
             'created_at' => AuthJson::time($role->createdAt),
             'updated_at' => AuthJson::time($role->updatedAt),
@@ -121,6 +123,14 @@ final class RoleJson
                 AreaLevel::cases(),
             ),
             'action_groups' => $groups,
+            'restrictions' => array_map(
+                static fn (Restriction $restriction): array => [
+                    'key' => $restriction->value,
+                    'label' => $restriction->label(),
+                    'hint' => $restriction->hint(),
+                ],
+                Restriction::cases(),
+            ),
         ];
     }
 }

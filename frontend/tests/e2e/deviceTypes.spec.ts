@@ -158,6 +158,42 @@ test.describe('Ausrüstungstypen (PC)', () => {
         ]);
     });
 
+    test('Einmalgerät: ankreuzen, Chip in der Liste, wieder abwählen', async ({
+        page,
+        apiRequests,
+    }) => {
+        await open(page);
+        const form = dialog(page);
+        await page.getByRole('button', { name: 'Atemschutzmaske bearbeiten' }).click();
+        await expect(form.getByTestId('single-use')).not.toBeChecked();
+        await form.getByTestId('single-use').check();
+        await form.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            '„Atemschutzmaske“ ist jetzt ein Einmalgerät.',
+        );
+        await expect(page.getByTestId('device-type-2')).toContainText('Einmalgerät');
+
+        // Name und Schalter zusammen: erst umbenennen, dann der Schalter.
+        await page.getByRole('button', { name: 'Atemschutzmaske bearbeiten' }).click();
+        await expect(form.getByTestId('single-use')).toBeChecked();
+        await form.getByTestId('single-use').uncheck();
+        await form.getByLabel('Name').fill('Atemschutzfilter');
+        await form.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            '„Atemschutzmaske“ heißt jetzt „Atemschutzfilter“. „Atemschutzfilter“ ist kein Einmalgerät mehr.',
+        );
+        await expect(page.getByTestId('device-type-2')).not.toContainText('Einmalgerät');
+        expect(
+            apiRequests
+                .filter((request) => request.method === 'POST')
+                .map((request) => [request.path, request.body]),
+        ).toEqual([
+            ['api/v1/device-types/2/single-use', { single_use: true }],
+            ['api/v1/device-types/2/rename', { name: 'Atemschutzfilter' }],
+            ['api/v1/device-types/2/single-use', { single_use: false }],
+        ]);
+    });
+
     test('deaktivieren mit Rückfrage, wieder aktivieren', async ({ page, apiRequests }) => {
         await open(page);
         const form = dialog(page);

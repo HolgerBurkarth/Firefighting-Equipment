@@ -55,7 +55,7 @@ final readonly class DeviceRepository
         'note' => 'note',
     ];
 
-    private const string SELECT = 'SELECT d.id, d.identifier, d.scan_code, d.device_type_id, t.name AS type_name, d.location_id,'
+    private const string SELECT = 'SELECT d.id, d.identifier, d.scan_code, d.device_type_id, t.name AS type_name, t.single_use AS type_single_use, d.location_id,'
         . ' l.name AS location_name, p.name AS parent_name, d.status, d.serial_number, d.manufacturer, d.model,'
         . ' d.procured_on, d.next_inspection_due, d.note, d.version, d.created_at, d.updated_at,'
         . ' d.state_changed_at, d.state_version';
@@ -482,7 +482,8 @@ final readonly class DeviceRepository
 
         return new BookingResult(
             // Inzwischen außerhalb des Datenfilters (anderer Vorgang nach dem Commit): wie fremd.
-            $this->find($tenant, $id) ?? throw DeviceNotFoundException::forId($id),
+            // Ein Ablauf (Benutzt melden) darf das Gerät aus dem Datenfilter heraus buchen: dann bleibt die Antwort gültig.
+            ($change->process ? new self($this->pdo, DeviceVisibility::all(), null, $this->channel) : $this)->find($tenant, $id) ?? throw DeviceNotFoundException::forId($id),
             $result[0],
             $result[1],
             $booking !== null && $booking->staleConfirmed,
@@ -512,7 +513,7 @@ final readonly class DeviceRepository
             return [BookingOutcome::Unchanged, null, null];
         }
         if ($locationId !== $current->locationId) {
-            $this->lockActiveLocation($tenant, $locationId);
+            $this->lockActiveLocation($tenant, $locationId, $change->process);
         }
 
         return [BookingOutcome::Applied, null, $this->applyState($tenant, $userId, $current, $locationId, $status, [], $comment)];
@@ -560,7 +561,7 @@ final readonly class DeviceRepository
             return [BookingOutcome::Unchanged, null, null];
         }
         if ($locationId !== $current->locationId) {
-            $location = $this->lockLocation($tenant, $locationId)
+            $location = $this->lockLocation($tenant, $locationId, $change->process)
                 ?? throw new InvalidDeviceValueException('Der Standort wurde nicht gefunden.');
             if ((int) $location['active'] !== 1) {
                 return $notApplied(NotAppliedReason::LocationLocked);
@@ -821,9 +822,9 @@ final readonly class DeviceRepository
      * @throws InvalidDeviceValueException  unbekannt oder fremd
      * @throws DeviceRuleViolationException gesperrt
      */
-    private function lockActiveLocation(Tenant $tenant, int $locationId): void
+    private function lockActiveLocation(Tenant $tenant, int $locationId, bool $process = false): void
     {
-        $location = $this->lockLocation($tenant, $locationId)
+        $location = $this->lockLocation($tenant, $locationId, $process)
             ?? throw new InvalidDeviceValueException('Der Standort wurde nicht gefunden.');
         if ((int) $location['active'] !== 1) {
             throw DeviceRuleViolationException::locationLocked(LocationName::fromString((string) $location['name']));
@@ -833,13 +834,13 @@ final readonly class DeviceRepository
     /**
      * @return array<string, mixed>|null null: unbekannt, fremd oder außerhalb des Datenfilters
      */
-    private function lockLocation(Tenant $tenant, int $locationId): ?array
+    private function lockLocation(Tenant $tenant, int $locationId, bool $process = false): ?array
     {
         $stmt = $this->pdo->prepare('SELECT name, active FROM fe_locations WHERE id = ? AND tenant_id = ? LOCK IN SHARE MODE');
         $stmt->execute([$locationId, $tenant->id]);
         $row = $stmt->fetch();
 
-        return is_array($row) && $this->visibility->allowsLocation($locationId) ? $row : null;
+        return is_array($row) && ($process || $this->visibility->allowsLocation($locationId)) ? $row : null;
     }
 
     /**
@@ -969,6 +970,7 @@ final readonly class DeviceRepository
             $row['scan_code'] === null ? null : ScanCode::fromDatabase((string) $row['scan_code']),
             self::utc((string) $row['state_changed_at']),
             (int) $row['state_version'],
+            (int) $row['type_single_use'] === 1,
         );
     }
 

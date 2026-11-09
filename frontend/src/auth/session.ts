@@ -109,7 +109,7 @@ function storedJson(state: AuthState): Record<string, unknown> {
             permissions: {
                 areas: state.permissions.areas,
                 actions: state.permissions.actions,
-                restrictions: [],
+                restrictions: state.permissions.restrictions,
                 filtered: state.permissions.filtered,
                 version: state.permissions.version,
             },

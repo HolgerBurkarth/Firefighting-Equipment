@@ -344,6 +344,23 @@ final readonly class LocationRepository
     }
 
     /**
+     * Die Sammelstelle, in die „Benutzt melden“ bucht (Phase 2, P2.3, E8): der aktive Standort mit der
+     * Aufgabe Sammelstelle, der benutzte Ausrüstung annimmt (`used` oder `both`), der mit der
+     * kleinsten ID. Unabhängig vom Datenfilter (der Ablauf gibt das Ziel vor, G4). null = keine.
+     */
+    public function collectionPointForUsed(Tenant $tenant): ?int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM fe_locations WHERE tenant_id = ? AND task = 'collection' AND active = 1"
+            . " AND collection_accepts IN ('used', 'both') ORDER BY id LIMIT 1",
+        );
+        $stmt->execute([$tenant->id]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
+    }
+
+    /**
      * @param string    $where SQL aus diesem Code, nie aus Eingaben
      * @param list<int> $params
      *

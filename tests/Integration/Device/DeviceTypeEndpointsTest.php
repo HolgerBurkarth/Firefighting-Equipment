@@ -60,7 +60,7 @@ final class DeviceTypeEndpointsTest extends AuthTestCase
         $types = self::json($response)['device_types'];
         self::assertSame(['Atemschutzmaske', 'Funkgerät'], array_column($types, 'name'));
         self::assertSame([0, 2], array_column($types, 'device_count'));
-        self::assertSame(['id', 'name', 'active', 'device_count', 'created_at', 'updated_at'], array_keys($types[1]));
+        self::assertSame(['id', 'name', 'active', 'single_use', 'device_count', 'created_at', 'updated_at'], array_keys($types[1]));
         self::assertSame($radio, $types[1]['id']);
         self::assertTrue($types[1]['active']);
         self::assertMatchesRegularExpression('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/D', $types[1]['created_at']);

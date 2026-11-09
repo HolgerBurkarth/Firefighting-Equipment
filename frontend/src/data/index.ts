@@ -27,6 +27,7 @@ import {
     createDeviceType,
     renameDeviceType as postDeviceTypeName,
     setDeviceTypeActive as postDeviceTypeActive,
+    setDeviceTypeSingleUse as postDeviceTypeSingleUse,
     type DeviceType,
 } from '../api/deviceTypes';
 import { fetchInspectionOverview, type InspectionOverview } from '../api/inspections';
@@ -212,6 +213,14 @@ export async function setDeviceTypeActive(
     active: boolean,
 ): Promise<ApiResult<DeviceType>> {
     return afterMasterDataChange(await postDeviceTypeActive(id, active), deviceTypeStore);
+}
+
+/** Als Einmalgerät markieren bzw. nicht (Phase 2, P2.3). */
+export async function setDeviceTypeSingleUse(
+    id: number,
+    singleUse: boolean,
+): Promise<ApiResult<DeviceType>> {
+    return afterMasterDataChange(await postDeviceTypeSingleUse(id, singleUse), deviceTypeStore);
 }
 
 /**

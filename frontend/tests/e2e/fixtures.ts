@@ -76,8 +76,9 @@ export function permissionsJson(
     areas: Readonly<Record<string, 'read' | 'write'>>,
     actions: readonly string[] = [],
     filtered = false,
+    restrictions: readonly string[] = [],
 ): Record<string, unknown> {
-    return { areas, actions, restrictions: [], filtered, version: `v-${JSON.stringify(areas)}` };
+    return { areas, actions, restrictions, filtered, version: `v-${JSON.stringify(areas)}` };
 }
 
 /** Rechte der Standard-Rollen, wie der Server sie in auth/me sendet (Admin: alles). */

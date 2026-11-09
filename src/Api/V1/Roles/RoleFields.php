@@ -10,6 +10,7 @@ use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Permission\Action;
 use FirefightingEquipment\Permission\Area;
 use FirefightingEquipment\Permission\AreaLevel;
+use FirefightingEquipment\Permission\Restriction;
 use FirefightingEquipment\Role\InvalidRoleValueException;
 use FirefightingEquipment\Role\RoleDraft;
 
@@ -23,7 +24,7 @@ final class RoleFields
     /** Höchstens so viele IDs je Datenfilter (eine Feuerwehr hat wenige Standorte und Typen). */
     public const int MAX_FILTER_IDS = 500;
 
-    private const array DRAFT_FIELDS = ['name', 'description', 'areas', 'actions', 'locations', 'device_types'];
+    private const array DRAFT_FIELDS = ['name', 'description', 'areas', 'actions', 'locations', 'device_types', 'restrictions'];
 
     private function __construct()
     {
@@ -51,6 +52,7 @@ final class RoleFields
                 self::actions($context->body['actions']),
                 self::ids($context->body['locations'], 'locations'),
                 self::ids($context->body['device_types'], 'device_types'),
+                self::restrictions($context->body['restrictions'] ?? []),
             );
         } catch (InvalidRoleValueException $e) {
             throw HttpException::invalidRequest($e->getMessage());
@@ -106,6 +108,26 @@ final class RoleFields
                 ?? throw HttpException::invalidRequest(sprintf('Unbekannte Aktion „%s“.', is_scalar($action) ? (string) $action : '?')),
             $value,
         );
+    }
+
+    /**
+     * Einschränkungen (Phase 2); das Feld darf fehlen (alte Apps, wie keine).
+     *
+     * @return bool Einschränkung „Bei Einmalgeräten nur benutzt melden“
+     */
+    private static function restrictions(mixed $value): bool
+    {
+        if (!is_array($value) || !array_is_list($value)) {
+            throw HttpException::invalidRequest('Das Feld "restrictions" muss eine Liste sein.');
+        }
+        $keys = [];
+        foreach ($value as $key) {
+            $restriction = (is_string($key) ? Restriction::tryFrom($key) : null)
+                ?? throw HttpException::invalidRequest(sprintf('Unbekannte Einschränkung „%s“.', is_scalar($key) ? (string) $key : '?'));
+            $keys[] = $restriction;
+        }
+
+        return in_array(Restriction::SingleUseUsedOnly, $keys, true);
     }
 
     /**

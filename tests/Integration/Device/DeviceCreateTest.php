@@ -52,7 +52,7 @@ final class DeviceCreateTest extends DeviceApiTestCase
             array_keys($device),
         );
         self::assertSame('MA 01', $device['identifier']);
-        self::assertSame(['id' => $this->typeId, 'name' => 'Atemschutzmaske'], $device['device_type']);
+        self::assertSame(['id' => $this->typeId, 'name' => 'Atemschutzmaske', 'single_use' => false], $device['device_type']);
         self::assertSame(['id' => $this->g1, 'name' => 'G1', 'path' => 'HLF 20 / G1'], $device['location']);
         self::assertSame(['maintenance', 'in Wartung', '2027-03-01', 1], [
             $device['status'], $device['status_label'], $device['next_inspection_due'], $device['version'],

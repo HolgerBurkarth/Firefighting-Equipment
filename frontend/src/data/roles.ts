@@ -32,6 +32,8 @@ export interface RoleForm {
     readonly locations: readonly number[];
     readonly typesMode: FilterMode;
     readonly deviceTypes: readonly number[];
+    /** Einschränkungen (Phase 2): Schlüssel aus dem Katalog. */
+    readonly restrictions: readonly string[];
 }
 
 export function emptyRoleForm(): RoleForm {
@@ -44,6 +46,7 @@ export function emptyRoleForm(): RoleForm {
         locations: [],
         typesMode: 'all',
         deviceTypes: [],
+        restrictions: [],
     };
 }
 
@@ -57,6 +60,7 @@ export function roleForm(role: Role): RoleForm {
         locations: [...(role.locations ?? [])],
         typesMode: role.deviceTypes === null ? 'all' : 'some',
         deviceTypes: [...(role.deviceTypes ?? [])],
+        restrictions: [...role.restrictions],
     };
 }
 
@@ -71,6 +75,7 @@ export function sameRoleForm(a: RoleForm, b: RoleForm): boolean {
         a.description === b.description &&
         areas(a) === areas(b) &&
         sorted(a.actions) === sorted(b.actions) &&
+        sorted(a.restrictions) === sorted(b.restrictions) &&
         a.locationsMode === b.locationsMode &&
         a.typesMode === b.typesMode &&
         (a.locationsMode === 'all' || sorted(a.locations) === sorted(b.locations)) &&
@@ -119,6 +124,9 @@ export function roleRequest(form: RoleForm, catalog: PermissionCatalog): RoleReq
             .filter((key) => form.actions.includes(key)),
         locations: form.locationsMode === 'all' ? null : [...form.locations].sort((x, y) => x - y),
         deviceTypes: form.typesMode === 'all' ? null : [...form.deviceTypes].sort((x, y) => x - y),
+        restrictions: catalog.restrictions
+            .map((restriction) => restriction.key)
+            .filter((key) => form.restrictions.includes(key)),
     };
 }
 

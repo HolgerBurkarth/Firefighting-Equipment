@@ -8,6 +8,25 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Einmalgeräte und Benutzt melden (Phase 2, Runde 8b, P2.3)“
+
+- Migration 0054: `fe_device_types.single_use` (Standard 0). Migration 0055 entfällt („Benutzt melden“
+  bleibt ein `state_changed` mit Status `used`).
+- Neu: `POST device-types/{id}/single-use {single_use}` (`device_types` Ändern);
+  `POST devices/{id}/used {version, comment?, client_ref?, occurred_at?, confirmed_stale?}` (Aktion
+  `device.used`; Status `used`, Ziel Sammelstelle, die `used` annimmt, sonst bleibt der Standort; auch
+  außerhalb des Datenfilters, G4).
+- Neue Felder: `single_use` in `device_type` (Gerätetypen-Liste und `device_type {id, name, single_use}`
+  in jedem Gerät, nur Zusatz); `restrictions` in `auth/me` (`permissions.restrictions`, bisher leer:
+  `single_use_used_only`), in `RoleJson::role` und im Katalog (`restrictions [{key, label, hint}]`);
+  Rollen-Bodys nehmen optional `restrictions` (Liste, fehlt = keine; Katalog-Datei
+  `tests/Fixtures/permission-catalog.json` neu).
+- Neuer Fehlercode `restricted_action` 403: Rolle mit der Einschränkung bucht ein Einmalgerät über
+  `devices/{id}/state` oder `devices/bulk/state` (dort je Eintrag als `error`).
+- Neue Aktion `device.used` im Katalog (nicht in den Standard-Rollen).
+- Tests: `DeviceUsedTest`, `RoleApiTest`, `TenantRoutePermissionsTest`, `DeviceVisibilityTest`;
+  Frontend `usedReport.spec.ts`. `CLAUDE.md`: Standorte und Geräte, Rollen und Rechte, Frontend.
+
 ## 2026-11-08 – „Standort-Aufgaben (Phase 2, Runde 8, P2.2)“
 
 - Migrationen 0052 (`fe_tenant_location_tasks`) und 0053 (`fe_locations.task`, `is_default_store`,

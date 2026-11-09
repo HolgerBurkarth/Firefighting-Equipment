@@ -21,6 +21,7 @@ final class DeviceTypeJson
             'id' => $type->id,
             'name' => $type->name->value,
             'active' => $type->active,
+            'single_use' => $type->singleUse,
             'device_count' => $type->deviceCount,
             'created_at' => AuthJson::time($type->createdAt),
             'updated_at' => AuthJson::time($type->updatedAt),

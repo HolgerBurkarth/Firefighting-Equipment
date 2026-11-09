@@ -9,6 +9,7 @@ use FirefightingEquipment\Auth\Session;
 use FirefightingEquipment\Permission\Action;
 use FirefightingEquipment\Permission\AreaLevel;
 use FirefightingEquipment\Permission\Permissions;
+use FirefightingEquipment\Permission\Restriction;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
@@ -46,8 +47,8 @@ final class AuthJson
 
     /**
      * Wirksame Rechte der Rolle (Plan Phase 1, Abschnitt 5): Bereiche mit Stufe, Aktionen (nur die,
-     * deren Bereich vorhanden ist; mit Datenfilter ohne Verwaltung, F3), Einschränkungen (erst ab
-     * Phase 2, bis dahin leer), Datenfilter und eine Kennung des Stands. `version` ändert sich mit
+     * deren Bereich vorhanden ist; mit Datenfilter ohne Verwaltung, F3), Einschränkungen (seit
+     * Phase 2, P2.3), Datenfilter und eine Kennung des Stands. `version` ändert sich mit
      * der Rolle des Kontos, jeder Änderung der Rolle (fe_roles.version), den Rechten selbst (auch
      * einem erweiterten Katalog) und den Standorten bzw. Gerätetypen des Datenfilters (auch einem
      * neuen Fach eines gewählten Standorts).
@@ -60,7 +61,7 @@ final class AuthJson
             // Als Objekt, auch ohne Bereiche ({} statt []).
             'areas' => (object) array_map(static fn (AreaLevel $level): string => $level->value, $permissions->areas()),
             'actions' => array_map(static fn (Action $action): string => $action->value, $permissions->actions()),
-            'restrictions' => [],
+            'restrictions' => array_map(static fn (Restriction $r): string => $r->value, $permissions->restrictions()),
             'filtered' => $permissions->isFiltered(),
         ];
         $json['version'] = hash('sha256', json_encode([$permissions->revision(), $permissions->visibility()->toArray(), $json], JSON_THROW_ON_ERROR));

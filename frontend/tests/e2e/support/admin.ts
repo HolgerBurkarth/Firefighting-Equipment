@@ -73,6 +73,7 @@ function assignableRole(
             actions: [],
             locations: null,
             device_types: null,
+            restrictions: [],
             version: 1,
             accounts: 0,
             invitation_codes: 0,

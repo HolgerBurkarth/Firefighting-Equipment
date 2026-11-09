@@ -188,6 +188,28 @@ describe('Buchung (POST devices/{id}/state)', () => {
         });
     });
 
+    it('„Benutzt melden“ geht an devices/{id}/used ohne Standort und Status', async () => {
+        const { fetch, requests } = respond(200, { device: deviceJson(5), result: RESULT });
+        await postDeviceState(
+            5,
+            { version: 1, used: true, comment: 'Einsatz', clientRef: 'ref-3' },
+            fetch,
+        );
+        expect(requests[0]?.url).toMatch(/\/api\/v1\/devices\/5\/used$/);
+        expect(requests[0]?.body).toEqual({ version: 1, comment: 'Einsatz', client_ref: 'ref-3' });
+    });
+
+    it('Einmalgerät: device_type.single_use wird gelesen, sonst fehlt das Feld', () => {
+        const single = parseDeviceListItem(
+            deviceJson(5, { device_type: { id: 1, name: 'Filter', single_use: true } }),
+        );
+        expect(single?.deviceType).toEqual({ id: 1, name: 'Filter', singleUse: true });
+        const normal = parseDeviceListItem(
+            deviceJson(5, { device_type: { id: 1, name: 'Maske', single_use: false } }),
+        );
+        expect(normal?.deviceType).toEqual({ id: 1, name: 'Maske' });
+    });
+
     it('Standort als location_id', async () => {
         const { fetch, requests } = respond(200, { device: deviceJson(5), result: RESULT });
         await postDeviceState(5, { version: 1, locationId: 12, clientRef: 'ref-2' }, fetch);

@@ -9,6 +9,7 @@ import {
     can,
     parsePermissions,
     PERMISSION_ACTIONS,
+    PERMISSION_RESTRICTIONS,
     permissionsOf,
     USER_PERMISSIONS,
 } from '../../src/api/permissions';
@@ -22,6 +23,7 @@ const catalog = JSON.parse(
 ) as {
     areas: { key: string; levels: string[] }[];
     action_groups: { actions: { key: string }[] }[];
+    restrictions: { key: string }[];
 };
 const defaultRolesPhp = readFileSync(
     new URL('../../../src/Role/DefaultRoles.php', import.meta.url),
@@ -72,9 +74,28 @@ describe('parsePermissions', () => {
         ).toEqual({
             areas: { devices: 'write', log: 'read' },
             actions: ['device.edit'],
+            restrictions: [],
             filtered: true,
             version: 'v-{"devices":"write","log":"read"}',
         });
+    });
+
+    it('liest die Einschränkungen; unbekannte und fehlende geben keine', () => {
+        const json = { ...permissionsJson({ search: 'read' }, ['device.used']) };
+        expect(
+            parsePermissions({ ...json, restrictions: ['single_use_used_only'] })?.restrictions,
+        ).toEqual(['single_use_used_only']);
+        expect(
+            parsePermissions({ ...json, restrictions: ['neu', 'single_use_used_only'] })
+                ?.restrictions,
+        ).toEqual(['single_use_used_only']);
+        expect(parsePermissions({ ...json, restrictions: undefined })?.restrictions).toEqual([]);
+    });
+
+    it('Einschränkungen wie der Katalog', () => {
+        expect(PERMISSION_RESTRICTIONS).toEqual(
+            catalog.restrictions.map((restriction) => restriction.key),
+        );
     });
 
     it('unbekannte Bereiche, Stufen und Aktionen geben kein Recht (neuerer Server)', () => {

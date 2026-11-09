@@ -21,6 +21,7 @@ enum Action: string
     case CsvImport = 'csv.import';
     case CsvExport = 'csv.export';
     case MailLog = 'mail.log';
+    case DeviceUsed = 'device.used';
 
     public function label(): string
     {
@@ -35,13 +36,14 @@ enum Action: string
             self::CsvImport => 'CSV-Import',
             self::CsvExport => 'CSV-Export',
             self::MailLog => 'Log-Mails empfangen',
+            self::DeviceUsed => 'Benutzt melden',
         };
     }
 
     public function group(): ActionGroup
     {
         return match ($this) {
-            self::BookMove, self::BookStatus => ActionGroup::Booking,
+            self::BookMove, self::BookStatus, self::DeviceUsed => ActionGroup::Booking,
             self::DeviceCreate, self::DeviceEdit, self::DeviceRetire, self::DeviceCode => ActionGroup::Devices,
             self::DevicesBulk, self::CsvImport, self::CsvExport => ActionGroup::Bulk,
             self::MailLog => ActionGroup::Notifications,
@@ -56,7 +58,7 @@ enum Action: string
     public function requires(): ?array
     {
         return match ($this) {
-            self::BookMove, self::BookStatus => [Area::Search, AreaLevel::Read],
+            self::BookMove, self::BookStatus, self::DeviceUsed => [Area::Search, AreaLevel::Read],
             self::DeviceCreate, self::DeviceEdit, self::DeviceRetire, self::DeviceCode,
             self::DevicesBulk, self::CsvImport => [Area::Devices, AreaLevel::Write],
             self::CsvExport => [Area::Devices, AreaLevel::Read],
