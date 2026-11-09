@@ -31,6 +31,8 @@ export interface QueuedBooking {
     readonly locationPath?: string;
     readonly status?: BookableStatus;
     readonly statusLabel?: string;
+    /** „Benutzt melden“ (Phase 2, P2.3, ab Format 2): Status benutzt, das Ziel gibt der Server vor. */
+    readonly used?: boolean;
     readonly comment?: string;
     /** Aktionszeit auf dem Handy, `JJJJ-MM-TTTHH:MM:SSZ`. */
     readonly occurredAt: string;
@@ -60,9 +62,11 @@ export const DEFAULT_QUEUE_LIMITS: QueueLimits = { maxAgeDays: 7, queueMaxAgeDay
  * sich die Einträge ändern, z. B. weil mit einer neuen Vertragsnummer der API (X-Client-Api)
  * Buchungen anders gesendet werden: Die neue Version wandelt ältere Formate beim Lesen um
  * (`readStoredQueue`), sodass Buchungen eines Updates nicht verloren gehen. Format 1 = Einträge wie
- * `QueuedBooking`; davor lag die Liste ohne Hülle (gilt als Format 1).
+ * `QueuedBooking`; davor lag die Liste ohne Hülle (gilt als Format 1). Format 2 (Phase 2, P2.3):
+ * Einträge „Benutzt melden“ (`used`); Format 1 hat dieselben Einträge ohne dieses Feld und wird
+ * unverändert übernommen.
  */
-export const QUEUE_FORMAT = 1;
+export const QUEUE_FORMAT = 2;
 
 export interface StoredQueue {
     readonly format: number;
@@ -87,7 +91,12 @@ export function readStoredQueue(stored: unknown): {
             return { bookings: [], writable: false };
         }
         const bookings = 'bookings' in stored ? stored.bookings : null;
-        if (format === QUEUE_FORMAT && Array.isArray(bookings)) {
+        if (
+            typeof format === 'number' &&
+            format >= 1 &&
+            format <= QUEUE_FORMAT &&
+            Array.isArray(bookings)
+        ) {
             return { bookings: bookings as QueuedBooking[], writable: true };
         }
     }
@@ -129,6 +138,9 @@ export function offlineBookingProblem(
 
 /** Text einer Buchung: „M1 → HLF 20 / G2 · defekt“ (nur Geändertes). */
 export function queuedText(booking: QueuedBooking): string {
+    if (booking.used === true) {
+        return `${booking.identifier} → benutzt gemeldet`;
+    }
     const parts = [booking.locationPath, booking.statusLabel].filter(
         (part): part is string => part !== undefined,
     );
@@ -152,6 +164,7 @@ export function pendingDevice(device: DeviceListItem, booking: QueuedBooking): D
             status: booking.status,
             statusLabel: booking.statusLabel ?? device.statusLabel,
         }),
+        ...(booking.used === true && { status: 'used' as const, statusLabel: 'benutzt' }),
         stateChangedAt: booking.occurredAt,
     };
 }
@@ -165,6 +178,8 @@ function problemText(code: string, message: string | null): string {
             return 'Diese Buchung ist älter als erlaubt.';
         case 'client_ref_conflict':
             return 'Diese Buchung passt nicht mehr zu einer schon gesendeten.';
+        case 'restricted_action':
+            return 'Für Einmalgeräte ist nur „Benutzt melden“ erlaubt.';
         case 'forbidden':
             // Die Rolle darf inzwischen nicht mehr umbuchen bzw. den Status setzen (Schritt 1.7c).
             return 'Dafür fehlen Ihnen inzwischen die Rechte.';
@@ -360,6 +375,7 @@ export class BookingQueue {
                     occurredAt: next.occurredAt,
                     ...(next.locationId !== undefined && { locationId: next.locationId }),
                     ...(next.status !== undefined && { status: next.status }),
+                    ...(next.used === true && { used: true }),
                     ...(next.comment !== undefined && { comment: next.comment }),
                     ...(next.confirmedStale === true && { confirmedStale: true }),
                 });

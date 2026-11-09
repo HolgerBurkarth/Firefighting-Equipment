@@ -31,6 +31,8 @@ export const PAGE_RIGHTS = {
     locations: (p) => allows(p, 'locations'),
     'device-types': (p) => allows(p, 'device_types'),
     users: (p) => allows(p, 'users'),
+    // Nur in Städten mit Sammelstelle oder Werkstatt sendet der Server den Bereich (Phase 2, P2.4).
+    maintenance: (p) => allows(p, 'maintenance'),
     notices: logRead,
     notice: logRead,
     // Anzeigemodus, Passwort und Geräte für jede Konsole; Farbe und Logo nur mit `settings`.

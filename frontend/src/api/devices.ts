@@ -10,7 +10,8 @@ export interface DeviceSummary {
     readonly id: number;
     readonly identifier: string;
     readonly scanCode: string | null;
-    readonly deviceType: { readonly id: number; readonly name: string };
+    /** `singleUse`: Einmalgerät (Phase 2, P2.3); fehlt = kein Einmalgerät. */
+    readonly deviceType: { readonly id: number; readonly name: string; readonly singleUse?: true };
     /** `path` wie im Backend: „HLF 20 / G1“ bzw. der Name bei Ebene 1. */
     readonly location: { readonly id: number; readonly name: string; readonly path: string };
     readonly status: DeviceStatus;
@@ -96,7 +97,11 @@ export function parseDeviceSummary(json: unknown): DeviceSummary | null {
         id,
         identifier,
         scanCode,
-        deviceType: { id: type['id'], name: type['name'] },
+        deviceType: {
+            id: type['id'],
+            name: type['name'],
+            ...(type['single_use'] === true && { singleUse: true as const }),
+        },
         location: { id: location['id'], name: location['name'], path: location['path'] },
         status,
         statusLabel,
@@ -373,27 +378,36 @@ export interface StateChangeRequest {
     readonly occurredAt?: string;
     /** Alte Buchung nach Rückfrage trotzdem senden (nur mit `occurredAt`). */
     readonly confirmedStale?: boolean;
+    /**
+     * „Benutzt melden“ (POST devices/{id}/used, Phase 2, P2.3): Status benutzt, Ziel gibt der Server
+     * vor (Sammelstelle); dann weder `locationId` noch `status`.
+     */
+    readonly used?: boolean;
 }
 
-/** POST devices/{id}/state: Umbuchen und/oder Status setzen. */
+/** POST devices/{id}/state: Umbuchen und/oder Status setzen; mit `used` POST devices/{id}/used. */
 export function postDeviceState(
     id: number,
     request: StateChangeRequest,
     fetchFn?: typeof fetch,
 ): Promise<ApiResult<BookingResponse>> {
-    return apiRequest(`devices/${String(id)}/state`, parseBookingResponse, {
-        method: 'POST',
-        body: {
-            version: request.version,
-            ...(request.locationId !== undefined && { location_id: request.locationId }),
-            ...(request.status !== undefined && { status: request.status }),
-            ...(request.comment !== undefined && { comment: request.comment }),
-            client_ref: request.clientRef,
-            ...(request.occurredAt !== undefined && { occurred_at: request.occurredAt }),
-            ...(request.confirmedStale === true && { confirmed_stale: true }),
+    return apiRequest(
+        `devices/${String(id)}/${request.used === true ? 'used' : 'state'}`,
+        parseBookingResponse,
+        {
+            method: 'POST',
+            body: {
+                version: request.version,
+                ...(request.locationId !== undefined && { location_id: request.locationId }),
+                ...(request.status !== undefined && { status: request.status }),
+                ...(request.comment !== undefined && { comment: request.comment }),
+                client_ref: request.clientRef,
+                ...(request.occurredAt !== undefined && { occurred_at: request.occurredAt }),
+                ...(request.confirmedStale === true && { confirmed_stale: true }),
+            },
+            ...(fetchFn && { fetchFn }),
         },
-        ...(fetchFn && { fetchFn }),
-    });
+    );
 }
 
 /** Aktueller Stand aus 409 version_conflict (`details.device`), sonst null. */

@@ -20,6 +20,8 @@ final readonly class DeviceType
         public \DateTimeImmutable $createdAt,
         /** UTC */
         public \DateTimeImmutable $updatedAt,
+        /** Einmalgerät: wird nach dem Einsatz ersetzt statt gewartet (Phase 2, P2.3) */
+        public bool $singleUse = false,
     ) {
     }
 }

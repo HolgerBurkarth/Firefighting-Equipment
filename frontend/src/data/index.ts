@@ -27,9 +27,11 @@ import {
     createDeviceType,
     renameDeviceType as postDeviceTypeName,
     setDeviceTypeActive as postDeviceTypeActive,
+    setDeviceTypeSingleUse as postDeviceTypeSingleUse,
     type DeviceType,
 } from '../api/deviceTypes';
 import { fetchInspectionOverview, type InspectionOverview } from '../api/inspections';
+import { postBack, postToWorkshop } from '../api/maintenance';
 import {
     createInvitationCode as postInvitationCode,
     revokeInvitationCode as postRevoke,
@@ -214,6 +216,14 @@ export async function setDeviceTypeActive(
     return afterMasterDataChange(await postDeviceTypeActive(id, active), deviceTypeStore);
 }
 
+/** Als Einmalgerät markieren bzw. nicht (Phase 2, P2.3). */
+export async function setDeviceTypeSingleUse(
+    id: number,
+    singleUse: boolean,
+): Promise<ApiResult<DeviceType>> {
+    return afterMasterDataChange(await postDeviceTypeSingleUse(id, singleUse), deviceTypeStore);
+}
+
 /**
  * Nach einer Änderung des Admins an einem Gerät (Stammdaten, Prüfdatum, Aussondern, Wieder
  * aufnehmen): Die Liste für „Suchen“ übernimmt den Stand sofort (ausgesonderte fallen heraus);
@@ -326,6 +336,24 @@ export async function bulkChangeState(
     return afterBulk(
         await runInBlocks(entries, (block) => postBulkState(block, comment), onProgress),
     );
+}
+
+/** „Zur Werkstatt“ (Seite Wartung; Phase 2, P2.4): der Server bucht ins Ziel der Werkstatt. */
+export async function maintenanceToWorkshop(
+    devices: readonly DeviceListItem[],
+    onProgress?: (done: number, total: number) => void,
+): Promise<BulkRun> {
+    const entries = devices.map((device) => ({ id: device.id, version: device.version }));
+    return afterBulk(await runInBlocks(entries, (block) => postToWorkshop(block), onProgress));
+}
+
+/** „Zurück ins Lager“ (Seite Wartung): ins Standard-Lager, einsatzbereit. */
+export async function maintenanceBack(
+    devices: readonly DeviceListItem[],
+    onProgress?: (done: number, total: number) => void,
+): Promise<BulkRun> {
+    const entries = devices.map((device) => ({ id: device.id, version: device.version }));
+    return afterBulk(await runInBlocks(entries, (block) => postBack(block), onProgress));
 }
 
 function afterBulk(run: BulkRun): BulkRun {

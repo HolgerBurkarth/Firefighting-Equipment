@@ -38,6 +38,7 @@ describe('API der Rollen', () => {
                 actions: [],
                 locations: null,
                 deviceTypes: [3],
+                restrictions: ['single_use_used_only'],
             },
             fetch,
         );
@@ -51,6 +52,7 @@ describe('API der Rollen', () => {
             actions: [],
             locations: null,
             device_types: [3],
+            restrictions: ['single_use_used_only'],
         });
     });
 

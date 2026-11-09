@@ -283,4 +283,8 @@ CHECK-Bedingungen.
 | G16 | Wer darf Rückgabe-Schlüssel erneuern und Aushänge drucken? | `returns.process` (Gerätewart, Admin). |
 | G17 | Tausch über Claude (P2.12) erlauben? | Ja mit Zugang „Ändern“ und `device.swap`; Unterschreiten ohne Ersatz über Claude nie (`stock.override` fällt in `forClaude` weg). |
 
+**Entscheidungen Holger 09.11.2026 (Runde 8b):** G4 entschieden wie vorgeschlagen: Rollen mit Datenfilter
+erreichen die Sammelstelle nur über „Benutzt melden“ bzw. den Tausch, nicht als freies Ziel beim Umbuchen.
+Migration 0055 (`used_reported`) entfällt: „Benutzt melden“ bleibt ein `state_changed` mit Status „benutzt“.
+
 **Entscheidungen Holger 08.11.2026:** G1–G11 und G13–G17 wie vorgeschlagen (G1: Wartungsintervall je Typ als eigene Phase direkt nach Phase 2; G13: `ClientApi::MIN` 3 freigegeben, als eigener Schritt nach einem Deploy mit `X-Client-Api` 3, Deploy außerhalb eines Dienstabends); G12 siehe oben. Begriffe in der Oberfläche nach Konzept Abschnitt 9 (Rückgabe, „Ausgeliehen an“, „in Betrieb seit“ …), nicht die Arbeitsbegriffe des Plans. Die beiden optionalen Migrationen mit Datenänderung (0066, 0068) nur nach Rückfrage (Vorschlag: entfallen).

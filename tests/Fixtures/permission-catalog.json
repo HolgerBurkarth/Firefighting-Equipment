@@ -107,6 +107,16 @@
                 "read",
                 "write"
             ]
+        },
+        {
+            "key": "maintenance",
+            "label": "Wartung",
+            "hint": "Sammelstelle und Werkstatt: Ausrüstung zur Wartung bringen und zurückholen",
+            "levels": [
+                "read",
+                "write"
+            ],
+            "levels_with_filter": []
         }
     ],
     "levels": [
@@ -135,6 +145,15 @@
                 {
                     "key": "book.status",
                     "label": "Status setzen",
+                    "requires": {
+                        "area": "search",
+                        "level": "read"
+                    },
+                    "with_filter": true
+                },
+                {
+                    "key": "device.used",
+                    "label": "Benutzt melden",
                     "requires": {
                         "area": "search",
                         "level": "read"
@@ -226,6 +245,13 @@
                     "with_filter": true
                 }
             ]
+        }
+    ],
+    "restrictions": [
+        {
+            "key": "single_use_used_only",
+            "label": "Bei Einmalgeräten nur „Benutzt melden“",
+            "hint": "Einmalgeräte darf diese Rolle nicht umbuchen und nicht auf einen anderen Status setzen, nur als benutzt melden."
         }
     ]
 }

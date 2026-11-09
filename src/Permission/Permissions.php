@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FirefightingEquipment\Permission;
 
 use FirefightingEquipment\Claude\ClaudeAccess;
+use FirefightingEquipment\Device\LocationTask;
 use FirefightingEquipment\Role\Role;
 use FirefightingEquipment\Role\SystemRole;
 
@@ -35,6 +36,10 @@ final readonly class Permissions
         private DeviceVisibility $visibility,
         private ?string $revision = null,
         private ?string $roleName = null,
+        /** @var list<Restriction> */
+        private array $restrictions = [],
+        /** @var list<LocationTask>|null freigeschaltete Aufgaben der Stadt; null = nicht begrenzt (Bereiche mit Aufgabe, Area::requiredTasks) */
+        private ?array $enabledTasks = null,
     ) {
     }
 
@@ -137,7 +142,50 @@ final readonly class Permissions
             throw new \LogicException('Die Rolle Admin hat keinen Datenfilter.');
         }
 
-        return new self($this->all, $this->areas, $this->actions, $visibility, $roleId . ':' . $roleVersion, $roleName);
+        return new self($this->all, $this->areas, $this->actions, $visibility, $roleId . ':' . $roleVersion, $roleName, $this->restrictions, $this->enabledTasks);
+    }
+
+    /**
+     * Dieselben Rechte mit den Einschränkungen der Rolle (Phase 2); die Rolle Admin hat keine.
+     *
+     * @param list<Restriction> $restrictions
+     */
+    public function withRestrictions(array $restrictions): self
+    {
+        if ($this->all && $restrictions !== []) {
+            throw new \LogicException('Die Rolle Admin hat keine Einschränkungen.');
+        }
+
+        return new self($this->all, $this->areas, $this->actions, $this->visibility, $this->revision, $this->roleName, array_values(array_filter(
+            Restriction::cases(),
+            static fn (Restriction $r): bool => in_array($r, $restrictions, true),
+        )), $this->enabledTasks);
+    }
+
+    /**
+     * Dieselben Rechte für eine Stadt mit diesen freigeschalteten Aufgaben: Bereiche, die eine Aufgabe
+     * brauchen (Area::requiredTasks), gibt es nur, wenn eine davon freigeschaltet ist (Phase 2, P2.4).
+     *
+     * @param list<LocationTask> $tasks
+     */
+    public function withEnabledTasks(array $tasks): self
+    {
+        return new self($this->all, $this->areas, $this->actions, $this->visibility, $this->revision, $this->roleName, $this->restrictions, $tasks);
+    }
+
+    /**
+     * Einschränkungen der Rolle in der Reihenfolge des Katalogs.
+     *
+     * @return list<Restriction>
+     */
+    public function restrictions(): array
+    {
+        return $this->restrictions;
+    }
+
+    public function restricted(Restriction $restriction): bool
+    {
+        return in_array($restriction, $this->restrictions, true);
     }
 
     /**
@@ -159,7 +207,7 @@ final readonly class Permissions
             ? array_values(array_filter($this->actions(), static fn (Action $a): bool => $a !== Action::MailLog))
             : [];
 
-        return new self(false, $areas, $actions, $this->visibility, $this->revision, $this->roleName);
+        return new self(false, $areas, $actions, $this->visibility, $this->revision, $this->roleName, $this->restrictions, $this->enabledTasks);
     }
 
     /** Name der Rolle, aus der die Rechte stammen (Liste „Konto wechseln“); null ohne Rolle. */
@@ -175,6 +223,10 @@ final readonly class Permissions
 
     public function level(Area $area): ?AreaLevel
     {
+        $needed = $area->requiredTasks();
+        if ($this->enabledTasks !== null && $needed !== [] && !array_any($needed, fn (LocationTask $task): bool => in_array($task, $this->enabledTasks ?? [], true))) {
+            return null;
+        }
         if ($this->all) {
             return $area->maxLevel();
         }
@@ -197,6 +249,8 @@ final readonly class Permissions
         return match ($area) {
             Area::Users => AreaLevel::Read,
             Area::Locations, Area::DeviceTypes => AreaLevel::Write,
+            // Die Orte der Wartung liegen außerhalb jedes Filters (Sammelstelle, Werkstatt, Lager).
+            Area::Maintenance => AreaLevel::Read,
             default => null,
         };
     }

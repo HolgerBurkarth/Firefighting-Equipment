@@ -56,7 +56,7 @@ final class RoleApiTest extends AuthTestCase
         $catalog = self::json($this->get('permission-catalog'));
 
         self::assertSame(
-            ['dashboard', 'search', 'devices', 'locations', 'device_types', 'due', 'log', 'users', 'settings'],
+            ['dashboard', 'search', 'devices', 'locations', 'device_types', 'due', 'log', 'users', 'settings', 'maintenance'],
             array_column($catalog['areas'], 'key'),
         );
         $areas = array_column($catalog['areas'], null, 'key');
@@ -75,7 +75,7 @@ final class RoleApiTest extends AuthTestCase
         self::assertFalse($actions['csv.import']['with_filter'], 'F3');
         self::assertNull($actions['mail.log']['requires']);
         self::assertSame(['key' => 'csv.export', 'label' => 'CSV-Export', 'requires' => ['area' => 'devices', 'level' => 'read'], 'with_filter' => true], $actions['csv.export']);
-        self::assertCount(10, $actions);
+        self::assertCount(11, $actions);
     }
 
     public function testListShowsDefaultRolesWithUsage(): void
@@ -95,7 +95,7 @@ final class RoleApiTest extends AuthTestCase
         self::assertFalse($roles[0]['editable']);
         self::assertFalse($roles[0]['deletable']);
         self::assertSame('admin', $roles[0]['system_key']);
-        self::assertSame(['dashboard', 'search', 'devices', 'locations', 'device_types', 'due', 'log', 'users', 'settings'], array_keys($roles[0]['areas']));
+        self::assertSame(['dashboard', 'search', 'devices', 'locations', 'device_types', 'due', 'log', 'users', 'settings', 'maintenance'], array_keys($roles[0]['areas']));
         self::assertSame(['accounts' => 1, 'invitation_codes' => 0], $roles[0]['usage']);
 
         self::assertSame([
@@ -110,6 +110,7 @@ final class RoleApiTest extends AuthTestCase
             'actions' => ['book.move', 'book.status'],
             'locations' => null,
             'device_types' => null,
+            'restrictions' => [],
             'version' => 1,
             'created_at' => $roles[1]['created_at'],
             'updated_at' => $roles[1]['updated_at'],
@@ -173,7 +174,7 @@ final class RoleApiTest extends AuthTestCase
         yield 'Name zu lang' => [['name' => str_repeat('ä', 51)], 'Der Name der Rolle darf höchstens 50 Zeichen lang sein (angegeben: 51).'];
         yield 'Name mit Zeilenumbruch' => [['name' => "A\nB"], 'Der Name der Rolle darf keine Steuerzeichen (z. B. Zeilenumbrüche) enthalten.'];
         yield 'Beschreibung zu lang' => [['description' => str_repeat('x', 201)], 'Die Kurzbeschreibung darf höchstens 200 Zeichen lang sein (angegeben: 201).'];
-        yield 'Bereich unbekannt' => [['areas' => ['maintenance' => 'read']], 'Unbekannter Bereich „maintenance“.'];
+        yield 'Bereich unbekannt' => [['areas' => ['loans' => 'read']], 'Unbekannter Bereich „loans“.'];
         yield 'Bereiche als Liste' => [['areas' => ['search']], 'Das Feld "areas" muss ein Objekt Bereich → Stufe sein.'];
         yield 'Stufe unbekannt' => [['areas' => ['search' => 'none']], 'Die Stufe für „Suchen und Ausrüstung ansehen“ muss "read" oder "write" sein.'];
         yield 'Dashboard ändern' => [['areas' => ['dashboard' => 'write']], 'Für „Dashboard“ gibt es nur „Ansehen“.'];
@@ -183,7 +184,7 @@ final class RoleApiTest extends AuthTestCase
         yield 'Standort keine Zahl' => [['locations' => ['1']], 'Das Feld "locations" darf nur positive ganze Zahlen enthalten.'];
         yield 'Standort einer anderen Stadt' => [['locations' => ['{tuttlingen-location}']], 'Den Standort #{tuttlingen-location} gibt es in dieser Stadt nicht.'];
         yield 'Typ unbekannt' => [['device_types' => [999999]], 'Den Ausrüstungstyp #999999 gibt es in dieser Stadt nicht.'];
-        yield 'unbekanntes Feld' => [['restrict_single_use' => true], 'Das Feld "restrict_single_use" ist hier nicht vorgesehen (möglich: name, description, areas, actions, locations, device_types).'];
+        yield 'unbekanntes Feld' => [['restrict_single_use' => true], 'Das Feld "restrict_single_use" ist hier nicht vorgesehen (möglich: name, description, areas, actions, locations, device_types, restrictions).'];
         yield 'Feld fehlt' => [['locations' => '{missing}'], 'Das Feld "locations" fehlt.'];
     }
 
@@ -472,6 +473,31 @@ final class RoleApiTest extends AuthTestCase
         );
     }
 
+    /** Phase 2, P2.3: Einschränkung „Bei Einmalgeräten nur benutzt melden“ speichern, kopieren, ändern. */
+    public function testRestrictionIsSavedCopiedAndChangesTheVersion(): void
+    {
+        $url = 'tenants/' . $this->tenantId . '/roles';
+        $created = self::json($this->post($url, self::draft(['name' => 'Geräteträger', 'areas' => ['search' => 'read'], 'actions' => ['device.used'], 'restrictions' => ['single_use_used_only']])))['role'];
+        self::assertSame(['single_use_used_only'], $created['restrictions']);
+        self::assertSame(['device.used'], $created['actions']);
+
+        $same = self::json($this->post($url . '/' . $created['id'], [...self::draft(['name' => 'Geräteträger', 'areas' => ['search' => 'read'], 'actions' => ['device.used'], 'restrictions' => ['single_use_used_only']]), 'version' => 1]))['role'];
+        self::assertSame(1, $same['version'], 'ohne Unterschied keine neue Version');
+
+        $copy = self::json($this->post($url, ['copy_of' => $created['id']]))['role'];
+        self::assertSame(['single_use_used_only'], $copy['restrictions']);
+
+        $lifted = self::json($this->post($url . '/' . $created['id'], [...self::draft(['name' => 'Geräteträger', 'areas' => ['search' => 'read'], 'actions' => ['device.used']]), 'version' => 1]))['role'];
+        self::assertSame([[], 2], [$lifted['restrictions'], $lifted['version']]);
+
+        $admin = array_values(array_filter(self::json($this->get($url))['roles'], static fn (array $r): bool => $r['system_key'] === 'admin'))[0];
+        self::assertSame([], $admin['restrictions']);
+        self::assertSame([], self::json($this->post($url, ['copy_of' => $admin['id']]))['role']['restrictions']);
+
+        self::assertError(400, 'invalid_request', $this->post($url, self::draft(['name' => 'Falsch', 'restrictions' => ['alles_verboten']])));
+        self::assertError(400, 'invalid_request', $this->post($url, self::draft(['name' => 'Falsch', 'restrictions' => 'single_use_used_only'])));
+    }
+
     public function testCopyOfAdminIsAnOrdinaryRoleWithAllRights(): void
     {
         $copy = self::json($this->post('tenants/' . $this->tenantId . '/roles', ['copy_of' => $this->systemRoleId($this->tenantId, 'admin')]))['role'];
@@ -483,8 +509,8 @@ final class RoleApiTest extends AuthTestCase
         self::assertNull($copy['description']);
         self::assertSame(['read'], array_values(array_unique([$copy['areas']['dashboard'], $copy['areas']['search']])));
         self::assertSame('write', $copy['areas']['users']);
-        self::assertCount(9, $copy['areas']);
-        self::assertCount(10, $copy['actions']);
+        self::assertCount(10, $copy['areas']);
+        self::assertCount(11, $copy['actions']);
     }
 
     /** F10: Übernahme aus einer anderen Stadt mit den Rechten, ohne Datenfilter. */

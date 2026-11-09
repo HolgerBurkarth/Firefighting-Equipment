@@ -48,7 +48,7 @@ final class DeviceListTest extends DeviceApiTestCase
         );
         self::assertSame([null, null, null], [$json['devices'][0]['serial_number'], $json['devices'][0]['manufacturer'], $json['devices'][0]['model']]);
         self::assertSame(['id' => $this->g1, 'name' => 'G1', 'path' => 'HLF 20 / G1'], $json['devices'][0]['location']);
-        self::assertSame(['id' => $this->typeId, 'name' => 'Atemschutzmaske'], $json['devices'][0]['device_type']);
+        self::assertSame(['id' => $this->typeId, 'name' => 'Atemschutzmaske', 'single_use' => false], $json['devices'][0]['device_type']);
     }
 
     public function testListContainsSearchableMasterData(): void

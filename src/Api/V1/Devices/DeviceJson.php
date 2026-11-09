@@ -23,7 +23,7 @@ final class DeviceJson
             'id' => $device->id,
             'identifier' => $device->identifier->value,
             'scan_code' => $device->scanCode?->value,
-            'device_type' => ['id' => $device->deviceTypeId, 'name' => $device->deviceTypeName],
+            'device_type' => ['id' => $device->deviceTypeId, 'name' => $device->deviceTypeName, 'single_use' => $device->deviceTypeSingleUse],
             'location' => ['id' => $device->locationId, 'name' => $device->locationName, 'path' => $device->locationPath()],
             'status' => $device->status->value,
             'status_label' => $device->status->label(),

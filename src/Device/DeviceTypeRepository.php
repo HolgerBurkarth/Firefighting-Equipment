@@ -93,6 +93,20 @@ final readonly class DeviceTypeRepository
     }
 
     /**
+     * Markiert den Typ als Einmalgerät (true) oder nicht (false); wiederholbar.
+     *
+     * @throws DeviceTypeNotFoundException
+     */
+    public function setSingleUse(Tenant $tenant, int $id, bool $singleUse): DeviceType
+    {
+        $this->pdo->prepare(
+            'UPDATE fe_device_types SET single_use = ?, updated_at = UTC_TIMESTAMP() WHERE id = ? AND tenant_id = ? AND single_use <> ?',
+        )->execute([(int) $singleUse, $id, $tenant->id, (int) $singleUse]);
+
+        return $this->find($tenant, $id) ?? throw DeviceTypeNotFoundException::forId($id);
+    }
+
+    /**
      * @param string    $where SQL aus diesem Code, nie aus Eingaben
      * @param list<int> $params
      *
@@ -103,7 +117,7 @@ final readonly class DeviceTypeRepository
         [$visible, $visibleParams] = $this->visibility->sql('d');
         [$types, $typeParams] = $this->visibility->deviceTypeSql('t.id');
         $stmt = $this->pdo->prepare(
-            'SELECT t.id, t.name, t.active, t.created_at, t.updated_at, COALESCE(c.devices, 0) AS devices'
+            'SELECT t.id, t.name, t.active, t.single_use, t.created_at, t.updated_at, COALESCE(c.devices, 0) AS devices'
             . ' FROM fe_device_types t LEFT JOIN ('
             . "SELECT d.device_type_id, COUNT(*) AS devices FROM fe_devices d WHERE d.tenant_id = ? AND d.status <> 'retired'" . $visible
             . ' GROUP BY d.device_type_id'
@@ -121,6 +135,7 @@ final readonly class DeviceTypeRepository
                 (int) $row['devices'],
                 self::utc((string) $row['created_at']),
                 self::utc((string) $row['updated_at']),
+                (int) $row['single_use'] === 1,
             ),
             $stmt->fetchAll(),
         );

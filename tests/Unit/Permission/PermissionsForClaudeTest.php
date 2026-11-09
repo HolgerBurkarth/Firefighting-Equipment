@@ -31,7 +31,7 @@ final class PermissionsForClaudeTest extends TestCase
     public static function combinations(): iterable
     {
         $all = Permissions::all();
-        $allAreas = ['dashboard' => 'read', 'search' => 'read', 'devices' => 'write', 'locations' => 'write', 'device_types' => 'write', 'due' => 'write', 'log' => 'write'];
+        $allAreas = ['dashboard' => 'read', 'search' => 'read', 'devices' => 'write', 'locations' => 'write', 'device_types' => 'write', 'due' => 'write', 'log' => 'write', 'maintenance' => 'write'];
         $allActions = array_values(array_filter(array_map(static fn (Action $a): string => $a->value, Action::cases()), static fn (string $a): bool => $a !== 'mail.log'));
         $read = array_map(static fn (): string => 'read', $allAreas);
 

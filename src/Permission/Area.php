@@ -20,6 +20,7 @@ enum Area: string
     case Log = 'log';
     case Users = 'users';
     case Settings = 'settings';
+    case Maintenance = 'maintenance';
 
     public function label(): string
     {
@@ -33,6 +34,7 @@ enum Area: string
             self::Log => 'Protokoll und Hinweise',
             self::Users => 'Benutzer',
             self::Settings => 'Einstellungen der Stadt',
+            self::Maintenance => 'Wartung',
         };
     }
 
@@ -49,6 +51,21 @@ enum Area: string
             self::Log => 'Hinweise erledigen, Verlauf exportieren',
             self::Users => 'Konten, Rollen zuweisen, Einladungscodes, Aushang',
             self::Settings => 'Farbe und Logo',
+            self::Maintenance => 'Sammelstelle und Werkstatt: Ausrüstung zur Wartung bringen und zurückholen',
+        };
+    }
+
+    /**
+     * Aufgaben von Standorten (Phase 2), von denen mindestens eine für die Stadt freigeschaltet sein
+     * muss, damit es den Bereich gibt (sonst bleibt alles wie vor Phase 2). Leer = immer.
+     *
+     * @return list<\FirefightingEquipment\Device\LocationTask>
+     */
+    public function requiredTasks(): array
+    {
+        return match ($this) {
+            self::Maintenance => [\FirefightingEquipment\Device\LocationTask::Collection, \FirefightingEquipment\Device\LocationTask::Workshop],
+            default => [],
         };
     }
 

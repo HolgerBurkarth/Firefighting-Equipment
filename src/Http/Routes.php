@@ -60,6 +60,9 @@ use FirefightingEquipment\Api\V1\Offline\ClientConfigHandler;
 use FirefightingEquipment\Api\V1\Roles\PermissionCatalogHandler;
 use FirefightingEquipment\Api\V1\Roles\RoleAction;
 use FirefightingEquipment\Api\V1\Locations\LocationTasksHandler;
+use FirefightingEquipment\Api\V1\Maintenance\MaintenanceListHandler;
+use FirefightingEquipment\Api\V1\Maintenance\MaintenanceMove;
+use FirefightingEquipment\Api\V1\Maintenance\MaintenanceMoveHandler;
 use FirefightingEquipment\Api\V1\Roles\RoleHandler;
 use FirefightingEquipment\Api\V1\SuperAdmins\SuperAdminListHandler;
 use FirefightingEquipment\Api\V1\SuperAdmins\SuperAdminLockHandler;
@@ -208,6 +211,7 @@ final class Routes
             ->add('POST', 'api/v1/device-types/{id}/rename', $write(Area::DeviceTypes), new DeviceTypeActionHandler(DeviceTypeAction::Rename))
             ->add('POST', 'api/v1/device-types/{id}/deactivate', $write(Area::DeviceTypes), new DeviceTypeActionHandler(DeviceTypeAction::Deactivate))
             ->add('POST', 'api/v1/device-types/{id}/activate', $write(Area::DeviceTypes), new DeviceTypeActionHandler(DeviceTypeAction::Activate))
+            ->add('POST', 'api/v1/device-types/{id}/single-use', $write(Area::DeviceTypes), new DeviceTypeActionHandler(DeviceTypeAction::SetSingleUse))
             ->add('GET', 'api/v1/locations', Requirement::anyOf($read(Area::Locations), $seeDevices), new LocationListHandler())
             ->add('POST', 'api/v1/locations', $write(Area::Locations), new LocationActionHandler(LocationAction::Create))
             ->add('GET', 'api/v1/locations/{id}', Requirement::anyOf($read(Area::Locations), $seeDevices), new LocationActionHandler(LocationAction::Show))
@@ -233,6 +237,10 @@ final class Routes
             ->add('POST', 'api/v1/devices/{id}/fields', $deviceFields, new DeviceActionHandler(DeviceAction::UpdateFields))
             ->add('POST', 'api/v1/devices/{id}/inspection-due', $write(Area::Due), new DeviceActionHandler(DeviceAction::SetInspectionDue))
             ->add('POST', 'api/v1/devices/{id}/state', $book, new DeviceStateHandler($clock, $offline))
+            ->add('GET', 'api/v1/maintenance', $read(Area::Maintenance), new MaintenanceListHandler())
+            ->add('POST', 'api/v1/maintenance/to-workshop', $write(Area::Maintenance), new MaintenanceMoveHandler(MaintenanceMove::ToWorkshop))
+            ->add('POST', 'api/v1/maintenance/back', $write(Area::Maintenance), new MaintenanceMoveHandler(MaintenanceMove::Back))
+            ->add('POST', 'api/v1/devices/{id}/used', $action(Action::DeviceUsed), new DeviceStateHandler($clock, $offline, used: true))
             ->add('POST', 'api/v1/devices/{id}/retire', $action(Action::DeviceRetire), new DeviceActionHandler(DeviceAction::Retire))
             ->add('POST', 'api/v1/devices/{id}/reinstate', $reinstate, new DeviceActionHandler(DeviceAction::Reinstate))
             ->add('GET', 'api/v1/devices/{id}/events', $seeDevices, new DeviceEventListHandler())

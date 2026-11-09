@@ -8,7 +8,13 @@ import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
 import { vRowLink } from '../components/rowLink';
-import { addDeviceType, deviceTypeStore, renameDeviceType, setDeviceTypeActive } from '../data';
+import {
+    addDeviceType,
+    deviceTypeStore,
+    renameDeviceType,
+    setDeviceTypeActive,
+    setDeviceTypeSingleUse,
+} from '../data';
 import { deviceCountText } from '../data/locationSearch';
 import {
     DEVICE_TYPE_NAME_MAX_LENGTH,
@@ -65,6 +71,8 @@ function ariaSort(key: DeviceTypeSortKey): 'ascending' | 'descending' | 'none' {
 const editing = ref<DeviceType | null>(null);
 const dialogOpen = ref(false);
 const name = ref('');
+/** Einmalgerät (Phase 2, P2.3): wird nach dem Einsatz ersetzt statt gewartet. */
+const singleUse = ref(false);
 const touched = ref(false);
 const busy = ref(false);
 const nameError = ref<string | null>(null);
@@ -78,7 +86,12 @@ const confirmOpen = ref(false);
 const initialName = computed(() => editing.value?.name ?? '');
 
 /** Ungespeicherte Eingaben im Fenster (auch für FormDialog: Klick daneben, Escape). */
-const unsaved = computed(() => dialogOpen.value && name.value !== initialName.value);
+const unsaved = computed(
+    () =>
+        dialogOpen.value &&
+        (name.value !== initialName.value ||
+            singleUse.value !== (editing.value?.singleUse === true)),
+);
 useUnsavedInput(() => unsaved.value);
 
 const liveProblem = computed(() => {
@@ -103,6 +116,7 @@ function openDialog(type: DeviceType | null, event: Event): void {
     opener.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     editing.value = type;
     name.value = type?.name ?? '';
+    singleUse.value = type?.singleUse === true;
     touched.value = false;
     nameError.value = null;
     dialogError.value = null;
@@ -124,28 +138,53 @@ async function submit(): Promise<void> {
     if (liveProblem.value !== null || busy.value) {
         return;
     }
-    if (current !== null && name.value === current.name) {
+    const nameChanged = name.value !== current?.name;
+    const singleUseChanged = singleUse.value !== (current?.singleUse === true);
+    if (!nameChanged && !singleUseChanged) {
         dialogOpen.value = false;
         return;
     }
     busy.value = true;
-    const result =
-        current === null
-            ? await addDeviceType(name.value)
-            : await renameDeviceType(current.id, name.value);
-    busy.value = false;
-    if (!result.ok) {
-        if (result.error.code === 'name_taken') {
-            nameError.value = result.error.message;
-        } else {
-            dialogError.value = result.error;
+    let saved: DeviceType | null = current;
+    if (nameChanged) {
+        const result =
+            current === null
+                ? await addDeviceType(name.value)
+                : await renameDeviceType(current.id, name.value);
+        if (!result.ok) {
+            busy.value = false;
+            if (result.error.code === 'name_taken') {
+                nameError.value = result.error.message;
+            } else {
+                dialogError.value = result.error;
+            }
+            return;
         }
+        saved = result.data;
+    }
+    if (singleUseChanged && saved !== null) {
+        const result = await setDeviceTypeSingleUse(saved.id, singleUse.value);
+        if (!result.ok) {
+            busy.value = false;
+            dialogError.value = result.error;
+            return;
+        }
+        saved = result.data;
+    }
+    busy.value = false;
+    if (saved === null) {
         return;
     }
-    success.value =
-        current === null
-            ? `„${result.data.name}“ wurde angelegt.`
-            : `„${current.name}“ heißt jetzt „${result.data.name}“.`;
+    const flag = singleUseChanged
+        ? ` „${saved.name}“ ist ${singleUse.value ? 'jetzt ein Einmalgerät' : 'kein Einmalgerät mehr'}.`
+        : '';
+    success.value = !nameChanged
+        ? flag.trim()
+        : `${
+              current === null
+                  ? `„${saved.name}“ wurde angelegt.`
+                  : `„${current.name}“ heißt jetzt „${saved.name}“.`
+          }${flag}`;
     dialogOpen.value = false;
 }
 
@@ -327,6 +366,9 @@ onMounted(() => {
                                 :title="`Ausrüstung vom Typ ${type.name}`"
                                 >{{ type.name }}</RouterLink
                             ><span v-else class="type-name">{{ type.name }}</span>
+                            <span v-if="type.singleUse === true" class="badge badge-used">
+                                Einmalgerät
+                            </span>
                             <span v-if="!type.active" class="badge badge-retired">
                                 deaktiviert
                             </span>
@@ -387,6 +429,15 @@ onMounted(() => {
                 {{ shownNameError }}
             </p>
         </label>
+        <label class="check">
+            <input v-model="singleUse" type="checkbox" data-testid="single-use" />
+            Einmalgerät
+        </label>
+        <p class="extra-text">
+            Einmalgeräte werden nach dem Einsatz ersetzt statt gewartet. Rollen mit der
+            Einschränkung „Bei Einmalgeräten nur „Benutzt melden““ dürfen sie nur als benutzt
+            melden.
+        </p>
         <template v-if="editing !== null" #extra>
             <template v-if="editing.active">
                 <p class="extra-text">

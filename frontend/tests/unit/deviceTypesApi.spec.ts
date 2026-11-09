@@ -6,6 +6,7 @@ import {
     parseDeviceTypeResponse,
     renameDeviceType,
     setDeviceTypeActive,
+    setDeviceTypeSingleUse,
 } from '../../src/api/deviceTypes';
 import { respond } from './support/fetch';
 
@@ -81,6 +82,22 @@ describe('Anfragen', () => {
         const on = respond(200, { device_type: typeJson() });
         await setDeviceTypeActive(3, true, on.fetch);
         expect(on.requests[0]?.url).toMatch(/\/api\/v1\/device-types\/3\/activate$/);
+    });
+
+    it('Einmalgerät: lesen und setzen', async () => {
+        expect(
+            parseDeviceTypeResponse({ device_type: typeJson({ single_use: true }) }),
+        ).toMatchObject({
+            singleUse: true,
+        });
+        expect(
+            parseDeviceTypeResponse({ device_type: typeJson({ single_use: false }) }),
+        ).not.toHaveProperty('singleUse');
+        const on = respond(200, { device_type: typeJson({ single_use: true }) });
+        const result = await setDeviceTypeSingleUse(3, true, on.fetch);
+        expect(on.requests[0]?.url).toMatch(/\/api\/v1\/device-types\/3\/single-use$/);
+        expect(on.requests[0]?.body).toEqual({ single_use: true });
+        expect(result.ok && result.data.singleUse).toBe(true);
     });
 
     it('meldet name_taken', async () => {

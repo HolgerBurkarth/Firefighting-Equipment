@@ -37,6 +37,8 @@ final readonly class Device
         public ?\DateTimeImmutable $stateChangedAt = null,
         /** Version nach der letzten Änderung von Standort oder Status; null = version */
         public ?int $stateVersion = null,
+        /** Der Gerätetyp ist ein Einmalgerät (Phase 2, P2.3) */
+        public bool $deviceTypeSingleUse = false,
     ) {
     }
 

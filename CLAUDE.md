@@ -290,7 +290,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   schon für eine andere Buchung verwendet), `stale_action` 409 (Offline-Buchung zu alt, ohne
   `confirmed_stale`), `client_outdated` 409 (App-Version unter `ClientApi::MIN`, `details
   {min_client_api}`), `claude_access_missing` 403 („Claude verbinden“: Anmeldung richtig, aber kein
-  Claude-Zugang), `unsupported_media_type` 415, `weak_password` 422, `clock_implausible` 422
+  Claude-Zugang), `restricted_action` 403 (Einschränkung der Rolle „Bei Einmalgeräten nur „Benutzt
+  melden““, Phase 2, P2.3), `unsupported_media_type` 415, `weak_password` 422, `clock_implausible` 422
   (Aktionszeit einer Offline-Buchung zu weit in der Zukunft), `too_many_attempts` 429 (mit
   `Retry-After`), `database_unavailable` 503, `frontend_unavailable` 503 (Build des Frontends fehlt, siehe
   "Frontend ausliefern"), `internal_error` 500. Neue Codes nur dort. Ein Frontend meldet bei 401 ab; daher ist ein falsches aktuelles
@@ -373,9 +374,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     `client_outdated` gilt bei `auth/me` als Störung (`isTransientError`: nie abmelden), der
     Verbindungshinweis und der graue Streifen entfallen dabei. Eine Buchung der Warteschlange mit
     `client_outdated` bleibt `waiting` (der Lauf endet), nach dem Update sendet sie die neue
-    Version. Gespeichert wird die Warteschlange mit Formatversion (`QUEUE_FORMAT` = 1,
-    `{format, bookings}`, `readStoredQueue`: Liste ohne Hülle = Format 1; ein neueres Format zeigt
-    und überschreibt eine alte App nie). Steigt `n` mit anderen Einträgen, steigt `QUEUE_FORMAT`,
+    Version. Gespeichert wird die Warteschlange mit Formatversion (`QUEUE_FORMAT` = 2 seit P2.3,
+    `{format, bookings}`, `readStoredQueue`: Liste ohne Hülle = Format 1, Format 1 und 2 werden gelesen;
+    ein neueres Format zeigt und überschreibt eine alte App nie). Steigt `n` mit anderen Einträgen, steigt `QUEUE_FORMAT`,
     und `readStoredQueue` wandelt ältere Formate um. Tests: `client.spec.ts`, `appUpdate.spec.ts`
     (Unit und Browser, Mail-Link mit `client_outdated` bzw. `X-Api-Version: 2`),
     `bookingQueue.spec.ts`, `session.spec.ts`.
@@ -630,6 +631,16 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Umbuchen-Ansicht simulieren `GET api/v1/devices/{id}` (`deviceDetail`) und `GET api/v1/locations`
   (`LOCATIONS`, mit Gerätezahlen), beide in `tests/e2e/support/devices.ts`; Tests in
   `tests/e2e/booking.spec.ts`.
+- Benutzt melden (Phase 2, P2.3; `DevicePage`): Mit der Aktion `device.used` zusätzlich der Knopf „Benutzt
+  melden“ (`report-used`) unter „Speichern“ (gesperrt, wenn schon benutzt): `deviceStore.book` mit
+  `used: true` → `POST devices/{id}/used` ohne Standort und Status (`StateChangeRequest.used`), Kommentar
+  optional, danach wie Speichern. Mit der Einschränkung `single_use_used_only` (`restricted`) und einem
+  Einmalgerät (`deviceType.singleUse`) entfallen Standort und Status und „Speichern“; es bleibt „Benutzt
+  melden“ mit Hinweis (`used-only-hint`). Offline in die Warteschlange (`QueuedBooking.used`, Text „M1 →
+  benutzt gemeldet“, `QUEUE_FORMAT` 2). Ausrüstungstypen: Kästchen „Einmalgerät“ im Fenster, Chip in der
+  Liste (`setDeviceTypeSingleUse`). Rollen: „3 · Einschränkungen“ im Editor (`catalog.restrictions`).
+  Tests `usedReport.spec.ts`, `deviceTypes.spec.ts`, `roles.spec.ts`, Unit `permissions.spec.ts`,
+  `bookingQueue.spec.ts`, `devicesApi.spec.ts`, `deviceTypesApi.spec.ts`, `roles.spec.ts`.
 - Prüffristen (`InspectionsPage`, `prueffristen`, KONZEPT.md Entscheidung 25): Abschnitte
   „Überfällig“ und „In den nächsten 30 Tagen fällig“ (`INSPECTION_WINDOW_DAYS` = 30, per Test gleich
   `InspectionWindow::DEFAULT_DAYS`) mit Anzahl. Im Modus `local` aus der Geräteliste
@@ -2212,8 +2223,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `null`; die App liest `roleName`, ohne Feld `null`). `AuthJson::permissions`:
   `permissions {areas: {bereich: read|write}, actions: [...], restrictions: [], filtered, version}`,
   unter `service` `null`. Nur wirksame Rechte in der Reihenfolge des Katalogs (Aktionen nur mit ihrem
-  Bereich, `Permissions::areas()`/`actions()`), `areas` immer ein Objekt, `restrictions` bis Phase 2
-  leer, `filtered` = Rolle mit Datenfilter (`Permissions::isFiltered`), `version` = SHA-256 über
+  Bereich, `Permissions::areas()`/`actions()`), `areas` immer ein Objekt, `restrictions` seit P2.3
+  die Einschränkungen der Rolle (`Restriction`: `single_use_used_only`), `filtered` = Rolle mit Datenfilter (`Permissions::isFiltered`), `version` = SHA-256 über
   Rolle und `fe_roles.version` (`Permissions::revision`, „<id>:<version>“), die Rechte und die IDs
   des Datenfilters (`DeviceVisibility::toArray`, ändert sich auch mit einem neuen Fach). Die App
   liest das Feld seit Schritt 1.7b (siehe „App nach Rechten“).
@@ -2263,9 +2274,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   offener App“, `page.clock`); die Browser-Tests prüfen `X-Client-Api` gegen
   `resources/client-api.json`.
 - Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank): `Area` (`dashboard`,
-  `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`; `maxLevel`:
+  `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`, `maintenance` (seit P2.4); `maxLevel`:
   `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`
-  (`book.move`, `book.status`, `device.create`, `device.edit`, `device.retire`, `device.code`,
+  (`book.move`, `book.status`, `device.used` (seit P2.3, braucht `search` Ansehen, Gruppe „Buchen“), `device.create`, `device.edit`, `device.retire`, `device.code`,
   `devices.bulk`, `csv.import`, `csv.export` (seit Schritt 1.7a, braucht `devices` Ansehen, auch mit
   Datenfilter; F2), `mail.log`; `requires()`: Bereich, ohne den die Aktion nicht wirkt; `group()`:
   Gruppe im Editor, `csv.export` unter „Mehrere Ausrüstungen“).
@@ -2681,8 +2692,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Scan-Code bleibt am ausgesonderten Gerät gespeichert. In der CHECK-Bedingung stehen die Zeichen als
   `'\\x{1D}'` (in SQL-Strings doppelter Backslash, sonst wird aus `\x` ein `x`).
 - Status (`status`, `ascii_bin`): `ready` (einsatzbereit), `maintenance` (in Wartung), `defective`
-  (defekt), `used` (benutzt, seit Phase 2 P2.1, Migrationen 0049–0051; zählt als nicht einsatzbereit,
-  in der App noch nicht wählbar bis „Benutzt melden“, P2.3), `retired` (ausgesondert). Ausgesonderte Geräte sind aus normalen Listen und Prüffristen
+  (defekt), `used` (benutzt, seit Phase 2 P2.1, Migrationen 0049–0051; zählt als nicht einsatzbereit;
+  gesetzt über „Benutzt melden“, P2.3, siehe unten), `retired` (ausgesondert). Ausgesonderte Geräte sind aus normalen Listen und Prüffristen
   ausgeblendet, nicht umbuchbar; der Admin kann sie wieder aufnehmen. Geräte werden nie gelöscht
   (jedes hat ein Ereignis, der Fremdschlüssel verhindert das Löschen; einzige Ausnahme: "Gerätedaten
   zurücksetzen").
@@ -2715,6 +2726,39 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   eines je Stadt (UNIQUE über `default_store_key`), das erste Lager wird es automatisch;
   `collection_accepts` (`used`/`defective`/`both`) genau bei der Sammelstelle. Eine Aufgabe ändert noch
   keine Buchung; Abläufe, die sie nutzen, folgen in P2.3 ff.
+- Einmalgeräte und „Benutzt melden“ (seit Phase 2, P2.3, Runde 8b; Migration 0054, die geplante 0055
+  entfällt: „Benutzt melden“ bleibt ein `state_changed` mit Status `used`, Holger 09.11.2026):
+  `fe_device_types.single_use` (Standard 0; `POST device-types/{id}/single-use {single_use}`, `device_types`
+  Ändern; `single_use` in `DeviceTypeJson` und als `device_type.single_use` jeder Geräte-Antwort).
+  `POST devices/{id}/used {version, comment?, client_ref?, occurred_at?, confirmed_stale?}` (Aktion
+  `device.used`, `DeviceStateHandler` mit `used: true`, sonst wie `/state` samt Wiederholung und Offline-
+  Regeln; weitere Felder 400): Status `used`; Ziel ist die Sammelstelle (`LocationRepository::
+  collectionPointForUsed`: aktiv, Aufgabe `collection`, nimmt `used` oder `both` an, kleinste ID), ohne
+  eine bleibt der Standort. G4 (entschieden): Dieses Ziel gilt auch außerhalb des Datenfilters
+  (`DeviceStateChange::$process`: `lockLocation` ohne Filter, die Antwort liest das Gerät ohne Filter,
+  danach sieht die Rolle es nicht mehr); freies Umbuchen bleibt im Filter (`DeviceVisibility::all()` an
+  genau dieser Stelle, `testAllIsUsedOnlyAtKnownPlaces`). Einschränkung `single_use_used_only`
+  (`Restriction`, `fe_roles.restrict_single_use`, `RoleDraft::$restrictSingleUse`, `restrictions` in
+  `RoleJson`/Katalog/`RoleFields`/`auth/me`): `POST devices/{id}/state` und `devices/bulk/state` lehnen
+  Einmalgeräte ab (`SingleUseGuard`, 403 `restricted_action`; in der Sammelaktion je Eintrag als Fehler),
+  die Rolle Admin hat nie eine. Tests `DeviceUsedTest`, `RoleApiTest`.
+- Wartung (Phase 2, P2.4, Runde 8b; Bereich `maintenance`, Seite „Wartung“): `Area::Maintenance` gibt es nur in
+  einer Stadt mit freigeschalteter Aufgabe Sammelstelle oder Werkstatt (`Area::requiredTasks`,
+  `Permissions::withEnabledTasks`, geladen in `PermissionRepository`; ohne Aufgaben sieht auch *Admin* den
+  Bereich nicht, „alles wie heute“; schaltet der Super-Admin Aufgaben um, ändert sich `permissions.version`).
+  F3: mit Datenfilter kein Zugriff (`excludedWithFilter` Ansehen). Routen (G10, eigene statt Sammelrouten):
+  `GET maintenance` (`MaintenanceListHandler`: je Stufe `collection`/`workshop` `{label, locations, total, shown,
+  devices}`, die nicht ausgesonderten Geräte an den aktiven Standorten der Aufgabe samt Fächern, am längsten
+  wartende zuerst nach `state_changed_at` (G5: keine Spalte 0056), höchstens 200 je Stufe; dazu
+  `default_store`), `POST maintenance/to-workshop` und `POST maintenance/back {devices: [{id, version}],
+  comment?}` (Bereich Ändern, `MaintenanceMoveHandler`, höchstens 50, Antwort und Teilerfolg wie die
+  Sammelaktionen der Liste plus `target`): Ziel erste aktive Werkstatt (Status in Wartung; Einmalgeräte als
+  Fehler `rule_violation`) bzw. Standard-Lager (einsatzbereit), auch außerhalb des Datenfilters
+  (`DeviceStateChange::$process`); fehlt das Ziel, 409 vor jeder Änderung. Sammelmail „Log“ wie sonst.
+  Tests `MaintenanceTest`. Frontend: `MaintenancePage` (`wartung`, Menü „Wartung“ nach „Ausrüstungstypen“,
+  `PAGE_RIGHTS.maintenance`), `src/api/maintenance.ts`, `src/data/maintenance.ts` („seit“, Transportliste
+  nur zum Kopieren; CSV/Druck und „Wartungsdatum setzen“ siehe `docs/TODO-SPAETER.md` T20), `maintenanceToWorkshop`/
+  `maintenanceBack` in `src/data/index.ts`. Tests `maintenance.spec.ts` (Browser, Unit).
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann

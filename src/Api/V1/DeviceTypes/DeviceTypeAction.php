@@ -17,4 +17,6 @@ enum DeviceTypeAction
     case Deactivate;
     /** POST api/v1/device-types/{id}/activate {} */
     case Activate;
+    /** POST api/v1/device-types/{id}/single-use {single_use} (Phase 2, P2.3) */
+    case SetSingleUse;
 }

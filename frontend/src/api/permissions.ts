@@ -17,7 +17,8 @@ export type PermissionArea =
     | 'due'
     | 'log'
     | 'users'
-    | 'settings';
+    | 'settings'
+    | 'maintenance';
 
 export type PermissionLevel = 'read' | 'write';
 
@@ -25,6 +26,7 @@ export type PermissionLevel = 'read' | 'write';
 export type PermissionAction =
     | 'book.move'
     | 'book.status'
+    | 'device.used'
     | 'device.create'
     | 'device.edit'
     | 'device.retire'
@@ -45,11 +47,18 @@ export const AREA_MAX_LEVELS: Readonly<Record<PermissionArea, PermissionLevel>> 
     log: 'write',
     users: 'write',
     settings: 'write',
+    maintenance: 'write',
 };
+
+/** Einschränkungen wie Restriction in PHP (per Test gleich dem Katalog). */
+export type PermissionRestriction = 'single_use_used_only';
+
+export const PERMISSION_RESTRICTIONS: readonly PermissionRestriction[] = ['single_use_used_only'];
 
 export const PERMISSION_ACTIONS: readonly PermissionAction[] = [
     'book.move',
     'book.status',
+    'device.used',
     'device.create',
     'device.edit',
     'device.retire',
@@ -66,6 +75,8 @@ export interface Permissions {
     /** Bereich → Stufe; fehlt = kein Zugriff. „Ändern“ schließt „Ansehen“ ein. */
     readonly areas: Readonly<Partial<Record<PermissionArea, PermissionLevel>>>;
     readonly actions: readonly PermissionAction[];
+    /** Einschränkungen der Rolle (Phase 2); fehlt im Feld = keine. */
+    readonly restrictions: readonly PermissionRestriction[];
     /** Rolle mit Datenfilter „Sieht nur …“. */
     readonly filtered: boolean;
     /** Kennung des Stands (`permissions.version`); null = nicht vom Server, aus der Kontoart. */
@@ -107,13 +118,18 @@ export function parsePermissions(json: unknown): Permissions | null | undefined 
     const actions = PERMISSION_ACTIONS.filter((action) =>
         (json['actions'] as unknown[]).some((value) => isAction(value) && value === action),
     );
-    return { areas, actions, filtered: json['filtered'], version: json['version'] };
+    const restrictions = PERMISSION_RESTRICTIONS.filter(
+        (restriction) =>
+            Array.isArray(json['restrictions']) && json['restrictions'].includes(restriction),
+    );
+    return { areas, actions, restrictions, filtered: json['filtered'], version: json['version'] };
 }
 
 /** Rechte der Standard-Rolle *Admin*: alles (Permissions::all in PHP). */
 export const ADMIN_PERMISSIONS: Permissions = {
     areas: { ...AREA_MAX_LEVELS },
     actions: PERMISSION_ACTIONS,
+    restrictions: [],
     filtered: false,
     version: null,
 };
@@ -122,6 +138,7 @@ export const ADMIN_PERMISSIONS: Permissions = {
 export const USER_PERMISSIONS: Permissions = {
     areas: { search: 'read', due: 'read' },
     actions: ['book.move', 'book.status'],
+    restrictions: [],
     filtered: false,
     version: null,
 };
@@ -151,4 +168,12 @@ export function allows(
 
 export function can(permissions: Permissions | null, action: PermissionAction): boolean {
     return permissions?.actions.includes(action) === true;
+}
+
+/** Gilt die Einschränkung für die Rolle (Phase 2)? */
+export function restricted(
+    permissions: Permissions | null,
+    restriction: PermissionRestriction,
+): boolean {
+    return permissions?.restrictions.includes(restriction) === true;
 }

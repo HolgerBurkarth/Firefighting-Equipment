@@ -45,6 +45,7 @@ export interface MockRole {
     actions: string[];
     locations: number[] | null;
     device_types: number[] | null;
+    restrictions: string[];
     version: number;
     accounts: number;
     invitation_codes: number;
@@ -65,6 +66,7 @@ export function roleJson(role: MockRole): Record<string, unknown> {
         actions: admin ? ALL_ACTIONS : role.actions,
         locations: role.locations,
         device_types: role.device_types,
+        restrictions: admin ? [] : role.restrictions,
         version: role.version,
         created_at: '2026-11-05T08:00:00Z',
         updated_at: '2026-11-05T08:00:00Z',
@@ -82,6 +84,7 @@ function mockRole(id: number, name: string, overrides: Partial<MockRole> = {}): 
         actions: [],
         locations: null,
         device_types: null,
+        restrictions: [],
         version: 1,
         accounts: 0,
         invitation_codes: 0,
@@ -197,6 +200,7 @@ export function roleServer(): RoleServer {
         actions: body['actions'] as string[],
         locations: body['locations'] as number[] | null,
         device_types: body['device_types'] as number[] | null,
+        restrictions: (body['restrictions'] as string[] | undefined) ?? [],
     });
     const create = (fields: Partial<MockRole> & { name: string }): MockResponse => {
         if (taken(fields.name)) {

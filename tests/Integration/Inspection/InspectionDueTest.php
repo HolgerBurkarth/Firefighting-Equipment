@@ -49,7 +49,7 @@ final class InspectionDueTest extends InspectionApiTestCase
             array_keys($device),
         );
         self::assertSame(['id' => $this->g1, 'name' => 'G1', 'path' => 'HLF 20 / G1'], $device['location']);
-        self::assertSame(['id' => $this->typeId, 'name' => 'Atemschutzmaske'], $device['device_type']);
+        self::assertSame(['id' => $this->typeId, 'name' => 'Atemschutzmaske', 'single_use' => false], $device['device_type']);
         self::assertSame('2026-06-14', $device['next_inspection_due']);
         self::assertArrayNotHasKey('days_overdue', $json['due_soon']['devices'][0]);
         self::assertArrayHasKey('days_until_due', $json['due_soon']['devices'][0]);

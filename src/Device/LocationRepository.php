@@ -344,6 +344,44 @@ final readonly class LocationRepository
     }
 
     /**
+     * Die Sammelstelle, in die „Benutzt melden“ bucht (Phase 2, P2.3, E8): der aktive Standort mit der
+     * Aufgabe Sammelstelle, der benutzte Ausrüstung annimmt (`used` oder `both`), der mit der
+     * kleinsten ID. Unabhängig vom Datenfilter (der Ablauf gibt das Ziel vor, G4). null = keine.
+     */
+    public function collectionPointForUsed(Tenant $tenant): ?int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM fe_locations WHERE tenant_id = ? AND task = 'collection' AND active = 1"
+            . " AND collection_accepts IN ('used', 'both') ORDER BY id LIMIT 1",
+        );
+        $stmt->execute([$tenant->id]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
+    }
+
+    /**
+     * Aktive Standorte der Ebene 1 mit dieser Aufgabe (Name, ID), nach ID; für die Seite „Wartung“ und
+     * die Ziele ihrer Sammelaktionen. Unabhängig vom Datenfilter (Phase 2, G4). Mit $defaultStoreOnly
+     * nur das Standard-Lager.
+     *
+     * @return list<array{id: int, name: string}>
+     */
+    public function withTask(Tenant $tenant, LocationTask $task, bool $defaultStoreOnly = false): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, name FROM fe_locations WHERE tenant_id = ? AND task = ? AND active = 1'
+            . ($defaultStoreOnly ? ' AND is_default_store = 1' : '') . ' ORDER BY id',
+        );
+        $stmt->execute([$tenant->id, $task->value]);
+
+        return array_map(
+            static fn (array $row): array => ['id' => (int) $row['id'], 'name' => (string) $row['name']],
+            $stmt->fetchAll(),
+        );
+    }
+
+    /**
      * @param string    $where SQL aus diesem Code, nie aus Eingaben
      * @param list<int> $params
      *

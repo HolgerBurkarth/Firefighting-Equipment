@@ -37,6 +37,8 @@ final readonly class RoleDraft
         public array $actions,
         public ?array $locationIds,
         public ?array $deviceTypeIds,
+        /** Einschränkung „Bei Einmalgeräten nur benutzt melden“ (Restriction::SingleUseUsedOnly) */
+        public bool $restrictSingleUse = false,
     ) {
     }
 
@@ -55,6 +57,7 @@ final readonly class RoleDraft
         array $actions,
         ?array $locationIds,
         ?array $deviceTypeIds,
+        bool $restrictSingleUse = false,
     ): self {
         $ordered = [];
         foreach (Area::cases() as $area) {
@@ -88,6 +91,7 @@ final readonly class RoleDraft
             array_values(array_filter(Action::cases(), static fn (Action $a): bool => in_array($a, $actions, true))),
             self::ids($locationIds),
             self::ids($deviceTypeIds),
+            $restrictSingleUse,
         );
     }
 
@@ -121,6 +125,7 @@ final readonly class RoleDraft
             $actions,
             $withFilters && $role->filterLocations ? $role->locationIds : null,
             $withFilters && $role->filterDeviceTypes ? $role->deviceTypeIds : null,
+            !$permissions->isAll() && $role->restrictSingleUse,
         );
     }
 
@@ -175,7 +180,8 @@ final readonly class RoleDraft
             && $areas === $storedAreas
             && $actions === $storedActions
             && $this->locationIds === ($role->filterLocations ? $role->locationIds : null)
-            && $this->deviceTypeIds === ($role->filterDeviceTypes ? $role->deviceTypeIds : null);
+            && $this->deviceTypeIds === ($role->filterDeviceTypes ? $role->deviceTypeIds : null)
+            && $this->restrictSingleUse === $role->restrictSingleUse;
     }
 
     /**

@@ -158,14 +158,15 @@ final readonly class RoleRepository
             $this->checkDraft($tenant, $draft);
             try {
                 $this->pdo->prepare(
-                    'INSERT INTO fe_roles (tenant_id, name, description, filter_locations, filter_device_types,'
-                    . ' created_at, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), ?)',
+                    'INSERT INTO fe_roles (tenant_id, name, description, filter_locations, filter_device_types, restrict_single_use,'
+                    . ' created_at, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), ?)',
                 )->execute([
                     $tenant->id,
                     $draft->name,
                     $draft->description,
                     (int) ($draft->locationIds !== null),
                     (int) ($draft->deviceTypeIds !== null),
+                    (int) $draft->restrictSingleUse,
                     $updatedBy,
                 ]);
             } catch (\PDOException $e) {
@@ -209,13 +210,14 @@ final readonly class RoleRepository
 
             try {
                 $this->pdo->prepare(
-                    'UPDATE fe_roles SET name = ?, description = ?, filter_locations = ?, filter_device_types = ?,'
+                    'UPDATE fe_roles SET name = ?, description = ?, filter_locations = ?, filter_device_types = ?, restrict_single_use = ?,'
                     . ' version = version + 1, updated_at = UTC_TIMESTAMP(), updated_by = ? WHERE id = ? AND tenant_id = ?',
                 )->execute([
                     $draft->name,
                     $draft->description,
                     (int) ($draft->locationIds !== null),
                     (int) ($draft->deviceTypeIds !== null),
+                    (int) $draft->restrictSingleUse,
                     $updatedBy,
                     $id,
                     $tenant->id,

@@ -124,6 +124,26 @@ describe('BookingQueue', () => {
         expect(q.state.bookings).toEqual([]);
     });
 
+    it('„Benutzt melden“ geht als used ohne Standort und Status an den Server', async () => {
+        const { q, requests } = queue([{ ok: true, status: 200, data: response() }]);
+        await q.use('test:7');
+        await q.add(booking({ used: true, statusLabel: 'benutzt' }));
+        await q.send();
+        expect(requests[0]?.request.used).toBe(true);
+        expect(q.state.bookings[0]?.state).toBe('done');
+    });
+
+    it('restricted_action: abgelehnt mit verständlicher Meldung', async () => {
+        const { q } = queue([{ ok: false, error: error('restricted_action', 403, 'x') }]);
+        await q.use('test:7');
+        await q.add(booking());
+        await q.send();
+        expect(q.state.bookings[0]).toMatchObject({
+            state: 'failed',
+            problem: 'Für Einmalgeräte ist nur „Benutzt melden“ erlaubt.',
+        });
+    });
+
     it('dieselbe client_ref kommt nur einmal in die Warteschlange', async () => {
         const { q, db } = queue([]);
         await q.use('test:7');
@@ -329,6 +349,22 @@ describe('Regeln', () => {
             occurredAt: entry.occurredAt,
             state: 'waiting',
         };
+        const used: QueuedBooking = {
+            clientRef: entry.clientRef,
+            deviceId: 4,
+            identifier: 'M4',
+            deviceTypeName: 'Atemschutzmaske',
+            version: 3,
+            used: true,
+            occurredAt: entry.occurredAt,
+            state: 'waiting',
+        };
+        expect(queuedText(used)).toBe('M4 → benutzt gemeldet');
+        expect(pendingDevice(device(), used)).toMatchObject({
+            status: 'used',
+            statusLabel: 'benutzt',
+            location: { path: 'Lager' },
+        });
         expect(queuedText(statusOnly)).toBe('M4 → defekt');
         expect(pendingDevice(device(), statusOnly).location.path).toBe('Lager');
         expect(unsentWarning(0)).toBeNull();
@@ -347,6 +383,7 @@ describe('readStoredQueue', () => {
     it.each([
         ['Liste ohne Format', [entry], [entry], true],
         ['aktuelles Format', { format: QUEUE_FORMAT, bookings: [entry] }, [entry], true],
+        ['Format 1 (vor „Benutzt melden“)', { format: 1, bookings: [entry] }, [entry], true],
         ['neueres Format', { format: QUEUE_FORMAT + 1, bookings: [entry] }, [], false],
         ['unbekannte Form', { format: 'x' }, [], true],
         ['aktuelles Format ohne Liste', { format: QUEUE_FORMAT }, [], true],

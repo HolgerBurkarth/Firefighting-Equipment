@@ -46,7 +46,7 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
  * „Rolle bearbeiten“ des Super-Admins (Plan Phase 1, Schritt 1.5; Mockup „Rolle-bearbeiten“):
  * `staedte/<id>/rollen/<rolle>` bzw. `staedte/<id>/rollen/neu`. Name und Kurzbeschreibung, „1 ·
  * Ansichten und Bereiche“ (Knöpfe je Stufe), „2 · Aktionen“ (grau ohne den nötigen Bereich), „4 ·
- * Sieht nur …“ (Standorte und Ausrüstungstypen; „3 · Einschränkungen“ erst ab Phase 2), rechts „So
+ * Sieht nur …“ (Standorte und Ausrüstungstypen; „3 · Einschränkungen“ seit Phase 2), rechts „So
  * sieht es die Rolle“. F3: Mit „Sieht nur …“ sind Verwaltungsrechte grau. Die Rolle Admin nur zum
  * Ansehen. Nach dem Speichern bzw. Löschen zurück zu den Rollen der Stadt.
  */
@@ -177,6 +177,13 @@ function toggleAction(key: string): void {
         ? form.value.actions.filter((action) => action !== key)
         : [...form.value.actions, key];
     update({ actions });
+}
+
+function toggleRestriction(key: string): void {
+    const restrictions = form.value.restrictions.includes(key)
+        ? form.value.restrictions.filter((restriction) => restriction !== key)
+        : [...form.value.restrictions, key];
+    update({ restrictions });
 }
 
 function toggleId(list: readonly number[], value: number): number[] {
@@ -467,6 +474,35 @@ onMounted(() => {
                                 </span>
                             </label>
                         </fieldset>
+                    </section>
+
+                    <section
+                        v-if="catalog.restrictions.length > 0"
+                        class="card"
+                        :aria-labelledby="`${id}-restrictions`"
+                        data-testid="role-restrictions"
+                    >
+                        <h2 :id="`${id}-restrictions`">3 · Einschränkungen</h2>
+                        <p class="hint">
+                            Eine Einschränkung nimmt der Rolle etwas, das ihre Rechte sonst erlauben
+                            würden.
+                        </p>
+                        <label
+                            v-for="restriction in catalog.restrictions"
+                            :key="restriction.key"
+                            class="check action"
+                        >
+                            <input
+                                type="checkbox"
+                                :checked="form.restrictions.includes(restriction.key)"
+                                :disabled="readOnly"
+                                @change="toggleRestriction(restriction.key)"
+                            />
+                            <span>
+                                {{ restriction.label }}
+                                <span class="note">{{ restriction.hint }}</span>
+                            </span>
+                        </label>
                     </section>
 
                     <section class="card" :aria-labelledby="`${id}-filter`">

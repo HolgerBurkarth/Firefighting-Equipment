@@ -101,6 +101,14 @@ test('neue Rolle: Bereiche, Aktionen, „Sieht nur …“, zurück mit Bestätig
     await expect(preview).toContainText('Suchen · Profil');
     await expect(preview).toContainText('Umbuchen');
 
+    // 3 · Einschränkungen (Phase 2, P2.3)
+    const restrictions = page.getByTestId('role-restrictions');
+    const singleUse = restrictions.getByRole('checkbox', {
+        name: /Bei Einmalgeräten nur „Benutzt melden“/,
+    });
+    await expect(singleUse).not.toBeChecked();
+    await singleUse.check();
+
     const locations = page.getByTestId('filter-locations');
     await locations.getByLabel('Nur ausgewählte').check();
     await expect(page.getByTestId('locations-problem')).toHaveText(
@@ -126,6 +134,7 @@ test('neue Rolle: Bereiche, Aktionen, „Sieht nur …“, zurück mit Bestätig
                 actions: ['book.move'],
                 locations: [11],
                 device_types: null,
+                restrictions: ['single_use_used_only'],
             },
         ],
     ]);
@@ -171,6 +180,7 @@ test('F3: mit „Sieht nur …“ keine Verwaltung', async ({ page, apiRequests 
                 actions: ['book.move', 'device.edit'],
                 locations: null,
                 device_types: [20],
+                restrictions: [],
             },
         ],
     ]);

@@ -33,9 +33,17 @@ export interface CatalogActionGroup {
     readonly actions: readonly CatalogAction[];
 }
 
+/** Einschränkung des Katalogs (Phase 2, „3 · Einschränkungen“). */
+export interface CatalogRestriction {
+    readonly key: string;
+    readonly label: string;
+    readonly hint: string;
+}
+
 /** GET permission-catalog: Bereiche, Stufen und Aktionen mit deutschen Bezeichnungen. */
 export interface PermissionCatalog {
     readonly areas: readonly CatalogArea[];
+    readonly restrictions: readonly CatalogRestriction[];
     readonly levelLabels: Readonly<Record<AreaLevel, string>>;
     readonly actionGroups: readonly CatalogActionGroup[];
 }
@@ -56,6 +64,8 @@ export interface Role {
     /** Datenfilter „Sieht nur …“: null = alle. */
     readonly locations: readonly number[] | null;
     readonly deviceTypes: readonly number[] | null;
+    /** Einschränkungen (Phase 2), z. B. `single_use_used_only`. */
+    readonly restrictions: readonly string[];
     readonly version: number;
     readonly updatedAt: string;
     /** Konten (ohne gelöschte) und offene Einladungscodes. */
@@ -71,6 +81,7 @@ export interface RoleRequest {
     readonly actions: readonly string[];
     readonly locations: readonly number[] | null;
     readonly deviceTypes: readonly number[] | null;
+    readonly restrictions: readonly string[];
 }
 
 /** Standort für die Auswahl „Sieht nur …“ (role-filter-options). */
@@ -187,8 +198,24 @@ export function parseCatalog(json: unknown): PermissionCatalog | null {
         }
         actionGroups.push({ label: group['label'], actions });
     }
+    const restrictions: CatalogRestriction[] = [];
+    // Fehlt das Feld (Server vor Phase 2), gibt es keine Einschränkungen.
+    for (const entry of Array.isArray(json['restrictions'])
+        ? (json['restrictions'] as unknown[])
+        : []) {
+        if (
+            !isRecord(entry) ||
+            typeof entry['key'] !== 'string' ||
+            typeof entry['label'] !== 'string' ||
+            typeof entry['hint'] !== 'string'
+        ) {
+            return null;
+        }
+        restrictions.push({ key: entry['key'], label: entry['label'], hint: entry['hint'] });
+    }
     return {
         areas,
+        restrictions,
         levelLabels: { read: levelLabels.read, write: levelLabels.write },
         actionGroups,
     };
@@ -205,6 +232,8 @@ export function parseRole(json: unknown): Role | null {
     const actions = stringList(json['actions']);
     const locations = idList(json['locations']);
     const deviceTypes = idList(json['device_types']);
+    // Fehlt das Feld (Server vor Phase 2): keine Einschränkungen.
+    const restrictions = json['restrictions'] === undefined ? [] : stringList(json['restrictions']);
     const accounts = json['usage']['accounts'];
     const invitationCodes = json['usage']['invitation_codes'];
     const areas: Record<string, AreaLevel> = {};
@@ -225,6 +254,7 @@ export function parseRole(json: unknown): Role | null {
         actions === null ||
         locations === undefined ||
         deviceTypes === undefined ||
+        restrictions === null ||
         !isId(version) ||
         !isUtcTime(updatedAt) ||
         !isCount(accounts) ||
@@ -244,6 +274,7 @@ export function parseRole(json: unknown): Role | null {
         actions,
         locations,
         deviceTypes,
+        restrictions,
         version,
         updatedAt,
         accounts,
@@ -340,6 +371,7 @@ function body(request: RoleRequest): Record<string, unknown> {
         actions: request.actions,
         locations: request.locations,
         device_types: request.deviceTypes,
+        restrictions: request.restrictions,
     };
 }
 
