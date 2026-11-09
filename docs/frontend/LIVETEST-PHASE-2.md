@@ -19,11 +19,12 @@ Test-Stadt, kein Super-Admin-Konto) am 08.11.2026 nach dem Deploy.
   freigeschaltet; Standorte tragen `task`, `is_default_store`, `collection_accepts`.
 - ☑ `POST locations/{id}/task` ohne Freischaltung: 409 „Die Aufgabe „Lager“ ist für diese Stadt nicht
   freigeschaltet.“
-- ☐ Reiter „Abläufe“ im Stadtdetail der Test-Stadt (Super-Admin, nur Holger): Lager und Sammelstelle
-  freischalten, „Sammelstelle“ umbenennen.
-- ☐ „Standorte“ als Admin: im Fenster „Bearbeiten“ eines Raums erscheint „Aufgabe“, Lager wählen →
-  Chip „Lager“ in der Zeile, Standard-Lager; Aufgabe wieder entfernen; danach die Aufgaben in der
-  Test-Stadt wieder abschalten.
+- ☑ Reiter „Abläufe“ im Stadtdetail der Test-Stadt (Super-Admin): Lager, Sammelstelle, Werkstatt freigeschaltet,
+  Sammelstelle in „Sammelstelle Wache“ umbenannt; Meldung „Die Abläufe sind gespeichert.“, Name bleibt nach dem
+  Neuladen (geprüft von Claude im Browser, 09.11.2026, Antwort auf Runde 8b).
+- ☑ „Standorte“ als Admin: Lager Gerätehaus = Lager (automatisch Standard-Lager), Kleiderkammer = Sammelstelle
+  (Auswahl „Nimmt an“), Atemschutzwerkstatt = Werkstatt; Chips in der Liste; danach die Aufgaben wieder entfernt
+  (geprüft von Claude im Browser, 09.11.2026).
 
 ## P2.3 Einmalgeräte und „Benutzt melden“ (Build `e737f630f9d8`, 09.11.2026)
 
@@ -32,14 +33,19 @@ Test-Stadt, kein Super-Admin-Konto) am 08.11.2026 nach dem Deploy.
   tragen `device_type.single_use`.
 - ☑ M91 per `POST devices/{id}/used`: Status benutzt, Standort blieb (keine Sammelstelle eingerichtet);
   danach auf „in Wartung“ zurückgesetzt.
-- ☐ Rolle „Geräteträger“ mit Einschränkung anlegen (Super-Admin, nur Holger): „3 · Einschränkungen“ im
-  Editor; am Handy ein Einmalgerät zeigt nur „Benutzt melden“.
-- ☐ „Benutzt melden“ offline am iPhone (Warteschlange „M1 → benutzt gemeldet“).
+- ☑ Rollen-Editor: Abschnitt „3 · Einschränkungen“ vorhanden; Rolle „Live-Test Geräteträger“ (ID 23, Test-Stadt)
+  angelegt mit Suchen Ansehen, Umbuchen, Status setzen, Benutzt melden und der Einschränkung (geprüft von Claude
+  im Browser, 09.11.2026). Diese Rolle bleibt für den Test am iPhone stehen, nicht löschen.
+- ☑ „Benutzt melden“ am Handy (Breite): M90 → Kleiderkammer · benutzt (geprüft von Claude im Browser, 09.11.2026).
+- ☐ Ein Einmalgerät am echten iPhone zeigt nur „Benutzt melden“ (Holger).
+- ☐ „Benutzt melden“ offline am iPhone (Warteschlange „M1 → benutzt gemeldet“, jetzt mit Rückfrage; Holger).
 
 ## P2.4 Wartung (Build `e737f630f9d8`)
 
 - ☑ `GET maintenance` ohne freigeschaltete Aufgaben: 403 (Bereich fehlt, Menü ohne „Wartung“ – wie vor Phase 2).
-- ☐ Als Super-Admin Sammelstelle und Werkstatt freischalten, Standorte zuweisen (Lager als Standard); dann
-  Seite „Wartung“: Stufen, „seit“, „Zur Werkstatt …“, „Zurück ins Lager …“, Transportliste kopieren
-  (Holger; danach die Aufgaben wieder abschalten).
+- ☑ Sammelstelle, Werkstatt und Lager freigeschaltet und zugewiesen; Seite „Wartung“: „Zur Werkstatt …“ →
+  Atemschutzwerkstatt, in Wartung; „Zurück ins Lager …“ → Lager Gerätehaus, einsatzbereit; Verlauf stimmt;
+  „Transportliste kopieren“ liefert eine saubere Liste; Menü „Wartung“ nur mit freigeschalteten Aufgaben;
+  danach zurückgesetzt, Wartung 403, M90 wieder HLF 20 / G1, einsatzbereit (geprüft von Claude im Browser,
+  09.11.2026).
 

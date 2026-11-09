@@ -283,6 +283,13 @@ CHECK-Bedingungen.
 | G16 | Wer darf Rückgabe-Schlüssel erneuern und Aushänge drucken? | `returns.process` (Gerätewart, Admin). |
 | G17 | Tausch über Claude (P2.12) erlauben? | Ja mit Zugang „Ändern“ und `device.swap`; Unterschreiten ohne Ersatz über Claude nie (`stock.override` fällt in `forClaude` weg). |
 
+**Stand Runde 9 (09.11.2026):** P2.5 (Verleih), P2.6 (Rückgabe ohne Anmeldung, Aushang, Rückgaben bearbeiten) und P2.7
+(Sollbestand: Regeln, „außer Betrieb“ berechnet, Anzeige auf „Standorte“) sind gebaut. Abweichungen: Migrationen
+0055–0060 statt 0057–0063 (die Nummern müssen lückenlos sein); keine Aktionen `loan.lend`/`returns.process` (der Bereich
+`loans` Ändern genügt); keine Tabelle `fe_location_outages`, keine Spalten `only_listed_types`/`position`; die Rückgabe ohne
+Anmeldung schreibt `user_id` NULL mit `actor_name` (G6) ohne Mail „Log“; Dashboard-Kachel für „außer Betrieb“ später (T21).
+Offen: P2.8 (Tausch, Prüfung aller Buchungen gegen den Sollbestand), P2.9, P2.10, P2.12, P2.13.
+
 **Entscheidungen Holger 09.11.2026 (Runde 8b):** G4 entschieden wie vorgeschlagen: Rollen mit Datenfilter
 erreichen die Sammelstelle nur über „Benutzt melden“ bzw. den Tausch, nicht als freies Ziel beim Umbuchen.
 Migration 0055 (`used_reported`) entfällt: „Benutzt melden“ bleibt ein `state_changed` mit Status „benutzt“.
