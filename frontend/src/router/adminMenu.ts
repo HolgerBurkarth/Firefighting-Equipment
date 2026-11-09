@@ -8,13 +8,14 @@ export type AdminMenuIconName =
     | 'account'
     | 'list'
     | 'wrench'
+    | 'loan'
     | 'settings'
     | 'logout'
     | 'city'
     | 'shield';
 
 /** Zähler an einem Eintrag (aus dem Dashboard-Stand, src/data/adminOverview.ts). */
-export type AdminMenuBadge = 'pendingUsers' | 'openNotices';
+export type AdminMenuBadge = 'pendingUsers' | 'openNotices' | 'overdueLoans';
 
 export interface AdminMenuEntry {
     /** Name der Route (src/router/index.ts). */
@@ -44,6 +45,7 @@ export const ADMIN_MENU: readonly AdminMenuEntry[] = [
     { route: 'locations', label: 'Standorte', icon: 'location' },
     { route: 'device-types', label: 'Ausrüstungstypen', icon: 'tag' },
     { route: 'maintenance', label: 'Wartung', icon: 'wrench' },
+    { route: 'loans', label: 'Verleih', icon: 'loan', badge: 'overdueLoans' },
     { route: 'users', label: 'Benutzer', icon: 'account', badge: 'pendingUsers' },
     {
         route: 'notices',

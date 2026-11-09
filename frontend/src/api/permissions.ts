@@ -18,7 +18,8 @@ export type PermissionArea =
     | 'log'
     | 'users'
     | 'settings'
-    | 'maintenance';
+    | 'maintenance'
+    | 'loans';
 
 export type PermissionLevel = 'read' | 'write';
 
@@ -48,6 +49,7 @@ export const AREA_MAX_LEVELS: Readonly<Record<PermissionArea, PermissionLevel>> 
     users: 'write',
     settings: 'write',
     maintenance: 'write',
+    loans: 'write',
 };
 
 /** Einschränkungen wie Restriction in PHP (per Test gleich dem Katalog). */

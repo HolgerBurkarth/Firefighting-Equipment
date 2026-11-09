@@ -221,7 +221,7 @@ test.describe('Aufgabe im Fenster „Bearbeiten“ (Admin)', () => {
         await expect(fieldset.getByLabel(/Standard-Lager/)).toBeVisible();
         await dialog(page).getByRole('button', { name: 'Speichern' }).click();
 
-        await expect(page.getByTestId('task-chip')).toHaveText('Lager');
+        await expect(page.getByTestId('task-chip')).toHaveText('Standard-Lager');
         expect(posted).toEqual([
             { task: 'store', is_default_store: false, collection_accepts: 'both' },
         ]);

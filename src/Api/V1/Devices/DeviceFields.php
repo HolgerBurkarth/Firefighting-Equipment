@@ -156,13 +156,15 @@ final class DeviceFields
      * Einträgen. Je Eintrag ein Kontext mit dem Objekt als Body, damit die Felder des Eintrags wie
      * die einer einzelnen Anfrage gelesen werden.
      *
+     * @param list<string> $extraFields weitere erlaubte Felder der Anfrage (z. B. beim Verleih)
+     *
      * @return list<RequestContext>
      *
      * @throws HttpException 400 invalid_request
      */
-    public static function bulkEntries(RequestContext $context, int $max): array
+    public static function bulkEntries(RequestContext $context, int $max, array $extraFields = []): array
     {
-        self::rejectUnknown($context, ['devices', 'comment']);
+        self::rejectUnknown($context, ['devices', 'comment', ...$extraFields]);
         $entries = $context->body['devices'] ?? null;
         if (!is_array($entries) || !array_is_list($entries) || $entries === [] || count($entries) > $max) {
             throw HttpException::invalidRequest(sprintf('Das Feld "devices" muss eine Liste mit 1 bis %d Ausrüstungen sein.', $max));

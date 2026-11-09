@@ -259,6 +259,7 @@ test.describe('Wartung mit Recht „Ändern“', () => {
         await expect(button).toContainText('(2)');
         await button.click();
         const confirm = page.getByTestId('confirm-dialog');
+        await expect(confirm).toContainText('2 Ausrüstungen zur Werkstatt bringen?');
         await expect(confirm).toContainText(
             'Sie stehen dann in „Werkstatt“ mit dem Status „in Wartung“.',
         );
@@ -309,7 +310,10 @@ test.describe('Wartung mit Recht „Ändern“', () => {
         await workshop.getByLabel('M4 auswählen').check();
         await workshop.getByTestId('back').click();
         await expect(page.getByTestId('confirm-dialog')).toContainText(
-            'Sie stehen dann in „Hauptlager“ mit dem Status „einsatzbereit“.',
+            '1 Ausrüstung zurück ins Lager bringen?',
+        );
+        await expect(page.getByTestId('confirm-dialog')).toContainText(
+            'Sie steht dann in „Hauptlager“ mit dem Status „einsatzbereit“.',
         );
         await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Bringen' }).click();
 

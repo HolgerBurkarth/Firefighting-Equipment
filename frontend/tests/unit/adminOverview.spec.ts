@@ -255,12 +255,14 @@ describe('AdminOverviewStore', () => {
             pendingUsers: true,
             notReady: true,
             activity: true,
+            loans: true,
         });
         expect(overviewScope(USER_PERMISSIONS)).toEqual({
             summary: true,
             pendingUsers: false,
             notReady: false,
             activity: false,
+            loans: false,
         });
         const dashboardOnly = parsePermissions(permissionsJson({ dashboard: 'read' })) ?? null;
         expect(overviewScope(dashboardOnly)).toEqual({
@@ -268,6 +270,7 @@ describe('AdminOverviewStore', () => {
             pendingUsers: false,
             notReady: false,
             activity: true,
+            loans: false,
         });
     });
 

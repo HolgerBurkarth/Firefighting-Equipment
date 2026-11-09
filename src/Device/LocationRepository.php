@@ -251,6 +251,17 @@ final readonly class LocationRepository
         return $this->transaction(function () use ($tenant, $id, $task, $defaultStore, $collectionAccepts): int {
             $row = $this->lockRow($tenant, $id, 'FOR UPDATE') ?? throw LocationNotFoundException::forId($id);
             $name = LocationName::fromString((string) $row['name']);
+            if ($task !== LocationTask::Borrower) {
+                // Verliehene Ausrüstung braucht den Leihnehmer (Phase 2, P2.5): erst zurückbuchen.
+                $open = $this->count(
+                    'SELECT COUNT(*) FROM fe_device_loans l JOIN fe_devices d ON d.id = l.device_id AND d.tenant_id = l.tenant_id'
+                    . " WHERE l.tenant_id = ? AND l.borrower_location_id = ? AND l.returned_at IS NULL AND d.status <> 'retired' AND d.location_id = l.borrower_location_id",
+                    [$tenant->id, $id],
+                );
+                if ($open > 0) {
+                    throw DeviceRuleViolationException::because(sprintf('Bei „%s“ %s noch verliehen. Bitte zuerst die Rückgabe buchen.', $name->value, $open === 1 ? 'ist 1 Ausrüstung' : sprintf('sind %d Ausrüstungen', $open)), ['loans' => $open]);
+                }
+            }
             if ($task !== null) {
                 if ($row['parent_id'] !== null) {
                     throw DeviceRuleViolationException::because(sprintf('Eine Aufgabe kann nur ein Standort der obersten Ebene haben; „%s“ ist ein Unterstandort.', $name->value));
@@ -358,6 +369,44 @@ final readonly class LocationRepository
         $id = $stmt->fetchColumn();
 
         return $id === false ? null : (int) $id;
+    }
+
+    /**
+     * Die Sammelstelle für benutzte bzw. defekte Ausrüstung (Rückgaben bearbeiten, P2.6): aktiv, Aufgabe
+     * Sammelstelle, nimmt diese Art oder beide an, kleinste ID. Unabhängig vom Datenfilter.
+     *
+     * @param 'used'|'defective' $kind
+     *
+     * @return array{id: int, name: string}|null
+     */
+    public function collectionPointFor(Tenant $tenant, string $kind): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, name FROM fe_locations WHERE tenant_id = ? AND task = 'collection' AND active = 1"
+            . " AND collection_accepts IN (?, 'both') ORDER BY id LIMIT 1",
+        );
+        $stmt->execute([$tenant->id, $kind]);
+        $row = $stmt->fetch();
+
+        return is_array($row) ? ['id' => (int) $row['id'], 'name' => (string) $row['name']] : null;
+    }
+
+    /**
+     * Wie {@see collectionPointForUsed()}, mit dem Namen (für die Rückfrage der App).
+     *
+     * @return array{id: int, name: string}|null
+     */
+    public function collectionPointForUsedWithName(Tenant $tenant): ?array
+    {
+        $id = $this->collectionPointForUsed($tenant);
+        if ($id === null) {
+            return null;
+        }
+        $stmt = $this->pdo->prepare('SELECT name FROM fe_locations WHERE id = ? AND tenant_id = ?');
+        $stmt->execute([$id, $tenant->id]);
+        $name = $stmt->fetchColumn();
+
+        return $name === false ? null : ['id' => $id, 'name' => (string) $name];
     }
 
     /**

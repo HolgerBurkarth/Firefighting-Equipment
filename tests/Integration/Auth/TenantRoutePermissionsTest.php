@@ -61,6 +61,8 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'POST api/v1/auth/email/verify' => ['public', 'public'],
         'POST api/v1/auth/email/resend' => ['public', 'public'],
         'POST api/v1/auth/invitation/accept' => ['public', 'public'],
+        'POST api/v1/returns' => ['public', 'public'],
+        'POST api/v1/returns/check' => ['public', 'public'],
         'GET api/v1/auth/notifications' => ['admin', 'mail.log'],
         'POST api/v1/auth/notifications' => ['admin', 'mail.log'],
         'GET api/v1/invitation-codes' => ['admin', 'users:read'],
@@ -89,6 +91,8 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'GET api/v1/locations' => ['authenticated', 'locations:read | search:read | devices:read'],
         'POST api/v1/locations' => ['admin', 'locations:write'],
         'GET api/v1/locations/{id}' => ['authenticated', 'locations:read | search:read | devices:read'],
+        'GET api/v1/stock' => ['admin', 'locations:read'],
+        'POST api/v1/locations/{id}/stock-rules' => ['admin', 'locations:write'],
         'POST api/v1/locations/{id}/rename' => ['admin', 'locations:write'],
         'POST api/v1/locations/{id}/lock' => ['admin', 'locations:write'],
         'POST api/v1/locations/{id}/unlock' => ['admin', 'locations:write'],
@@ -111,6 +115,12 @@ final class TenantRoutePermissionsTest extends AuthTestCase
             . ' device_type_id → device.edit, serial_number → device.edit, manufacturer → device.edit, model → device.edit,'
             . ' procured_on → device.edit, note → device.edit'],
         'POST api/v1/devices/{id}/inspection-due' => ['admin', 'due:write'],
+        'GET api/v1/loans' => ['admin', 'loans:read'],
+        'POST api/v1/loans' => ['admin', 'loans:write'],
+        'POST api/v1/loans/to-collection' => ['admin', 'loans:write'],
+        'POST api/v1/loans/to-store' => ['admin', 'loans:write'],
+        'POST api/v1/return-points/{id}/renew' => ['admin', 'loans:write'],
+        'POST api/v1/return-points/{id}/revoke' => ['admin', 'loans:write'],
         'GET api/v1/maintenance' => ['admin', 'maintenance:read'],
         'POST api/v1/maintenance/to-workshop' => ['admin', 'maintenance:write'],
         'POST api/v1/maintenance/back' => ['admin', 'maintenance:write'],
@@ -164,7 +174,7 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         parent::setUp();
 
         // Der Bereich „Wartung“ gilt nur in einer Stadt mit Sammelstelle oder Werkstatt (Phase 2, P2.4).
-        foreach (['collection', 'workshop'] as $task) {
+        foreach (['collection', 'workshop', 'borrower', 'returns'] as $task) {
             $this->insert('fe_tenant_location_tasks', ['tenant_id' => $this->tenant('immendingen')->id, 'task' => $task, 'enabled' => 1]);
         }
     }

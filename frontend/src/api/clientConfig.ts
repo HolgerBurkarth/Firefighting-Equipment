@@ -10,6 +10,8 @@ export interface ClientConfig {
     /** Ältere Buchungen der Warteschlange gehen nur nach Rückfrage raus (`confirmed_stale`). */
     readonly queueMaxAgeDays: number;
     readonly maxClockSkewSeconds: number;
+    /** Name der Sammelstelle für „Benutzt melden“; null = keine (oder ältere Server). */
+    readonly usedTarget?: string | null;
 }
 
 function isDays(value: unknown): value is number {
@@ -34,7 +36,10 @@ export function parseClientConfig(json: unknown): ClientConfig | null {
     ) {
         return null;
     }
-    return { serverTime, maxAgeDays, queueMaxAgeDays, maxClockSkewSeconds: skew };
+    const target = json['used_target'];
+    const usedTarget =
+        isRecord(target) && typeof target['name'] === 'string' ? target['name'] : null;
+    return { serverTime, maxAgeDays, queueMaxAgeDays, maxClockSkewSeconds: skew, usedTarget };
 }
 
 /** GET client-config (angemeldet). */

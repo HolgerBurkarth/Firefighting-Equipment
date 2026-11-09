@@ -84,9 +84,9 @@ export function permissionsJson(
 /** Rechte der Standard-Rollen, wie der Server sie in auth/me sendet (Admin: alles). */
 export const ADMIN_RIGHTS = permissionsJson(
     Object.fromEntries(
-        // Wartung gibt es nur in Städten mit Sammelstelle oder Werkstatt (Phase 2, P2.4).
+        // Wartung und Verleih gibt es nur in Städten mit den Aufgaben (Phase 2, P2.4/P2.5).
         CATALOG.areas
-            .filter((area) => area.key !== 'maintenance')
+            .filter((area) => area.key !== 'maintenance' && area.key !== 'loans')
             .map((area) => [area.key, area.levels.includes('write') ? 'write' : 'read']),
     ),
     CATALOG.action_groups.flatMap((group) => group.actions.map((action) => action.key)),
@@ -250,6 +250,12 @@ async function fulfillApi(
         await route.fulfill({ status: 200, json: DEFAULT_CLIENT_CONFIG });
     } else if (method === 'GET' && path === 'api/v1/locations' && !isService) {
         await route.fulfill({ status: 200, json: { locations: [] } });
+    } else if (method === 'GET' && path === 'api/v1/stock' && !isService) {
+        // „Standorte“ zeigt den Sollbestand (Phase 2, P2.7); ohne eigene Angabe keinen.
+        await route.fulfill({
+            status: 200,
+            json: { locations: [], summary: { locations: 0, out_of_service: 0 } },
+        });
     } else if (method === 'GET' && path === 'api/v1/location-tasks' && !isService) {
         // „Standorte“ des Admins liest die freigeschalteten Aufgaben; ohne eigene Angabe keine.
         await route.fulfill({

@@ -10,6 +10,7 @@ import {
     type DeviceDetail,
     type DeviceListItem,
 } from '../api/devices';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
 import DeviceDetails from '../components/DeviceDetails.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FocusHeader from '../components/FocusHeader.vue';
@@ -34,6 +35,7 @@ import {
 } from '../data/booking';
 import { actionTime, offlineBookingProblem, pendingDevice, queuedText } from '../data/bookingQueue';
 import { offlineData } from '../data/offline';
+import { usedTargetName, usedTargetText } from '../data/usedTarget';
 import { connectivity, isOffline } from '../runtime/connectivity';
 import {
     bookingLocationChoices,
@@ -354,6 +356,20 @@ async function save(): Promise<void> {
         ...(changesStatus.value && status.value !== null && { status: status.value }),
         ...(text !== '' && { comment: text }),
     });
+}
+
+/** Rückfrage vor „Benutzt melden“ (am Handy tippt man leicht daneben, das Gerät kann den Filter verlassen). */
+const usedConfirmOpen = ref(false);
+const usedConfirmTitle = computed(
+    () => `${device.value?.identifier ?? 'Diese Ausrüstung'} als benutzt melden?`,
+);
+const usedConfirmDescription = computed(() => usedTargetText(usedTargetName.value));
+
+function askReportUsed(): void {
+    if (device.value === null || saving.value || alreadyUsed.value) {
+        return;
+    }
+    usedConfirmOpen.value = true;
 }
 
 /** „Benutzt melden“: wie Speichern, online und offline (Warteschlange). */
@@ -690,12 +706,19 @@ async function submit(
                     type="button"
                     data-testid="report-used"
                     :disabled="saving || alreadyUsed"
-                    @click="reportUsed"
+                    @click="askReportUsed"
                 >
                     {{ saving && usedOnly ? 'Wird gespeichert …' : 'Benutzt melden' }}
                 </button>
             </div>
         </form>
+        <ConfirmDialog
+            v-model:open="usedConfirmOpen"
+            :title="usedConfirmTitle"
+            :description="usedConfirmDescription"
+            confirm-label="Benutzt melden"
+            @confirm="reportUsed"
+        />
     </template>
 </template>
 

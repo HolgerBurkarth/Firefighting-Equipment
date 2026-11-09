@@ -30,6 +30,7 @@ final class ClientConfigTest extends AuthTestCase
             'server_time' => '2026-10-27T13:05:09Z',
             'offline' => ['max_age_days' => 10, 'queue_max_age_days' => 3],
             'max_clock_skew_seconds' => 300,
+            'used_target' => null,
         ], self::json($response));
     }
 
@@ -41,5 +42,17 @@ final class ClientConfigTest extends AuthTestCase
 
         self::assertSame(['max_age_days' => 7, 'queue_max_age_days' => 7], $body['offline']);
         self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/', $body['server_time']);
+    }
+
+    public function testNamesTheCollectionPointForUsedEquipment(): void
+    {
+        $this->account('immendingen', 'user@example.org');
+        $tenantId = (int) $this->pdo()->query("SELECT id FROM fe_tenants WHERE slug = 'immendingen'")->fetchColumn();
+        $this->pdo()->prepare("INSERT INTO fe_tenant_location_tasks (tenant_id, task, enabled) VALUES (?, 'collection', 1)")->execute([$tenantId]);
+        $this->pdo()->prepare("INSERT INTO fe_locations (tenant_id, name, kind, level, task, collection_accepts) VALUES (?, 'Wache', 'room', 1, 'collection', 'used')")->execute([$tenantId]);
+
+        $body = self::json($this->send('GET', self::url('immendingen', 'client-config'), cookie: $this->loginCookie('immendingen', 'user@example.org')));
+
+        self::assertSame('Wache', $body['used_target']['name']);
     }
 }

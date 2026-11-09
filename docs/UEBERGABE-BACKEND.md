@@ -8,6 +8,46 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-09 – „Sollbestand (Phase 2, Runde 9, P2.7)“
+
+- Migrationen 0059 (`fe_stock_rules`), 0060 (`fe_stock_rule_types`). Abweichungen vom Plan: keine Spalten
+  `only_listed_types`/`position`, keine Tabelle `fe_location_outages`; „außer Betrieb“ wird nur berechnet.
+- Neu: `GET stock` (`locations` Ansehen), `POST locations/{id}/stock-rules` (`locations` Ändern); siehe `CLAUDE.md`,
+  Standorte und Geräte, „Sollbestand“. Keine bestehende Route ändert sich; die Prüfung der Buchungen gegen den
+  Sollbestand und der Tausch (P2.8) folgen später.
+- Tests: `StockTest`, `TenantRoutePermissionsTest`; Frontend `stock.spec.ts`.
+
+## 2026-11-09 – „Rückgabe ohne Anmeldung (Phase 2, Runde 9, P2.6)“
+
+- Migrationen 0056 (`fe_return_points`), 0057 (`public_return` in `fe_auth_attempts`), 0058 (`fe_device_events`:
+  `user_id` NULL erlaubt, neue Spalte `actor_name`, CHECK). Die Nummern im Plan (0059–0060) verschieben sich, weil
+  sie lückenlos sein müssen.
+- Neu (Admin, Bereich `loans` Ändern): `POST return-points/{id}/renew`, `POST return-points/{id}/revoke`,
+  `POST loans/to-collection`, `POST loans/to-store`. `GET loans` zusätzlich `returns[].link_created_at` und
+  `in_returns`.
+- Neu (ÖFFENTLICH, ohne Sitzung): `POST returns/check`, `POST returns`. Der geheime Schlüssel ist der Nachweis;
+  Bremse `public_return`. Der Verlauf nennt „<Name> (ohne Anmeldung)“: `user.id` ist dort `null`, `type_label`
+  „Rückgabe“ (die App liest nur `user.name`).
+- Tests: `ReturnTest`, `TenantRoutePermissionsTest`, `DeviceVisibilityTest`; Frontend `returnPage.spec.ts`,
+  `loans.spec.ts`, `returns.spec.ts`.
+
+## 2026-11-09 – „Verleih (Phase 2, Runde 9, P2.5)“
+
+- Migration 0055: `fe_device_loans`. Neuer Bereich `loans` (nur mit Aufgabe „Ausgeliehen an“ oder „Rückgabe“;
+  `permissions.areas`, Katalog-Datei). Keine neuen Aktionen (Abweichung vom Plan, Bereich Ändern genügt).
+- Neu: `GET loans`, `POST loans` (siehe `CLAUDE.md`, Standorte und Geräte, „Verleih“). Verleih bucht als
+  `state_changed` auf den Standort des Leihnehmers; `POST locations/{id}/task` verweigert das Entfernen der Aufgabe
+  „Ausgeliehen an“ bei offenem Verleih (409 `rule_violation`, `details {loans}`).
+- Tests: `LoanTest`, `TenantRoutePermissionsTest`, `RoleApiTest`, `PermissionsForClaudeTest`; Frontend `loans.spec.ts`.
+
+## 2026-11-09 – „Korrekturen aus dem Live-Test Runde 8b (Runde 9)“
+
+- `GET client-config`: neues Feld `used_target` (`{id, name}` der Sammelstelle, in die „Benutzt melden“ bucht,
+  sonst `null`; unabhängig vom Datenfilter). Nur Zusatz. Zweck: Die Rückfrage vor „Benutzt melden“ nennt den Ort.
+- `GET maintenance`: bei gleicher Zeit (`state_changed_at`) natürlich nach Nummer sortiert (vorher nach ID).
+- Tests: `ClientConfigTest`, `MaintenanceTest::testSameTimeSortsNaturallyByIdentifier`,
+  `DeviceVisibilityTest` (bekannte Stelle von `DeviceVisibility::all()`).
+
 ## 2026-11-09 – „Wartung: Sammelstelle und Werkstatt (Phase 2, Runde 8b, P2.4)“
 
 - Neuer Bereich `maintenance` (Katalog, `auth/me` `permissions.areas`): nur in Städten mit freigeschalteter

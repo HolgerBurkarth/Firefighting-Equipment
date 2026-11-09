@@ -636,7 +636,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `used: true` → `POST devices/{id}/used` ohne Standort und Status (`StateChangeRequest.used`), Kommentar
   optional, danach wie Speichern. Mit der Einschränkung `single_use_used_only` (`restricted`) und einem
   Einmalgerät (`deviceType.singleUse`) entfallen Standort und Status und „Speichern“; es bleibt „Benutzt
-  melden“ mit Hinweis (`used-only-hint`). Offline in die Warteschlange (`QueuedBooking.used`, Text „M1 →
+  melden“ mit Hinweis (`used-only-hint`). Vorher eine Rückfrage (`ConfirmDialog`, Standard „Abbrechen“:
+  „M1 als benutzt melden?“ und „Es kommt in die Sammelstelle <Name>.“ bzw. „Der Standort bleibt.“; der Name kommt
+  aus `GET client-config` `used_target`, gemerkt je Stadt in `src/data/usedTarget.ts`, localStorage
+  `ff-used-target:<kürzel>`, daher auch offline und bei Rollen, die die Sammelstelle nicht sehen). Offline in die Warteschlange (`QueuedBooking.used`, Text „M1 →
   benutzt gemeldet“, `QUEUE_FORMAT` 2). Ausrüstungstypen: Kästchen „Einmalgerät“ im Fenster, Chip in der
   Liste (`setDeviceTypeSingleUse`). Rollen: „3 · Einschränkungen“ im Editor (`catalog.restrictions`).
   Tests `usedReport.spec.ts`, `deviceTypes.spec.ts`, `roles.spec.ts`, Unit `permissions.spec.ts`,
@@ -2274,7 +2277,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   offener App“, `page.clock`); die Browser-Tests prüfen `X-Client-Api` gegen
   `resources/client-api.json`.
 - Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank): `Area` (`dashboard`,
-  `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`, `maintenance` (seit P2.4); `maxLevel`:
+  `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`, `maintenance` (seit P2.4), `loans` (seit P2.5); `maxLevel`:
   `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`
   (`book.move`, `book.status`, `device.used` (seit P2.3, braucht `search` Ansehen, Gruppe „Buchen“), `device.create`, `device.edit`, `device.retire`, `device.code`,
   `devices.bulk`, `csv.import`, `csv.export` (seit Schritt 1.7a, braucht `devices` Ansehen, auch mit
@@ -2759,6 +2762,68 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `PAGE_RIGHTS.maintenance`), `src/api/maintenance.ts`, `src/data/maintenance.ts` („seit“, Transportliste
   nur zum Kopieren; CSV/Druck und „Wartungsdatum setzen“ siehe `docs/TODO-SPAETER.md` T20), `maintenanceToWorkshop`/
   `maintenanceBack` in `src/data/index.ts`. Tests `maintenance.spec.ts` (Browser, Unit).
+- Verleih (Phase 2, P2.5, Runde 9; Bereich `loans`, Seite „Verleih“): `Area::Loans` gibt es nur in einer Stadt mit
+  freigeschalteter Aufgabe „Ausgeliehen an“ oder „Rückgabe“ (`Area::requiredTasks`); F3: mit Datenfilter kein
+  Zugriff. Abweichung vom Plan: keine eigenen Aktionen `loan.lend`/`returns.process`, der Bereich Ändern genügt.
+  Migration 0055 `fe_device_loans` (je Ausrüstung eine Zeile: Leihnehmer, Ansprechpartner, `due_back_on`,
+  Kommentar, `lent_by`, `returned_at`; höchstens ein offener Verleih je Ausrüstung über `open_device_key` + UNIQUE;
+  der Plan nannte 0057, die Nummern müssen lückenlos sein). Verleih = Buchung auf einen aktiven Standort der
+  Ebene 1 mit der Aufgabe „Ausgeliehen an“ (Ereignis `state_changed`, Status bleibt) UND Eintrag in
+  derselben Transaktion (`DeviceStateChange::$inTransaction`, `LoanRepository::lending`); steht die Ausrüstung
+  schon bei einem Leihnehmer mit offenem Verleih → Fehler des Eintrags, wurde sie von Hand woandershin gebucht,
+  schließt der neue Verleih den alten. Offen = `returned_at` leer, nicht ausgesondert, noch am Standort des
+  Leihnehmers (`LoanRepository::OPEN`). `GET loans` (`loans` Ansehen, `LoanListHandler`): `{today, summary
+  {open, overdue}, shown, loans [{id, device (wie GET devices), borrower {id, name}, contact, due_back_on,
+  overdue, days_overdue, comment, lent_at, lent_by {id, name}}], borrowers, returns, labels}` nach Leihnehmer,
+  „Rückgabe bis“ (ohne zuletzt), höchstens 500; überfällig = vor heute (Europe/Berlin). `POST loans` (`loans`
+  Ändern, `LoanLendHandler`): `{devices: [{id, version}], borrower_location_id, contact?, due_back_on?, comment?}`,
+  höchstens 50, Antwort wie die Sammelaktionen plus `borrower`, danach eine Sammelmail „Log“. Die Aufgabe
+  „Ausgeliehen an“ lässt sich von einem Standort nicht entfernen, solange dort Ausrüstung verliehen ist (409).
+  Tests `LoanTest`. Frontend: `LoansPage` (`verleih`, Menü „Verleih“ mit rotem Zähler der überfälligen
+  Rückgaben, `PAGE_RIGHTS.loans`), `LendDialog` (Nummer oder Scan-Code per Enter hinzufügen, Leihnehmer, Ansprechpartner,
+  „Rückgabe bis“, Kommentar), `src/api/loans.ts`, `src/data/loans.ts`, `lendEquipment` in `src/data/index.ts`,
+  Kachel „Verliehen“ im Dashboard (`AdminOverview.loans`, nur mit dem Bereich). Tests `loans.spec.ts` (Browser, Unit).
+- Rückgabe (Phase 2, P2.6, Runde 9; Plan 3.4): Migrationen 0056 `fe_return_points` (je Standort mit der Aufgabe
+  „Rückgabe“ höchstens ein gültiger Schlüssel, nur der SHA-256 gespeichert, `revoked_at`), 0057 Aktion
+  `public_return` in `fe_auth_attempts`, 0058 `fe_device_events.user_id` darf NULL sein und `actor_name`
+  (nur `state_changed`, genau dann gesetzt, wenn das Konto fehlt; G6). Schlüssel `ReturnKey` (32 Zufallsbytes,
+  base64url, 43 Zeichen). Admin (`loans` Ändern, G16): `POST return-points/{id}/renew {}` → `{key}` (Klartext nur in
+  dieser Antwort; der alte Schlüssel gilt nicht mehr), `POST return-points/{id}/revoke {}`; `GET loans` nennt je
+  Rückgabestelle `link_created_at` und die Ausrüstung dort (`in_returns`); „Rückgaben bearbeiten“: `POST
+  loans/to-collection` (benutzt → Sammelstelle, die Benutzte annimmt, defekt → die Defekte annimmt, Status bleibt;
+  sonst Fehler des Eintrags) und `POST loans/to-store` (Standard-Lager, einsatzbereit), nur für Ausrüstung in der
+  Rückgabe, Ziel auch außerhalb des Datenfilters, Antwort wie die Sammelaktionen plus `target`. ÖFFENTLICH (`Access::Public`,
+  keine Sitzung, kein Cookie): `POST returns/check {key, code}` → `{identifier, device_type, location}` (nur Nummer
+  und Typ einer VERLIEHENEN Ausrüstung, Nummer ohne Groß-/Kleinschreibung oder Scan-Code genau) und `POST returns
+  {key, code, name, condition (ok|used|defective), comment?}` → bucht in die Rückgabe, schließt den Verleih in
+  derselben Transaktion (`DeviceRepository::returnLoaned`, `LoanRepository::returning`), `condition` `ok` lässt den
+  Status, sonst `used`/`defective`; Verlauf „Rückgabe“ von „<Name> (ohne Anmeldung)“ (`DeviceEvent::$userId` null,
+  `type_label` „Rückgabe“, JSON `user.id` null; keine Mail „Log“). Ungültiger Schlüssel oder Code → 400 `invalid_request`
+  (gleiche Meldungen, zählt in die Bremse `PublicReturnThrottle`: 20 Fehlversuche je IP-Präfix in 15 Minuten, sonst
+  429). Bekannte Stelle von `DeviceVisibility::all()`: `PublicReturnHandler`. Tests `ReturnTest`. Frontend: öffentliche
+  Seite `ReturnPage` (`rueckgabe#schluessel=…`, `meta.public`, nur unter Städten; Schlüssel aus dem Fragment per
+  `takeFragmentParam`, übersteht ein Neuladen in sessionStorage `ff-return-key`; Nummer prüfen, Name, Zustand, Hinweis),
+  in `LoansPage` die Abschnitte „Rückgabe“ (Aushang erzeugen/erneuern/widerrufen, Link und QR-Code nur einmal,
+  `ReturnPoster` zum Drucken, `returnLink` in `src/data/loans.ts`) und „In der Rückgabe“ (Auswahl, „In Ordnung ins Lager“,
+  „Benutzte und Defekte in die Sammelstelle“, `processReturns`). Tests `returnPage.spec.ts`, `loans.spec.ts`, Unit
+  `returns.spec.ts`.
+- Sollbestand (Phase 2, P2.7, Runde 9; Plan 3.5, ohne Tausch und ohne Prüfung der Buchungen, die kommen mit P2.8):
+  Migrationen 0059 `fe_stock_rules` (Standort, `min_count` 1–99) und 0060 `fe_stock_rule_types` (Typen einer Regel,
+  gleichwertig, `ON DELETE CASCADE` nur dort). Abweichungen vom Plan: keine Spalten `only_listed_types` und
+  `position`, keine Tabelle `fe_location_outages` (kein Verlauf von „außer Betrieb“, keine Hinweise im Protokoll) –
+  „außer Betrieb“ wird nur berechnet. Gezählt wird (G11): einsatzbereite (`ready`), nicht ausgesonderte Ausrüstung
+  der Typen einer Regel am Standort, bei der Ebene 1 samt Fächern (`StockRepository::overview`, eine Abfrage).
+  `GET stock` (`locations` Ansehen): `{locations [{location {id, name, path, level}, rules [{id, min_count, types
+  [{id, name}], have, missing}], out_of_service}], summary {locations, out_of_service}}` nur Standorte mit Regeln
+  (gesperrte nicht), mit Datenfilter nur Sichtbares. `POST locations/{id}/stock-rules {rules: [{min_count,
+  device_type_ids}]}` (`locations` Ändern, F3: nie mit Datenfilter) ersetzt alle Regeln des Standorts (höchstens
+  20 Regeln mit je 1–20 verschiedenen Typen; leere Liste = keine), Antwort `{stock: {rules, out_of_service}|null}`;
+  gesperrter Standort 409, Typ einer anderen Stadt oder unbekannt 400, Standort unbekannt 404. Tests `StockTest`.
+  Frontend: `StockPanel` unten auf „Standorte“ (`src/api/stock.ts`, `src/data/stock.ts`; Liste mit Chip „außer
+  Betrieb“/„vollständig“ und „mindestens 3 Atemschutzmaske oder Funkgerät: 2 vorhanden, 1 fehlt“; Fenster „Sollbestand
+  festlegen“ mit Standort, Regeln aus Anzahl und Typ-Kästchen; die Typen lädt erst das Fenster). Browser-Tests
+  fragen `GET api/v1/stock` ohne eigene Angabe mit „keine Regeln“ (`tests/e2e/fixtures.ts`). Nicht gebaut: Kachel im
+  Dashboard, Anzeige am Fahrzeug in der Baumzeile (`docs/TODO-SPAETER.md`, T21). Tests `stock.spec.ts` (Browser, Unit).
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann
@@ -3075,7 +3140,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`OfflineSettings::fromConfigFile` in `Application::create`; Tests: `OfflineSettings::fixed`).
   `max_age_days` prüft nur das Handy. `GET client-config` (`Access::Authenticated`,
   `ClientConfigHandler`, in `TenantReadRoutesAccessTest`): `{server_time (UTC, …Z), offline
-  {max_age_days, queue_max_age_days}, max_clock_skew_seconds}`.
+  {max_age_days, queue_max_age_days}, max_clock_skew_seconds, used_target {id, name}|null}` (`used_target`
+  seit Runde 9: Sammelstelle für „Benutzt melden“, unabhängig vom Datenfilter; `ClientConfigHandler` ist
+  eine bekannte Stelle von `DeviceVisibility::all()`).
 
 ## Hinweise (API)
 - Nur Admins der Stadt (`Access::Admin`, in `AdminRoutesAccessTest`): `GET notices[?status=open|

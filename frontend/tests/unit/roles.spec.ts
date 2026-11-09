@@ -99,6 +99,7 @@ describe('Katalog und Grenzen wie im Backend', () => {
             'users',
             'settings',
             'maintenance',
+            'loans',
         ]);
         expect(parsed.levelLabels).toEqual({ read: 'Ansehen', write: 'Ändern' });
         expect(allActions(parsed)).toHaveLength(11);
@@ -277,6 +278,20 @@ describe('Vorschau und Tabelle', () => {
             menu: ['Termine', 'Protokoll', 'Einstellungen'],
             bar: ['Termine', 'Dashboard', 'Profil'],
         });
+    });
+
+    it('Vorschau „Darf“ nennt die Einschränkung', () => {
+        expect(
+            rolePreview(
+                catalog(),
+                form({
+                    areas: { search: 'read' },
+                    actions: ['book.move', 'device.used'],
+                    restrictions: ['single_use_used_only'],
+                }),
+                null,
+            ).may,
+        ).toBe('Umbuchen, Benutzt melden, bei Einmalgeräten nur Benutzt melden');
     });
 
     it('„So sieht es die Rolle“', () => {

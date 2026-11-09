@@ -11,6 +11,10 @@ namespace FirefightingEquipment\Device;
  *
  * $process: das Ziel gibt ein Ablauf vor ("Benutzt melden" in die Sammelstelle, Phase 2, G4); es darf
  * außerhalb des Datenfilters der Rolle liegen, und das Gerät darf danach daraus fallen.
+ *
+ * $inTransaction: Arbeit, die der Ablauf in DERSELBEN Transaktion wie die Buchung erledigt (z. B. der
+ * Eintrag des Verleihs, P2.5); sie läuft mit dem gesperrten Stand VOR der Buchung, nur wenn sich
+ * wirklich etwas ändert, und ein Fehler rollt die Buchung zurück.
  */
 final readonly class DeviceStateChange
 {
@@ -21,6 +25,7 @@ final readonly class DeviceStateChange
         public ?int $locationId,
         public ?DeviceStatus $status,
         public bool $process = false,
+        public ?\Closure $inTransaction = null,
     ) {
         if ($locationId === null && $status === null) {
             throw new InvalidDeviceValueException('Bitte einen neuen Standort (location_id) und/oder Status (status) angeben.');
