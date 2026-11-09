@@ -125,6 +125,7 @@ final class TenantRoutePermissionsTest extends AuthTestCase
         'POST api/v1/maintenance/to-workshop' => ['admin', 'maintenance:write'],
         'POST api/v1/maintenance/back' => ['admin', 'maintenance:write'],
         'POST api/v1/devices/{id}/used' => ['admin', 'device.used'],
+        'POST api/v1/devices/swap' => ['admin', 'device.swap'],
         'POST api/v1/devices/{id}/state' => ['authenticated', 'book.move | book.status; Felder: location_id → book.move, status → book.status'],
         'POST api/v1/devices/{id}/retire' => ['admin', 'device.retire'],
         'POST api/v1/devices/{id}/reinstate' => ['admin', 'device.retire; Felder: identifier → device.edit, device_type_id → device.edit, scan_code → device.code'],

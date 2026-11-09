@@ -383,6 +383,8 @@ export interface StateChangeRequest {
      * vor (Sammelstelle); dann weder `locationId` noch `status`.
      */
     readonly used?: boolean;
+    /** Nach Rückfrage trotz unterschrittenem Sollbestand buchen (nur mit der Aktion `stock.override`). */
+    readonly confirmedBelowMinimum?: boolean;
 }
 
 /** POST devices/{id}/state: Umbuchen und/oder Status setzen; mit `used` POST devices/{id}/used. */
@@ -404,10 +406,56 @@ export function postDeviceState(
                 client_ref: request.clientRef,
                 ...(request.occurredAt !== undefined && { occurred_at: request.occurredAt }),
                 ...(request.confirmedStale === true && { confirmed_stale: true }),
+                ...(request.confirmedBelowMinimum === true && { confirmed_below_minimum: true }),
             },
             ...(fetchFn && { fetchFn }),
         },
     );
+}
+
+/** Tausch (POST devices/swap, Phase 2, P2.8): Ausrüstung heraus, Ersatz hinein. */
+export interface SwapRequest {
+    readonly out: { readonly id: number; readonly version: number };
+    readonly in: { readonly id: number; readonly version: number };
+    /** Status der Ausrüstung, die herausgeht (Standard auf dem Server: benutzt). */
+    readonly outStatus?: 'used' | 'defective' | 'maintenance';
+    readonly comment?: string;
+    readonly confirmedBelowMinimum?: boolean;
+}
+
+export interface SwapResponse {
+    readonly out: DeviceListItem;
+    readonly in: DeviceListItem;
+    readonly swapId: string;
+}
+
+export function parseSwapResponse(json: unknown): SwapResponse | null {
+    if (!isRecord(json)) {
+        return null;
+    }
+    const out = parseDeviceListItem(json['out']);
+    const replacement = parseDeviceListItem(json['in']);
+    const swapId = json['swap_id'];
+    return out === null || replacement === null || typeof swapId !== 'string'
+        ? null
+        : { out, in: replacement, swapId };
+}
+
+export function postSwap(
+    request: SwapRequest,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<SwapResponse>> {
+    return apiRequest('devices/swap', parseSwapResponse, {
+        method: 'POST',
+        body: {
+            out: request.out,
+            in: request.in,
+            ...(request.outStatus !== undefined && { out_status: request.outStatus }),
+            ...(request.comment !== undefined && { comment: request.comment }),
+            ...(request.confirmedBelowMinimum === true && { confirmed_below_minimum: true }),
+        },
+        ...(fetchFn && { fetchFn }),
+    });
 }
 
 /** Aktueller Stand aus 409 version_conflict (`details.device`), sonst null. */

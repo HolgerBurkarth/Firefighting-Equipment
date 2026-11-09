@@ -85,3 +85,14 @@ Geprüft mit freigeschalteten Aufgaben (danach alles zurückgesetzt: Abläufe ab
 - ☑ In der Rückgabe: „Benutzte und Defekte in die Sammelstelle …“ (M92 → Kleiderkammer, benutzt) und „In Ordnung ins Lager …“ (M93 → Lager Gerätehaus, einsatzbereit).
 - ☒ „Benutzt melden“ bei direkt geöffneter Seite (M94): Ersatztext „falls es eine gibt …“ trotz vorhandener Sammelstelle → behoben in Runde 10 (`client-config` wird vor der Rückfrage geladen), live noch zu prüfen.
 - ☒ Korrekturen aus der Prüfung, behoben in Runde 10 (live noch zu prüfen): Meldung „1 Ausrüstung an „Hattingen“ verliehen.“; die Liste zeigt nach dem Verleihen nie kurz „Zurzeit ist nichts verliehen.“ („Liste wird aktualisiert …“); ein Verleih heißt im Verlauf, in „Letzte Aktivitäten“, im CSV und in der Log-Mail „Verliehen“; nach „Widerrufen“ steht „Kein gültiger Aushang“.
+
+## Runde 10: P2.8 (Sollbestand bei Buchungen, Tausch; 09.11.2026)
+
+Noch nicht live geprüft (Build folgt nach dem Deploy der Runde).
+
+- ☐ Sollbestand setzen (HLF 20: mindestens 2 Atemschutzmasken, 2 einsatzbereite am HLF); eine davon in Wartung setzen: Hinweis
+  „Am Standort … blieben nur 1 von mindestens 2“, Knöpfe „Tauschen …“ und (Admin) „Trotzdem buchen …“.
+- ☐ „Tauschen …“: Ersatz aus dem Lager wählen, M-Nummer geht in die Sammelstelle (benutzt), Ersatz steht am HLF; Verlauf beider
+  Ausrüstungen; Sollbestand wieder erfüllt; danach alles zurücksetzen und die Regeln entfernen.
+- ☐ „Trotzdem buchen“ (Admin): Hinweis „Sollbestand unterschritten“ im Protokoll; erledigen.
+- ☐ Geräteträger (Rolle ID 23) ohne `device.swap`: kein Knopf „Tauschen …“ (Rolle um die Aktion erweitern nur mit Holger).

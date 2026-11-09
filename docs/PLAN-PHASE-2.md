@@ -290,6 +290,8 @@ CHECK-Bedingungen.
 Anmeldung schreibt `user_id` NULL mit `actor_name` (G6) ohne Mail „Log“; Dashboard-Kachel für „außer Betrieb“ später (T21).
 Offen: P2.8 (Tausch, Prüfung aller Buchungen gegen den Sollbestand), P2.9, P2.10, P2.12, P2.13.
 
+**Stand Runde 10 (09.11.2026):** P2.8 gebaut (Migrationen 0061/0062, Aktionen `device.swap` und `stock.override`, Prüfung in `/state`, `/used`, Verleih, Wartung, Rückgaben; `POST devices/swap`; Dialog „Tauschen“ und „Trotzdem buchen“ in `DevicePage`). Nicht gebaut: Prüfung im CSV-Import (Vorschau-Warnung), Tausch und Unterschreitung offline (P2.9), P2.10.
+
 **Entscheidungen Holger 09.11.2026 (Runde 8b):** G4 entschieden wie vorgeschlagen: Rollen mit Datenfilter
 erreichen die Sammelstelle nur über „Benutzt melden“ bzw. den Tausch, nicht als freies Ziel beim Umbuchen.
 Migration 0055 (`used_reported`) entfällt: „Benutzt melden“ bleibt ein `state_changed` mit Status „benutzt“.

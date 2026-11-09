@@ -75,6 +75,10 @@ const KIND_EXPLANATIONS: Readonly<Partial<Record<string, string>>> = {
         'Der gewünschte Standort war beim Eingang der Buchung gesperrt. Die Buchung steht nur im Verlauf; die Ausrüstung blieb, wo sie war.',
     stale_confirmed:
         'Die Buchung war älter als erlaubt und wurde nach einer Rückfrage auf dem Handy trotzdem gesendet.',
+    stock_below_minimum:
+        'Die Buchung hat den Sollbestand des Standorts unterschritten. Wer sie gesendet hat, durfte das nach einer Rückfrage („Trotzdem buchen“).',
+    swap_replacement_moved:
+        'Beim Tausch war der Ersatz inzwischen woanders. Der Tausch wurde trotzdem gebucht; bitte prüfen, ob der Bestand stimmt.',
 };
 
 export function noticeExplanation(notice: Notice): string | null {

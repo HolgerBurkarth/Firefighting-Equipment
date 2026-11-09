@@ -169,6 +169,24 @@
                         "level": "read"
                     },
                     "with_filter": true
+                },
+                {
+                    "key": "device.swap",
+                    "label": "Tauschen",
+                    "requires": {
+                        "area": "search",
+                        "level": "read"
+                    },
+                    "with_filter": true
+                },
+                {
+                    "key": "stock.override",
+                    "label": "Sollbestand ohne Ersatz unterschreiten",
+                    "requires": {
+                        "area": "search",
+                        "level": "read"
+                    },
+                    "with_filter": true
                 }
             ]
         },

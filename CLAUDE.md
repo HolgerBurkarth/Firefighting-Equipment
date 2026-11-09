@@ -2276,7 +2276,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `offline.spec.ts`, `bookingQueue.spec.ts`, Browser `permissions.spec.ts` („Rechte ändern sich bei
   offener App“, `page.clock`); die Browser-Tests prüfen `X-Client-Api` gegen
   `resources/client-api.json`.
-- Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank): `Area` (`dashboard`,
+- Rechte-Katalog `src/Permission/` (fest im Code, Werte wie in der Datenbank; seit P2.8 auch `device.swap`, `stock.override`): `Area` (`dashboard`,
   `search`, `devices`, `locations`, `device_types`, `due`, `log`, `users`, `settings`, `maintenance` (seit P2.4), `loans` (seit P2.5); `maxLevel`:
   `dashboard` und `search` nur Ansehen), `AreaLevel` (`read`, `write` schließt `read` ein), `Action`
   (`book.move`, `book.status`, `device.used` (seit P2.3, braucht `search` Ansehen, Gruppe „Buchen“), `device.create`, `device.edit`, `device.retire`, `device.code`,
@@ -2824,6 +2824,29 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   festlegen“ mit Standort, Regeln aus Anzahl und Typ-Kästchen; die Typen lädt erst das Fenster). Browser-Tests
   fragen `GET api/v1/stock` ohne eigene Angabe mit „keine Regeln“ (`tests/e2e/fixtures.ts`). Nicht gebaut: Kachel im
   Dashboard, Anzeige am Fahrzeug in der Baumzeile (`docs/TODO-SPAETER.md`, T21). Tests `stock.spec.ts` (Browser, Unit).
+- Prüfung gegen den Sollbestand und Tausch (Phase 2, P2.8, Runde 10; Migrationen 0061 `fe_device_events.swap_id`
+  (CHAR(32) ascii, nur `state_changed`) und 0062 Arten `stock_below_minimum`, `swap_replacement_moved` in
+  `fe_device_notices`; Aktionen `device.swap` und `stock.override`, beide `search` Ansehen, Gruppe Buchen, mit
+  Datenfilter erlaubt; `stock.override` fällt über `Permissions::forClaude` weg, G17). `Stock\StockGuard` prüft in
+  der Transaktion einer Buchung (`DeviceRepository::online`, gesperrte Geräte): Eine Regel (Ebene 1 samt Fächern, nur
+  `ready`, Typen einer Regel zusammen) wird nur dann beanstandet, wenn die Buchung ihren Bestand VERRINGERT und er danach
+  unter `min_count` liegt; gezählt wird IMMER über alle Ausrüstungen, nie nur die sichtbaren. `DeviceStateChange::$stock`
+  (`StockMode`): `Enforce` (Standard; auch Verleih, Wartung, Rückgaben), `Ask` (Rolle hat `stock.override`, noch nicht
+  bestätigt), `Override` (`confirmed_below_minimum: true` im Body von `/state` und `/used`), `Skip`. Abgelehnt: 409
+  `rule_violation` mit `details.stock {location {id, name, path}, rule {id, min_count, types}, have (nach der Buchung),
+  missing, can_override}`; mit Override gebucht, und hat die Buchung eine `client_ref`, legt `book()` den Hinweis
+  `stock_below_minimum` an (Mail an die Empfänger „Log“ wie sonst). Offline-Buchungen (`occurred_at`) und Sammelaktionen
+  der Liste werden nicht geprüft bzw. nur mit `Enforce` (Offline: P2.9, noch offen). `POST devices/swap` (Aktion
+  `device.swap`, `DeviceSwapHandler`, `DeviceRepository::swap`): `{out {id, version}, in {id, version}, out_status?
+  (used|defective|maintenance, Standard used), out_location_id?, comment?, confirmed_below_minimum?}`; „out“ geht in die
+  Sammelstelle für benutzte bzw. defekte Ausrüstung (auch außerhalb des Datenfilters, G4), sonst bleibt der Standort;
+  der Ersatz „in“ muss einsatzbereit sein und kommt an den bisherigen Standort von „out“; beide in EINER Transaktion
+  (gesperrt in der Reihenfolge der IDs), beide Ereignisse tragen dieselbe `swap_id`; die Prüfung gilt für beide zusammen.
+  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (Ersatz suchen, Status danach, Kommentar), in `DevicePage` der
+  Knopf „Tauschen …“ (`swap-open`, nur online) und bei 409 mit `details.stock` der Kasten `stock-block` mit „Tauschen …“
+  und, mit `stock.override`, „Trotzdem buchen …“ (Rückfrage, sendet `confirmed_below_minimum`); `src/data/swap.ts`
+  (`parseStockBlock`, `swapCandidates`: einsatzbereit, Typen der verletzten Regel zuerst). Nicht gebaut: Tausch offline
+  (P2.9), Prüfung im CSV-Import. Tests `StockSwapTest`, `NoticeKindTest`, Browser `swap.spec.ts`, Unit `swap.spec.ts`.
 - Historie (`fe_device_events`): unveränderlich, der Code schreibt nur `INSERT`, nie `UPDATE` oder
   `DELETE` (ohne Trigger nicht erzwingbar; kein Repository bekommt solche Methoden; einzige Ausnahme:
   "Gerätedaten zurücksetzen"). Wer (`user_id` aus derselben Stadt, Fremdschlüssel auf `fe_users`; anonymisierte Konten bleiben), Wann

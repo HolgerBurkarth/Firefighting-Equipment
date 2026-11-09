@@ -22,6 +22,9 @@ import {
     type DeviceListItem,
     type NewDeviceRequest,
     type ReinstateRequest,
+    postSwap,
+    type SwapRequest,
+    type SwapResponse,
 } from '../api/devices';
 import {
     createDeviceType,
@@ -283,6 +286,23 @@ export async function saveInspectionDue(
     request: DeviceActionBase & { readonly nextInspectionDue: string | null },
 ): Promise<ApiResult<DeviceDetail>> {
     return afterDeviceChange(await postInspectionDue(id, request));
+}
+
+/**
+ * Tausch (Phase 2, P2.8): beide Stände gleich übernehmen, die Listen laden neu. Nur mit Verbindung
+ * (offline: P2.9).
+ */
+export async function swapEquipment(request: SwapRequest): Promise<ApiResult<SwapResponse>> {
+    const result = await postSwap(request);
+    if (result.ok) {
+        deviceStore.upsert(result.data.out);
+        deviceStore.upsert(result.data.in);
+        refreshDeviceLists();
+    } else if (result.error.code === 'version_conflict') {
+        // Der Stand der betroffenen Ausrüstung kam mit der Antwort: Liste neu laden, die Seite zeigt ihn dann.
+        void deviceStore.refresh('changed');
+    }
+    return result;
 }
 
 /** Aussondern (Admin). */

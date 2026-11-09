@@ -16,9 +16,11 @@ use FirefightingEquipment\Device\DeviceStatus;
 use FirefightingEquipment\Device\DeviceText;
 use FirefightingEquipment\Device\NewDevice;
 use FirefightingEquipment\Device\ScanCode;
+use FirefightingEquipment\Device\Stock\StockMode;
 use FirefightingEquipment\Http\HttpException;
 use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Offline\ActionTime;
+use FirefightingEquipment\Permission\Action;
 
 /**
  * Liest die JSON-Bodys der ändernden Geräte-Routen. Unbekannte Felder werden abgelehnt (400), damit
@@ -115,12 +117,30 @@ final class DeviceFields
      */
     public static function stateChange(RequestContext $context): DeviceStateChange
     {
-        self::rejectUnknown($context, ['version', 'location_id', 'status', 'comment', 'client_ref', 'occurred_at', 'confirmed_stale']);
+        self::rejectUnknown($context, ['version', 'location_id', 'status', 'comment', 'client_ref', 'occurred_at', 'confirmed_stale', 'confirmed_below_minimum']);
 
         return new DeviceStateChange(
             $context->optionalIntField('location_id', 1, self::MAX_ID),
             self::serviceStatus($context, false),
+            stock: self::stockMode($context),
         );
+    }
+
+    /**
+     * Umgang mit dem Sollbestand (P2.8): confirmed_below_minimum (echtes true/false) und die Aktion
+     * stock.override der Rolle. Ohne Aktion Enforce, mit Aktion ohne Bestätigung Ask (die Ablehnung nennt
+     * can_override), mit beidem Override.
+     *
+     * @throws HttpException 400 invalid_request
+     */
+    public static function stockMode(RequestContext $context): StockMode
+    {
+        $confirmed = ($context->body['confirmed_below_minimum'] ?? null) !== null && $context->boolField('confirmed_below_minimum');
+        if (!$context->permissions()->can(Action::StockOverride)) {
+            return StockMode::Enforce;
+        }
+
+        return $confirmed ? StockMode::Override : StockMode::Ask;
     }
 
     /**

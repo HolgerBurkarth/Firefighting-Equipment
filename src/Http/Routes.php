@@ -35,6 +35,7 @@ use FirefightingEquipment\Api\V1\Devices\DeviceImportHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceImportTemplateHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceListHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceStateHandler;
+use FirefightingEquipment\Api\V1\Devices\DeviceSwapHandler;
 use FirefightingEquipment\Api\V1\Devices\DeviceSummaryHandler;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeAction;
 use FirefightingEquipment\Api\V1\DeviceTypes\DeviceTypeActionHandler;
@@ -258,6 +259,7 @@ final class Routes
             ->add('GET', 'api/v1/maintenance', $read(Area::Maintenance), new MaintenanceListHandler())
             ->add('POST', 'api/v1/maintenance/to-workshop', $write(Area::Maintenance), new MaintenanceMoveHandler(MaintenanceMove::ToWorkshop))
             ->add('POST', 'api/v1/maintenance/back', $write(Area::Maintenance), new MaintenanceMoveHandler(MaintenanceMove::Back))
+            ->add('POST', 'api/v1/devices/swap', $action(Action::DeviceSwap), new DeviceSwapHandler())
             ->add('POST', 'api/v1/devices/{id}/used', $action(Action::DeviceUsed), new DeviceStateHandler($clock, $offline, used: true))
             ->add('POST', 'api/v1/devices/{id}/retire', $action(Action::DeviceRetire), new DeviceActionHandler(DeviceAction::Retire))
             ->add('POST', 'api/v1/devices/{id}/reinstate', $reinstate, new DeviceActionHandler(DeviceAction::Reinstate))

@@ -22,6 +22,8 @@ enum Action: string
     case CsvExport = 'csv.export';
     case MailLog = 'mail.log';
     case DeviceUsed = 'device.used';
+    case DeviceSwap = 'device.swap';
+    case StockOverride = 'stock.override';
 
     public function label(): string
     {
@@ -37,13 +39,15 @@ enum Action: string
             self::CsvExport => 'CSV-Export',
             self::MailLog => 'Log-Mails empfangen',
             self::DeviceUsed => 'Benutzt melden',
+            self::DeviceSwap => 'Tauschen',
+            self::StockOverride => 'Sollbestand ohne Ersatz unterschreiten',
         };
     }
 
     public function group(): ActionGroup
     {
         return match ($this) {
-            self::BookMove, self::BookStatus, self::DeviceUsed => ActionGroup::Booking,
+            self::BookMove, self::BookStatus, self::DeviceUsed, self::DeviceSwap, self::StockOverride => ActionGroup::Booking,
             self::DeviceCreate, self::DeviceEdit, self::DeviceRetire, self::DeviceCode => ActionGroup::Devices,
             self::DevicesBulk, self::CsvImport, self::CsvExport => ActionGroup::Bulk,
             self::MailLog => ActionGroup::Notifications,
@@ -58,7 +62,7 @@ enum Action: string
     public function requires(): ?array
     {
         return match ($this) {
-            self::BookMove, self::BookStatus, self::DeviceUsed => [Area::Search, AreaLevel::Read],
+            self::BookMove, self::BookStatus, self::DeviceUsed, self::DeviceSwap, self::StockOverride => [Area::Search, AreaLevel::Read],
             self::DeviceCreate, self::DeviceEdit, self::DeviceRetire, self::DeviceCode,
             self::DevicesBulk, self::CsvImport => [Area::Devices, AreaLevel::Write],
             self::CsvExport => [Area::Devices, AreaLevel::Read],

@@ -68,8 +68,8 @@ final readonly class DeviceStateHandler implements RequestHandler
         try {
             $version = DeviceFields::version($context);
             if ($this->used) {
-                DeviceFields::rejectUnknown($context, ['version', 'comment', 'client_ref', 'occurred_at', 'confirmed_stale']);
-                $change = new DeviceStateChange(new LocationRepository($pdo, $context->visibility())->collectionPointForUsed($tenant), DeviceStatus::Used, true);
+                DeviceFields::rejectUnknown($context, ['version', 'comment', 'client_ref', 'occurred_at', 'confirmed_stale', 'confirmed_below_minimum']);
+                $change = new DeviceStateChange(new LocationRepository($pdo, $context->visibility())->collectionPointForUsed($tenant), DeviceStatus::Used, true, stock: DeviceFields::stockMode($context));
             } else {
                 $change = DeviceFields::stateChange($context);
                 SingleUseGuard::check($context->permissions(), $devices, $tenant, $deviceId);

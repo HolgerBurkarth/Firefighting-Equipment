@@ -9,8 +9,10 @@ import {
     type BookableStatus,
     type DeviceDetail,
     type DeviceListItem,
+    type SwapResponse,
 } from '../api/devices';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
+import SwapDialog from '../components/SwapDialog.vue';
 import DeviceDetails from '../components/DeviceDetails.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FocusHeader from '../components/FocusHeader.vue';
@@ -36,6 +38,7 @@ import {
 import { actionTime, offlineBookingProblem, pendingDevice, queuedText } from '../data/bookingQueue';
 import { offlineData } from '../data/offline';
 import { fetchClientConfig } from '../api/clientConfig';
+import { parseStockBlock, stockBlockText } from '../data/swap';
 import { ensureUsedTarget, usedTargetName, usedTargetText } from '../data/usedTarget';
 import { currentAppBase } from '../runtime/appBase';
 import { connectivity, isOffline } from '../runtime/connectivity';
@@ -62,6 +65,8 @@ const canMove = computed(() => can(currentPermissions.value, 'book.move'));
 const canSetStatus = computed(() => can(currentPermissions.value, 'book.status'));
 /** „Benutzt melden“ (Phase 2, P2.3): Status benutzt, das Ziel (Sammelstelle) gibt der Server vor. */
 const canReportUsed = computed(() => can(currentPermissions.value, 'device.used'));
+/** Tauschen (P2.8): Ausrüstung heraus, Ersatz hinein, in einer Buchung (nur mit Verbindung). */
+const canSwap = computed(() => can(currentPermissions.value, 'device.swap'));
 /**
  * Einschränkung „Bei Einmalgeräten nur benutzt melden“: Bei einem Einmalgerät gibt es dann weder
  * Standort noch Status, nur „Benutzt melden“ (der Server lehnt anderes mit 403 restricted_action ab).
@@ -360,6 +365,46 @@ async function save(): Promise<void> {
     });
 }
 
+/**
+ * Die letzte Buchung hat den Sollbestand eines Standorts unterschritten (409, Phase 2, P2.8): Statt nur einer
+ * Fehlermeldung bietet die Seite „Tauschen …“ an und, mit der Aktion stock.override, „Trotzdem buchen …“.
+ */
+const stockBlock = computed(() => parseStockBlock(saveError.value?.details ?? null));
+const lastContent = shallowRef<Parameters<typeof submit>[1] | null>(null);
+const overrideOpen = ref(false);
+const swapOpen = ref(false);
+const swapButton = useTemplateRef<HTMLButtonElement>('swapButton');
+
+function openSwap(): void {
+    swapOpen.value = true;
+}
+
+async function bookBelowMinimum(): Promise<void> {
+    const current = device.value;
+    const content = lastContent.value;
+    if (current === null || content === null || saving.value) {
+        return;
+    }
+    saveError.value = null;
+    await submit(current, { ...content, confirmedBelowMinimum: true });
+}
+
+async function onSwapped(response: SwapResponse): Promise<void> {
+    rememberDevice(deviceId);
+    setBookingNotice({
+        kind: 'success',
+        text: `${response.out.identifier} ⇄ ${response.in.identifier} · getauscht`,
+    });
+    saved.value = true;
+    await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);
+}
+
+function onSwapConflict(latest: DeviceListItem): void {
+    if (latest.id === deviceId) {
+        device.value = latest;
+    }
+}
+
 /** Rückfrage vor „Benutzt melden“ (am Handy tippt man leicht daneben, das Gerät kann den Filter verlassen). */
 const usedConfirmOpen = ref(false);
 const usedConfirmTitle = computed(
@@ -412,8 +457,10 @@ async function submit(
         status?: BookableStatus;
         used?: boolean;
         comment?: string;
+        confirmedBelowMinimum?: boolean;
     },
 ): Promise<void> {
+    lastContent.value = content;
     // Offline (Streifen): gleich in die Warteschlange (KONZEPT.md, "Offline-Modus – Entscheidungen",
     // 52), sofern offline gebucht werden darf; meldet der Browser offline, sonst gleich der Grund.
     // Online und nach einer nur gescheiterten Anfrage wie bisher senden; scheitert es an der
@@ -696,7 +743,36 @@ async function submit(
                 <p v-if="nothingChanged && !usedOnly" class="notice notice-info" role="status">
                     Bitte wählen Sie einen anderen Standort oder Status.
                 </p>
-                <ErrorNotice v-if="saveError !== null" :error="saveError" />
+                <div
+                    v-if="stockBlock !== null"
+                    class="notice notice-error"
+                    role="alert"
+                    data-testid="stock-block"
+                >
+                    <p>{{ stockBlockText(stockBlock) }}</p>
+                    <p>Tauschen Sie die Ausrüstung gegen einen einsatzbereiten Ersatz.</p>
+                    <div class="stock-actions">
+                        <button
+                            v-if="canSwap"
+                            class="btn btn-primary"
+                            type="button"
+                            data-testid="stock-swap"
+                            @click="openSwap"
+                        >
+                            Tauschen …
+                        </button>
+                        <button
+                            v-if="stockBlock.canOverride"
+                            class="btn"
+                            type="button"
+                            data-testid="stock-override"
+                            @click="overrideOpen = true"
+                        >
+                            Trotzdem buchen …
+                        </button>
+                    </div>
+                </div>
+                <ErrorNotice v-else-if="saveError !== null" :error="saveError" />
                 <p
                     v-if="offlineProblem !== null"
                     class="notice notice-error"
@@ -713,6 +789,20 @@ async function submit(
                 >
                     {{ saving ? 'Wird gespeichert …' : 'Speichern' }}
                 </button>
+                <button
+                    v-if="canSwap"
+                    ref="swapButton"
+                    class="btn"
+                    type="button"
+                    data-testid="swap-open"
+                    :disabled="saving || isOffline"
+                    @click="openSwap"
+                >
+                    Tauschen …
+                </button>
+                <p v-if="canSwap && isOffline" class="hint" data-testid="swap-offline">
+                    Tauschen geht nur mit Verbindung.
+                </p>
                 <button
                     v-if="canReportUsed"
                     class="btn"
@@ -733,10 +823,32 @@ async function submit(
             confirm-label="Benutzt melden"
             @confirm="reportUsed"
         />
+        <ConfirmDialog
+            v-model:open="overrideOpen"
+            title="Sollbestand unterschreiten?"
+            description="Der Standort hat danach weniger einsatzbereite Ausrüstung als vorgegeben. Die Admins bekommen einen Hinweis."
+            confirm-label="Trotzdem buchen"
+            @confirm="bookBelowMinimum"
+        />
+        <SwapDialog
+            v-if="canSwap && device !== null"
+            v-model:open="swapOpen"
+            :device="device"
+            :type-ids="stockBlock?.typeIds ?? []"
+            :return-focus="swapButton"
+            @swapped="onSwapped"
+            @conflict="onSwapConflict"
+        />
     </template>
 </template>
 
 <style scoped>
+.stock-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 .device-form {
     display: flex;
     flex: 1 0 auto;

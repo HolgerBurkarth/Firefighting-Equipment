@@ -16,6 +16,8 @@ enum NoticeKind: string
     case NotAppliedRetired = 'not_applied_retired';
     case NotAppliedLocationLocked = 'not_applied_location_locked';
     case StaleConfirmed = 'stale_confirmed';
+    case StockBelowMinimum = 'stock_below_minimum';
+    case SwapReplacementMoved = 'swap_replacement_moved';
 
     /**
      * Art zum Ergebnis einer Offline-Buchung; null = kein Hinweis.
@@ -39,6 +41,8 @@ enum NoticeKind: string
             self::NotAppliedRetired => 'Nicht übernommen (Ausrüstung ausgesondert)',
             self::NotAppliedLocationLocked => 'Nicht übernommen (Standort gesperrt)',
             self::StaleConfirmed => 'Alte Buchung nach Rückfrage gesendet',
+            self::StockBelowMinimum => 'Sollbestand unterschritten',
+            self::SwapReplacementMoved => 'Tausch: Ersatz war inzwischen woanders',
         };
     }
 
@@ -53,6 +57,8 @@ enum NoticeKind: string
             self::NotAppliedRetired => 'nicht übernommen (ausgesondert)',
             self::NotAppliedLocationLocked => 'nicht übernommen (Standort gesperrt)',
             self::StaleConfirmed => 'alte Buchung nach Rückfrage',
+            self::StockBelowMinimum => 'Sollbestand unterschritten',
+            self::SwapReplacementMoved => 'Ersatz war woanders',
         };
     }
 }

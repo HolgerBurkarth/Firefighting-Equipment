@@ -30,7 +30,7 @@ final class NoticeKindTest extends TestCase
     public function testValuesMatchSchemaAndHaveGermanLabels(): void
     {
         self::assertSame(
-            ['overwritten', 'history_only', 'not_applied_retired', 'not_applied_location_locked', 'stale_confirmed'],
+            ['overwritten', 'history_only', 'not_applied_retired', 'not_applied_location_locked', 'stale_confirmed', 'stock_below_minimum', 'swap_replacement_moved'],
             array_map(static fn (NoticeKind $k): string => $k->value, NoticeKind::cases()),
         );
         foreach (NoticeKind::cases() as $kind) {
