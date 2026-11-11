@@ -125,5 +125,18 @@ Bleibt für Holger nur bei gemeldeten Problemen: echtes iPhone im Flugmodus (B1�
 (B4), Uhr des Handys (B9) und B10 (Konfiguration des Servers).
 
 Läufe:
-- ☐ Noch kein Lauf (Datei `.env.local` fehlt noch; Rolle „Live-Test Geräteträger“ mit `device.swap`
-  sowie Lager und Sammelstelle richtet Claude ein).
+- 11.11.2026, mehrere Läufe (Chromium Playwright, Chrome-Kanal, nur Konto 1, Konto 2 im eigenen
+  Browser, `context.route` statt `setOffline`): ☑ C1 Service Worker und Kopie, ☑ C2 Neuladen ohne Netz,
+  ☑ C3 Suche aus der Kopie, ☒ C4 `locator.click: Page crashed` (Umbuchen von M94 offline), alle weiteren
+  Punkte ☐ nicht gelaufen (C5–C10, B8a, W1–W3). Beim Absturz stürzen BEIDE Seiten gleichzeitig ab, auch
+  in getrennten Browsern; auch mit nur Konto 1, mit installiertem Chrome und mit abgebrochenen
+  API-Anfragen statt `setOffline`. Das Browser-Log (`--enable-logging --v=1`) zeigt keine Absturzmeldung.
+  Von Hand in Holgers Chrome (fetch für `/api/` abgelehnt) kein Absturz, Buchung kam genau einmal an;
+  die 16 Offline-Browser-Tests laufen lokal grün. Ursache offen (Verdacht: Speicher des Rechners,
+  Schleife der Seite nach Neuladen ohne Netz); Wiederholung erst nach Klärung. M90–M95 danach
+  unverändert (einsatzbereit, Anfangsstandorte); der Hinweis `swap_replacement_moved` im Protokoll
+  bleibt für Claude als Admin.
+- Diagnose-Schalter des Skripts (Umgebungsvariablen): `FF_LIVE_DIAG=1` (Abstürze, Skriptfehler und
+  Fehlermeldungen der Seiten), `FF_LIVE_NET=route` (API-Anfragen abbrechen statt `setOffline`),
+  `FF_LIVE_CHANNEL=chrome` (installiertes Chrome), `FF_LIVE_ONE=1` (nur Konto 1, Lauf endet nach C6),
+  `FF_LIVE_LOGFILE=<Pfad>` (Browser-Log, danach löschen). Konto 2 läuft immer in einem eigenen Browser.

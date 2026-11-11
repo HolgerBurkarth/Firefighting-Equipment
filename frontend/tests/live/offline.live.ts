@@ -229,14 +229,15 @@ interface Holder {
 async function chromiumPart(
     run: Run,
     browser: Browser,
+    browser2: Browser | null,
     accounts: LiveAccounts,
     allowed: Set<number>,
     originals: Map<number, Original>,
     holder: Holder,
 ): Promise<void> {
     const { results } = run;
-    const newContext = async (): Promise<BrowserContext> => {
-        const context = await browser.newContext({
+    const newContext = async (target: Browser): Promise<BrowserContext> => {
+        const context = await target.newContext({
             locale: 'de-DE',
             timezoneId: 'Europe/Berlin',
             serviceWorkers: 'allow',
@@ -244,21 +245,28 @@ async function chromiumPart(
         await installGuard(context, allowed, run.violations);
         return context;
     };
-    const ctx1 = await newContext();
-    const ctx2 = await newContext();
+    // Konto 2 läuft in einem eigenen Browser (nicht nur in einem eigenen Kontext): Zwei Kontexte
+    // mit Service Worker in EINEM Chromium stürzten im Live-Lauf gemeinsam ab (11.11.2026).
+    // `FF_LIVE_ONE=1` (Diagnose): nur Konto 1, Lauf endet nach C6.
+    const ctx1 = await newContext(browser);
+    const ctx2: BrowserContext | undefined = browser2 ? await newContext(browser2) : undefined;
     const p1 = await ctx1.newPage();
-    const p2 = await ctx2.newPage();
+    const p2: Page | undefined = ctx2 ? await ctx2.newPage() : undefined;
     holder.p1 = p1;
     diagnose(p1, 'p1');
-    diagnose(p2, 'p2');
     const rec1 = record(p1);
-    const rec2 = record(p2);
+    const rec2 = p2 ? record(p2) : [];
 
     await login(p1, accounts.user1, ACCOUNT_IDS.user1, 'Konto 1');
-    await login(p2, accounts.user2, ACCOUNT_IDS.user2, 'Konto 2');
+    if (p2) {
+        diagnose(p2, 'p2');
+        await login(p2, accounts.user2, ACCOUNT_IDS.user2, 'Konto 2');
+    }
 
     const listed = await api<{ devices: LiveDevice[] }>(p1, 'GET', 'devices?q=M9&limit=200');
-    const listed2 = await api<{ devices: LiveDevice[] }>(p2, 'GET', 'devices?q=M9&limit=200');
+    const listed2 = p2
+        ? await api<{ devices: LiveDevice[] }>(p2, 'GET', 'devices?q=M9&limit=200')
+        : listed;
     const visible2 = new Set(listed2.data.devices.map((device) => device.id));
     const pick: Pick = pickDevices(listed.data.devices, visible2);
     for (const device of Object.values(pick)) {
@@ -375,6 +383,10 @@ async function chromiumPart(
             'Konto 1: Offline-Umbuchen',
             'keine passende Ausrüstung M90–M99 (einsatzbereit, für beide Konten sichtbar)',
         );
+    }
+
+    if (!p2 || !ctx2) {
+        return;
     }
 
     // --- Konto 2 (Geräteträger): Benutzt melden und Tausch offline ---
@@ -564,12 +576,19 @@ async function main(): Promise<ResultList> {
     const allowed = new Set<number>();
     const originals = new Map<number, Original>();
     const holder: Holder = {};
-    const chrome = await chromium.launch(
-        process.env['FF_LIVE_CHANNEL'] === 'chrome' ? { channel: 'chrome' } : {},
-    );
+    const one = process.env['FF_LIVE_ONE'] === '1';
+    const logFile = process.env['FF_LIVE_LOGFILE'];
+    const launchOptions = {
+        ...(process.env['FF_LIVE_CHANNEL'] === 'chrome' && { channel: 'chrome' as const }),
+        ...(logFile && { args: ['--enable-logging', '--v=1', `--log-file=${logFile}`] }),
+    };
+    const chrome = await chromium.launch(launchOptions);
+    const chrome2 = one ? null : await chromium.launch();
     try {
-        await chromiumPart(run, chrome, accounts, allowed, originals, holder);
-        await webkitPart(run, accounts, allowed, holder);
+        await chromiumPart(run, chrome, chrome2, accounts, allowed, originals, holder);
+        if (!one) {
+            await webkitPart(run, accounts, allowed, holder);
+        }
     } finally {
         if (holder.p1) {
             const notes = await resetAll(holder.p1, originals);
@@ -580,6 +599,7 @@ async function main(): Promise<ResultList> {
                 ...(notes.length > 0 && { detail: notes.join('; ') }),
             });
         }
+        await chrome2?.close();
         await chrome.close();
         if (run.violations.length > 0) {
             results.items.push({
