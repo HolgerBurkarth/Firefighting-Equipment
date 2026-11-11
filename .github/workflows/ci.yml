@@ -146,10 +146,12 @@ jobs:
         with:
           path: ~/mariadb-client-debs
           key: mariadb-client-debs-${{ runner.os }}-${{ steps.mariadb-client.outputs.id }}
-      # Aus den lokalen Dateien; apt braucht dafür keine Paketquelle (alle Abhängigkeiten liegen dabei).
+      # Mit dpkg aus den lokalen Dateien, nicht mit apt-get: apt schlug fehl, weil die Paketlisten des
+      # Runners älter sind als die zwischengespeicherten Pakete und es andere Versionen nachladen wollte
+      # (CI 11.11.2026). Alle nötigen Abhängigkeiten liegen im Cache.
       - name: MariaDB-Client installieren
         run: |
-          sudo apt-get install -y -qq --no-install-recommends --no-download ~/mariadb-client-debs/*.deb
+          sudo dpkg -i ~/mariadb-client-debs/*.deb
           mysqldump --version
 
       - name: Testdatenbank einstellen
