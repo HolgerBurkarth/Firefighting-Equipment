@@ -3729,7 +3729,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `frontend/package-lock.json` sein; der Schritt „Playwright-Version“ bricht sonst ab (beim Anheben von
   Playwright Tag und Prüfwert in `ci.yml` mit ändern). PHP (`php -S`) kommt weiter von `setup-php`
   (im Container), Node von `setup-node`; Zahl der Teile, Reporter und Artefakte unverändert.
-  `HOME=/root` für Firefox, `--ipc=host` gegen Abstürze von Chromium. `scripts/install-browser-deps.sh`
+  `HOME=/root` für Firefox am Schritt „Playwright“ (der Runner setzt `HOME` der Schritte auf `/github/home`, `container.env` greift nicht), `--ipc=host` gegen Abstürze von Chromium. `scripts/install-browser-deps.sh`
   samt Test bleibt im Repository, wird vom Workflow aber nicht mehr aufgerufen.
 - Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Drei Ausnahmen, je mit
   `gh run rerun <id> --failed`:

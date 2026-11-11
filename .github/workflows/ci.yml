@@ -248,11 +248,10 @@ jobs:
     # @playwright/test in frontend/package-lock.json entsprechen (Schritt "Playwright-Version").
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
-      # Firefox braucht ein beschreibbares HOME; --ipc=host gegen Abstürze von Chromium durch zu
-      # kleinen gemeinsamen Speicher.
+      # --ipc=host gegen Abstürze von Chromium durch zu kleinen gemeinsamen Speicher. HOME für Firefox
+      # setzt der Schritt "Playwright" (der Runner überschreibt HOME der Schritte mit /github/home,
+      # eine Angabe hier greift nicht: Firefox startete nicht, CI 11.11.2026).
       options: --ipc=host
-      env:
-        HOME: /root
     # Normal 3–6 min (Container ziehen kostet etwa 1 min).
     timeout-minutes: 25
     strategy:
@@ -316,6 +315,7 @@ jobs:
         working-directory: frontend
         env:
           E2E_FILES: ${{ needs.changes.outputs.e2e_files }}
+          HOME: /root
         run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} $E2E_FILES
 
       # Teilbericht (Reporter blob, playwright.config.ts) für e2e-report; Traces gescheiterter Tests
