@@ -39,7 +39,13 @@ function admin(level: 'read' | 'write' | null = 'write') {
 const WORKSHOP = { id: 60, name: 'Werkstatt' };
 const STORE = { id: 70, name: 'Hauptlager' };
 
-const NOW = Date.now();
+// Feste Uhrzeit (Mittag am heutigen Berliner Kalendertag): „seit 5 Std.“ gilt nur am selben Kalendertag,
+// vor 05:00 Ortszeit läge „vor 5 Stunden“ am Vortag („seit 1 Tag“, nächtliche CI 11.11.2026). Die Seite
+// bekommt dieselbe Zeit über page.clock.
+const BERLIN_TODAY = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(
+    new Date(),
+);
+const NOW = Date.parse(`${BERLIN_TODAY}T11:00:00Z`);
 const ago = (hours: number): string =>
     new Date(NOW - hours * 3_600_000).toISOString().slice(0, 19) + 'Z';
 
@@ -198,6 +204,7 @@ test.describe('Wartung mit Recht „Ändern“', () => {
     });
 
     test.beforeEach(async ({ page }) => {
+        await page.clock.install({ time: NOW });
         await page.addInitScript(() => {
             const list: string[] = [];
             Object.assign(window, { __copied: list });
