@@ -240,9 +240,65 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # PHP und vendor/ für die Browser-Tests im Playwright-Container. Ohne apt: setup-php hing im
+  # Container bei den Ubuntu-Paketquellen (CI 11.11.2026, drei von acht Teilen bis zum Abbruch).
+  # PHP stammt aus dem offiziellen Image von Docker Hub (feste Version), vendor/ aus Composer auf dem
+  # Runner; beides geht als ein tar-Archiv (artifact-Zip verliert Rechte) in den Job e2e. Im Image
+  # fehlen gd, mysqli und pdo_mysql: `php -S` liefert in den Browser-Tests nur das Frontend aus und
+  # braucht keine Datenbank, daher `--ignore-platform-reqs`. Version nur zusammen mit PHP_VERSION ändern.
+  php-runtime:
+    name: PHP für die Browser-Tests
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Composer-Cache-Ordner
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+      - run: composer install --no-dev --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+
+      - name: PHP aus dem Image holen
+        env:
+          PHP_IMAGE: php:8.5.12-cli-bookworm
+        run: |
+          mkdir -p php-runtime/lib
+          docker run --rm -v "$PWD/php-runtime:/out" "$PHP_IMAGE" sh -c '
+            set -e
+            cp /usr/local/bin/php /out/php
+            cp /usr/local/etc/php/php.ini-production /out/php.ini
+            # Gemeinsame Bibliotheken des Images; die der C-Bibliothek hat der Playwright-Container (Ubuntu 24.04, neuer).
+            ldd /usr/local/bin/php | awk "/=> \//{print \$3}" | grep -vE "/(libc|libm|libdl|libpthread|librt|libresolv|libutil)\.so" | xargs -r -I{} cp -L {} /out/lib/
+          '
+          ls php-runtime php-runtime/lib
+          test ! -e vendor/composer/platform_check.php || { echo "::error::platform_check.php würde die fehlenden Erweiterungen im Container beanstanden"; exit 1; }
+          sudo chown -R "$(id -u):$(id -g)" php-runtime
+          tar czf php-runtime.tgz php-runtime vendor
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: php-runtime
+          path: php-runtime.tgz
+          if-no-files-found: error
+          retention-days: 1
+
   e2e:
     name: Browser-Tests (Teil ${{ matrix.shard }}/${{ strategy.job-total }})
-    needs: [changes, frontend-build]
+    needs: [changes, frontend-build, php-runtime]
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-24.04
     # Offizieller Playwright-Container: Browser und Systempakete sind schon darin, apt wird nicht
@@ -266,23 +322,25 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # PHP liefert den Build in den Browser-Tests aus (php -S, ohne Datenbank).
-      - uses: shivammathur/setup-php@v2
+      # PHP liefert den Build in den Browser-Tests aus (php -S, ohne Datenbank); Programm und vendor/
+      # kommen aus dem Job php-runtime. Der Wrapper setzt Bibliothekspfad und php.ini nur für php.
+      - uses: actions/download-artifact@v8
         with:
-          php-version: ${{ env.PHP_VERSION }}
-          extensions: ${{ env.PHP_EXTENSIONS }}
-          coverage: none
-          tools: composer:v2
-
-      - name: Composer-Cache-Ordner
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache/restore@v6
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-${{ runner.os }}-
-      - run: composer install --no-dev --no-interaction --no-progress --prefer-dist
+          name: php-runtime
+          path: ${{ runner.temp }}/php-runtime
+      - name: PHP bereitstellen
+        run: |
+          tar xzf "$RUNNER_TEMP/php-runtime/php-runtime.tgz" -C /opt php-runtime
+          tar xzf "$RUNNER_TEMP/php-runtime/php-runtime.tgz" -C "$GITHUB_WORKSPACE" vendor
+          cat > /usr/local/bin/php <<'WRAPPER'
+          #!/bin/sh
+          export LD_LIBRARY_PATH=/opt/php-runtime/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+          export PHPRC=/opt/php-runtime
+          exec /opt/php-runtime/php "$@"
+          WRAPPER
+          chmod +x /usr/local/bin/php
+          php -v
+          php -m | paste -sd' ' -
 
       - uses: actions/setup-node@v7
         with:
@@ -376,7 +434,7 @@ jobs:
 
   deploy:
     name: Branch deploy aktualisieren
-    needs: [changes, php, frontend-checks, frontend-build, e2e]
+    needs: [changes, php, frontend-checks, frontend-build, php-runtime, e2e]
     # Übersprungene PHP- bzw. Browser-Tests (Bereich nicht betroffen) blockieren nicht; gescheiterte
     # oder abgebrochene schon. Nachts und von Hand nie (nur Push).
     if: >-
@@ -384,6 +442,7 @@ jobs:
       needs.changes.result == 'success' && needs.frontend-checks.result == 'success' &&
       needs.frontend-build.result == 'success' &&
       (needs.php.result == 'success' || needs.php.result == 'skipped') &&
+      (needs.php-runtime.result == 'success' || needs.php-runtime.result == 'skipped') &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped')
     runs-on: ubuntu-24.04
     timeout-minutes: 10

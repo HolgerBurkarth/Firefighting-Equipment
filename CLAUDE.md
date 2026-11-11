@@ -3728,8 +3728,16 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `security.ubuntu.com`) von den Runnern aus nicht erreichbar, drei Läufe scheiterten vor dem ersten
   Test (GitHub meldete keine Störung). Die Version im Tag MUSS die von `@playwright/test` in
   `frontend/package-lock.json` sein; der Schritt „Playwright-Version“ bricht sonst ab (beim Anheben von
-  Playwright Tag und Prüfwert in `ci.yml` mit ändern). PHP (`php -S`) kommt weiter von `setup-php`
-  (im Container), Node von `setup-node`; Zahl der Teile, Reporter und Artefakte unverändert.
+  Playwright Tag und Prüfwert in `ci.yml` mit ändern). PHP (`php -S`) kommt NICHT aus `setup-php` im Container (hing
+  bei drei von acht Teilen bis zum Abbruch: `sudo: command not found`, dann apt gegen die Ubuntu-Quellen),
+  sondern aus dem Job `php-runtime` (Runner, braucht `changes`, nur bei `e2e == 'true'`): `php` und
+  die gemeinsamen Bibliotheken aus dem offiziellen Docker-Image `php:8.5.12-cli-bookworm` (feste Version,
+  zusammen mit `PHP_VERSION` ändern) und `vendor/` (`composer install --no-dev --ignore-platform-reqs`,
+  im Image fehlen gd, mysqli, pdo_mysql; `php -S` liefert in den Browser-Tests nur das Frontend aus,
+  `platform_check.php` darf nicht entstehen) als ein tar-Archiv (Artefakt `php-runtime`, 1 Tag). `e2e`
+  entpackt es nach `/opt/php-runtime` und legt `/usr/local/bin/php` als Wrapper an (setzt
+  `LD_LIBRARY_PATH` und `PHPRC` nur für php). `deploy` braucht `php-runtime` (grün oder übersprungen).
+  Node kommt von `setup-node`; Zahl der Teile, Reporter und Artefakte unverändert.
   `HOME=/root` für Firefox am Schritt „Playwright“ (der Runner setzt `HOME` der Schritte auf `/github/home`, `container.env` greift nicht), `--ipc=host` gegen Abstürze von Chromium. `scripts/install-browser-deps.sh`
   samt Test bleibt im Repository, wird vom Workflow aber nicht mehr aufgerufen.
 - Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Drei Ausnahmen, je mit
