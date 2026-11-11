@@ -74,6 +74,55 @@ async function openDevice(page: Page, identifier: string): Promise<void> {
     ).toBeVisible();
 }
 
+/**
+ * Diagnose (nur für die Fehlersuche, Umgebungsvariablen): `FF_LIVE_NET=route` bricht API-Anfragen
+ * ab statt `setOffline`, `FF_LIVE_CHANNEL=chrome` nimmt das installierte Chrome, `FF_LIVE_DIAG=1`
+ * schreibt Abstürze, Skriptfehler und Fehlermeldungen der Seiten (nur Text, gekürzt).
+ */
+const NET_MODE = process.env['FF_LIVE_NET'] === 'route' ? 'route' : 'offline';
+const abortApi = async (route: Route): Promise<void> => {
+    await route.abort();
+};
+
+async function setNet(context: BrowserContext, offline: boolean): Promise<void> {
+    if (NET_MODE === 'offline') {
+        await context.setOffline(offline);
+        return;
+    }
+    if (offline) {
+        await context.route('**/api/**', abortApi);
+    } else {
+        await context.unroute('**/api/**', abortApi);
+    }
+}
+
+function diagnose(page: Page, name: string): void {
+    if (process.env['FF_LIVE_DIAG'] !== '1') {
+        return;
+    }
+    const say = (text: string): void => {
+        process.stdout.write(`DIAG ${name} ${text.slice(0, 300)}
+`);
+    };
+    page.on('crash', () => {
+        say('CRASH der Seite');
+    });
+    page.on('pageerror', (error) => {
+        say(`pageerror ${error.message.slice(0, 200)}`);
+    });
+    page.on('console', (message) => {
+        if (message.type() === 'error' || message.type() === 'warning') {
+            say(`console.${message.type()} ${message.text()}`);
+        }
+    });
+    page.context().on('serviceworker', (worker) => {
+        say('Service Worker gestartet');
+        worker.on('close', () => {
+            say('Service Worker beendet');
+        });
+    });
+}
+
 async function bookStatus(
     page: Page,
     identifier: string,
@@ -200,6 +249,8 @@ async function chromiumPart(
     const p1 = await ctx1.newPage();
     const p2 = await ctx2.newPage();
     holder.p1 = p1;
+    diagnose(p1, 'p1');
+    diagnose(p2, 'p2');
     const rec1 = record(p1);
     const rec2 = record(p2);
 
@@ -239,7 +290,7 @@ async function chromiumPart(
             'C2',
             'Chromium: echtes Offline – Neuladen ohne Netz zeigt den Streifen, nicht die Anmeldung',
             async () => {
-                await ctx1.setOffline(true);
+                await setNet(ctx1, true);
                 await p1.reload();
                 await expect(p1.getByTestId('offline-notice')).toContainText(
                     'Offline – angezeigt wird der Stand vom',
@@ -268,7 +319,7 @@ async function chromiumPart(
             await route.abort();
         };
         await ctx1.route('**/api/v1/devices/*/state', blockState);
-        await ctx1.setOffline(false);
+        await setNet(ctx1, false);
         await results.step(
             'C5',
             'Chromium: Abmelden mit wartender Buchung fragt nach, „Abbrechen“ behält alles',
@@ -333,7 +384,7 @@ async function chromiumPart(
         'GET',
         'client-config',
     );
-    await ctx2.setOffline(true);
+    await setNet(ctx2, true);
     await p2.reload();
     await expect(p2.getByTestId('offline-notice')).toBeVisible();
     const queued: string[] = [];
@@ -383,7 +434,7 @@ async function chromiumPart(
     } else {
         results.skip('C8', 'Tausch offline', 'kein Paar gleichen Typs an verschiedenen Standorten');
     }
-    await ctx2.setOffline(false);
+    await setNet(ctx2, false);
     await sendNow(p2);
     await results.step(
         'C9',
@@ -405,7 +456,7 @@ async function chromiumPart(
             `Chromium: Konto 2 tauscht ${lateOut.identifier} ⇄ ${lateIn.identifier} offline, Konto 1 bucht den Ersatz online um – Hinweis im Ergebnis`,
             async () => {
                 await open(p2, 'suchen');
-                await ctx2.setOffline(true);
+                await setNet(ctx2, true);
                 await expect(p2.getByTestId('offline-notice')).toBeVisible();
                 await swapOffline(p2, lateOut.identifier, lateIn.identifier);
                 const now = await fresh(p1, lateIn.id);
@@ -415,7 +466,7 @@ async function chromiumPart(
                     comment: 'Live-Test: Ersatz inzwischen umgebucht',
                 });
                 expect(moved.status, 'Konto 1 bucht den Ersatz online um').toBe(200);
-                await ctx2.setOffline(false);
+                await setNet(ctx2, false);
                 await sendNow(p2);
                 const expected = queued.includes('devices/swap') ? 2 : 1;
                 await expect
@@ -435,7 +486,7 @@ async function chromiumPart(
             'kein zweites Paar gleichen Typs an verschiedenen Standorten',
         );
     }
-    await ctx2.setOffline(false);
+    await setNet(ctx2, false);
 }
 
 async function webkitPart(
@@ -503,14 +554,19 @@ async function webkitPart(
     }
 }
 
+let partialResults: ResultList | null = null;
+
 async function main(): Promise<ResultList> {
     const results = new ResultList();
+    partialResults = results;
     const run: Run = { results, violations: [] };
     const accounts = loadLiveAccounts();
     const allowed = new Set<number>();
     const originals = new Map<number, Original>();
     const holder: Holder = {};
-    const chrome = await chromium.launch();
+    const chrome = await chromium.launch(
+        process.env['FF_LIVE_CHANNEL'] === 'chrome' ? { channel: 'chrome' } : {},
+    );
     try {
         await chromiumPart(run, chrome, accounts, allowed, originals, holder);
         await webkitPart(run, accounts, allowed, holder);
@@ -553,7 +609,7 @@ async function execute(): Promise<void> {
     const text = [
         `Live-Lauf Offline ${new Date().toISOString()} – ${BASE_URL}`,
         WEBKIT_LIMIT,
-        results ? results.render() : '(keine Ergebnisse)',
+        (results ?? partialResults)?.render() ?? '(keine Ergebnisse)',
         fatal ? `ABBRUCH: ${fatal}` : '',
     ]
         .filter((line) => line !== '')
