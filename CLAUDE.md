@@ -3715,19 +3715,22 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Teilberichte mit `npx playwright merge-reports --reporter html` zu einem Bericht zusammen,
   Artefakt `playwright-report` (7 Tage, mit Traces gescheiterter Tests).
 - Caches: npm über `actions/setup-node` (`cache: npm`); Composer-Downloads über `actions/cache`
-  (Schlüssel `composer.lock`, angelegt im Job `php`, `e2e` liest nur); Playwright-Browser
-  (`~/.cache/ms-playwright`, Schlüssel = Playwright-Version, gespeichert gleich nach dem
-  Installieren nur von Teil 1). Die Systempakete installiert `npx playwright install-deps` in jedem
-  Teil über `scripts/install-browser-deps.sh` (seit 06.11.2026; der Mirror
-  `azure.archive.ubuntu.com` hing mehrmals bis zum Abbruch des Jobs, normal dauert der Schritt
-  25–70 s): je Versuch höchstens 180 s, insgesamt 3 Versuche, vor jeder Wiederholung übrig
-  gebliebene `apt-get`/`dpkg` beenden (`timeout` trifft nur `npx`, das von `sudo` gestartete
-  `apt-get` hielt sonst die Sperre von dpkg, CI 06.11.2026), `dpkg --configure -a` und Umstellen
-  auf `archive.ubuntu.com` in `/etc/apt/apt-mirrors.txt` (dorthin verweist `ubuntu.sources` der
-  Runner mit `mirror+file:`; apt wechselt den Mirror nur bei Fehlern, nicht bei langsamen
-  Downloads) sowie in `ubuntu.sources`/`sources.list`; Schritt höchstens 14 min, Job `e2e` 25 min. Danach ohne Treffer `npx playwright install` (nur die Browser). Tests
-  `tests/Unit/Scripts/InstallBrowserDepsTest` (Ersatz für Befehl, sudo und Paketquellen über
-  `FF_BROWSER_DEPS_*`, nur für Tests).
+  (Schlüssel `composer.lock`, angelegt im Job `php`, `e2e` liest nur); MariaDB-Client im Job `php`:
+  die `.deb`-Dateien von `mariadb-client` samt Abhängigkeiten in `~/mariadb-client-debs`
+  (Schlüssel `mariadb-client-debs-<OS>-<Version laut apt-cache policy>-<ImageVersion des Runners>`),
+  nur bei fehlendem Cache lädt `apt-get install --download-only` sie aus den Paketquellen; installiert
+  wird immer aus den lokalen Dateien (`--no-download`).
+- Job `e2e` läuft im offiziellen Playwright-Container (`container.image`
+  `mcr.microsoft.com/playwright:v<Version>-noble`, seit 11.11.2026, Vorgabe Holger): Browser und
+  Systempakete sind im Image, `apt`, `scripts/install-browser-deps.sh` und der Browser-Cache entfallen.
+  Grund: Am 11.11.2026 waren die Ubuntu-Paketquellen (`azure.archive.ubuntu.com`,
+  `security.ubuntu.com`) von den Runnern aus nicht erreichbar, drei Läufe scheiterten vor dem ersten
+  Test (GitHub meldete keine Störung). Die Version im Tag MUSS die von `@playwright/test` in
+  `frontend/package-lock.json` sein; der Schritt „Playwright-Version“ bricht sonst ab (beim Anheben von
+  Playwright Tag und Prüfwert in `ci.yml` mit ändern). PHP (`php -S`) kommt weiter von `setup-php`
+  (im Container), Node von `setup-node`; Zahl der Teile, Reporter und Artefakte unverändert.
+  `HOME=/root` für Firefox, `--ipc=host` gegen Abstürze von Chromium. `scripts/install-browser-deps.sh`
+  samt Test bleibt im Repository, wird vom Workflow aber nicht mehr aufgerufen.
 - Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Drei Ausnahmen, je mit
   `gh run rerun <id> --failed`:
   - Ein Lauf, der ausschließlich am bekannten Firefox-Fehler beim Schließen des Browser-Kontexts

@@ -119,10 +119,37 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      - name: MariaDB-Client (mysqldump wie auf dem Server)
+      # mysqldump wie auf dem Server. Die .deb-Dateien liegen im Cache (Schlüssel = Version des Pakets
+      # laut Paketliste des Runners und Version des Runner-Images); nur bei fehlendem Cache lädt apt sie
+      # aus den Paketquellen (Ausfall der Ubuntu-Paketquellen am 11.11.2026, CI rot vor dem ersten Test).
+      - name: Version des MariaDB-Clients
+        id: mariadb-client
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends mariadb-client
+          candidate=$(apt-cache policy mariadb-client | sed -n 's/^ *Candidate: //p')
+          echo "id=${candidate:-unbekannt}-${ImageVersion:-ohne-image}" >> "$GITHUB_OUTPUT"
+      - name: MariaDB-Client aus dem Cache
+        id: mariadb-client-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/mariadb-client-debs
+          key: mariadb-client-debs-${{ runner.os }}-${{ steps.mariadb-client.outputs.id }}
+      - name: MariaDB-Client laden (nur ohne Cache)
+        if: steps.mariadb-client-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq || true
+          sudo apt-get install -y -qq --no-install-recommends --download-only mariadb-client
+          mkdir -p ~/mariadb-client-debs
+          cp /var/cache/apt/archives/*.deb ~/mariadb-client-debs/
+      - name: MariaDB-Client in den Cache
+        if: steps.mariadb-client-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/mariadb-client-debs
+          key: mariadb-client-debs-${{ runner.os }}-${{ steps.mariadb-client.outputs.id }}
+      # Aus den lokalen Dateien; apt braucht dafür keine Paketquelle (alle Abhängigkeiten liegen dabei).
+      - name: MariaDB-Client installieren
+        run: |
+          sudo apt-get install -y -qq --no-install-recommends --no-download ~/mariadb-client-debs/*.deb
           mysqldump --version
 
       - name: Testdatenbank einstellen
@@ -216,7 +243,17 @@ jobs:
     needs: [changes, frontend-build]
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-24.04
-    # Normal 3–5 min; Reserve für bis zu drei Versuche der Systempakete (höchstens 14 min).
+    # Offizieller Playwright-Container: Browser und Systempakete sind schon darin, apt wird nicht
+    # gebraucht (Ausfall der Ubuntu-Paketquellen am 11.11.2026). Die Version MUSS der von
+    # @playwright/test in frontend/package-lock.json entsprechen (Schritt "Playwright-Version").
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      # Firefox braucht ein beschreibbares HOME; --ipc=host gegen Abstürze von Chromium durch zu
+      # kleinen gemeinsamen Speicher.
+      options: --ipc=host
+      env:
+        HOME: /root
+    # Normal 3–6 min (Container ziehen kostet etwa 1 min).
     timeout-minutes: 25
     strategy:
       # Alle Teile laufen zu Ende, damit der Bericht vollständig ist.
@@ -261,35 +298,18 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-      # Browser im Cache je Playwright-Version; die Systempakete installiert apt in jedem Lauf, mit
-      # Zeitgrenze je Versuch und Wiederholung über einen anderen Mirror (scripts/install-browser-deps.sh;
-      # der Mirror des Runners hing mehrmals bis zum Abbruch des Jobs).
+      # Image und npm-Paket müssen dieselbe Playwright-Version haben, sonst fände Playwright seine
+      # Browser nicht (sie liegen im Image unter PLAYWRIGHT_BROWSERS_PATH).
       - name: Playwright-Version
-        id: playwright
         working-directory: frontend
-        run: echo "version=$(npx playwright --version | sed 's/^Version //')" >> "$GITHUB_OUTPUT"
-      - name: Playwright-Browser aus dem Cache
-        id: playwright-cache
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - name: Systempakete der Browser
-        working-directory: frontend
-        timeout-minutes: 14
-        run: bash ../scripts/install-browser-deps.sh npx playwright install-deps chromium firefox webkit
-      - name: Playwright-Browser installieren
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        working-directory: frontend
-        run: npx playwright install chromium firefox webkit
-      # Gleich nach dem Installieren speichern (nicht erst am Ende: dort nur bei Erfolg), nur Teil 1,
-      # damit die Teile nicht gleichzeitig denselben Schlüssel anlegen.
-      - name: Playwright-Browser in den Cache
-        if: steps.playwright-cache.outputs.cache-hit != 'true' && matrix.shard == 1
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+        run: |
+          expected=1.64.1
+          actual=$(npx playwright --version | sed 's/^Version //')
+          echo "Playwright $actual, Image v$expected"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::Playwright $actual aus package-lock.json, aber das Image im Job e2e ist v$expected. Tag des Images in .github/workflows/ci.yml anpassen."
+            exit 1
+          fi
 
       # E2E_FILES: nur die betroffenen Testdateien (leer = alle), siehe Job "changes".
       - name: Playwright
