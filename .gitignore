@@ -25,3 +25,7 @@ Thumbs.db
 /login.json
 /request.json
 /reset.json
+
+# Live-Lauf (npm run test:live-offline): Zugangsdaten und Sitzungen nur lokal, nie committen
+/frontend/tests/live/.env.local
+/frontend/tests/live/*.storage.json

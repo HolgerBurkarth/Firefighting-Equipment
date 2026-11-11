@@ -16,6 +16,7 @@
     "test:unit:log": "node tests/unit/support/unitLog.ts",
     "test:e2e": "playwright test",
     "test:e2e:all": "playwright test --config playwright.all.config.ts",
+    "test:live-offline": "playwright test --config tests/live/playwright.live.config.ts",
     "test:load": "node tests/e2e/support/loadRun.ts",
     "measure:start": "node tests/e2e/support/measureStart.ts",
     "test": "npm run lint && npm run test:unit && npm run build && npm run test:e2e"

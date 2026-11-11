@@ -2,8 +2,11 @@
 
 Offline-Modus (KONZEPT.md, "Offline-Modus – Entscheidungen", 48–56) nur in der Test-Stadt
 `https://www.prodad.de/firefighting/test/`, mit Testgeräten M90–M99 (Werte danach zurücksetzen).
-Echtes Offline (Flugmodus) kann Claude im Browser nicht prüfen; diese Punkte macht Holger am iPhone.
-Ergebnisse bitte mit der Nummer eintragen (☑ bzw. ☒ mit Fund).
+Echtes Offline (Flugmodus) kann Claude im Browser nicht prüfen; diese Punkte machte Holger bisher am
+iPhone. Seit 11.11.2026 prüft das Skript `npm run test:live-offline` (siehe unten, Abschnitt „Live-Lauf
+Offline“) das meiste selbst mit echtem `setOffline` in Chromium; das iPhone entfällt als regelmäßige
+Prüfung und wird nur noch bei gemeldeten Problemen gebraucht. Ergebnisse bitte mit der Nummer eintragen
+(☑ bzw. ☒ mit Fund).
 
 ## Vorbereitung
 - iPhone mit der Test-Stadt als App auf dem Home-Bildschirm (oder Safari), angemeldet als Benutzer
@@ -97,3 +100,30 @@ Live geprüft am 04.11.2026 im Browser (Chrome, Test-Stadt, als Admin), Build `6
 - ☐ V5 (offen für Holger, iPhone) Warteschlange im neuen Format: offline buchen, dann online; die
   Buchung geht wie bisher raus (gespeichert jetzt als `{format: 1, bookings}`; ältere Listen liest
   die App weiter).
+
+## Live-Lauf Offline (Skript, ohne Holger)
+
+`npm run test:live-offline` in `frontend/` (Test-Stadt, zwei vorhandene Konten aus
+`frontend/tests/live/.env.local`, nur M90–M99, danach zurückgesetzt; Regeln in CLAUDE.md, „Autonomer
+Ablauf“, Schritt 5). Der Agent führt ihn nach jedem Deploy aus, der Offline, Warteschlange, Tausch,
+Benutzt melden, Service Worker oder Updates betrifft, und trägt das Ergebnis hier ein.
+
+Einmalig von Holger: Datei `frontend/tests/live/.env.local` anlegen (Vorlage `.env.local.example`
+daneben) mit `FF_LIVE_USER1_EMAIL`, `FF_LIVE_USER1_PASSWORD` (Konto #5 „Holger (Test)“) und
+`FF_LIVE_USER2_EMAIL`, `FF_LIVE_USER2_PASSWORD` (Konto #7 „Holger Test 1“). Die Datei ist nicht
+versioniert.
+
+Punkte des Laufs (Chromium, echtes Offline): C1 Service Worker und Kopie, C2 Neuladen ohne Netz
+(Streifen), C3 Suche aus der Kopie, C4 Umbuchen offline, C5 Abmelden mit wartender Buchung (Rückfrage,
+„Abbrechen“ behält alles), B8a Kontowechsel mit Warteschlange des anderen Kontos, C6 Senden genau
+einmal (Aktionszeit, `client_ref`), C7 Benutzt melden offline, C8 Tausch offline, C9 Senden von Konto 2
+genau einmal, C10 „Ersatz inzwischen woanders“ (Hinweis im Ergebnis). WebKit „iPhone 13“: W1–W3 (App-Logik,
+IndexedDB, Warteschlange, Senden mit abgebrochenen API-Anfragen; kein echtes Offline, keine Kamera, kein
+Flugmodus). G1 meldet Verstöße gegen den Schutz (fremde Adresse, andere Ausrüstung), R1 das Zurücksetzen.
+
+Bleibt für Holger nur bei gemeldeten Problemen: echtes iPhone im Flugmodus (B1–B9 wie oben), Kamera
+(B4), Uhr des Handys (B9) und B10 (Konfiguration des Servers).
+
+Läufe:
+- ☐ Noch kein Lauf (Datei `.env.local` fehlt noch; Rolle „Live-Test Geräteträger“ mit `device.swap`
+  sowie Lager und Sammelstelle richtet Claude ein).
