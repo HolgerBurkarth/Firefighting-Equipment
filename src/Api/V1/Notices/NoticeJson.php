@@ -8,6 +8,7 @@ use FirefightingEquipment\Api\V1\Auth\AuthJson;
 use FirefightingEquipment\Device\DeviceEventLocation;
 use FirefightingEquipment\Device\Notice\DeviceNotice;
 use FirefightingEquipment\Device\Notice\NoticeHistoryEntry;
+use FirefightingEquipment\Device\Notice\NoticeKind;
 use FirefightingEquipment\Device\Notice\NoticeUser;
 
 /**
@@ -33,7 +34,8 @@ final class NoticeJson
             'status' => $notice->status->value,
             'status_label' => $notice->status->label(),
             'stale_confirmed' => $notice->staleConfirmed,
-            'detail' => $notice->detail,
+            'detail' => NoticeKind::cleanDetail($notice->detail),
+            'detail_label' => $notice->detail === null ? null : $notice->kind->detailLabel(),
             'created_at' => AuthJson::time($notice->createdAt),
             'updated_at' => AuthJson::time($notice->updatedAt),
             'device' => ['id' => $notice->deviceId, 'identifier' => $notice->deviceIdentifier, 'device_type' => $notice->deviceTypeName],

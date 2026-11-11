@@ -330,6 +330,17 @@ describe('Texte und Filter des Protokolls', () => {
         ).toContain(
             'Unterschritten: Live-Test Wagen: 1 von mindestens 2 Live-Testtyp 2 einsatzbereit.',
         );
+        const swap = noticeExplanation(
+            notice(1, {
+                kind: 'swap_replacement_moved',
+                detail: 'Ersatz M93 war inzwischen nicht mehr einsatzbereit (in Wartung).',
+            }),
+        );
+        expect(swap).toContain(
+            'Grund: Ersatz M93 war inzwischen nicht mehr einsatzbereit (in Wartung).',
+        );
+        expect(swap).not.toContain('Unterschritten');
+        expect(swap).not.toContain('..');
         expect(otherStateHeading(notice(1))).toBe('Überschriebener Stand');
         expect(otherStateHeading(notice(1, { kind: 'history_only' }))).toBe('Stand beim Eingang');
     });

@@ -8,6 +8,14 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-11 – „Hinweis Tausch: Bezeichnung „Grund“ statt „Unterschritten“, kein doppelter Punkt“
+
+`GET notices`/`GET notices/{id}` liefern zusätzlich `detail_label` (`null` ohne `detail`, sonst „Sollbestand“
+bei `stock_below_minimum`, „Grund“ bei `swap_replacement_moved`; `NoticeKind::detailLabel`). `detail` endet nie
+mehr auf einen Punkt (`NoticeKind::cleanDetail`; neue Einträge werden ohne gespeichert). Die Mail zeigt „Grund: …“
+statt „Sollbestand: …“ beim Tausch; die Werkzeuge der Hinweise nennen `detail` und `detail_label`. Nur ein Feld
+kam hinzu. Tests: `StockSwapTest`, `NoticeKindTest`, Frontend `notices.spec.ts`.
+
 ## 2026-11-09 – „Verleih dauerhaft im Verlauf speichern (Runde 13)“
 
 Neue Spalte `fe_device_events.action` (Migration 0065, reine Erweiterung, ASCII, NULL erlaubt, CHECK: nur `lent` und nur bei

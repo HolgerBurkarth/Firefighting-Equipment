@@ -516,7 +516,7 @@ final class MailTemplates
             'Ausrüstung: ' . self::logValue($notice->deviceIdentifier) . ' (' . $notice->deviceTypeName . ')',
         ];
         if ($notice->detail !== null) {
-            $lines[] = 'Sollbestand: ' . self::logValue($notice->detail);
+            $lines[] = $notice->kind->detailLabel() . ': ' . self::logValue(NoticeKind::cleanDetail($notice->detail) ?? '');
         }
         array_push($lines,
             '',

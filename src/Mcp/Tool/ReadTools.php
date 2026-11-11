@@ -569,6 +569,8 @@ final class ReadTools
             'status' => $notice['status'] ?? null,
             'status_label' => $notice['status_label'] ?? null,
             'stale_confirmed' => $notice['stale_confirmed'] ?? false,
+            'detail' => is_string($notice['detail'] ?? null) ? $notice['detail'] : null,
+            'detail_label' => is_string($notice['detail_label'] ?? null) ? $notice['detail_label'] : null,
             'equipment' => ['id' => $device['id'] ?? null, 'number' => $device['identifier'] ?? null, 'equipment_type' => $device['device_type'] ?? null],
             'booking' => [
                 'user' => is_array($booking['user'] ?? null) ? ($booking['user']['name'] ?? null) : null,

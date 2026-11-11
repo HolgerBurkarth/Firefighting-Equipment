@@ -118,9 +118,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
      Ändert der Push nur `.md`-Dateien, läuft keine CI und es gibt nichts zu deployen.
   3. Rot: `gh run view <id> --log-failed` lesen, Ursache in der „✅ FERTIG“-Meldung erklären,
      beheben, committen, pushen. Höchstens 3 Reparaturversuche je Fehler, danach anhalten und
-     berichten („⛔ ABGEBROCHEN“). Nie einfach neu starten; zwei Ausnahmen (siehe "GitHub Actions
+     berichten („⛔ ABGEBROCHEN“). Nie einfach neu starten; Ausnahmen (siehe "GitHub Actions
      (CI)"), je EINMAL mit `gh run rerun <id> --failed`: Ein Lauf, der AUSSCHLIESSLICH am bekannten
-     Firefox-Fehler #43413 scheitert, und (seit 05.11.2026) ein Job, der beim Einrichten des Runners
+     Firefox-Fehler #43413 scheitert, bei einer Störung der Infrastruktur vor dem ersten Test (Paketquellen,
+     GitHub, Browser-Download) nach mindestens 30 Minuten Wartezeit einmal (seit 11.11.2026, Einzelheiten
+     unter "GitHub Actions (CI)"), und (seit 05.11.2026) ein Job, der beim Einrichten des Runners
      scheitert, bevor der erste Test bzw. die erste Prüfung läuft (z. B. Paket-Mirror, Download von
      Browsern oder Paketen, Netzwerk des Runners), einmal je Lauf. Die „✅ FERTIG“-Meldung nennt
      dann die Ursache mit der Zeile aus dem Protokoll. Scheitert ein Test oder eine Prüfung, gilt
@@ -3235,7 +3237,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`NoticeListHandler`, `NoticeActionHandler` mit `NoticeAction`, `NoticeJson`). Tests:
   `tests/Integration/Device/DeviceNoticeTest`, `DeviceNoticeSchemaTest`,
   `tests/Integration/Notification/DeviceNoticeNotificationTest`.
-- `detail` (Migration `0063`, JSON `notice.detail`, Mail-Zeile „Sollbestand: …“, App: `noticeExplanation` „Unterschritten: …“): bei
+- `detail` (Migration `0063`, JSON `notice.detail` ohne Punkt am Ende (`NoticeKind::cleanDetail`, auch für ältere Einträge) und `notice.detail_label` (`NoticeKind::detailLabel`: „Sollbestand“, beim Tausch „Grund“), Mail-Zeile „Sollbestand: …“ bzw. „Grund: …“, App: `noticeExplanation` „Unterschritten: …“ bzw. „Grund: …“, Claude-Werkzeug `get_notice`/`list_notices` mit `detail` und `detail_label`): bei
   `stock_below_minimum` die unterschrittene Regel („HLF 20 / G1: 1 von mindestens 2 Atemschutzmaske einsatzbereit“,
   `StockViolation::detail`), sonst `null`.
 - Tabellen: `fe_device_notices` (Migration `0027`; ein Hinweis je Quittung, `booking_id` eindeutig;
@@ -3726,7 +3728,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Downloads) sowie in `ubuntu.sources`/`sources.list`; Schritt höchstens 14 min, Job `e2e` 25 min. Danach ohne Treffer `npx playwright install` (nur die Browser). Tests
   `tests/Unit/Scripts/InstallBrowserDepsTest` (Ersatz für Befehl, sudo und Paketquellen über
   `FF_BROWSER_DEPS_*`, nur für Tests).
-- Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Zwei Ausnahmen, je mit
+- Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Drei Ausnahmen, je mit
   `gh run rerun <id> --failed`:
   - Ein Lauf, der ausschließlich am bekannten Firefox-Fehler beim Schließen des Browser-Kontexts
     scheitert (`_maybeDontRestoreTabs`, [microsoft/playwright#43413](https://github.com/microsoft/playwright/issues/43413),
@@ -3736,6 +3738,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     läuft (z. B. Paket-Mirror bei `install-deps`, Download von Browsern oder Paketen, Netzwerk des
     Runners), darf EINMAL je Lauf wiederholt werden (seit 05.11.2026). Die „✅ FERTIG“-Meldung nennt
     die Ursache mit der Zeile aus dem Protokoll.
+  - Dritte Ausnahme (seit 11.11.2026, Vorgabe Holger): Scheitert ein Lauf, bevor ein Test läuft,
+    nachweislich an der Infrastruktur (z. B. Paketquellen wie `security.ubuntu.com` nicht erreichbar,
+    GitHub-Störung, Download der Browser), darf er nach mindestens 30 Minuten Wartezeit EINMAL neu
+    gestartet werden (`gh run rerun <id> --failed` bzw. `workflow_dispatch`). Scheitert er wieder,
+    anhalten und berichten („⛔ ABGEBROCHEN“).
   Scheitert auch der neue Lauf, wird nicht noch einmal neu gestartet, sondern untersucht. Scheitert
   ein Test oder eine Prüfung, gilt immer: untersuchen, nicht neu starten.
 - Job `deploy`: nur bei Push auf `main` und nur, wenn `changes`, `frontend-checks` und
