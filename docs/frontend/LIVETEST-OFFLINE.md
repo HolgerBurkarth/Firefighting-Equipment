@@ -136,6 +136,20 @@ Läufe:
   Schleife der Seite nach Neuladen ohne Netz); Wiederholung erst nach Klärung. M90–M95 danach
   unverändert (einsatzbereit, Anfangsstandorte); der Hinweis `swap_replacement_moved` im Protokoll
   bleibt für Claude als Admin.
+- 11.11.2026, Nachtrag zum Absturz (Ursache geklärt): Es war KEIN Speicherproblem der App und kein Absturz beim
+  Speichern. Mit Speichermessung (`FF_LIVE_MEM=1`) blieb die Seite bei 5–32 MB (alle Chromium-Prozesse rund
+  280 MB), keine Schleife (Stichproben der Aufrufliste im Leerlauf). Der Klick auf die Karte von M94 in
+  `openDevice` wartete ohne Ende, weil das Muster `M94` nie passte (Text der Karte „M94Live-Testtyp 2 …“
+  ohne Wortgrenze); nach 10 Minuten (Zeitgrenze des Tests) beendete Playwright den Browser, daher „Page crashed“
+  in beiden Browsern gleichzeitig. Behoben mit `cardTextPattern` (Test `memoryGuard.spec.ts`). Der lokale
+  Browser-Test `offlineReload.spec.ts` (Neuladen ohne Netz, dann Standort, Status, Benutzt melden offline mit
+  Lager und Sammelstelle, Speichergrenze) lief von Anfang an grün.
+- 11.11.2026, Lauf 1 nach der Korrektur (beide Konten, WebKit, `FF_LIVE_MEM=1`): ☑ C1–C8, ☒ C9 (Messfehler des
+  Skripts: Die Antwort wurde gezählt, bevor sie aufgezeichnet war; kein Fehler der App), ☑ C10, ☑ W1–W3, ☑ R1.
+- 11.11.2026, Lauf 2 (Skript korrigiert, `expectSentOnce` wartet auf die Antwort): ☑ C1, ☑ C2, ☑ C3, ☑ C4, ☑ C5,
+  ☑ B8a, ☑ C6, ☑ C7, ☑ C8, ☑ C9, ☑ C10, ☑ W1, ☑ W2, ☑ W3, ☑ R1 (alle bestanden). Höchster Seitenspeicher 32 MB,
+  Schutz nicht ausgelöst. M90–M95 danach auf dem Anfangsstand.
+- Weitere Diagnose-Schalter: `FF_LIVE_MEM=1` (Speichermessung und Schutz, `test-results/live-memory.txt`).
 - Diagnose-Schalter des Skripts (Umgebungsvariablen): `FF_LIVE_DIAG=1` (Abstürze, Skriptfehler und
   Fehlermeldungen der Seiten), `FF_LIVE_NET=route` (API-Anfragen abbrechen statt `setOffline`),
   `FF_LIVE_CHANNEL=chrome` (installiertes Chrome), `FF_LIVE_ONE=1` (nur Konto 1, Lauf endet nach C6),

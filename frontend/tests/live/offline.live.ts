@@ -53,7 +53,10 @@ function sent(list: Recorded[], path: string): Recorded[] {
 }
 
 /** Die Buchung ging genau einmal raus, mit Aktionszeit und client_ref. */
-function expectSentOnce(list: Recorded[], path: string): void {
+async function expectSentOnce(list: Recorded[], path: string): Promise<void> {
+    // Die Antwort wird erst nach dem Zustand „angekommen“ aufgezeichnet: kurz warten, dann genau prüfen
+    // (zu viele Antworten fallen im Wartefenster auf, weil es nur bei 0 weitergeht).
+    await expect.poll(() => sent(list, path).length, { timeout: 30_000 }).toBeGreaterThan(0);
     const entries = sent(list, path);
     expect(entries, `Antworten 200 auf POST ${path}`).toHaveLength(1);
     expect(entries[0]?.request).toMatchObject({
@@ -401,7 +404,7 @@ async function chromiumPart(
                 await expect(
                     p1.getByTestId('queued-done').filter({ hasText: a.identifier }),
                 ).toBeVisible();
-                expectSentOnce(rec1, `devices/${String(a.id)}/state`);
+                await expectSentOnce(rec1, `devices/${String(a.id)}/state`);
                 expect((await fresh(p1, a.id)).status).toBe(target);
             },
         );
@@ -483,7 +486,7 @@ async function chromiumPart(
             expect(queued.length, 'Es wurde nichts in die Warteschlange gelegt').toBeGreaterThan(0);
             await expect(p2.getByTestId('queued-waiting')).toHaveCount(0);
             for (const path of queued) {
-                expectSentOnce(rec2, path);
+                await expectSentOnce(rec2, path);
             }
         },
     );
@@ -586,7 +589,7 @@ async function webkitPart(
                 await expect(
                     page.getByTestId('queued-done').filter({ hasText: now.identifier }),
                 ).toBeVisible();
-                expectSentOnce(rec, `devices/${String(bookingId)}/state`);
+                await expectSentOnce(rec, `devices/${String(bookingId)}/state`);
             },
         );
     } finally {
