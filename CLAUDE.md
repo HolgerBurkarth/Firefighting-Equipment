@@ -3719,7 +3719,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   die `.deb`-Dateien von `mariadb-client` samt Abhängigkeiten in `~/mariadb-client-debs`
   (Schlüssel `mariadb-client-debs-<OS>-<Version laut apt-cache policy>-<ImageVersion des Runners>`),
   nur bei fehlendem Cache lädt `apt-get install --download-only` sie aus den Paketquellen; installiert
-  wird immer aus den lokalen Dateien mit `dpkg -i` (`apt-get` wollte wegen älterer Paketlisten andere
+  wird immer aus den lokalen Dateien mit `dpkg -i` nach `dpkg --remove` des vorinstallierten `mysql-client-8.0` (`apt-get` wollte wegen älterer Paketlisten andere
   Versionen nachladen).
 - Job `e2e` läuft im offiziellen Playwright-Container (`container.image`
   `mcr.microsoft.com/playwright:v<Version>-noble`, seit 11.11.2026, Vorgabe Holger): Browser und
