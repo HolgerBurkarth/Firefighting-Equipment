@@ -118,9 +118,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
      Ändert der Push nur `.md`-Dateien, läuft keine CI und es gibt nichts zu deployen.
   3. Rot: `gh run view <id> --log-failed` lesen, Ursache in der „✅ FERTIG“-Meldung erklären,
      beheben, committen, pushen. Höchstens 3 Reparaturversuche je Fehler, danach anhalten und
-     berichten („⛔ ABGEBROCHEN“). Nie einfach neu starten; zwei Ausnahmen (siehe "GitHub Actions
+     berichten („⛔ ABGEBROCHEN“). Nie einfach neu starten; Ausnahmen (siehe "GitHub Actions
      (CI)"), je EINMAL mit `gh run rerun <id> --failed`: Ein Lauf, der AUSSCHLIESSLICH am bekannten
-     Firefox-Fehler #43413 scheitert, und (seit 05.11.2026) ein Job, der beim Einrichten des Runners
+     Firefox-Fehler #43413 scheitert, bei einer Störung der Infrastruktur vor dem ersten Test (Paketquellen,
+     GitHub, Browser-Download) nach mindestens 30 Minuten Wartezeit einmal (seit 11.11.2026, Einzelheiten
+     unter "GitHub Actions (CI)"), und (seit 05.11.2026) ein Job, der beim Einrichten des Runners
      scheitert, bevor der erste Test bzw. die erste Prüfung läuft (z. B. Paket-Mirror, Download von
      Browsern oder Paketen, Netzwerk des Runners), einmal je Lauf. Die „✅ FERTIG“-Meldung nennt
      dann die Ursache mit der Zeile aus dem Protokoll. Scheitert ein Test oder eine Prüfung, gilt
@@ -170,7 +172,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
        `docs/frontend/LIVETEST-OFFLINE.md` bzw. `LIVETEST-PHASE-2.md` ein. Voraussetzung in der
        Test-Stadt (richtet Claude ein): Lager Gerätehaus (Aufgabe Lager) und Kleiderkammer (Sammelstelle)
        dauerhaft freigeschaltet, Rolle „Live-Test Geräteträger“ (ID 23) mit `device.used` und
-       `device.swap`. Ein echtes iPhone entfällt als regelmäßige Prüfung („nur bei gemeldeten
+       `device.swap`. Diagnose-Schalter (nur Fehlersuche): `FF_LIVE_ONE=1` nur Konto 1, `FF_LIVE_MEM=1` misst alle 500 ms den Speicher der Seite und aller Chromium-Prozesse (`tests/live/support/memoryGuard.ts`, Ausgabe `test-results/live-memory.txt`) und schließt den Browser bei über 1 GB Seite, über 3 GB gesamt, 10 s ununterbrochenem Wachstum oder 10 s ohne Antwort. Der „Absturz“ vom 11.11.2026 war kein Speicherproblem der App: Der Klick auf die Karte wartete wegen eines falschen Musters (`` im zusammengesetzten Kartentext, jetzt `cardTextPattern`) bis zum Ende der Testzeit, dann beendete Playwright den Browser. Ein Test, der in der Live-Umgebung hängt, braucht eine kurze Zeitgrenze je Aktion. Ein echtes iPhone entfällt als regelmäßige Prüfung („nur bei gemeldeten
        Problemen“). Nach jedem Deploy, der Offline, Warteschlange, Tausch, Benutzt melden, Service
        Worker oder Updates betrifft, führt der Agent den Lauf selbst aus (Befehl in `frontend/`, Dauer
        einige Minuten, Zeitgrenze 10 Minuten) und nennt das Ergebnis in der „✅ FERTIG“-Meldung. Fehlt die
@@ -3235,7 +3237,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`NoticeListHandler`, `NoticeActionHandler` mit `NoticeAction`, `NoticeJson`). Tests:
   `tests/Integration/Device/DeviceNoticeTest`, `DeviceNoticeSchemaTest`,
   `tests/Integration/Notification/DeviceNoticeNotificationTest`.
-- `detail` (Migration `0063`, JSON `notice.detail`, Mail-Zeile „Sollbestand: …“, App: `noticeExplanation` „Unterschritten: …“): bei
+- `detail` (Migration `0063`, JSON `notice.detail` ohne Punkt am Ende (`NoticeKind::cleanDetail`, auch für ältere Einträge) und `notice.detail_label` (`NoticeKind::detailLabel`: „Sollbestand“, beim Tausch „Grund“), Mail-Zeile „Sollbestand: …“ bzw. „Grund: …“, App: `noticeExplanation` „Unterschritten: …“ bzw. „Grund: …“, Claude-Werkzeug `get_notice`/`list_notices` mit `detail` und `detail_label`): bei
   `stock_below_minimum` die unterschrittene Regel („HLF 20 / G1: 1 von mindestens 2 Atemschutzmaske einsatzbereit“,
   `StockViolation::detail`), sonst `null`.
 - Tabellen: `fe_device_notices` (Migration `0027`; ein Hinweis je Quittung, `booking_id` eindeutig;
@@ -3713,20 +3715,32 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Teilberichte mit `npx playwright merge-reports --reporter html` zu einem Bericht zusammen,
   Artefakt `playwright-report` (7 Tage, mit Traces gescheiterter Tests).
 - Caches: npm über `actions/setup-node` (`cache: npm`); Composer-Downloads über `actions/cache`
-  (Schlüssel `composer.lock`, angelegt im Job `php`, `e2e` liest nur); Playwright-Browser
-  (`~/.cache/ms-playwright`, Schlüssel = Playwright-Version, gespeichert gleich nach dem
-  Installieren nur von Teil 1). Die Systempakete installiert `npx playwright install-deps` in jedem
-  Teil über `scripts/install-browser-deps.sh` (seit 06.11.2026; der Mirror
-  `azure.archive.ubuntu.com` hing mehrmals bis zum Abbruch des Jobs, normal dauert der Schritt
-  25–70 s): je Versuch höchstens 180 s, insgesamt 3 Versuche, vor jeder Wiederholung übrig
-  gebliebene `apt-get`/`dpkg` beenden (`timeout` trifft nur `npx`, das von `sudo` gestartete
-  `apt-get` hielt sonst die Sperre von dpkg, CI 06.11.2026), `dpkg --configure -a` und Umstellen
-  auf `archive.ubuntu.com` in `/etc/apt/apt-mirrors.txt` (dorthin verweist `ubuntu.sources` der
-  Runner mit `mirror+file:`; apt wechselt den Mirror nur bei Fehlern, nicht bei langsamen
-  Downloads) sowie in `ubuntu.sources`/`sources.list`; Schritt höchstens 14 min, Job `e2e` 25 min. Danach ohne Treffer `npx playwright install` (nur die Browser). Tests
-  `tests/Unit/Scripts/InstallBrowserDepsTest` (Ersatz für Befehl, sudo und Paketquellen über
-  `FF_BROWSER_DEPS_*`, nur für Tests).
-- Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Zwei Ausnahmen, je mit
+  (Schlüssel `composer.lock`, angelegt im Job `php`, `e2e` liest nur); MariaDB-Client im Job `php`:
+  die `.deb`-Dateien von `mariadb-client` samt Abhängigkeiten in `~/mariadb-client-debs`
+  (Schlüssel `mariadb-client-debs-<OS>-<Version laut apt-cache policy>-<ImageVersion des Runners>`),
+  nur bei fehlendem Cache lädt `apt-get install --download-only` sie aus den Paketquellen; installiert
+  wird immer aus den lokalen Dateien mit `dpkg -i` nach `dpkg --remove` der vorinstallierten MySQL-Pakete des Runners (Client und Server, Konflikt) (`apt-get` wollte wegen älterer Paketlisten andere
+  Versionen nachladen).
+- Job `e2e` läuft im offiziellen Playwright-Container (`container.image`
+  `mcr.microsoft.com/playwright:v<Version>-noble`, seit 11.11.2026, Vorgabe Holger): Browser und
+  Systempakete sind im Image, `apt`, `scripts/install-browser-deps.sh` und der Browser-Cache entfallen.
+  Grund: Am 11.11.2026 waren die Ubuntu-Paketquellen (`azure.archive.ubuntu.com`,
+  `security.ubuntu.com`) von den Runnern aus nicht erreichbar, drei Läufe scheiterten vor dem ersten
+  Test (GitHub meldete keine Störung). Die Version im Tag MUSS die von `@playwright/test` in
+  `frontend/package-lock.json` sein; der Schritt „Playwright-Version“ bricht sonst ab (beim Anheben von
+  Playwright Tag und Prüfwert in `ci.yml` mit ändern). PHP (`php -S`) kommt NICHT aus `setup-php` im Container (hing
+  bei drei von acht Teilen bis zum Abbruch: `sudo: command not found`, dann apt gegen die Ubuntu-Quellen),
+  sondern aus dem Job `php-runtime` (Runner, braucht `changes`, nur bei `e2e == 'true'`): `php` und
+  die gemeinsamen Bibliotheken aus dem offiziellen Docker-Image `php:8.5.12-cli-bookworm` (feste Version,
+  zusammen mit `PHP_VERSION` ändern) und `vendor/` (`composer install --no-dev --ignore-platform-reqs`,
+  im Image fehlen gd, mysqli, pdo_mysql; `php -S` liefert in den Browser-Tests nur das Frontend aus,
+  `platform_check.php` darf nicht entstehen) als ein tar-Archiv (Artefakt `php-runtime`, 1 Tag). `e2e`
+  entpackt es nach `/opt/php-runtime` und legt `/usr/local/bin/php` als Wrapper an (setzt
+  `LD_LIBRARY_PATH` und `PHPRC` nur für php). `deploy` braucht `php-runtime` (grün oder übersprungen).
+  Node kommt von `setup-node`; Zahl der Teile, Reporter und Artefakte unverändert.
+  `HOME=/root` für Firefox am Schritt „Playwright“ (der Runner setzt `HOME` der Schritte auf `/github/home`, `container.env` greift nicht), `--ipc=host` gegen Abstürze von Chromium. `scripts/install-browser-deps.sh`
+  samt Test bleibt im Repository, wird vom Workflow aber nicht mehr aufgerufen.
+- Rote CI-Läufe werden nicht neu gestartet, sondern untersucht. Drei Ausnahmen, je mit
   `gh run rerun <id> --failed`:
   - Ein Lauf, der ausschließlich am bekannten Firefox-Fehler beim Schließen des Browser-Kontexts
     scheitert (`_maybeDontRestoreTabs`, [microsoft/playwright#43413](https://github.com/microsoft/playwright/issues/43413),
@@ -3736,6 +3750,11 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
     läuft (z. B. Paket-Mirror bei `install-deps`, Download von Browsern oder Paketen, Netzwerk des
     Runners), darf EINMAL je Lauf wiederholt werden (seit 05.11.2026). Die „✅ FERTIG“-Meldung nennt
     die Ursache mit der Zeile aus dem Protokoll.
+  - Dritte Ausnahme (seit 11.11.2026, Vorgabe Holger): Scheitert ein Lauf, bevor ein Test läuft,
+    nachweislich an der Infrastruktur (z. B. Paketquellen wie `security.ubuntu.com` nicht erreichbar,
+    GitHub-Störung, Download der Browser), darf er nach mindestens 30 Minuten Wartezeit EINMAL neu
+    gestartet werden (`gh run rerun <id> --failed` bzw. `workflow_dispatch`). Scheitert er wieder,
+    anhalten und berichten („⛔ ABGEBROCHEN“).
   Scheitert auch der neue Lauf, wird nicht noch einmal neu gestartet, sondern untersucht. Scheitert
   ein Test oder eine Prüfung, gilt immer: untersuchen, nicht neu starten.
 - Job `deploy`: nur bei Push auf `main` und nur, wenn `changes`, `frontend-checks` und

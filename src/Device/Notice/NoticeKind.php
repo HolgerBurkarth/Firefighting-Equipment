@@ -47,6 +47,25 @@ enum NoticeKind: string
     }
 
     /**
+     * Bezeichnung der Angabe `detail` (Sollbestand bzw. Grund beim Tausch), für App, Mail und Werkzeuge.
+     */
+    public function detailLabel(): string
+    {
+        return match ($this) {
+            self::SwapReplacementMoved => 'Grund',
+            default => 'Sollbestand',
+        };
+    }
+
+    /**
+     * Angabe ohne Punkt am Ende (die Sätze der Anzeige setzen ihren eigenen; ältere Einträge enden noch mit einem).
+     */
+    public static function cleanDetail(?string $detail): ?string
+    {
+        return $detail === null ? null : rtrim($detail, ". 	");
+    }
+
+    /**
      * Kurzer Grund für den Betreff der Mail („Log <Stadt>: Hinweis – <Gerät> <Grund>“).
      */
     public function subjectReason(): string

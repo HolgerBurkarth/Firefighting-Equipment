@@ -27,6 +27,15 @@ final class NoticeKindTest extends TestCase
         self::assertNull(NoticeKind::forResult(null, false));
     }
 
+    public function testDetailLabelAndCleanDetail(): void
+    {
+        self::assertSame('Grund', NoticeKind::SwapReplacementMoved->detailLabel());
+        self::assertSame('Sollbestand', NoticeKind::StockBelowMinimum->detailLabel());
+        self::assertSame('Ersatz M93 war nicht einsatzbereit (in Wartung)', NoticeKind::cleanDetail('Ersatz M93 war nicht einsatzbereit (in Wartung).'));
+        self::assertSame('HLF: 1 von 2', NoticeKind::cleanDetail('HLF: 1 von 2'));
+        self::assertNull(NoticeKind::cleanDetail(null));
+    }
+
     public function testValuesMatchSchemaAndHaveGermanLabels(): void
     {
         self::assertSame(

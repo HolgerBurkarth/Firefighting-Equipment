@@ -654,9 +654,9 @@ final readonly class DeviceRepository
                 if (!$offline) {
                     throw DeviceRuleViolationException::because(sprintf('%s ist nicht einsatzbereit und kann nicht als Ersatz dienen.', $in->identifier->value));
                 }
-                $replacementProblem = sprintf('Ersatz %s war inzwischen nicht mehr einsatzbereit (%s).', $in->identifier->value, $in->status->label());
+                $replacementProblem = sprintf('Ersatz %s war inzwischen nicht mehr einsatzbereit (%s)', $in->identifier->value, $in->status->label());
             } elseif ($offline && $in->version !== $inVersion && ($in->stateVersion ?? $in->version) > $inVersion) {
-                $replacementProblem = sprintf('Ersatz %s war inzwischen anders gebucht (%s).', $in->identifier->value, $in->locationPath());
+                $replacementProblem = sprintf('Ersatz %s war inzwischen anders gebucht (%s)', $in->identifier->value, $in->locationPath());
             }
 
             $outLocation = $outChange->locationId ?? $out->locationId;

@@ -81,11 +81,16 @@ const KIND_EXPLANATIONS: Readonly<Partial<Record<string, string>>> = {
         'Beim Tausch war der Ersatz inzwischen woanders. Der Tausch wurde trotzdem gebucht; bitte prüfen, ob der Bestand stimmt.',
 };
 
+/** Bezeichnung der Angabe `detail` (wie `NoticeKind::detailLabel`). */
+function detailLabel(kind: string): string {
+    return kind === 'swap_replacement_moved' ? 'Grund' : 'Unterschritten';
+}
+
 export function noticeExplanation(notice: Notice): string | null {
     const base = KIND_EXPLANATIONS[notice.kind] ?? null;
     const text =
         base !== null && notice.detail !== null
-            ? `${base} Unterschritten: ${notice.detail}.`
+            ? `${base} ${detailLabel(notice.kind)}: ${notice.detail.replace(/[.\s]+$/u, '')}.`
             : base;
     if (notice.staleConfirmed && notice.kind !== 'stale_confirmed') {
         const stale =

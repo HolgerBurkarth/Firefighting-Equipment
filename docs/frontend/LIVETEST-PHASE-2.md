@@ -142,3 +142,13 @@ Vom Agenten im Browser (Test-Stadt, Admin; `health` ok, keine Migration):
 - ☑ Bestehender Verlauf der Test-Stadt lässt sich über den Claude-Konnektor lesen (`list_city_history`); die früheren Verleihe (vor der Spalte, ohne Wert) heißen erwartungsgemäß „Umgebucht“.
 - ☑ Verleih bleibt „Verliehen“ (Claude im Chat, 09.11.2026): M94 an Hattingen verliehen, zurückgebucht, dann Aufgabe „Ausgeliehen an“ abgeschaltet → Verlauf, „Letzte Aktivitäten“ und CSV-Export zeigen weiter „Verliehen“. Log-Mail nicht geprüft (lokal durch `LoanTest` abgedeckt).
 - ☑ Claude-Werkzeuge der Abläufe aus Runde 12: geprüft, Ergebnisse in `LIVETEST-MCP.md`, „Runde 12“ und „Runde 14“.
+
+## Live-Lauf Offline (Skript, 11.11.2026)
+
+Siehe `LIVETEST-OFFLINE.md`, Abschnitt „Live-Lauf Offline“. Lauf 2 nach der Korrektur des Skripts, Test-Stadt, Build
+des Standes vom 11.11.2026, beide Konten:
+- ☑ Benutzt melden offline (C7) und Senden genau einmal (C9) mit Aktionszeit und `client_ref`.
+- ☑ Tausch offline (C8) und Senden von Konto 2 genau einmal (C9).
+- ☑ „Ersatz inzwischen woanders“: Hinweis `notice_id` im Ergebnis (C10).
+- ☑ WebKit „iPhone 13“ (W1–W3, abgebrochene API-Anfragen, kein echtes Offline).
+- ☑ Ausrüstung M90–M95 auf dem Anfangsstand (R1).

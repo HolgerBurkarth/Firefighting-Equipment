@@ -266,6 +266,10 @@ final class StockSwapTest extends DeviceApiTestCase
         $row = $this->pdo()->query('SELECT kind, detail FROM fe_device_notices')->fetch();
         self::assertSame('swap_replacement_moved', $row['kind']);
         self::assertStringContainsString('M9', (string) $row['detail']);
+        self::assertStringEndsNotWith('.', (string) $row['detail']);
+        $notice = self::json($this->api('GET', 'notices/' . $json['result']['notice_id']))['notice'];
+        self::assertSame('Grund', $notice['detail_label']);
+        self::assertStringEndsNotWith('.', (string) $notice['detail']);
         self::assertSame(409, $this->api('POST', 'devices/swap', [
             'out' => ['id' => $out['id'], 'version' => 99],
             'in' => ['id' => $in['id'], 'version' => 99],

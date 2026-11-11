@@ -119,10 +119,41 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      - name: MariaDB-Client (mysqldump wie auf dem Server)
+      # mysqldump wie auf dem Server. Die .deb-Dateien liegen im Cache (Schlüssel = Version des Pakets
+      # laut Paketliste des Runners und Version des Runner-Images); nur bei fehlendem Cache lädt apt sie
+      # aus den Paketquellen (Ausfall der Ubuntu-Paketquellen am 11.11.2026, CI rot vor dem ersten Test).
+      - name: Version des MariaDB-Clients
+        id: mariadb-client
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends mariadb-client
+          candidate=$(apt-cache policy mariadb-client | sed -n 's/^ *Candidate: //p')
+          echo "id=${candidate:-unbekannt}-${ImageVersion:-ohne-image}" >> "$GITHUB_OUTPUT"
+      - name: MariaDB-Client aus dem Cache
+        id: mariadb-client-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/mariadb-client-debs
+          key: mariadb-client-debs-${{ runner.os }}-${{ steps.mariadb-client.outputs.id }}
+      - name: MariaDB-Client laden (nur ohne Cache)
+        if: steps.mariadb-client-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq || true
+          sudo apt-get install -y -qq --no-install-recommends --download-only mariadb-client
+          mkdir -p ~/mariadb-client-debs
+          cp /var/cache/apt/archives/*.deb ~/mariadb-client-debs/
+      - name: MariaDB-Client in den Cache
+        if: steps.mariadb-client-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/mariadb-client-debs
+          key: mariadb-client-debs-${{ runner.os }}-${{ steps.mariadb-client.outputs.id }}
+      # Mit dpkg aus den lokalen Dateien, nicht mit apt-get: apt schlug fehl, weil die Paketlisten des
+      # Runners älter sind als die zwischengespeicherten Pakete und es andere Versionen nachladen wollte
+      # (CI 11.11.2026). Alle nötigen Abhängigkeiten liegen im Cache.
+      - name: MariaDB-Client installieren
+        run: |
+          # Der MySQL-Client und -Server des Runner-Images stehen im Konflikt (apt hat ihn früher selbst entfernt).
+          sudo dpkg --remove --force-depends mysql-client mysql-client-8.0 mysql-client-core-8.0 mysql-server mysql-server-8.0 mysql-server-core-8.0 || true
+          sudo dpkg -i --auto-deconfigure ~/mariadb-client-debs/*.deb
           mysqldump --version
 
       - name: Testdatenbank einstellen
@@ -211,24 +242,21 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  e2e:
-    name: Browser-Tests (Teil ${{ matrix.shard }}/${{ strategy.job-total }})
-    needs: [changes, frontend-build]
+  # PHP und vendor/ für die Browser-Tests im Playwright-Container. Ohne apt: setup-php hing im
+  # Container bei den Ubuntu-Paketquellen (CI 11.11.2026, drei von acht Teilen bis zum Abbruch).
+  # PHP stammt aus dem offiziellen Image von Docker Hub (feste Version), vendor/ aus Composer auf dem
+  # Runner; beides geht als ein tar-Archiv (artifact-Zip verliert Rechte) in den Job e2e. Im Image
+  # fehlen gd, mysqli und pdo_mysql: `php -S` liefert in den Browser-Tests nur das Frontend aus und
+  # braucht keine Datenbank, daher `--ignore-platform-reqs`. Version nur zusammen mit PHP_VERSION ändern.
+  php-runtime:
+    name: PHP für die Browser-Tests
+    needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-24.04
-    # Normal 3–5 min; Reserve für bis zu drei Versuche der Systempakete (höchstens 14 min).
-    timeout-minutes: 25
-    strategy:
-      # Alle Teile laufen zu Ende, damit der Bericht vollständig ist.
-      fail-fast: false
-      matrix:
-        # Anzahl aus dem Job "changes" (E2E_SHARDS in frontend/build/ciScope.ts bei allen Tests,
-        # weniger bei wenigen betroffenen); "--shard" liest sie aus job-total.
-        shard: ${{ fromJSON(needs.changes.outputs.e2e_shards) }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
-      # PHP liefert den Build in den Browser-Tests aus (php -S, ohne Datenbank).
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
@@ -244,7 +272,77 @@ jobs:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
           restore-keys: composer-${{ runner.os }}-
-      - run: composer install --no-dev --no-interaction --no-progress --prefer-dist
+      - run: composer install --no-dev --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+
+      - name: PHP aus dem Image holen
+        env:
+          PHP_IMAGE: php:8.5.12-cli-bookworm
+        run: |
+          mkdir -p php-runtime/lib
+          docker run --rm -v "$PWD/php-runtime:/out" "$PHP_IMAGE" sh -c '
+            set -e
+            cp /usr/local/bin/php /out/php
+            cp /usr/local/etc/php/php.ini-production /out/php.ini
+            # Gemeinsame Bibliotheken des Images; die der C-Bibliothek hat der Playwright-Container (Ubuntu 24.04, neuer).
+            ldd /usr/local/bin/php | awk "/=> \//{print \$3}" | grep -vE "/(libc|libm|libdl|libpthread|librt|libresolv|libutil)\.so" | xargs -r -I{} cp -L {} /out/lib/
+          '
+          ls php-runtime php-runtime/lib
+          test ! -e vendor/composer/platform_check.php || { echo "::error::platform_check.php würde die fehlenden Erweiterungen im Container beanstanden"; exit 1; }
+          sudo chown -R "$(id -u):$(id -g)" php-runtime
+          tar czf php-runtime.tgz php-runtime vendor
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: php-runtime
+          path: php-runtime.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+  e2e:
+    name: Browser-Tests (Teil ${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: [changes, frontend-build, php-runtime]
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-24.04
+    # Offizieller Playwright-Container: Browser und Systempakete sind schon darin, apt wird nicht
+    # gebraucht (Ausfall der Ubuntu-Paketquellen am 11.11.2026). Die Version MUSS der von
+    # @playwright/test in frontend/package-lock.json entsprechen (Schritt "Playwright-Version").
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      # --ipc=host gegen Abstürze von Chromium durch zu kleinen gemeinsamen Speicher. HOME für Firefox
+      # setzt der Schritt "Playwright" (der Runner überschreibt HOME der Schritte mit /github/home,
+      # eine Angabe hier greift nicht: Firefox startete nicht, CI 11.11.2026).
+      options: --ipc=host
+    # Normal 3–6 min (Container ziehen kostet etwa 1 min).
+    timeout-minutes: 25
+    strategy:
+      # Alle Teile laufen zu Ende, damit der Bericht vollständig ist.
+      fail-fast: false
+      matrix:
+        # Anzahl aus dem Job "changes" (E2E_SHARDS in frontend/build/ciScope.ts bei allen Tests,
+        # weniger bei wenigen betroffenen); "--shard" liest sie aus job-total.
+        shard: ${{ fromJSON(needs.changes.outputs.e2e_shards) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # PHP liefert den Build in den Browser-Tests aus (php -S, ohne Datenbank); Programm und vendor/
+      # kommen aus dem Job php-runtime. Der Wrapper setzt Bibliothekspfad und php.ini nur für php.
+      - uses: actions/download-artifact@v8
+        with:
+          name: php-runtime
+          path: ${{ runner.temp }}/php-runtime
+      - name: PHP bereitstellen
+        run: |
+          tar xzf "$RUNNER_TEMP/php-runtime/php-runtime.tgz" -C /opt php-runtime
+          tar xzf "$RUNNER_TEMP/php-runtime/php-runtime.tgz" -C "$GITHUB_WORKSPACE" vendor
+          cat > /usr/local/bin/php <<'WRAPPER'
+          #!/bin/sh
+          export LD_LIBRARY_PATH=/opt/php-runtime/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+          export PHPRC=/opt/php-runtime
+          exec /opt/php-runtime/php "$@"
+          WRAPPER
+          chmod +x /usr/local/bin/php
+          php -v
+          php -m | paste -sd' ' -
 
       - uses: actions/setup-node@v7
         with:
@@ -261,41 +359,25 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-      # Browser im Cache je Playwright-Version; die Systempakete installiert apt in jedem Lauf, mit
-      # Zeitgrenze je Versuch und Wiederholung über einen anderen Mirror (scripts/install-browser-deps.sh;
-      # der Mirror des Runners hing mehrmals bis zum Abbruch des Jobs).
+      # Image und npm-Paket müssen dieselbe Playwright-Version haben, sonst fände Playwright seine
+      # Browser nicht (sie liegen im Image unter PLAYWRIGHT_BROWSERS_PATH).
       - name: Playwright-Version
-        id: playwright
         working-directory: frontend
-        run: echo "version=$(npx playwright --version | sed 's/^Version //')" >> "$GITHUB_OUTPUT"
-      - name: Playwright-Browser aus dem Cache
-        id: playwright-cache
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - name: Systempakete der Browser
-        working-directory: frontend
-        timeout-minutes: 14
-        run: bash ../scripts/install-browser-deps.sh npx playwright install-deps chromium firefox webkit
-      - name: Playwright-Browser installieren
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        working-directory: frontend
-        run: npx playwright install chromium firefox webkit
-      # Gleich nach dem Installieren speichern (nicht erst am Ende: dort nur bei Erfolg), nur Teil 1,
-      # damit die Teile nicht gleichzeitig denselben Schlüssel anlegen.
-      - name: Playwright-Browser in den Cache
-        if: steps.playwright-cache.outputs.cache-hit != 'true' && matrix.shard == 1
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+        run: |
+          expected=1.64.1
+          actual=$(npx playwright --version | sed 's/^Version //')
+          echo "Playwright $actual, Image v$expected"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::Playwright $actual aus package-lock.json, aber das Image im Job e2e ist v$expected. Tag des Images in .github/workflows/ci.yml anpassen."
+            exit 1
+          fi
 
       # E2E_FILES: nur die betroffenen Testdateien (leer = alle), siehe Job "changes".
       - name: Playwright
         working-directory: frontend
         env:
           E2E_FILES: ${{ needs.changes.outputs.e2e_files }}
+          HOME: /root
         run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} $E2E_FILES
 
       # Teilbericht (Reporter blob, playwright.config.ts) für e2e-report; Traces gescheiterter Tests
@@ -354,7 +436,7 @@ jobs:
 
   deploy:
     name: Branch deploy aktualisieren
-    needs: [changes, php, frontend-checks, frontend-build, e2e]
+    needs: [changes, php, frontend-checks, frontend-build, php-runtime, e2e]
     # Übersprungene PHP- bzw. Browser-Tests (Bereich nicht betroffen) blockieren nicht; gescheiterte
     # oder abgebrochene schon. Nachts und von Hand nie (nur Push).
     if: >-
@@ -362,6 +444,7 @@ jobs:
       needs.changes.result == 'success' && needs.frontend-checks.result == 'success' &&
       needs.frontend-build.result == 'success' &&
       (needs.php.result == 'success' || needs.php.result == 'skipped') &&
+      (needs.php-runtime.result == 'success' || needs.php-runtime.result == 'skipped') &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
