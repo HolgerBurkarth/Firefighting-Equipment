@@ -151,9 +151,9 @@ jobs:
       # (CI 11.11.2026). Alle nötigen Abhängigkeiten liegen im Cache.
       - name: MariaDB-Client installieren
         run: |
-          # Der MySQL-Client des Runner-Images steht im Konflikt (apt hat ihn früher selbst entfernt).
-          sudo dpkg --remove --force-depends mysql-client mysql-client-8.0 mysql-client-core-8.0 || true
-          sudo dpkg -i ~/mariadb-client-debs/*.deb
+          # Der MySQL-Client und -Server des Runner-Images stehen im Konflikt (apt hat ihn früher selbst entfernt).
+          sudo dpkg --remove --force-depends mysql-client mysql-client-8.0 mysql-client-core-8.0 mysql-server mysql-server-8.0 mysql-server-core-8.0 || true
+          sudo dpkg -i --auto-deconfigure ~/mariadb-client-debs/*.deb
           mysqldump --version
 
       - name: Testdatenbank einstellen
