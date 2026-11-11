@@ -22,7 +22,8 @@ zurücknehmen.
 - [ ] **Welche Version ist live?** `https://www.prodad.de/firefighting/immendingen/build.json`
   öffnen; `build` sind die ersten 12 Zeichen des Commits. Mit dem letzten „✅ FERTIG“ vergleichen.
   Dazu `https://www.prodad.de/firefighting/service/api/v1/health` → `{"status":"ok","database":"ok"}`.
-- [ ] **Letzten nächtlichen CI-Lauf** ansehen (grün?).
+- [ ] **Letzten nächtlichen CI-Lauf** ansehen (grün?): auf GitHub im Repository → Actions → Workflow
+  „CI“, Ereignis „schedule“ (der oberste Lauf dieser Art), oder Claude danach fragen.
 - [ ] **Information**: Wer wird wann informiert (Phil)? Zeitpunkt festlegen, an dem niemand mitten
   in einer Buchung ist (z. B. nicht während einer Übung oder eines Einsatzes). Die Apps der Nutzer
   holen die neuen Rechte beim nächsten Öffnen von selbst; sie müssen nichts tun.
@@ -39,7 +40,7 @@ Oberfläche der Stadt (Standard in Klammern).
 |---|---|
 | **Lager** | Ein Standort ist ein Lager. Das **Standard-Lager** ist das Ziel von „Zurück ins Lager“ (Wartung) und „In Ordnung ins Lager“ (Rückgabe). Das erste Lager wird automatisch zum Standard-Lager. |
 | **Sammelstelle** | Hierhin kommt benutzte oder defekte Ausrüstung („Benutzt melden“, Tausch, „Benutzte und Defekte in die Sammelstelle“). Schaltet die Seite **Wartung** frei. |
-| **Werkstatt** | Ziel von „in die Werkstatt“ (Status „in Wartung“). Schaltet ebenfalls die Seite **Wartung** frei. |
+| **Werkstatt** | Ziel von „Zur Werkstatt …“ (Status „in Wartung“). Schaltet ebenfalls die Seite **Wartung** frei. |
 | **Rückgabe** | Standort, an dem zurückgebrachte, verliehene Ausrüstung ankommt (Aushang mit QR-Code, siehe 7). Schaltet die Seite **Verleih** frei. |
 | **Ausgeliehen an** | Standort eines Leihnehmers. Wer dorthin verliehen wird, bekommt einen Eintrag im Verleih (Ansprechpartner, „Rückgabe bis“). Schaltet die Seite **Verleih** frei. |
 
@@ -49,6 +50,11 @@ Hinweise:
 - Das Freischalten ändert noch keine Buchung und keinen Standort.
 - Nach dem Speichern erscheint „Die Abläufe sind gespeichert.“. Die Rechte der Konten ändern sich
   dadurch (neue Bereiche); die Apps laden sie beim nächsten Aufruf.
+- **Claude-Konnektor neu verbinden:** Nach dem Freischalten oder Abschalten von Abläufen muss der
+  Claude-Konnektor getrennt und neu verbunden werden (claude.ai: Konnektor „Trennen“, dann „Verbinden“),
+  damit Claude die passenden Werkzeuge sieht. Der Konnektor merkt sich die Werkzeugliste vom Verbinden;
+  ein erneutes Abrufen genügt nicht. Ohne neues Verbinden fehlen z. B. `lend_equipment`, `list_loans`,
+  `list_maintenance`, bzw. ein abgeschaltetes Werkzeug scheitert mit dem Hinweis, die Liste neu abzurufen.
 - **⚠ Entscheidung:** Welche Aufgaben braucht Immendingen zum Start? Naheliegend: alle fünf. Wer
   nur „Benutzt melden“ und Sollbestand will, braucht **Sammelstelle** (und **Lager** als Ziel von
   „Zurück“); Verleih/Rückgabe kann später folgen.
@@ -89,7 +95,7 @@ Ort: Admin-Konsole → **Ausrüstungstypen** → Stift → Kästchen **Einmalger
 Einsatz ersetzt statt gewartet“).
 
 Folgen:
-- Einmalgeräte werden **nicht gewartet** (auf der Seite Wartung nicht wählbar, „in die Werkstatt“
+- Einmalgeräte werden **nicht gewartet** (auf der Seite Wartung nicht wählbar, „Zur Werkstatt …“
   ist ein Fehler).
 - Rollen mit der Einschränkung **„Bei Einmalgeräten nur „Benutzt melden““** (siehe 6) sehen bei
   einem Einmalgerät weder Standort noch Status noch „Speichern“, nur **Benutzt melden** (mit
@@ -114,7 +120,8 @@ Ort: Admin-Konsole → **Standorte**, unten der Bereich Sollbestand → **Sollbe
   20 Typen). Das Speichern ersetzt alle Regeln des Standorts; leere Liste = keine Regel.
 - Gezählt wird: **einsatzbereite**, nicht ausgesonderte Ausrüstung der Typen am Standort; bei einem
   Fahrzeug (Ebene 1) **samt Fächern**.
-- **„außer Betrieb“** (Chip in der Liste; sonst „vollständig“) heißt: mindestens eine Regel des
+- **„außer Betrieb“** bzw. „vollständig“ steht im Bereich Sollbestand unten auf der Seite
+  **Standorte** (nicht als Chip am Fahrzeug in der Standortliste, das ist T21) und heißt: mindestens eine Regel des
   Standorts ist unterschritten („mindestens 3 Atemschutzmaske: 2 vorhanden, 1 fehlt“). Das ist nur
   eine Anzeige, es sperrt nichts.
 - Bei jeder Buchung prüft der Server: Verringert sie den Bestand unter die Mindestanzahl, wird sie
@@ -199,14 +206,16 @@ Ort: Admin-Konsole → **Verleih** → Abschnitt der Rückgabe (Überschrift = A
 
 ## 8. Mails
 
-- Jede Person stellt ihre Benachrichtigung selbst ein (Profil bzw. Einstellungen,
-  „Benachrichtigung „Log““). Nur Rollen mit der Aktion **Log-Mails empfangen** sehen sie
-  (Admin immer; bei *Gerätewart* anhaken).
-- **Alle Vorgänge** (Standard für alle, die vorher schon eingeschaltet hatten) oder
-  **Nur ausgewählte** mit Themen, dann **Auswahl speichern**:
+- Jede Person stellt ihre Benachrichtigung selbst ein (Profil bzw. Einstellungen, Abschnitt
+  „Benachrichtigung“, Kästchen **Mail bei jeder Änderung an der Ausrüstung**). Nur Rollen mit der
+  Aktion **Log-Mails empfangen** sehen sie (Admin immer; bei *Gerätewart* anhaken).
+- Erst wenn das Kästchen an ist, erscheint die Auswahl **Alle Vorgänge** (Standard für alle, die
+  vorher schon eingeschaltet hatten) oder **Nur ausgewählte** mit Themen, dann **Auswahl speichern**:
   Defekt gemeldet · Benutzt gemeldet · Rückgabe eingegangen · Ausrüstung verliehen ·
   Hinweise im Protokoll · Sonstige Umbuchungen und Status · Stammdaten, Wartungsdatum und Import.
-- Es gibt keine Erinnerungs-Mails (T19) und keine Mail bei Rückgabe ohne Anmeldung (T23).
+- Das Thema **Rückgabe eingegangen** löst heute keine Mail aus: Es gehört zu Rückgaben ohne Anmeldung,
+  und dafür wird keine Mail gesendet (T23). Es ist wählbar, bleibt aber wirkungslos.
+- Es gibt keine Erinnerungs-Mails (T19).
 - **⚠ Entscheidung:** Wer soll welche Themen bekommen? Vorschlag: Gerätewart mindestens
   „Defekt gemeldet“, „Benutzt gemeldet“, „Hinweise im Protokoll“.
 
@@ -218,7 +227,7 @@ vorsichtig buchen oder ein Testgerät verwenden.
 - [ ] **Buchung**: Ausrüstung suchen, umbuchen, Bestätigung erscheint, Verlauf zeigt den Eintrag.
 - [ ] **Benutzt melden**: Rückfrage nennt die Sammelstelle; danach Status „benutzt“ und Standort
   Sammelstelle. Geräteträger mit Einmalgerät: nur dieser Knopf.
-- [ ] **Wartung**: Ausrüstung in der Sammelstelle → in die Werkstatt → zurück ins Lager
+- [ ] **Wartung**: Ausrüstung in der Sammelstelle → „Zur Werkstatt …“ → zurück ins Lager
   (Status „einsatzbereit“).
 - [ ] **Verleih**: „Verleihen …“ an einen Leihnehmer; Eintrag in der Liste mit „Rückgabe bis“.
 - [ ] **Rückgabe**: über den Aushang (am besten am Handy) zurückgeben; in der Liste erscheint die
@@ -252,9 +261,10 @@ Bei Problemen:
 - **T21** Sollbestand: Kachel „Außer Betrieb“ im Dashboard, Anzeige am Fahrzeug in der
   Standortliste, Verlauf und Hinweis von „außer Betrieb“.
 - **T22** Verleih: Rückgabe von Hand aus der Liste, Verleih verlängern, Kamera-Scanner im Fenster
-  „Verleihen“ und auf der Rückgabeseite, Mail „Rückgabe eingegangen“, Mail „Rückgabe überfällig“
-  (gibt es nicht).
-- **T23** Log-Mail bzw. Hinweis bei Rückgabe ohne Anmeldung (nach ersten Rückmeldungen).
+  „Verleihen“ und auf der Rückgabeseite, Mail „Rückgabe eingegangen“ (das Thema ist
+  wählbar, löst aber noch keine Mail aus, siehe T23), Mail „Rückgabe überfällig“ (gibt es nicht).
+- **T23** Log-Mail bzw. Hinweis bei Rückgabe ohne Anmeldung (nach ersten Rückmeldungen); erst damit
+  löst das Mail-Thema „Rückgabe eingegangen“ etwas aus.
 - **T24** Kamera-Scanner auf der öffentlichen Rückgabeseite.
 - **T25** Mail-Auswahl „Nur Wichtiges“ und Filter nach Ausrüstungstypen.
 - **T17 Datenschutz / Claude-Zugang:** Der Zugang für Claude (MCP) ist **nur in der Test-Stadt**

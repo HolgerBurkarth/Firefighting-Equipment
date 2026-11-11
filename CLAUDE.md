@@ -136,7 +136,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
      - Nur in der Test-Stadt `https://www.prodad.de/firefighting/test/`, nie in echten Städten
        (z. B. Immendingen).
      - Keine Passwörter eingeben und nicht abmelden (neu anmelden tut nur der Nutzer). Fehlt eine
-       Anmeldung: „❓ RÜCKFRAGE“.
+       Anmeldung: „❓ RÜCKFRAGE“. EINZIGE Ausnahme (seit 11.11.2026, Vorgabe Holger): das Skript
+       `npm run test:live-offline` (siehe unten, Punkt „Live-Lauf Offline“) meldet sich selbst an.
      - Keine Dateien herunterladen; CSV-Inhalte im Browser per JavaScript prüfen (den Blob vor dem
        Speichern abfangen).
      - Testgeräte: Kennungen M90–M99 bzw. Gerätetyp „Live-Testtyp 2“; an bestehenden Geräten
@@ -146,6 +147,35 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
        `docs/TODO-SPAETER.md`.
      - Was der Browser nicht prüfen kann (schmale Fensterbreiten, iPhone, Handscanner, Kamera,
        Mails), als offen für den Nutzer markieren.
+     - Live-Lauf Offline (seit 11.11.2026, `frontend/tests/live/`, eigene Playwright-Konfiguration,
+       nicht in der CI, nicht Teil von `npm run test:e2e`): Nur das Skript `npm run test:live-offline`
+       darf sich anmelden, nur unter `https://www.prodad.de/firefighting/test/`, nur mit den zwei
+       vorhandenen Konten der Test-Stadt (Konto #5 „Holger (Test)“, Rolle *Benutzer*; Konto #7 „Holger
+       Test 1“, Rolle „Live-Test Geräteträger“), nur mit Ausrüstung M90–M99; danach wird alles
+       zurückgesetzt (`finally`). Zugangsdaten stehen in `frontend/tests/live/.env.local` (lokal, in
+       `.gitignore`; Vorlage `.env.local.example`, Schlüssel `FF_LIVE_USER1_EMAIL`,
+       `FF_LIVE_USER1_PASSWORD`, `FF_LIVE_USER2_EMAIL`, `FF_LIVE_USER2_PASSWORD`). Agenten öffnen,
+       zeigen oder committen diese Datei nie; nur das Skript liest sie. Fehlt sie oder ist sie
+       unvollständig, bricht das Skript vor dem Anmelden ab; nach einer gescheiterten Anmeldung sofort
+       ohne zweiten Versuch (die Anmeldung hat eine Bremse). Kein Trace, kein Screenshot, kein Video;
+       keine Ausgabe von Passwort oder Cookie; Sitzungen nur im Speicher. Das Skript blockiert jede
+       Adresse außerhalb der Test-Stadt und jede ändernde Anfrage an andere Ausrüstung als die gewählte
+       (`tests/live/support/guard.ts`, Unit-Test `liveRun.spec.ts`). Inhalt: Chromium mit echtem
+       `context.setOffline` (Start und Neuladen ohne Netz, Streifen, Suche aus der Kopie, Umbuchen,
+       Benutzt melden und Tausch offline, Abmelden mit wartender Buchung, Kontowechsel mit Warteschlange
+       des anderen Kontos, Senden genau einmal mit Aktionszeit und `client_ref`, „Ersatz inzwischen
+       woanders“ mit Hinweis im Ergebnis) und WebKit „iPhone 13“ mit abgebrochenen API-Anfragen (nur
+       App-Logik, IndexedDB, Warteschlange, Senden; kein echtes Offline). Ausgabe ☑/☒/☐ je Punkt
+       (auch in `frontend/test-results/live-offline.txt`); der Agent trägt sie in
+       `docs/frontend/LIVETEST-OFFLINE.md` bzw. `LIVETEST-PHASE-2.md` ein. Voraussetzung in der
+       Test-Stadt (richtet Claude ein): Lager Gerätehaus (Aufgabe Lager) und Kleiderkammer (Sammelstelle)
+       dauerhaft freigeschaltet, Rolle „Live-Test Geräteträger“ (ID 23) mit `device.used` und
+       `device.swap`. Ein echtes iPhone entfällt als regelmäßige Prüfung („nur bei gemeldeten
+       Problemen“). Nach jedem Deploy, der Offline, Warteschlange, Tausch, Benutzt melden, Service
+       Worker oder Updates betrifft, führt der Agent den Lauf selbst aus (Befehl in `frontend/`, Dauer
+       einige Minuten, Zeitgrenze 10 Minuten) und nennt das Ergebnis in der „✅ FERTIG“-Meldung. Fehlt die
+       Datei oder scheitert die Anmeldung, steht das dort („❓ RÜCKFRAGE“); das ist kein Grund, die
+       Regel „keine Passwörter“ anders zu umgehen.
   6. „✅ FERTIG“ zusätzlich mit: was live ist (Commit, Build-Kennung), Laufzeit der CI, Reparaturen
      (Ursache je roten Lauf), was live im Browser geprüft ist (☑/☒) und was für den Nutzer offen
      bleibt.
@@ -1479,7 +1509,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   <test>: <erste Zeile der Meldung>`; leert kein Playwright-Lauf),
   `npm run build`, `npm run test:e2e` (braucht den Build; lokal nur Chromium und WebKit),
   `npm run test:e2e:all` (alle fünf Profile, `playwright.all.config.ts`), `npm run test:load`
-  (Lastläufe, siehe unten). Entwicklung: `npm run dev`
+  (Lastläufe, siehe unten), `npm run test:live-offline` (Live-Lauf gegen die Test-Stadt, siehe
+  "Autonomer Ablauf", Schritt 5; nie in der CI). Entwicklung: `npm run dev`
   (`http://localhost:5173/firefighting/test/`, API per Proxy an `php -S localhost:8000`; für
   ändernde Anfragen `http://localhost:5173` in `http.allowed_origins`).
 - Browser-Tests (Playwright: Chromium, Firefox, WebKit, iPhone 13, Pixel 7) laufen gegen den Build,
