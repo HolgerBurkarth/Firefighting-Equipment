@@ -118,3 +118,12 @@ export async function open(page: Page, path: string): Promise<void> {
     }
     await page.goto(url);
 }
+
+/**
+ * Muster für den Text einer Karte in der Trefferliste: Er beginnt mit der Nummer, direkt gefolgt vom
+ * Typ („M94Live-Testtyp 2 …“, die Teile stehen ohne Leerzeichen im Text). Kein `\b` nach der Nummer,
+ * es fände nie etwas; „nicht von einer weiteren Ziffer gefolgt“ trennt M9 von M94.
+ */
+export function cardTextPattern(identifier: string): RegExp {
+    return new RegExp(`^${identifier}(?![0-9])`);
+}

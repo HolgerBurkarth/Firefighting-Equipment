@@ -23,7 +23,8 @@ import {
     type Recorded,
 } from './support/browser';
 import { LiveEnvError, loadLiveAccounts, type LiveAccounts } from './support/env';
-import { ACCOUNT_IDS, BASE_URL, installGuard, open } from './support/guard';
+import { ACCOUNT_IDS, BASE_URL, cardTextPattern, installGuard, open } from './support/guard';
+import { startMonitor, type Monitor } from './support/memoryGuard';
 import { pickDevices, type Pick } from './support/pick';
 import { ResultList } from './support/results';
 
@@ -64,9 +65,12 @@ function expectSentOnce(list: Recorded[], path: string): void {
 async function openDevice(page: Page, identifier: string): Promise<void> {
     await open(page, 'suchen');
     await page.getByRole('searchbox').fill(identifier);
+    // Der Text der Karte ist zusammengesetzt („M94Live-Testtyp 2 …“): kein \b nach der Nummer, sondern
+    // „nicht von einer weiteren Ziffer gefolgt“ (sonst fände M9 auch M94). Mit \b wartete der Klick
+    // ohne Ende auf eine Karte, die längst da war (Live-Lauf 11.11.2026).
     await page
         .getByTestId('device-card')
-        .filter({ hasText: new RegExp(`\\b${identifier}\\b`) })
+        .filter({ hasText: cardTextPattern(identifier) })
         .first()
         .click();
     await expect(
@@ -127,9 +131,20 @@ async function bookStatus(
     page: Page,
     identifier: string,
     status: 'ready' | 'maintenance',
+    beforeSave?: () => void,
 ): Promise<void> {
+    const mark = (text: string): void => {
+        if (process.env['FF_LIVE_DIAG'] === '1') {
+            process.stdout.write(`DIAG step ${text}
+`);
+        }
+    };
+    mark('oeffnen');
     await openDevice(page, identifier);
+    mark('Status waehlen');
     await page.getByRole('button', { name: STATUS_LABEL[status] ?? status }).click();
+    mark('Speichern');
+    beforeSave?.();
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
     await expect(page.getByTestId('booking-notice')).toContainText('wird gesendet');
@@ -224,6 +239,7 @@ interface Run {
 interface Holder {
     p1?: Page;
     bookingId?: number;
+    monitor?: Monitor;
 }
 
 async function chromiumPart(
@@ -254,6 +270,7 @@ async function chromiumPart(
     const p2: Page | undefined = ctx2 ? await ctx2.newPage() : undefined;
     holder.p1 = p1;
     diagnose(p1, 'p1');
+    let monitor = null as Monitor | null;
     const rec1 = record(p1);
     const rec2 = p2 ? record(p2) : [];
 
@@ -263,6 +280,13 @@ async function chromiumPart(
         await login(p2, accounts.user2, ACCOUNT_IDS.user2, 'Konto 2');
     }
 
+    // Diagnose Speicher (FF_LIVE_MEM=1): Messung und Schutz, siehe support/memoryGuard.ts.
+    if (process.env['FF_LIVE_MEM'] === '1') {
+        monitor = await startMonitor(p1, [browser, browser2]);
+        holder.monitor = monitor;
+        monitor.sampleEvery(3000);
+        p1.setDefaultTimeout(30_000);
+    }
     const listed = await api<{ devices: LiveDevice[] }>(p1, 'GET', 'devices?q=M9&limit=200');
     const listed2 = p2
         ? await api<{ devices: LiveDevice[] }>(p2, 'GET', 'devices?q=M9&limit=200')
@@ -317,7 +341,11 @@ async function chromiumPart(
             'C4',
             `Chromium: ${a.identifier} offline umbuchen (→ ${STATUS_LABEL[target] ?? target}), Warteschlange wartet`,
             async () => {
-                await bookStatus(p1, a.identifier, target);
+                await bookStatus(p1, a.identifier, target, () => {
+                    for (const ms of [1000, 3000, 6000]) {
+                        monitor?.pauseAfter(ms, `nach Speichern +${String(ms)} ms`);
+                    }
+                });
                 expect(sent(rec1, `devices/${String(a.id)}/state`)).toHaveLength(0);
             },
         );
@@ -590,6 +618,7 @@ async function main(): Promise<ResultList> {
             await webkitPart(run, accounts, allowed, holder);
         }
     } finally {
+        holder.monitor?.stop();
         if (holder.p1) {
             const notes = await resetAll(holder.p1, originals);
             results.items.push({

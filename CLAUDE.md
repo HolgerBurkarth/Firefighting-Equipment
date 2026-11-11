@@ -170,7 +170,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
        `docs/frontend/LIVETEST-OFFLINE.md` bzw. `LIVETEST-PHASE-2.md` ein. Voraussetzung in der
        Test-Stadt (richtet Claude ein): Lager Gerätehaus (Aufgabe Lager) und Kleiderkammer (Sammelstelle)
        dauerhaft freigeschaltet, Rolle „Live-Test Geräteträger“ (ID 23) mit `device.used` und
-       `device.swap`. Ein echtes iPhone entfällt als regelmäßige Prüfung („nur bei gemeldeten
+       `device.swap`. Diagnose-Schalter (nur Fehlersuche): `FF_LIVE_ONE=1` nur Konto 1, `FF_LIVE_MEM=1` misst alle 500 ms den Speicher der Seite und aller Chromium-Prozesse (`tests/live/support/memoryGuard.ts`, Ausgabe `test-results/live-memory.txt`) und schließt den Browser bei über 1 GB Seite, über 3 GB gesamt, 10 s ununterbrochenem Wachstum oder 10 s ohne Antwort. Der „Absturz“ vom 11.11.2026 war kein Speicherproblem der App: Der Klick auf die Karte wartete wegen eines falschen Musters (`` im zusammengesetzten Kartentext, jetzt `cardTextPattern`) bis zum Ende der Testzeit, dann beendete Playwright den Browser. Ein Test, der in der Live-Umgebung hängt, braucht eine kurze Zeitgrenze je Aktion. Ein echtes iPhone entfällt als regelmäßige Prüfung („nur bei gemeldeten
        Problemen“). Nach jedem Deploy, der Offline, Warteschlange, Tausch, Benutzt melden, Service
        Worker oder Updates betrifft, führt der Agent den Lauf selbst aus (Befehl in `frontend/`, Dauer
        einige Minuten, Zeitgrenze 10 Minuten) und nennt das Ergebnis in der „✅ FERTIG“-Meldung. Fehlt die
