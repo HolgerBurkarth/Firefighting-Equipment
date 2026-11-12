@@ -252,7 +252,7 @@ test.describe('Einladungscodes', () => {
         await expect(poster.getByTestId('poster-valid')).toContainText(
             'Gültig bis 30.11.2026, 14:05 Uhr',
         );
-        await expect(poster).toContainText('QR-Code mit der Handy-Kamera scannen');
+        await expect(poster).toContainText('QR-Code scannen');
         await expect(poster).toContainText('feuerwehr-app@prodad.de');
         await expect(
             poster.getByRole('img', { name: 'QR-Code mit dem Link zur Registrierung' }),
@@ -311,6 +311,14 @@ test.describe('Einladungscodes', () => {
             ['api/v1/invitation-codes/2/revoke', {}],
             ['api/v1/invitation-codes/3/revoke', {}],
         ]);
+    });
+
+    test('Aushang hat vier gezeichnete Schritte (Runde 14)', async ({ page }) => {
+        await openCodes(page);
+        await createCode(page);
+        const steps = page.getByTestId('invitation-poster').getByTestId('how-to-step');
+        await expect(steps).toHaveCount(4);
+        await expect(steps.nth(2)).toContainText('E-Mail bestätigen');
     });
 
     test('Aushang als PDF genau eine A4-Seite', async ({ page, browserName }) => {

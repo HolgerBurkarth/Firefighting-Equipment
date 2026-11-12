@@ -487,6 +487,19 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
         });
     }
 
+    test('Aushang der Rückgabe als PDF: vier gezeichnete Schritte, genau eine A4-Seite', async ({
+        page,
+        browserName,
+    }) => {
+        test.skip(browserName !== 'chromium', 'page.pdf gibt es nur in Chromium');
+        await page.goto('/firefighting/test/verleih');
+        await page.getByTestId('return-place').getByTestId('renew-key').click();
+        await expect(page.getByTestId('issued-key')).toBeVisible();
+        await expect(page.getByTestId('return-poster').getByTestId('how-to-step')).toHaveCount(4);
+        const pdf = (await page.pdf({ format: 'A4' })).toString('latin1');
+        expect(pdf.match(/\/Type\s*\/Page[^s]/g)).toHaveLength(1);
+    });
+
     test('Aushang erzeugen: Link mit Schlüssel im Fragment, danach erneuern und widerrufen', async ({
         page,
     }) => {

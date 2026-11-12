@@ -1481,7 +1481,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `rowLink.spec.ts`.
 - Regel für Listen und Breiten (seit 12.11.2026, Runde 14, Punkt 2; Holgers Befund: am Tablet fehlten Knöpfe): Kein
   Bedienelement einer Zeile darf abgeschnitten oder nur durch waagerechtes Scrollen erreichbar sein.
-  Tabellen wechseln auf Kacheln unter 1024 px (Benutzer, Ausrüstungstypen? nein: Ausrüstung 1024, Typen/Städte 768),
+  Tabellen wechseln auf Kacheln unter 1024 px (Benutzer, Ausrüstung), unter 768 px (Typen, Städte),
   Einladungscodes und Rollen im Stadtdetail unter 1280 px. Jede Liste hat in ihrer Testdatei einen Test „Breiten
   (Runde 14)“ bei 390, 768 und 1024 px (`unreachableControls` und `horizontalOverflow` in `tests/e2e/support/layout.ts`:
   Mitte jedes Bedienelements liegt im Fenster und auf dem Element selbst). Neue Listen bekommen denselben Test.

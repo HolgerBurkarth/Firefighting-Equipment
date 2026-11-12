@@ -12,6 +12,8 @@ import ErrorNotice from '../components/ErrorNotice.vue';
 import MailHint from '../components/MailHint.vue';
 import NewPasswordField from '../components/NewPasswordField.vue';
 import { isTenantUnavailable, tenantState } from '../runtime/tenantState';
+import HowToSteps from '../components/HowToSteps.vue';
+import { REGISTER_STEPS } from '../data/howTo';
 import { takeFragmentParam } from '../runtime/fragment';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 
@@ -171,6 +173,7 @@ async function onSubmit(): Promise<void> {
         </template>
 
         <form v-else-if="!formHidden" class="card" novalidate @submit.prevent="onSubmit">
+            <HowToSteps :steps="REGISTER_STEPS" variant="screen" />
             <p class="hint">
                 Mit dem Einladungscode Ihrer Feuerwehr legen Sie hier Ihr Konto an. Nach der
                 Bestätigung Ihrer E-Mail-Adresse schaltet ein Admin es frei.
