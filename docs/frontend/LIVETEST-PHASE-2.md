@@ -152,3 +152,11 @@ des Standes vom 11.11.2026, beide Konten:
 - ☑ „Ersatz inzwischen woanders“: Hinweis `notice_id` im Ergebnis (C10).
 - ☑ WebKit „iPhone 13“ (W1–W3, abgebrochene API-Anfragen, kein echtes Offline).
 - ☑ Ausrüstung M90–M95 auf dem Anfangsstand (R1).
+
+## Runde 14 (12.11.2026, Build 1ec8f212fd27, Test-Stadt, durch den Agenten im Browser)
+
+- ☑ Dashboard ohne Sollbestand: keine Kachel „Außer Betrieb“.
+- ☑ Regel „mindestens 50 Atemschutzmaske“ am „Live-Test Wagen“ gesetzt: Standortliste zeigt den Chip „außer Betrieb“, Dashboard die Kachel „Außer Betrieb · 1 · von 1 Standort mit Sollbestand“, ein Klick führt zu „Standorte“.
+- ☑ Regel wieder entfernt (Chip und Kachel weg, „Noch kein Sollbestand festgelegt.“).
+- ☑ Seite „Rückgabe“ (mit Platzhalter-Schlüssel, keine Buchung): vier gezeichnete Schritte über dem Formular.
+- ☐ Offen für Holger: Aushänge drucken (Einladungscode und Rückgabe, eine A4-Seite), Listen am Tablet (768 und 1024 px) und am iPhone, PDFs in docs/anleitungen/ lesen.

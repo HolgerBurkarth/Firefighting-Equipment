@@ -40,6 +40,8 @@ export interface Step {
     readonly title: string;
     readonly text: string;
     readonly shot: Shot | null;
+    /** Zweites Bild neben dem ersten (nur Handy, z. B. Formular und Meldung danach). */
+    readonly shot2?: Shot | null;
 }
 
 export const PHONE = { width: 390, height: 780 } as const;
@@ -125,6 +127,11 @@ body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; color: #1b2430; fo
 .cover .can ul { margin: 0; padding-left: 6mm; font-size: 13pt; }
 .cover .can li { margin: 1.5mm 0; }
 .cover .note { margin-top: 10mm; color: #5b6675; font-size: 10pt; }
+.sheet { height: 263mm; display: flex; flex-direction: column; justify-content: flex-start; gap: 6mm; page-break-after: always; overflow: hidden; }
+.sheet:last-child { page-break-after: auto; }
+.sheet .step { flex: 1 1 0; min-height: 0; margin: 0; padding-bottom: 5mm; border-bottom: 0.3mm solid #d5dbe3; }
+.sheet .step:last-child { border-bottom: 0; }
+.figs { display: flex; gap: 4mm; flex: none; }
 .step { break-inside: avoid; display: flex; gap: 7mm; margin: 0 0 9mm; align-items: flex-start; }
 .step.stack { flex-direction: column; gap: 3mm; }
 .step .head { display: flex; gap: 3mm; align-items: center; }
@@ -133,9 +140,10 @@ body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; color: #1b2430; fo
 .step p { margin: 1.5mm 0 0; }
 .text { flex: 1 1 0; min-width: 0; }
 .shot { margin: 0; }
-.shot-mobile { flex: none; width: 58mm; }
-.shot-poster { flex: none; width: 82mm; }
-.shot-desktop { width: 100%; }
+.shot-mobile { flex: none; width: 46mm; }
+.figs .shot-mobile { width: 42mm; }
+.shot-poster { flex: none; width: 70mm; }
+.shot-desktop { width: 130mm; align-self: center; }
 .pic { position: relative; border: 0.3mm solid #8796a8; border-radius: 2mm; overflow: hidden; line-height: 0; }
 .pic img { width: 100%; height: auto; display: block; }
 .frame { position: absolute; border: 0.7mm solid #d81b60; border-radius: 1.5mm; box-shadow: 0 0 0 0.4mm #fff; }
@@ -155,20 +163,29 @@ export interface Guide {
 
 /** Setzt die Schritte zu einem PDF zusammen und liefert dessen Pfad. */
 export async function renderGuide(page: Page, guide: Guide): Promise<string> {
-    const steps = guide.steps
-        .map((step, index) => {
-            const shot = step.shot;
-            const stack = !shot?.mobile;
-            return `<section class="step ${stack ? 'stack' : ''}">
-                ${shot?.mobile === true ? figure(shot) : ''}
+    const rendered = guide.steps.map((step, index) => {
+        const shot = step.shot;
+        const stack = !shot?.mobile;
+        const figs =
+            shot?.mobile === true
+                ? step.shot2
+                    ? `<div class="figs">${figure(shot)}${figure(step.shot2)}</div>`
+                    : figure(shot)
+                : '';
+        return `<section class="step ${stack ? 'stack' : ''}">
+                ${figs}
                 <div class="text">
                     <div class="head"><span class="no">${String(index + 1)}</span><h2>${escapeHtml(step.title)}</h2></div>
                     <p>${escapeHtml(step.text)}</p>
                 </div>
                 ${shot !== null && !shot.mobile ? figure(shot) : ''}
             </section>`;
-        })
-        .join('\n');
+    });
+    const sheets: string[] = [];
+    for (let i = 0; i < rendered.length; i += 2) {
+        sheets.push(`<div class="sheet">${rendered.slice(i, i + 2).join('')}</div>`);
+    }
+    const steps = sheets.join('');
     const can = guide.can.map((c) => `<li>${escapeHtml(c)}</li>`).join('');
     const html = `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Anleitung ${escapeHtml(guide.role)}</title><style>${STYLE}</style></head><body>
         <section class="cover">
