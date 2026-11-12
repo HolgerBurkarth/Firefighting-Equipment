@@ -336,6 +336,8 @@ async function saveOffline(
     setBookingNotice({
         kind: 'info',
         text: `Gespeichert – wird gesendet, sobald eine Verbindung besteht: ${queuedText({ ...booking, state: 'waiting' })}`,
+        clientRef: booking.clientRef,
+        queuedLabel: queuedText({ ...booking, state: 'waiting' }),
     });
     saved.value = true;
     await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);
@@ -399,11 +401,13 @@ async function onSwapped(response: SwapResponse): Promise<void> {
     await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);
 }
 
-async function onSwapQueued(text: string): Promise<void> {
+async function onSwapQueued(text: string, clientRef: string): Promise<void> {
     rememberDevice(deviceId);
     setBookingNotice({
         kind: 'info',
         text: `Gespeichert – wird gesendet, sobald eine Verbindung besteht: ${text}`,
+        clientRef,
+        queuedLabel: text,
     });
     saved.value = true;
     await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);
@@ -519,7 +523,13 @@ async function submit(
     void locationStore.refresh('changed');
     // Geräteliste der Admin-Konsole, falls schon geöffnet (sonst nichts).
     void adminDeviceList.refresh('changed');
-    setBookingNotice(bookingNotice(result.data));
+    setBookingNotice(
+        bookingNotice(
+            result.data,
+            { status: current.status, locationId: current.location.id },
+            canSwap.value,
+        ),
+    );
     saved.value = true;
     // Zurück, woher man kam (Suchen, Prüffristen, Geräteliste, Gerätedetail oder Hinweis der
     // Admin-Konsole), sonst zu „Suchen“ (Entscheidung 22).

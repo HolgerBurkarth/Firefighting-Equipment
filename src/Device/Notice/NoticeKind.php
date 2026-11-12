@@ -37,7 +37,7 @@ enum NoticeKind: string
     {
         return match ($this) {
             self::Overwritten => 'Anderen Stand überschrieben',
-            self::HistoryOnly => 'Nur Historie (neuerer Stand vorhanden)',
+            self::HistoryOnly => 'Buchung kam zu spät – Stand nicht geändert',
             self::NotAppliedRetired => 'Nicht übernommen (Ausrüstung ausgesondert)',
             self::NotAppliedLocationLocked => 'Nicht übernommen (Standort gesperrt)',
             self::StaleConfirmed => 'Alte Buchung nach Rückfrage gesendet',

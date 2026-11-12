@@ -13,6 +13,7 @@ import {
     STOCK_MAX_RULES,
     stockInputs,
     stockProblem,
+    outageText,
     stockSummary,
     type RuleDraft,
 } from '../data/stock';
@@ -33,6 +34,8 @@ const canWrite = computed(() => allows(currentPermissions.value, 'locations', 'w
 const state = shallowRef<StockState | null>(null);
 const error = shallowRef<ApiError | null>(null);
 const success = ref<string | null>(null);
+/** Folge der neuen Regel (U4): der Standort gilt jetzt als außer Betrieb. */
+const outage = ref<string | null>(null);
 
 async function load(): Promise<void> {
     const result = await fetchStock();
@@ -75,7 +78,11 @@ const locationOptions = computed((): SelectOption[] => {
         options.push({ value: String(location.id), label: location.name });
         for (const child of location.children) {
             if (child.active) {
-                options.push({ value: String(child.id), label: child.name, level: 2 });
+                options.push({
+                    value: String(child.id),
+                    label: `${location.name} / ${child.name}`,
+                    level: 2,
+                });
             }
         }
     }
@@ -98,6 +105,7 @@ function openDialog(entry: StockEntry | null, event: Event): void {
     touched.value = false;
     dialogError.value = null;
     success.value = null;
+    outage.value = null;
     void deviceTypeStore.refresh('open');
     void adminLocationStore.refresh('open');
     open.value = true;
@@ -157,13 +165,15 @@ async function submit(): Promise<void> {
             : `Sollbestand von „${name}“ gespeichert.`;
     open.value = false;
     await load();
+    const saved = state.value?.entries.find((entry) => entry.location.id === target);
+    outage.value = saved === undefined ? null : outageText(saved);
 }
 </script>
 
 <template>
     <section class="stock" aria-labelledby="stock-title" data-testid="stock-panel">
         <div class="stock-head">
-            <h2 id="stock-title">Sollbestand</h2>
+            <h2 id="stock-title" tabindex="-1">Sollbestand</h2>
             <button
                 v-if="canWrite"
                 class="btn"
@@ -182,6 +192,14 @@ async function submit(): Promise<void> {
             data-testid="stock-success"
         >
             {{ success }}
+        </p>
+        <p
+            v-if="success !== null && outage !== null"
+            class="notice notice-error"
+            role="status"
+            data-testid="stock-outage"
+        >
+            {{ outage }}
         </p>
         <template v-if="state !== null">
             <p class="summary" data-testid="stock-summary">{{ stockSummary(entries) }}</p>
@@ -267,9 +285,7 @@ async function submit(): Promise<void> {
                     />
                 </label>
                 <fieldset class="draft-types">
-                    <legend class="field-label">
-                        Ausrüstungstyp (mehrere = gleichwertig, zählen zusammen)
-                    </legend>
+                    <legend class="field-label">Ausrüstungstyp</legend>
                     <label v-for="type in types" :key="type.id" class="check">
                         <input
                             type="checkbox"
@@ -279,6 +295,10 @@ async function submit(): Promise<void> {
                         />
                         {{ type.name }}
                     </label>
+                    <p class="field-hint">
+                        Mehrere Typen werden zusammen gezählt. Für getrennte Zahlen legen Sie eine
+                        zweite Regel an.
+                    </p>
                 </fieldset>
                 <button
                     class="btn btn-small"

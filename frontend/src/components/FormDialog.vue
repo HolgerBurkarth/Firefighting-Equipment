@@ -111,16 +111,20 @@ function onCloseAutoFocus(event: Event): void {
                 <form class="form-body" novalidate @submit.prevent="emit('submit')">
                     <slot />
                     <ErrorNotice v-if="error !== null" :error="error" />
-                    <div class="form-actions">
-                        <DialogClose class="btn" type="button">Abbrechen</DialogClose>
-                        <button
-                            class="btn"
-                            :class="`btn-${variant}`"
-                            type="submit"
-                            :disabled="busy || !canSubmit"
-                        >
-                            {{ submitLabel }}
-                        </button>
+                    <!-- Abbrechen/Speichern bleiben am unteren Rand des Fensters sichtbar (U2, U7). -->
+                    <div class="form-foot" data-testid="form-foot">
+                        <slot name="foot" />
+                        <div class="form-actions">
+                            <DialogClose class="btn" type="button">Abbrechen</DialogClose>
+                            <button
+                                class="btn"
+                                :class="`btn-${variant}`"
+                                type="submit"
+                                :disabled="busy || !canSubmit"
+                            >
+                                {{ submitLabel }}
+                            </button>
+                        </div>
                     </div>
                 </form>
                 <div v-if="$slots['extra']" class="form-extra">
@@ -182,6 +186,19 @@ function onCloseAutoFocus(event: Event): void {
     display: flex;
     flex-direction: column;
     gap: 16px;
+}
+
+.form-foot {
+    position: sticky;
+    z-index: 1;
+    bottom: -20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 -20px -20px;
+    padding: 12px 20px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
 }
 
 .form-actions {

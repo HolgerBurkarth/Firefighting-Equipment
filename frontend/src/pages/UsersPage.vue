@@ -198,6 +198,8 @@ const touched = ref(false);
 const nameError = ref<string | null>(null);
 const dialogError = ref<ApiError | null>(null);
 const claudeAccess = ref<ClaudeAccess>('off');
+/** Der Abschnitt „Claude-Zugang“ ist eingeklappt, solange der Zugang aus ist (U7). */
+const claudeOpen = ref(false);
 
 const isOwn = computed(() => target.value !== null && target.value.id === ownId.value);
 /** Anzeigename nur bei aktiven Konten (eingeladene bekommen ihn beim Annehmen der Einladung). */
@@ -254,6 +256,7 @@ function openDialog(user: AdminUser, kind: Mode, event: Event): void {
     nameError.value = null;
     dialogError.value = null;
     claudeAccess.value = user.claudeAccess;
+    claudeOpen.value = user.claudeAccess !== 'off';
     dialogOpen.value = true;
     void assignableRoleStore.refresh('open');
 }
@@ -1002,37 +1005,55 @@ onMounted(() => {
                 }}
             </p>
         </fieldset>
-        <fieldset
+        <details
             v-if="showsClaude"
-            class="roles claude-access"
-            :disabled="claudeBlocker !== null"
-            data-testid="claude-access"
+            class="claude-details"
+            :open="claudeOpen || claudeBlocker !== null"
+            data-testid="claude-details"
+            @toggle="claudeOpen = ($event.target as HTMLDetailsElement).open"
         >
-            <legend class="field-label">Claude-Zugang</legend>
-            <label v-for="value in CLAUDE_ACCESS_VALUES" :key="value" class="role-option">
-                <input
-                    v-model="claudeAccess"
-                    type="radio"
-                    :aria-label="`Claude-Zugang: ${CLAUDE_ACCESS_LABELS[value]}`"
-                    :name="`${id}-claude`"
-                    :value="value"
-                />
-                <span class="role-text">
-                    <strong>{{ CLAUDE_ACCESS_LABELS[value] }}</strong>
-                    <span class="field-hint">{{
-                        value === 'off'
-                            ? 'Keine Verbindung möglich; bestehende werden getrennt.'
-                            : value === 'read'
-                              ? 'Claude darf ansehen, was die Rolle sieht, aber nichts ändern.'
-                              : 'Claude darf, was die Rolle darf – außer Benutzer und Einstellungen.'
-                    }}</span>
-                </span>
-            </label>
-            <p v-if="claudeBlocker !== null" class="field-hint" data-testid="claude-blocker">
-                {{ claudeBlocker }}
+            <summary>Claude-Zugang (KI-Assistent) – nur für Admins</summary>
+            <p class="field-hint">
+                Claude ist ein KI-Assistent. Hier legen Sie fest, ob er für dieses Konto Ausrüstung
+                lesen oder ändern darf.
             </p>
-        </fieldset>
+            <fieldset
+                class="roles claude-access"
+                :disabled="claudeBlocker !== null"
+                data-testid="claude-access"
+            >
+                <legend class="field-label">Claude-Zugang</legend>
+                <label v-for="value in CLAUDE_ACCESS_VALUES" :key="value" class="role-option">
+                    <input
+                        v-model="claudeAccess"
+                        type="radio"
+                        :aria-label="`Claude-Zugang: ${CLAUDE_ACCESS_LABELS[value]}`"
+                        :name="`${id}-claude`"
+                        :value="value"
+                    />
+                    <span class="role-text">
+                        <strong>{{ CLAUDE_ACCESS_LABELS[value] }}</strong>
+                        <span class="field-hint">{{
+                            value === 'off'
+                                ? 'Keine Verbindung möglich; bestehende werden getrennt.'
+                                : value === 'read'
+                                  ? 'Claude darf ansehen, was die Rolle sieht, aber nichts ändern.'
+                                  : 'Claude darf, was die Rolle darf – außer Benutzer und Einstellungen.'
+                        }}</span>
+                    </span>
+                </label>
+                <p v-if="claudeBlocker !== null" class="field-hint" data-testid="claude-blocker">
+                    {{ claudeBlocker }}
+                </p>
+            </fieldset>
+        </details>
         <template v-if="mode === 'edit' && target !== null && !isOwn" #extra>
+            <h3 class="end-title">Konto beenden</h3>
+            <p class="field-hint">
+                Gesperrt: kann sich nicht mehr anmelden, lässt sich wieder entsperren. Gelöscht (z.
+                B. bei Austritt): die persönlichen Daten werden entfernt, im Verlauf bleibt
+                „Gelöschter Benutzer #…“.
+            </p>
             <button v-if="target.locked" class="btn" type="button" :disabled="busy" @click="unlock">
                 {{ target.label }} entsperren
             </button>
@@ -1054,7 +1075,7 @@ onMounted(() => {
                 :disabled="busy"
                 @click="ask('delete', target)"
             >
-                {{ target.label }} löschen …
+                {{ target.label }} löschen (ausgetreten) …
             </button>
         </template>
     </FormDialog>
@@ -1349,6 +1370,19 @@ onMounted(() => {
     margin-left: 6px;
 }
 
+.claude-details > summary {
+    min-height: var(--touch-min);
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: var(--font-weight-semibold);
+}
+
+.end-title {
+    margin: 0;
+    font-size: 16px;
+}
+
 .claude-connections {
     display: block;
     margin-top: 4px;
@@ -1372,8 +1406,8 @@ onMounted(() => {
 }
 
 .role-option input {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     margin: 2px 0 0;
     flex: none;
     accent-color: var(--accent);
@@ -1434,8 +1468,8 @@ onMounted(() => {
 }
 
 .select-box input {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     margin: 0;
     accent-color: var(--accent);
 }

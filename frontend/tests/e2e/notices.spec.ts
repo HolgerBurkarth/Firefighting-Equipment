@@ -52,7 +52,7 @@ function initialNotices(): Record<string, unknown>[] {
         }),
         noticeJson(1, {
             kind: 'history_only',
-            kind_label: 'Nur Historie (neuerer Stand vorhanden)',
+            kind_label: 'Buchung kam zu spät – Stand nicht geändert',
             status: 'resolved',
             status_label: 'erledigt',
             history: [
@@ -225,7 +225,7 @@ test.describe('Protokoll: Hinweise', () => {
         await expect(page).toHaveURL(/\/protokoll\?status=erledigt$/);
         await expect(page.getByTestId('notice-count')).toHaveText('1 erledigter Hinweis');
         await expect(list.locator('.notice-kind')).toHaveText([
-            'Nur Historie (neuerer Stand vorhanden)',
+            'Buchung kam zu spät – Stand nicht geändert',
         ]);
         await page.getByRole('button', { name: 'Alle' }).click();
         await expect(page.getByTestId('notice-count')).toHaveText('3 Hinweise');
@@ -312,7 +312,9 @@ test.describe('Protokoll: Hinweise', () => {
         await note.fill(' Mit Gerätewart geklärt\n\tMaske getauscht ');
         await dialog.getByRole('button', { name: 'Erledigen' }).click();
 
-        await expect(page.getByTestId('success-notice')).toHaveText('Der Hinweis ist erledigt.');
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Der Hinweis ist erledigt. Die Buchung gilt. War der überschriebene Stand richtig, buchen Sie die Ausrüstung selbst zurück.',
+        );
         expect(sent(apiRequests, 'POST', 'api/v1/notices/3/resolve')).toEqual([
             { note: 'Mit Gerätewart geklärt\n Maske getauscht' },
         ]);
@@ -355,6 +357,57 @@ test.describe('Protokoll: Hinweise', () => {
         await page.getByTestId('notice-3').getByRole('link').click();
         await expect(page.getByTestId('device-now')).toContainText('HLF 20 / G1');
         expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+    });
+});
+
+test.describe('Protokoll: Klartext, gleiche Zeiten, was nach „Erledigen“ zu tun ist (U17)', () => {
+    const base = noticeJson(3);
+    useServer(() =>
+        noticeServer([
+            noticeJson(3, {
+                kind: 'history_only',
+                kind_label: 'Buchung kam zu spät – Stand nicht geändert',
+                booking: {
+                    ...(base['booking'] as Record<string, unknown>),
+                    occurred_at: '2026-10-30T09:00:00Z',
+                    received_at: '2026-10-30T09:00:00Z',
+                },
+                other: {
+                    ...(base['other'] as Record<string, unknown>),
+                    occurred_at: '2026-10-30T09:00:00Z',
+                },
+            }),
+        ]),
+    );
+    test.use({
+        api: {
+            'GET api/v1/auth/me': ME,
+            ...OVERVIEW,
+            ...delegate(() => server),
+            ...deviceDetail(M1),
+        },
+    });
+
+    test('Klartext statt „Nur Historie“, gleiche Zeiten nur einmal, Antwort auf „Und jetzt?“', async ({
+        page,
+    }) => {
+        await open(page);
+        await expect(page.locator('.notice-kind')).toHaveText([
+            'Buchung kam zu spät – Stand nicht geändert',
+        ]);
+        await expect(page.locator('body')).not.toContainText('Nur Historie');
+        await page.getByTestId('notice-3').getByRole('link').click();
+        await expect(page.getByTestId('other')).toContainText('Stand beim Eingang');
+        // „Erfasst“ ist hier gleich dem Eingang der Buchung: nicht noch einmal zeigen.
+        await expect(page.getByTestId('other')).not.toContainText('Erfasst');
+        await page.getByRole('button', { name: 'Erledigen …' }).click();
+        await page
+            .getByRole('dialog', { name: 'Hinweis erledigen' })
+            .getByRole('button', { name: 'Erledigen' })
+            .click();
+        await expect(page.getByTestId('success-notice')).toHaveText(
+            'Der Hinweis ist erledigt. Es ist nichts weiter zu tun: Die Ausrüstung hat den neueren Stand behalten.',
+        );
     });
 });
 

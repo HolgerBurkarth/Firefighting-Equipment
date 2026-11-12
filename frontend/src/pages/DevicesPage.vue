@@ -951,8 +951,8 @@ const canBulk = computed(
 }
 
 .select-box input {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     margin: 0;
     accent-color: var(--accent);
 }

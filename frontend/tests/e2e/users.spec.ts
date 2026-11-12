@@ -9,7 +9,7 @@ import {
     type MockResponse,
 } from './fixtures';
 import { adminOverview, assignableRolesJson, userJson } from './support/admin';
-import { horizontalOverflow, unreachableControls } from './support/layout';
+import { horizontalOverflow, smallTargets, unreachableControls } from './support/layout';
 import { delegate } from './support/masterData';
 
 /**
@@ -527,7 +527,7 @@ test.describe('Benutzer', () => {
     test('Löschen nach Rückfrage', async ({ page, apiRequests }) => {
         await open(page);
         await page.getByRole('button', { name: 'Zoë Kraus bearbeiten' }).click();
-        await page.getByRole('button', { name: 'Zoë Kraus löschen …' }).click();
+        await page.getByRole('button', { name: 'Zoë Kraus löschen (ausgetreten) …' }).click();
         const confirm = page.getByRole('alertdialog', { name: 'Zoë Kraus löschen?' });
         await expect(confirm).toContainText('„Gelöschter Benutzer #9“');
         await confirm.getByRole('button', { name: 'Löschen' }).click();
@@ -553,6 +553,59 @@ test.describe('Benutzer', () => {
         await expect(
             page.getByRole('navigation', { name: 'Hauptmenü' }).getByTestId('account-name'),
         ).toHaveText('Tom Keller');
+    });
+});
+
+test.describe('Fenster „Bearbeiten“ (U7)', () => {
+    useServer();
+    test.use({ tenant: { ...TEST_TENANT, body: { ...TEST_TENANT.body, claude_available: true } } });
+
+    for (const [width, height] of [
+        [1280, 600],
+        [390, 700],
+    ] as const) {
+        test(`${String(width)}×${String(height)}: Speichern fest am Rand, Mausrad scrollt, Abschnitt „Konto beenden“`, async ({
+            page,
+            isMobile,
+        }) => {
+            test.skip(isMobile, 'Mausrad gibt es in Playwright-WebKit für Handys nicht');
+            await page.setViewportSize({ width, height });
+            await open(page);
+            await page.getByRole('button', { name: 'Anna Berg bearbeiten' }).click();
+            const dialog = page.getByRole('dialog', { name: 'Anna Berg bearbeiten' });
+            const save = dialog.getByRole('button', { name: 'Speichern' });
+            await expect(save).toBeInViewport();
+            // Das Mausrad über dem Fenster scrollt das Fenster (nicht die Seite dahinter).
+            const box = await dialog.boundingBox();
+            await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + 120);
+            await page.mouse.wheel(0, 2000);
+            await expect
+                .poll(() => dialog.evaluate((element) => element.scrollTop))
+                .toBeGreaterThan(0);
+            const end = dialog.getByRole('heading', { name: 'Konto beenden' });
+            await expect(end).toBeInViewport();
+            await expect(
+                dialog.getByRole('button', { name: 'Anna Berg löschen (ausgetreten) …' }),
+            ).toBeInViewport();
+            await expect(save).toBeInViewport();
+            // Claude-Zugang ist erklärt; das Konto hat ihn, der Abschnitt ist offen.
+            await expect(dialog.getByTestId('claude-details')).toContainText(
+                'Claude ist ein KI-Assistent.',
+            );
+            expect(
+                await dialog.evaluate((element) => element.scrollWidth - element.clientWidth),
+            ).toBeLessThanOrEqual(0);
+        });
+    }
+
+    test('Claude-Zugang ist bei „Aus“ eingeklappt und lässt sich aufklappen', async ({ page }) => {
+        await open(page);
+        await page.getByRole('button', { name: 'Zoë Kraus bearbeiten' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Zoë Kraus bearbeiten' });
+        const details = dialog.getByTestId('claude-details');
+        await expect(details).not.toHaveAttribute('open', '');
+        await details.getByText('Claude-Zugang (KI-Assistent)').click();
+        await expect(details.getByRole('radio', { name: 'Claude-Zugang: Lesen' })).toBeVisible();
     });
 });
 
@@ -662,6 +715,7 @@ test.describe('Claude-Zugang', () => {
 
         await page.getByRole('button', { name: 'Zoë Kraus bearbeiten' }).click();
         const locked = page.getByRole('dialog', { name: 'Zoë Kraus bearbeiten' });
+        await locked.getByText('Claude-Zugang (KI-Assistent)').click();
         await expect(locked.getByRole('radio', { name: 'Claude-Zugang: Lesen' })).toBeEnabled();
     });
 });
@@ -733,6 +787,11 @@ test.describe('Breiten (Runde 14, Punkt 2)', () => {
                 [],
             );
             expect(await unreachableControls(page, '.pending-card')).toEqual([]);
+            // U3: Kästchen der Liste mindestens 44 px.
+            expect(await smallTargets(page, '[data-testid="user-table"]')).toEqual([]);
+            await page.getByRole('button', { name: 'Max Neu freischalten' }).click();
+            await expect(page.getByRole('dialog', { name: 'Max Neu freischalten' })).toBeVisible();
+            expect(await smallTargets(page, '[data-form-dialog]')).toEqual([]);
         });
     }
 });

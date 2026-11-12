@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { horizontalOverflow, unreachableControls } from './support/layout';
+import { horizontalOverflow, smallTargets, unreachableControls } from './support/layout';
 import {
     ADMIN_RIGHTS,
     expect,
@@ -56,7 +56,9 @@ interface Entry {
 }
 
 /** Zustandsbehafteter Server: bucht wie MaintenanceMoveHandler (Version + 1, Fehler je Gerät). */
-function maintenanceServer(options: { workshop?: boolean; store?: boolean } = {}) {
+function maintenanceServer(
+    options: { workshop?: boolean; store?: boolean; defectiveInWorkshop?: boolean } = {},
+) {
     const hasWorkshop = options.workshop ?? true;
     const hasStore = options.store ?? true;
     let devices = [
@@ -89,6 +91,17 @@ function maintenanceServer(options: { workshop?: boolean; store?: boolean } = {}
             status_label: 'in Wartung',
             state_changed_at: ago(30),
         }),
+        ...(options.defectiveInWorkshop === true
+            ? [
+                  deviceJson(5, {
+                      identifier: 'PA 11',
+                      location: { id: 60, name: 'Werkstatt', path: 'Werkstatt' },
+                      status: 'defective',
+                      status_label: 'defekt',
+                      state_changed_at: ago(20),
+                  }),
+              ]
+            : []),
     ];
     const stageOf = (place: number): Record<string, unknown>[] =>
         devices.filter(
@@ -234,6 +247,8 @@ test.describe('Wartung mit Recht „Ändern“', () => {
             expect(await unreachableControls(page, '[data-testid="maintenance-device"]')).toEqual(
                 [],
             );
+            // U3: Kästchen und „Alle auswählen“ sind mindestens 44 px große Flächen.
+            expect(await smallTargets(page, '[data-testid^="stage-"]')).toEqual([]);
         });
     }
 
@@ -282,11 +297,11 @@ test.describe('Wartung mit Recht „Ändern“', () => {
         await expect(button).toContainText('(2)');
         await button.click();
         const confirm = page.getByTestId('confirm-dialog');
-        await expect(confirm).toContainText('2 Ausrüstungen zur Werkstatt bringen?');
+        await expect(confirm).toContainText('2 Ausrüstungen in die Werkstatt bringen?');
         await expect(confirm).toContainText(
             'Sie stehen dann in „Werkstatt“ mit dem Status „in Wartung“.',
         );
-        await confirm.getByRole('button', { name: 'Bringen' }).click();
+        await confirm.getByRole('button', { name: 'In die Werkstatt bringen' }).click();
 
         await expect(page.getByTestId('maintenance-result')).toHaveText(
             'Zur Werkstatt: 2 Ausrüstungen geändert.',
@@ -316,7 +331,10 @@ test.describe('Wartung mit Recht „Ändern“', () => {
         await collection.getByLabel('M2 auswählen').check();
         server.bump(2);
         await collection.getByTestId('to-workshop').click();
-        await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Bringen' }).click();
+        await page
+            .getByTestId('confirm-dialog')
+            .getByRole('button', { name: 'In die Werkstatt bringen' })
+            .click();
 
         await expect(page.getByTestId('maintenance-result')).toHaveText(
             'Zur Werkstatt: 1 Ausrüstung geändert, 1 nicht möglich.',
@@ -333,12 +351,15 @@ test.describe('Wartung mit Recht „Ändern“', () => {
         await workshop.getByLabel('M4 auswählen').check();
         await workshop.getByTestId('back').click();
         await expect(page.getByTestId('confirm-dialog')).toContainText(
-            '1 Ausrüstung zurück ins Lager bringen?',
+            '1 Ausrüstung ins Lager bringen?',
         );
         await expect(page.getByTestId('confirm-dialog')).toContainText(
             'Sie steht dann in „Hauptlager“ mit dem Status „einsatzbereit“.',
         );
-        await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Bringen' }).click();
+        await page
+            .getByTestId('confirm-dialog')
+            .getByRole('button', { name: 'Ins Lager bringen' })
+            .click();
 
         await expect(page.getByTestId('maintenance-result')).toHaveText(
             'Zurück ins Lager: 1 Ausrüstung geändert.',
@@ -355,7 +376,12 @@ test.describe('Wartung mit Recht „Ändern“', () => {
         await page.goto('/firefighting/test/wartung');
         const collection = page.getByTestId('stage-collection');
         await collection.getByTestId('copy-collection').click();
-        await expect(collection.getByText('Kopiert.')).toBeVisible();
+        // U5: Rückmeldung direkt am Knopf mit der Anzahl, verschwindet nach wenigen Sekunden.
+        await expect(collection.getByTestId('copy-note-collection')).toHaveText(
+            '✓ Liste kopiert (3 Ausrüstungen)',
+        );
+        await page.clock.runFor(5000);
+        await expect(collection.getByTestId('copy-note-collection')).toHaveCount(0);
         await collection.getByLabel('M2 auswählen').check();
         await collection.getByTestId('copy-collection').click();
         await expect
@@ -364,6 +390,74 @@ test.describe('Wartung mit Recht „Ändern“', () => {
                 'Sammelstelle (3)\nM1 · Atemschutzmaske · defekt · Sammelstelle\nM2 · Atemschutzmaske · benutzt · Sammelstelle / Kiste\nEF-1 · Einmalfilter · benutzt · Sammelstelle',
                 'Sammelstelle (1)\nM2 · Atemschutzmaske · benutzt · Sammelstelle / Kiste',
             ]);
+    });
+});
+
+test.describe('Wartung: Rückfragen und defekte Ausrüstung (U5, U10)', () => {
+    test.use({
+        api: {
+            'GET api/v1/auth/me': admin(),
+            ...ADMIN_OVERVIEW,
+            ...delegate(() => server.api),
+        },
+    });
+
+    test.beforeEach(async ({ page }) => {
+        server = maintenanceServer({ defectiveInWorkshop: true });
+        await page.clock.install({ time: NOW });
+        await page.addInitScript(() => {
+            const list: string[] = [];
+            Object.assign(window, { __copied: list });
+            Object.defineProperty(navigator, 'clipboard', {
+                configurable: true,
+                value: { writeText: (text: string) => Promise.resolve(void list.push(text)) },
+            });
+        });
+        await page.setViewportSize({ width: 390, height: 900 });
+    });
+
+    test('U5: Reihenfolge genannt, im Fenster „Transportliste vorher kopieren?“ mit Rückmeldung', async ({
+        page,
+    }) => {
+        await page.goto('/firefighting/test/wartung');
+        const collection = page.getByTestId('stage-collection');
+        await expect(collection).toContainText(
+            'erst „Transportliste kopieren“, dann „In die Werkstatt bringen“',
+        );
+        await collection.getByLabel('M2 auswählen').check();
+        await collection.getByTestId('to-workshop').click();
+        const confirm = page.getByTestId('confirm-dialog');
+        await expect(confirm).toContainText('Transportliste vorher kopieren?');
+        await confirm.getByTestId('confirm-copy').click();
+        await expect(confirm).toContainText('✓ Liste kopiert (1 Ausrüstung)');
+        await expect
+            .poll(() => copied(page))
+            .toEqual(['Sammelstelle (1)\nM2 · Atemschutzmaske · benutzt · Sammelstelle / Kiste']);
+    });
+
+    test('U10: „Alle auswählen“ lässt Defektes in der Werkstatt aus, Warnung bei Handauswahl', async ({
+        page,
+    }) => {
+        await page.goto('/firefighting/test/wartung');
+        const workshop = page.getByTestId('stage-workshop');
+        await expect(workshop.getByTestId('stays-in-workshop')).toHaveText(
+            'defekt – bleibt in der Werkstatt',
+        );
+        await workshop.getByLabel('Alle angezeigten Ausrüstungen in „Werkstatt“ auswählen').check();
+        await expect(workshop.getByLabel('M4 auswählen')).toBeChecked();
+        await expect(workshop.getByLabel('PA 11 auswählen')).not.toBeChecked();
+        await expect(workshop.getByTestId('back')).toContainText('Ins Lager bringen …');
+        await expect(workshop.getByTestId('back')).toContainText('(1)');
+        // Von Hand gewählt: die Rückfrage warnt.
+        await workshop.getByLabel('PA 11 auswählen').check();
+        await workshop.getByTestId('back').click();
+        await expect(page.getByTestId('confirm-dialog')).toContainText(
+            'Achtung: PA 11 ist noch defekt und gilt danach als einsatzbereit.',
+        );
+        await page
+            .getByTestId('confirm-dialog')
+            .getByRole('button', { name: 'Ins Lager bringen' })
+            .click();
     });
 });
 

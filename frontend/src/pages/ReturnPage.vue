@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef } from 'vue';
+import { computed, nextTick, ref, useTemplateRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
     checkReturn,
@@ -11,6 +11,7 @@ import {
 import type { ApiError } from '../api/client';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import { RETURN_CONDITIONS, returnProblem } from '../data/loans';
+import { eventTimeText } from '../data/changeTime';
 import HowToSteps from '../components/HowToSteps.vue';
 import { RETURN_STEPS } from '../data/howTo';
 import { takeFragmentParam } from '../runtime/fragment';
@@ -54,6 +55,10 @@ const condition = ref<ReturnCondition>('ok');
 const comment = ref('');
 const found = ref<ReturnFound | null>(null);
 const done = ref<ReturnDone | null>(null);
+/** Beleg der letzten Rückgabe (U1): Zustand und Hinweis, wie der Bote sie angegeben hat. */
+const receipt = ref<{ conditionLabel: string; comment: string | null } | null>(null);
+/** „Schon zurückgegeben“ (U1): Nummer und Zeit vom Server, keine Namen. */
+const alreadyReturned = ref<{ identifier: string; at: string } | null>(null);
 const busy = ref(false);
 const error = ref<ApiError | null>(null);
 const problem = ref<string | null>(null);
@@ -77,10 +82,27 @@ function reset(): void {
     submitted.value = false;
     error.value = null;
     problem.value = null;
-    codeInput.value?.focus();
+    alreadyReturned.value = null;
+    receipt.value = null;
+    void nextTick(() => codeInput.value?.focus());
+}
+
+function onCodeInput(): void {
+    found.value = null;
+    alreadyReturned.value = null;
 }
 
 function onFailure(failure: ApiError): void {
+    const details = failure.details;
+    if (
+        failure.code === 'invalid_request' &&
+        details !== null &&
+        typeof details['identifier'] === 'string' &&
+        typeof details['returned_at'] === 'string'
+    ) {
+        alreadyReturned.value = { identifier: details['identifier'], at: details['returned_at'] };
+        return;
+    }
     if (failure.code === 'invalid_request' && failure.message !== null) {
         problem.value = failure.message;
         keyInvalid.value = failure.message.includes('Rückgabe-Link');
@@ -95,6 +117,7 @@ async function onCheck(): Promise<void> {
     }
     error.value = null;
     problem.value = null;
+    alreadyReturned.value = null;
     found.value = null;
     if (code.value.trim() === '') {
         problem.value = 'Bitte geben Sie die Nummer der Ausrüstung ein.';
@@ -136,6 +159,12 @@ async function onSubmit(): Promise<void> {
     if (result.ok) {
         done.value = result.data;
         found.value = null;
+        receipt.value = {
+            conditionLabel:
+                RETURN_CONDITIONS.find((entry) => entry.value === condition.value)?.label ??
+                condition.value,
+            comment: text === '' ? null : text,
+        };
         return;
     }
     onFailure(result.error);
@@ -160,11 +189,26 @@ async function onSubmit(): Promise<void> {
         </template>
         <template v-else>
             <section v-if="done !== null" class="card" data-testid="return-done" role="status">
-                <h2>Danke!</h2>
-                <p>
-                    <strong>{{ done.identifier }}</strong> ({{ done.deviceType }}) ist zurückgegeben
-                    und steht jetzt in „{{ done.location }}“.
-                </p>
+                <h2>Danke – Ihre Rückgabe ist angekommen</h2>
+                <dl class="receipt" data-testid="return-receipt">
+                    <dt>Ausrüstung</dt>
+                    <dd>
+                        <strong>{{ done.identifier }}</strong> ({{ done.deviceType }})
+                    </dd>
+                    <dt>Zustand</dt>
+                    <dd>{{ receipt?.conditionLabel ?? done.statusLabel }}</dd>
+                    <template v-if="receipt?.comment">
+                        <dt>Hinweis</dt>
+                        <dd>{{ receipt.comment }}</dd>
+                    </template>
+                    <template v-if="done.returnedAt !== null">
+                        <dt>Zeit</dt>
+                        <dd>{{ eventTimeText(done.returnedAt) }}</dd>
+                    </template>
+                    <dt>Abgelegt in</dt>
+                    <dd>„{{ done.location }}“</dd>
+                </dl>
+                <p class="found">Sie müssen nichts weiter tun.</p>
                 <button
                     class="btn btn-primary"
                     type="button"
@@ -174,12 +218,9 @@ async function onSubmit(): Promise<void> {
                     Weitere Ausrüstung zurückgeben
                 </button>
             </section>
-            <section v-else class="card" aria-label="So geht die Rückgabe">
-                <HowToSteps :steps="RETURN_STEPS" variant="screen" />
-            </section>
             <form v-if="done === null" class="card" novalidate @submit.prevent="onSubmit">
                 <p class="hint">
-                    Nummer der Ausrüstung eingeben (oder mit einem Handscanner einlesen), prüfen und
+                    Nummer der Ausrüstung eingeben (oder mit einem Handscanner einlesen), suchen und
                     Ihren Namen angeben. Eine Anmeldung ist nicht nötig.
                 </p>
                 <div class="field">
@@ -196,7 +237,7 @@ async function onSubmit(): Promise<void> {
                             :disabled="busy"
                             data-testid="return-code"
                             @keydown.enter.prevent="onCheck"
-                            @input="found = null"
+                            @input="onCodeInput"
                         />
                         <button
                             class="btn"
@@ -205,7 +246,7 @@ async function onSubmit(): Promise<void> {
                             data-testid="return-check"
                             @click="onCheck"
                         >
-                            Prüfen
+                            Nummer suchen
                         </button>
                     </div>
                 </div>
@@ -214,6 +255,15 @@ async function onSubmit(): Promise<void> {
                     ✓ <strong>{{ found.identifier }}</strong> · {{ found.deviceType }} – wird in „{{
                         found.location
                     }}“ abgegeben.
+                </p>
+                <p
+                    v-if="alreadyReturned !== null"
+                    class="found"
+                    role="status"
+                    data-testid="return-already"
+                >
+                    <strong>{{ alreadyReturned.identifier }}</strong> wurde bereits zurückgegeben
+                    ({{ eventTimeText(alreadyReturned.at) }}). Sie müssen nichts weiter tun.
                 </p>
 
                 <template v-if="found !== null">
@@ -277,6 +327,11 @@ async function onSubmit(): Promise<void> {
                 </p>
                 <ErrorNotice v-if="error !== null" :error="error" />
             </form>
+            <!-- Die Bilder unter dem Formular und einklappbar (U22): das Formular steht zuerst im Bild. -->
+            <details v-if="done === null" class="card steps" data-testid="return-steps">
+                <summary>So geht die Rückgabe (mit Bildern)</summary>
+                <HowToSteps :steps="RETURN_STEPS" variant="screen" />
+            </details>
         </template>
     </main>
 </template>
@@ -329,5 +384,29 @@ async function onSubmit(): Promise<void> {
     flex-wrap: wrap;
     gap: 6px 18px;
     border: 0;
+}
+
+.receipt {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 14px;
+    margin: 0;
+}
+
+.receipt dt {
+    color: var(--muted);
+}
+
+.receipt dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.steps summary {
+    min-height: var(--touch-min);
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: var(--font-weight-semibold);
 }
 </style>

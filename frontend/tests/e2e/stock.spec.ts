@@ -58,7 +58,7 @@ interface Rule {
     missing: number;
 }
 
-function stockServer() {
+function stockServer(options: { have?: number } = {}) {
     let rules: Rule[] = [
         {
             id: 1,
@@ -106,12 +106,17 @@ function stockServer() {
                     types: TYPES.filter((type) => rule.device_type_ids.includes(type.id)).map(
                         (type) => ({ id: type.id, name: type.name }),
                     ),
-                    have: 5,
-                    missing: 0,
+                    have: options.have ?? 5,
+                    missing: Math.max(0, rule.min_count - (options.have ?? 5)),
                 }));
                 return {
                     status: 200,
-                    body: { stock: rules.length === 0 ? null : { rules, out_of_service: false } },
+                    body: {
+                        stock:
+                            rules.length === 0
+                                ? null
+                                : { rules, out_of_service: rules.some((r) => r.missing > 0) },
+                    },
                 };
             },
         } as Record<string, (request: MockRequest) => MockResponse>,
@@ -250,6 +255,42 @@ test.describe('Sollbestand mit Recht „Ändern“', () => {
         );
         await expect(page.getByTestId('stock-summary')).toHaveText(
             'Noch kein Sollbestand festgelegt.',
+        );
+    });
+
+    test('U4: Sprunglink oben, Fach mit Fahrzeug, Satz zu mehreren Typen, Folge der neuen Regel', async ({
+        page,
+    }) => {
+        server = stockServer({ have: 2 });
+        await page.setViewportSize({ width: 390, height: 700 });
+        await page.goto('/firefighting/test/standorte');
+        const jump = page.getByTestId('stock-jump');
+        await expect(jump).toHaveText('Sollbestand (1 außer Betrieb) ↓');
+        await jump.click();
+        await expect(page.getByRole('heading', { name: 'Sollbestand' })).toBeFocused();
+        await expect(page.getByRole('heading', { name: 'Sollbestand' })).toBeInViewport();
+
+        await page.getByTestId('stock-open').click();
+        const dialog = page.getByTestId('form-dialog');
+        await dialog.getByRole('combobox', { name: 'Standort' }).click();
+        await expect(page.getByRole('option', { name: 'HLF 20 / G1' })).toBeVisible();
+        // Das Fach nennt sein Fahrzeug; gespeichert wird hier für das Fahrzeug selbst.
+        await page.getByRole('option', { name: 'HLF 20', exact: true }).click();
+        await expect(dialog.getByTestId('stock-draft')).toHaveCount(1);
+        await dialog.getByRole('button', { name: 'Regel 1 entfernen' }).click();
+        await dialog.getByTestId('stock-add').click();
+        await expect(dialog).toContainText(
+            'Mehrere Typen werden zusammen gezählt. Für getrennte Zahlen legen Sie eine zweite Regel an.',
+        );
+        await dialog.getByLabel('Regel 1: Soll-Anzahl').fill('4');
+        await dialog.getByLabel('Atemschutzmaske').check();
+        await dialog.getByRole('button', { name: 'Speichern' }).click();
+        // Die neue Regel hat Folgen: Das Fach gilt als außer Betrieb, und die Seite sagt es.
+        await expect(page.getByTestId('stock-success')).toHaveText(
+            'Sollbestand von „HLF 20“ gespeichert.',
+        );
+        await expect(page.getByTestId('stock-outage')).toContainText(
+            'hat zurzeit nur 2 von 4 Atemschutzmaske (einsatzbereit) und gilt deshalb als außer Betrieb.',
         );
     });
 

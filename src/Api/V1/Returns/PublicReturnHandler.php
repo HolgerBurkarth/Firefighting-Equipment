@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Api\V1\Returns;
 
+use FirefightingEquipment\Api\V1\Auth\AuthJson;
 use FirefightingEquipment\Api\V1\DeviceErrors;
 use FirefightingEquipment\Api\V1\Devices\DeviceFields;
 use FirefightingEquipment\Auth\IpPrefix;
@@ -31,7 +32,7 @@ use FirefightingEquipment\User\PersonName;
  *   Nummer und Typ ({identifier, device_type});
  * - POST returns {key, code, name, condition (ok|used|defective), comment?}: bucht sie in die Rückgabe, beendet
  *   den Verleih und trägt „<Name> (ohne Anmeldung)“ als Urheber in den Verlauf ein. condition `ok` lässt den
- *   Status, `used`/`defective` setzt ihn. Antwort {identifier, device_type, location, status_label}.
+ *   Status, `used`/`defective` setzt ihn. Antwort {identifier, device_type, location, status_label, returned_at}. Schon zurückgegeben (U1): 400 mit `details {identifier, returned_at}`.
  * Ungültiger Schlüssel oder Code → 400 `invalid_request` (zählt in die Bremse `public_return`, 20 je
  * IP-Präfix und 15 Minuten, sonst 429); Verlauf und Ausrüstung bleiben unberührt.
  */
@@ -84,7 +85,14 @@ final readonly class PublicReturnHandler implements RequestHandler
         $found = $loans->findLoaned($tenant, $code);
         if ($found === null) {
             $throttle->record($tenant->id, $ip, false);
-            throw HttpException::invalidRequest('Diese Ausrüstung ist nicht verliehen. Bitte Nummer prüfen.');
+            $returned = $loans->findReturned($tenant, $code, $place['id']);
+            if ($returned !== null) {
+                throw HttpException::invalidRequest(
+                    sprintf('%s wurde bereits zurückgegeben. Sie müssen nichts weiter tun.', $returned['identifier']),
+                    ['identifier' => $returned['identifier'], 'returned_at' => AuthJson::time($returned['at'])],
+                );
+            }
+            throw HttpException::invalidRequest('Diese Nummer kennen wir nicht oder die Ausrüstung ist nicht verliehen. Bitte schreiben Sie sie so wie auf dem Etikett, z. B. HRT 14.');
         }
 
         if ($this->check) {
@@ -120,6 +128,7 @@ final readonly class PublicReturnHandler implements RequestHandler
             'device_type' => $device->deviceTypeName,
             'location' => $place['name'],
             'status_label' => $device->status->label(),
+            'returned_at' => AuthJson::time($device->stateChangedAt ?? $device->updatedAt),
         ]);
     }
 }

@@ -124,8 +124,14 @@ test.describe('Umbuchen und Status', () => {
         await expect(page.getByTestId('comment-error')).toBeHidden();
         await page.getByRole('button', { name: 'Speichern' }).click();
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
-        await expect(page.getByTestId('booking-notice')).toHaveText('✓ M1 → HLF 20 / G1 · defekt');
+        await expect(page.getByTestId('booking-notice')).toContainText(
+            '✓ M1 → HLF 20 / G1 · defekt',
+        );
         await expect(page.getByTestId('booking-notice')).toHaveClass(/notice-success/);
+        // U11: Die Ausrüstung steht weiter im Fahrzeug; die Bestätigung sagt, was jetzt zu tun ist.
+        await expect(page.getByTestId('booking-follow-up')).toHaveText(
+            'Bitte nehmen Sie M1 aus „HLF 20 / G1“ heraus und geben Sie sie in der Wartung ab.',
+        );
 
         const [body] = stateRequests(apiRequests);
         expect(body).toEqual({

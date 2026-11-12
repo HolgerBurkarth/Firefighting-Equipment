@@ -58,6 +58,7 @@ onBeforeUnmount(() => {
                 <AlertDialogDescription class="confirm-description">
                     {{ description }}
                 </AlertDialogDescription>
+                <slot />
                 <div class="confirm-actions">
                     <AlertDialogCancel class="btn">{{
                         cancelLabel ?? 'Abbrechen'

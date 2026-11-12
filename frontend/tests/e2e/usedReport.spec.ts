@@ -198,12 +198,36 @@ test.describe('Rückfrage nennt die Sammelstelle', () => {
         },
     });
 
-    test('„Es kommt in die Sammelstelle Wache.“', async ({ page }) => {
+    test('„Es kommt zur Sammelstelle „Wache“.“', async ({ page }) => {
         await openFromSearch(page, 'M1', 'M1 · Atemschutzmaske');
         await page.getByTestId('report-used').click();
         const dialog = page.getByTestId('confirm-dialog');
         await expect(dialog).toContainText('M1 als benutzt melden?');
-        await expect(dialog).toContainText('Es kommt in die Sammelstelle Wache.');
+        await expect(dialog).toContainText('Es kommt zur Sammelstelle „Wache“.');
+    });
+});
+
+test.describe('Rückfrage nennt eine Sammelstelle namens „Sammelstelle“ nur einmal (U20)', () => {
+    test.use({
+        api: {
+            'GET api/v1/auth/me': me([]),
+            'GET api/v1/devices': devicesEndpoint([M1]),
+            ...deviceDetail(M1),
+            ...LOCATIONS,
+            'GET api/v1/client-config': {
+                status: 200,
+                body: { ...DEFAULT_CLIENT_CONFIG, used_target: { id: 40, name: 'Sammelstelle' } },
+            },
+        },
+    });
+
+    test('„Es kommt in die Sammelstelle.“', async ({ page }) => {
+        await openFromSearch(page, 'M1', 'M1 · Atemschutzmaske');
+        await page.getByTestId('report-used').click();
+        const dialog = page.getByTestId('confirm-dialog');
+        await expect(dialog).toContainText('Es kommt in die Sammelstelle.');
+        await expect(dialog).not.toContainText('Sammelstelle Sammelstelle');
+        await expect(dialog).not.toContainText('„Sammelstelle“');
     });
 });
 
@@ -231,7 +255,7 @@ test.describe('Rückfrage bei direkt geöffneter Seite', () => {
         ).toBeVisible();
         await page.getByTestId('report-used').click();
         const dialog = page.getByTestId('confirm-dialog');
-        await expect(dialog).toContainText('Es kommt in die Sammelstelle Wache.');
+        await expect(dialog).toContainText('Es kommt zur Sammelstelle „Wache“.');
         await expect(dialog).not.toContainText('falls es eine gibt');
     });
 });

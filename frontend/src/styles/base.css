@@ -359,14 +359,41 @@ body:has([data-dialog-passthrough]) [data-form-dialog] {
 .check {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    min-width: var(--touch-min);
     min-height: var(--touch-min);
+    padding: 0 10px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
 }
 
+/* U3: die ganze Zeile ist das Ziel (mindestens 44 px), das Symbol selbst größer; die gewählte Zeile ist hinterlegt. */
 .check input {
-    width: 20px;
-    height: 20px;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+.check:has(input:checked) {
+    background: var(--selected-bg);
+}
+
+/* Kästchen in einer Listenzeile: das <label> ist das 44-px-Ziel (U3). */
+.pick {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    cursor: pointer;
+}
+
+.pick input {
+    width: 24px;
+    height: 24px;
     margin: 0;
     accent-color: var(--accent);
 }

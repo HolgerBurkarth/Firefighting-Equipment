@@ -296,12 +296,18 @@ export function checkReturn(
 
 export interface ReturnDone extends ReturnFound {
     readonly statusLabel: string;
+    /** Zeit der Rückgabe laut Server (UTC, `…Z`); fehlt bei einem älteren Server. */
+    readonly returnedAt: string | null;
 }
 
 function parseReturnDone(json: unknown): ReturnDone | null {
     const found = parseReturnFound(json);
     return found !== null && isRecord(json) && typeof json['status_label'] === 'string'
-        ? { ...found, statusLabel: json['status_label'] }
+        ? {
+              ...found,
+              statusLabel: json['status_label'],
+              returnedAt: typeof json['returned_at'] === 'string' ? json['returned_at'] : null,
+          }
         : null;
 }
 

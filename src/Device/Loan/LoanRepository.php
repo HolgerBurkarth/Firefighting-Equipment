@@ -106,13 +106,49 @@ final readonly class LoanRepository
             'SELECT d.id, d.identifier, t.name AS type_name FROM fe_device_loans l'
             . ' JOIN fe_devices d ON d.id = l.device_id AND d.tenant_id = l.tenant_id'
             . ' JOIN fe_device_types t ON t.id = d.device_type_id AND t.tenant_id = d.tenant_id'
-            . " WHERE l.tenant_id = ? AND " . self::OPEN . " AND (d.identifier_key = REPLACE(LOWER(?), 'ẞ', 'ß') OR d.scan_code = ?)"
-            . ' ORDER BY d.id LIMIT 1',
+            . " WHERE l.tenant_id = ? AND " . self::OPEN . " AND (d.identifier_key = REPLACE(LOWER(?), 'ẞ', 'ß') OR d.scan_code = ?"
+            . " OR REPLACE(d.identifier_key, ' ', '') = REPLACE(REPLACE(LOWER(?), 'ẞ', 'ß'), ' ', ''))"
+            . " ORDER BY (d.identifier_key = REPLACE(LOWER(?), 'ẞ', 'ß')) DESC, d.id LIMIT 1",
         );
-        $stmt->execute([$tenant->id, $identifier, $code]);
+        $stmt->execute([$tenant->id, $identifier, $code, $identifier, $identifier]);
         $row = $stmt->fetch();
 
         return is_array($row) ? ['id' => (int) $row['id'], 'identifier' => (string) $row['identifier'], 'device_type' => (string) $row['type_name']] : null;
+    }
+
+    /**
+     * Ausrüstung, die zu Nummer (Leerzeichen und Groß-/Kleinschreibung egal) oder Scan-Code gehört, nicht verliehen
+     * ist und gerade in der Rückgabe `$locationId` steht: „schon zurückgegeben“ (U1). Nur Nummer und Zeit der
+     * letzten Änderung von Standort oder Status, keine Namen.
+     *
+     * @return array{identifier: string, at: \DateTimeImmutable}|null
+     */
+    public function findReturned(Tenant $tenant, string $code, int $locationId): ?array
+    {
+        $code = trim($code);
+        if ($code === '' || mb_strlen($code) > 200 || !mb_check_encoding($code, 'UTF-8')) {
+            return null;
+        }
+        $identifier = trim((string) preg_replace('/\s+/u', ' ', $code));
+        $stmt = $this->pdo->prepare(
+            'SELECT d.identifier, d.state_changed_at, d.updated_at FROM fe_devices d'
+            . " WHERE d.tenant_id = ? AND d.status <> 'retired' AND d.location_id = ?"
+            . " AND (d.identifier_key = REPLACE(LOWER(?), 'ẞ', 'ß') OR d.scan_code = ?"
+            . " OR REPLACE(d.identifier_key, ' ', '') = REPLACE(REPLACE(LOWER(?), 'ẞ', 'ß'), ' ', ''))"
+            . ' AND NOT EXISTS (SELECT 1 FROM fe_device_loans l WHERE l.tenant_id = d.tenant_id AND l.device_id = d.id AND l.returned_at IS NULL'
+            . ' AND d.location_id = l.borrower_location_id)'
+            . ' ORDER BY d.id LIMIT 1',
+        );
+        $stmt->execute([$tenant->id, $locationId, $identifier, $code, $identifier]);
+        $row = $stmt->fetch();
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return [
+            'identifier' => (string) $row['identifier'],
+            'at' => new \DateTimeImmutable((string) ($row['state_changed_at'] ?? $row['updated_at']), new \DateTimeZone('UTC')),
+        ];
     }
 
     /**

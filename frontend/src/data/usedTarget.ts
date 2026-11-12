@@ -47,7 +47,13 @@ export function usedTargetText(name: string | null | undefined): string {
     if (name === undefined) {
         return 'Es kommt in die Sammelstelle, falls es eine gibt – sonst bleibt der Standort.';
     }
-    return name === null ? 'Der Standort bleibt.' : `Es kommt in die Sammelstelle ${name}.`;
+    if (name === null) {
+        return 'Der Standort bleibt.';
+    }
+    // Heißt die Stelle selbst „Sammelstelle“, wiederholt der Satz sie nicht (U20).
+    return name.trim().toLowerCase() === 'sammelstelle'
+        ? 'Es kommt in die Sammelstelle.'
+        : `Es kommt zur Sammelstelle „${name}“.`;
 }
 
 function isUnknown(): boolean {

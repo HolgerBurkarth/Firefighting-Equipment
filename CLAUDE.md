@@ -1492,6 +1492,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (Feuerwehr Musterstadt, Anna Beispiel), nie echte Daten; Markierungen (Rahmen mit Nummer) setzt `shoot` aus den
   Positionen der Elemente. Rechte der Rollen Gerätewart und Geräteträger wie in docs/MERKBLATT-EINRICHTUNG-PHASE-2.md,
   Abschnitt 6 (`RIGHTS` im Spec). Nach Änderungen an den gezeigten Seiten neu erzeugen und die PDFs committen.
+- Bedienziele (seit 12.11.2026, U3): Auswahlpunkte und Kästchen liegen in einem `<label class="check">` (mindestens 44 × 44 px, die gewählte Zeile hinterlegt, Symbol 24 px); Tests prüfen die tippbare Fläche mit `smallTargets` (`tests/e2e/support/layout.ts`: Fläche = `<label>` des Elements, sonst `[data-row-target]`, sonst es selbst).
 - Regel für ALLE Formulare: ungespeicherte Eingaben über `useUnsavedInput(() => …)`
   (`src/runtime/unsavedInput.ts`) melden: true, solange etwas eingegeben und nicht gespeichert ist;
   nach dem Speichern oder Leeren false. Nur so lädt die App nie mitten in einer Eingabe neu.
@@ -1506,7 +1507,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Fenster (`body:has([data-form-dialog])`) fest oben über die Abdunklung und macht sie trotz
   `pointer-events: none` von Reka UI bedienbar (auch am Handy und bei gescrollter Seite, Reka UI
   sperrt das Scrollen); das Fenster rückt um `--app-notice-height` nach unten (Höhe des Hinweises,
-  `ResizeObserver` in `AppNotices`, per CSSOM). Schichten: Abdunklung 10, Hinweis 20, Fenster 30,
+  `ResizeObserver` in `AppNotices`, per CSSOM). „Abbrechen" und der Absenden-Knopf stehen in `.form-foot` fest am unteren Rand des Fensters (`position: sticky`, Slot `foot` für einen Satz darüber; U2/U7). Schichten: Abdunklung 10, Hinweis 20, Fenster 30,
   `ConfirmDialog` 40/45, Auswahllisten (`AppSelect`) 50. Der Hinweis ist dabei für Bildschirmleser
   verborgen (Reka UI setzt `aria-hidden` außerhalb des Fensters), Browser-Tests klicken ihn über
   den Text. Grund: Live-Test 31.10.2026, ein Klick auf „Jetzt aktualisieren“ bei offenem Fenster
@@ -1618,6 +1619,15 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Werte, die sich nicht mehr ändern (z. B. `document.baseURI`).
 - Formatierung: Prettier (4 Leerzeichen laut `.editorconfig`, JSON 2), ESLint mit typgeprüften
   strikten Regeln, `no-console`, nur `<script setup lang="ts">`, kein `v-html`.
+
+- Verbesserungen aus dem Benutzertest (12.11.2026, Bericht `docs/usability/BENUTZERTEST-2026-11.md`, Runde 15; Einzelheiten bei den Abschnitten oben):
+  U1/U22 Rückgabeseite (Beleg „Danke“, „schon zurückgegeben“, Knopf „Nummer suchen“, Bilder in `<details>` unter dem Formular, Fokus ins Nummernfeld); U2 Tauschen; U3 `smallTargets`;
+  U4 Sollbestand; U5/U10 Wartung; U6 Verleih: Sprunglinks (`jump`, scrollt zur Überschrift und fokussiert sie) und „Rückgabe-Aushang“;
+  U7 Benutzer „Bearbeiten“: Abschnitt „Konto beenden“ mit „… löschen (ausgetreten) …“, Claude-Zugang als `<details>` (offen, wenn nicht „Aus“ oder gesperrt) mit Erklärung;
+  U9 `BookingNotice.clientRef/queuedLabel`: `BookingNoticeMessage` ersetzt „Gespeichert – wird gesendet …“ nach dem Senden durch „Angekommen um HH:MM: …“ (Uhrzeit nur, wenn das Ankommen miterlebt wurde);
+  U11 `BookingNotice.followUp`: Wechselt eine Ausrüstung auf „defekt“ und bleibt an ihrem Platz, bittet die Bestätigung, sie herauszunehmen und in der Wartung abzugeben (mit `device.swap` zusätzlich Hinweis auf „Tauschen …“);
+  U17 Protokoll: `history_only` heißt „Buchung kam zu spät – Stand nicht geändert“, gleiche Zeiten nur einmal, `afterResolveText` sagt nach „Erledigen“, ob noch etwas zu tun ist;
+  U20 `usedTargetText`: „Es kommt zur Sammelstelle „Wache“.“ bzw. „Es kommt in die Sammelstelle.“, wenn die Stelle selbst so heißt.
 
 ## Server und .htaccess
 - Die `.htaccess` in der Hauptebene des Webspace (`htdocs/.htaccess`) gehört NICHT zum
@@ -2824,7 +2834,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Tests `MaintenanceTest`. Frontend: `MaintenancePage` (`wartung`, Menü „Wartung“ nach „Ausrüstungstypen“,
   `PAGE_RIGHTS.maintenance`), `src/api/maintenance.ts`, `src/data/maintenance.ts` („seit“, Transportliste
   nur zum Kopieren; CSV/Druck und „Wartungsdatum setzen“ siehe `docs/TODO-SPAETER.md` T20), `maintenanceToWorkshop`/
-  `maintenanceBack` in `src/data/index.ts`. Tests `maintenance.spec.ts` (Browser, Unit).
+  `maintenanceBack` in `src/data/index.ts`. Seit 12.11.2026 (U5, U10): Knöpfe „In die Werkstatt bringen …" / „Ins Lager bringen …" (Bestätigung gleich benannt), Rückmeldung „Liste kopiert (N Ausrüstungen)" am Knopf (4 s), Satz zur Reihenfolge, im Fenster „In die Werkstatt" „Transportliste vorher kopieren?" mit Knopf; defekte Ausrüstung in der Werkstatt trägt „defekt – bleibt in der Werkstatt", „Alle auswählen" nimmt sie nie mit, von Hand gewählt warnt die Rückfrage. `ConfirmDialog` hat einen Standard-Slot unter dem Text. Tests `maintenance.spec.ts` (Browser, Unit).
 - Verleih (Phase 2, P2.5, Runde 9; Bereich `loans`, Seite „Verleih“): `Area::Loans` gibt es nur in einer Stadt mit
   freigeschalteter Aufgabe „Ausgeliehen an“ oder „Rückgabe“ (`Area::requiredTasks`); F3: mit Datenfilter kein
   Zugriff. Abweichung vom Plan: keine eigenen Aktionen `loan.lend`/`returns.process`, der Bereich Ändern genügt.
@@ -2863,12 +2873,12 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Status, sonst `used`/`defective`; Verlauf „Rückgabe“ von „<Name> (ohne Anmeldung)“ (`DeviceEvent::$userId` null,
   `type_label` „Rückgabe“, JSON `user.id` null; keine Mail „Log“). Ungültiger Schlüssel oder Code → 400 `invalid_request`
   (gleiche Meldungen, zählt in die Bremse `PublicReturnThrottle`: 20 Fehlversuche je IP-Präfix in 15 Minuten, sonst
-  429). Bekannte Stelle von `DeviceVisibility::all()`: `PublicReturnHandler`. Tests `ReturnTest`. Frontend: öffentliche
+  429). Seit 12.11.2026 (U1): Nummer ohne Rücksicht auf Leerzeichen und Groß-/Kleinschreibung („HRT16" = „HRT 16"); `POST returns` liefert `returned_at`; eine Ausrüstung, die in der Rückgabe des Schlüssels steht und nicht mehr verliehen ist, ergibt 400 „… wurde bereits zurückgegeben …" mit `details {identifier, returned_at}` (keine Namen), sonst eine gemeinsame Meldung „Diese Nummer kennen wir nicht oder die Ausrüstung ist nicht verliehen …". Bekannte Stelle von `DeviceVisibility::all()`: `PublicReturnHandler`. Tests `ReturnTest`. Frontend: öffentliche
   Seite `ReturnPage` (`rueckgabe#schluessel=…`, `meta.public`, nur unter Städten; Schlüssel aus dem Fragment per
   `takeFragmentParam`, übersteht ein Neuladen in sessionStorage `ff-return-key`; Nummer prüfen, Name, Zustand, Hinweis),
   in `LoansPage` die Abschnitte „Rückgabe“ (Aushang erzeugen/erneuern/widerrufen, Link und QR-Code nur einmal,
   `ReturnPoster` zum Drucken, `returnLink` in `src/data/loans.ts`) und „In der Rückgabe“ (Auswahl, „In Ordnung ins Lager“,
-  „Benutzte und Defekte in die Sammelstelle“, `processReturns`). Tests `returnPage.spec.ts`, `loans.spec.ts`, Unit
+  „Benutzte und Defekte in die Sammelstelle“, `processReturns`). Seite „Danke" als Beleg (Nummer, Zustand, Hinweis, Zeit, „Sie müssen nichts weiter tun"), Hinweis „schon zurückgegeben" (`return-already`), Knopf „Nummer suchen", Formular zuerst, Bilder darunter in `<details>` (U1/U22). Tests `returnPage.spec.ts`, `loans.spec.ts`, Unit
   `returns.spec.ts`.
 - Sollbestand (Phase 2, P2.7, Runde 9; Plan 3.5, ohne Tausch und ohne Prüfung der Buchungen, die kommen mit P2.8):
   Migrationen 0059 `fe_stock_rules` (Standort, `min_count` 1–99) und 0060 `fe_stock_rule_types` (Typen einer Regel,
@@ -2884,7 +2894,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   gesperrter Standort 409, Typ einer anderen Stadt oder unbekannt 400, Standort unbekannt 404. Tests `StockTest`.
   Frontend: `StockPanel` unten auf „Standorte“ (`src/api/stock.ts`, `src/data/stock.ts`; Liste mit Chip „außer
   Betrieb“/„vollständig“ und „mindestens 3 Atemschutzmaske oder Funkgerät: 2 vorhanden, 1 fehlt“; Fenster „Sollbestand
-  festlegen“ mit Standort, Regeln aus Anzahl und Typ-Kästchen; die Typen lädt erst das Fenster). Browser-Tests
+  festlegen“ mit Standort, Regeln aus Anzahl und Typ-Kästchen; die Typen lädt erst das Fenster). Seit 12.11.2026 (U4): Knopf „Sollbestand (N außer Betrieb) ↓" oben auf „Standorte" (`stock-jump`, scrollt zur Überschrift und fokussiert sie), Fächer im Auswahlfeld mit Fahrzeug („HLF 20 / G1"), Satz „Mehrere Typen werden zusammen gezählt …" im Fenster, nach dem Speichern bei „außer Betrieb" die Folge in Worten (`stock-outage`, `outageText`: „… hat zurzeit nur 2 von 4 Atemschutzmaske (einsatzbereit) und gilt deshalb als außer Betrieb."). Browser-Tests
   fragen `GET api/v1/stock` ohne eigene Angabe mit „keine Regeln“ (`tests/e2e/fixtures.ts`). Seit Runde 14 (T21): Kachel „Außer Betrieb“ im Dashboard
   (`AdminOverview.stock`, `scope.stock` = Bereich Standorte, nur mit mindestens einer Regel, `stockTile`, führt zu `standorte`) und Chip „außer Betrieb“
   am Fahrzeug bzw. Fach in der Baumzeile (`StockPanel` meldet `loaded`; kein Chip, wenn vollständig). Tests `stock.spec.ts` (Browser, Unit).
@@ -2906,7 +2916,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Sammelstelle für benutzte bzw. defekte Ausrüstung (auch außerhalb des Datenfilters, G4), sonst bleibt der Standort;
   der Ersatz „in“ muss einsatzbereit sein und kommt an den bisherigen Standort von „out“; beide in EINER Transaktion
   (gesperrt in der Reihenfolge der IDs), beide Ereignisse tragen dieselbe `swap_id`; die Prüfung gilt für beide zusammen.
-  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (beim Öffnen, auch nach einer Ablehnung, lädt er Ausrüstung und Standorte vom Server neu (`refresh('changed')`), bis dahin „Wird geladen …“ statt eines alten Stands; offline oder bei Fehler gilt die Kopie mit Hinweis `swap-stale` und ihrem Stand; Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Status danach, Kommentar), in `DevicePage` der
+  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (beim Öffnen, auch nach einer Ablehnung, lädt er Ausrüstung und Standorte vom Server neu (`refresh('changed')`), bis dahin „Wird geladen …“ statt eines alten Stands; offline oder bei Fehler gilt die Kopie mit Hinweis `swap-stale` und ihrem Stand; Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Seit 12.11.2026 (U2): Kopf „M5 ersetzen durch …“ (mit gewähltem Ersatz), zuerst „Zustand von M5?" als drei große Knöpfe (`aria-pressed`, OHNE Vorauswahl; „Tauschen" erst mit Zustand und Ersatz, solange fehlt ein Satz `swap-missing`, danach `swap-summary` im festen Fuß), Ersatz als ganze Zeilen mit Wartungsdatum; Kommentar), in `DevicePage` der
   Knopf „Tauschen …“ (`swap-open`, nur online) und bei 409 mit `details.stock` der Kasten `stock-block` mit „Tauschen …“
   und, mit `stock.override`, „Trotzdem buchen …“ (Rückfrage, sendet `confirmed_below_minimum`); `src/data/swap.ts`
   (`parseStockBlock`, `swapCandidates`: einsatzbereit, Typen der verletzten Regel zuerst). Offline (P2.9, Runde 11): `POST devices/swap`

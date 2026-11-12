@@ -3,7 +3,7 @@ import type { MockRequest, MockResponse } from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
 import { deviceJson, devicesEndpoint, fullDevice } from './support/devices';
 import { delegate } from './support/masterData';
-import { horizontalOverflow, unreachableControls } from './support/layout';
+import { horizontalOverflow, smallTargets, unreachableControls } from './support/layout';
 
 /**
  * Seite „Verleih“ (Phase 2, P2.5): offene Verleihe nach Leihnehmer, „Verleihen …“ mit Nummer, Leihnehmer,
@@ -484,6 +484,8 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
             expect(await unreachableControls(page, '[data-testid="return-place"]')).toEqual([]);
             expect(await unreachableControls(page, '[data-testid="in-returns"]')).toEqual([]);
             expect(await unreachableControls(page, '[data-testid="return-device"]')).toEqual([]);
+            // U3: Kästchen der Rückgabe-Liste sind mindestens 44 px große Flächen.
+            expect(await smallTargets(page, '[data-testid="in-returns"]')).toEqual([]);
         });
     }
 
@@ -498,6 +500,32 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
         await expect(page.getByTestId('return-poster').getByTestId('how-to-step')).toHaveCount(4);
         const pdf = (await page.pdf({ format: 'A4' })).toString('latin1');
         expect(pdf.match(/\/Type\s*\/Page[^s]/g)).toHaveLength(1);
+    });
+
+    test('U6: Sprunglinks oben, Abschnitt „Rückgabe-Aushang“ mit Erklärung, „Aushang abschalten“', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 390, height: 700 });
+        await page.goto('/firefighting/test/verleih');
+        const jumps = page.getByTestId('loan-jumps');
+        await expect(jumps.getByRole('button')).toHaveText([
+            'Verliehen',
+            /In der Rückgabe \(\d+\)/,
+            'Rückgabe-Aushang',
+        ]);
+        await jumps.getByTestId('jump-poster').click();
+        const heading = page.getByRole('heading', { name: 'Rückgabe-Aushang', level: 2 });
+        await expect(heading).toBeFocused();
+        await expect(heading).toBeInViewport();
+        await expect(page.getByTestId('returns-section')).toContainText(
+            'Aushang ausdrucken und aufhängen',
+        );
+        await page.getByTestId('renew-key').click();
+        await page.getByTestId('issued-key').getByRole('button', { name: 'Schließen' }).click();
+        await expect(page.getByTestId('revoke-key')).toHaveText('Aushang abschalten …');
+        await expect(page.getByRole('button', { name: 'Widerrufen' })).toHaveCount(0);
+        await jumps.getByTestId('jump-loans').click();
+        await expect(page.getByRole('heading', { name: 'Verleih', level: 1 })).toBeFocused();
     });
 
     test('Aushang erzeugen: Link mit Schlüssel im Fragment, danach erneuern und widerrufen', async ({
@@ -530,7 +558,7 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
         await place.getByTestId('revoke-key').click();
         await page
             .getByTestId('confirm-dialog')
-            .getByRole('button', { name: 'Ungültig machen' })
+            .getByRole('button', { name: 'Aushang abschalten', exact: true })
             .click();
         await expect(page.getByTestId('return-link-state')).toHaveText('Kein gültiger Aushang');
     });

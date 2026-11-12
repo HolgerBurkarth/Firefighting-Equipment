@@ -7,8 +7,8 @@ import { searchDevices } from './deviceSearch';
 export type SwapOutStatus = 'used' | 'defective' | 'maintenance';
 
 export const SWAP_OUT_STATUSES: readonly { value: SwapOutStatus; label: string }[] = [
-    { value: 'used', label: 'benutzt' },
-    { value: 'defective', label: 'defekt' },
+    { value: 'used', label: 'Benutzt' },
+    { value: 'defective', label: 'Defekt' },
     { value: 'maintenance', label: 'in Wartung' },
 ];
 

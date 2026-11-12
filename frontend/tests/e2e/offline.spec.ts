@@ -315,6 +315,16 @@ test.describe('Offline-Modus: Buchungen in der Warteschlange', () => {
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
     }
 
+    test('U9: der Hinweis „wird gesendet“ weicht dem Ankommen mit Uhrzeit', async ({ page }) => {
+        await bookOffline(page);
+        const notice = page.getByTestId('booking-notice');
+        await expect(notice).toContainText('Gespeichert – wird gesendet');
+        state.mode = 'online';
+        await page.evaluate(() => window.dispatchEvent(new Event('online')));
+        await expect(notice).toHaveText(/^✓ Angekommen um \d{2}:\d{2}: M1 → defekt$/);
+        await expect(notice).not.toContainText('wird gesendet');
+    });
+
     test('offline gebucht: wartet mit Uhr, Liste zeigt den Wunsch, bei Verbindung gesendet', async ({
         page,
         apiRequests,
@@ -628,7 +638,7 @@ test.describe('Offline-Modus: Tausch (Phase 2, P2.9)', () => {
         await page.getByTestId('swap-open').click();
         const dialog = page.getByTestId('form-dialog');
         await dialog.getByRole('radio', { name: /M4/ }).check();
-        await dialog.getByRole('radio', { name: 'defekt' }).check();
+        await dialog.getByRole('button', { name: 'Defekt' }).click();
         await dialog.getByRole('button', { name: 'Tauschen', exact: true }).click();
 
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
@@ -665,7 +675,7 @@ test.describe('Offline-Modus: Tausch (Phase 2, P2.9)', () => {
         await page.getByTestId('swap-open').click();
         const dialog = page.getByTestId('form-dialog');
         await dialog.getByRole('radio', { name: /M4/ }).check();
-        await dialog.getByRole('radio', { name: 'defekt' }).check();
+        await dialog.getByRole('button', { name: 'Defekt' }).click();
         // Die Verbindung bricht ab, bevor der Tausch gesendet wird: kein Streifen „Offline“, nur die Anfrage scheitert.
         state.mode = 'offline';
         await dialog.getByRole('button', { name: 'Tauschen', exact: true }).click();

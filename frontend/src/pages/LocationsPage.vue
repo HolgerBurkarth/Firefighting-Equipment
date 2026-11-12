@@ -45,7 +45,16 @@ const canListDevices = computed(() => allows(currentPermissions.value, 'devices'
 const canListStock = computed(() => allows(currentPermissions.value, 'locations'));
 /** Standorte unter Sollbestand (T21): Chip „außer Betrieb“ am Fahrzeug bzw. Fach, sonst keiner. */
 const outOfService = ref<ReadonlySet<number>>(new Set());
+/** Kurzfassung für den Sprunglink oben (U4): „Sollbestand (1 außer Betrieb)“. */
+const stockLinkText = ref('Sollbestand');
+function jumpToStock(): void {
+    const heading = document.getElementById('stock-title');
+    heading?.scrollIntoView({ block: 'start' });
+    heading?.focus({ preventScroll: true });
+}
 function onStockLoaded(stock: StockState): void {
+    const out = stock.entries.filter((entry) => entry.outOfService).length;
+    stockLinkText.value = out > 0 ? `Sollbestand (${String(out)} außer Betrieb)` : 'Sollbestand';
     outOfService.value = new Set(
         stock.entries.filter((entry) => entry.outOfService).map((entry) => entry.location.id),
     );
@@ -390,6 +399,15 @@ onMounted(() => {
 <template>
     <div class="page-head">
         <h1>Standorte</h1>
+        <button
+            v-if="canListStock"
+            class="btn"
+            type="button"
+            data-testid="stock-jump"
+            @click="jumpToStock"
+        >
+            {{ stockLinkText }} ↓
+        </button>
         <button
             v-if="canWrite"
             class="btn btn-accent"
