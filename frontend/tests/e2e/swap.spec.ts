@@ -9,6 +9,7 @@ import {
     type MockResponse,
 } from './fixtures';
 import { deviceDetail, deviceJson, devicesEndpoint, LOCATIONS } from './support/devices';
+import { horizontalOverflow, smallTargets } from './support/layout';
 
 /**
  * Sollbestand und Tausch (Phase 2, P2.8): Eine Buchung, die den Sollbestand unterschreiten würde, lehnt der
@@ -111,7 +112,7 @@ test.describe('Sollbestand: Tauschen statt Fehlermeldung', () => {
 
         await page.getByTestId('stock-swap').click();
         const dialog = page.getByTestId('form-dialog');
-        await expect(dialog).toContainText('M1 tauschen');
+        await expect(dialog).toContainText('M1 ersetzen durch');
         // Nur die Typen der Regel (Atemschutzmaske), das Funkgerät F5 wird nicht angeboten.
         const options = dialog.getByTestId('swap-candidates').getByRole('listitem');
         await expect(options).toHaveCount(1);
@@ -123,7 +124,10 @@ test.describe('Sollbestand: Tauschen statt Fehlermeldung', () => {
         await expect(dialog.getByRole('button', { name: 'Tauschen', exact: true })).toBeDisabled();
 
         await dialog.getByRole('radio', { name: /M9/ }).check();
-        await dialog.getByRole('radio', { name: 'defekt' }).check();
+        // Der Zustand ist nicht vorbelegt (U2): erst mit Zustand und Ersatz wird „Tauschen“ frei.
+        await expect(dialog.getByRole('button', { name: 'Tauschen', exact: true })).toBeDisabled();
+        await expect(dialog.getByTestId('swap-missing')).toContainText('Zustand von M1');
+        await dialog.getByRole('button', { name: 'Defekt' }).click();
         await dialog.getByLabel('Kommentar (optional)').fill('Maske gerissen');
         await dialog.getByRole('button', { name: 'Tauschen', exact: true }).click();
 
@@ -210,6 +214,78 @@ test.describe('Sollbestand: Trotzdem buchen mit stock.override', () => {
         expect(bookings[0]).not.toHaveProperty('confirmed_below_minimum');
         expect(bookings[1]).toMatchObject({ status: 'maintenance', confirmed_below_minimum: true });
     });
+});
+
+test.describe('Tauschen am Handy (U2)', () => {
+    const many = Array.from({ length: 17 }, (_, index) =>
+        deviceJson(20 + index, {
+            identifier: `M${String(20 + index)}`,
+            location: {
+                id: 7,
+                name: 'Lager Gerätehaus',
+                path: 'Lager Gerätehaus / Regal Atemschutz',
+            },
+            next_inspection_due: `2027-0${String((index % 9) + 1)}-15`,
+        }),
+    );
+    test.use({
+        api: {
+            'GET api/v1/auth/me': me(['book.move', 'book.status', 'device.swap']),
+            'GET api/v1/devices': devicesEndpoint([M1, ...many]),
+            ...deviceDetail(M1),
+            ...LOCATIONS,
+            'POST api/v1/devices/swap': swapped,
+        },
+    });
+
+    // 390 px, 768 px, 1024 px und 125 % Zoom (390 / 1,25 = 312 px).
+    for (const [width, height] of [
+        [390, 700],
+        [312, 560],
+        [768, 900],
+        [1024, 800],
+    ] as const) {
+        test(`Zustand ohne Vorauswahl, „Tauschen“ fest am Rand, kein Überstand bei ${String(width)} px`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height });
+            await page.goto('/firefighting/test/geraete/1');
+            await page.getByTestId('swap-open').click();
+            const dialog = page.getByTestId('form-dialog');
+            await expect(dialog).toContainText('M1 ersetzen durch …');
+            await expect(dialog.getByTestId('swap-candidates').getByRole('listitem')).toHaveCount(
+                17,
+            );
+            // Drei große Zustandsknöpfe, keiner gewählt.
+            const states = dialog
+                .getByRole('group', { name: 'Zustand von M1' })
+                .getByRole('button');
+            await expect(states).toHaveCount(3);
+            for (const state of await states.all()) {
+                await expect(state).toHaveAttribute('aria-pressed', 'false');
+                expect((await state.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+            }
+            // Der Tausch-Knopf liegt ohne Scrollen im Bild, auch bei langer Liste.
+            const submit = dialog.getByRole('button', { name: 'Tauschen', exact: true });
+            await expect(submit).toBeInViewport();
+            await expect(submit).toBeDisabled();
+            await states.nth(1).click();
+            await dialog.getByRole('radio', { name: /M33/ }).scrollIntoViewIfNeeded();
+            await dialog.getByRole('radio', { name: /M33/ }).check();
+            await expect(dialog).toContainText('M1 ersetzen durch M33');
+            await expect(dialog.getByTestId('swap-summary')).toContainText(
+                'M33 kommt an den Standort',
+            );
+            await expect(submit).toBeInViewport();
+            await expect(submit).toBeEnabled();
+            // Kein Überstand, alle Ziele mindestens 44 px (U3).
+            expect(
+                await dialog.evaluate((element) => element.scrollWidth - element.clientWidth),
+            ).toBeLessThanOrEqual(0);
+            expect(await smallTargets(page, '[data-form-dialog]')).toEqual([]);
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+        });
+    }
 });
 
 test.describe('Tauschen: Ersatzliste ist beim Öffnen aktuell', () => {

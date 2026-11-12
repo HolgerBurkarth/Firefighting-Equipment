@@ -14,6 +14,7 @@ import {
     swapCandidates,
     type SwapOutStatus,
 } from '../data/swap';
+import { germanDate } from '../data/changeTime';
 import { connectivity, isOffline } from '../runtime/connectivity';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 import FormDialog from './FormDialog.vue';
@@ -41,7 +42,8 @@ const emit = defineEmits<{
 
 const query = ref('');
 const replacementId = ref<number | null>(null);
-const outStatus = ref<SwapOutStatus>('used');
+/** Ohne Vorauswahl (U2): Der Zustand der Ausrüstung muss bewusst gewählt werden. */
+const outStatus = ref<SwapOutStatus | null>(null);
 const comment = ref('');
 const busy = ref(false);
 const error = ref<ApiError | null>(null);
@@ -100,7 +102,7 @@ watch(open, (value) => {
         showOthers.value = false;
         query.value = '';
         replacementId.value = null;
-        outStatus.value = 'used';
+        outStatus.value = null;
         comment.value = '';
         error.value = null;
         offlineProblem.value = null;
@@ -133,7 +135,32 @@ const replacementWarning = computed(
 const replacement = computed(
     () => deviceStore.state.devices.find((entry) => entry.id === replacementId.value) ?? null,
 );
-const canSubmit = computed(() => replacement.value !== null && armed.value && !listLoading.value);
+const canSubmit = computed(
+    () =>
+        replacement.value !== null && outStatus.value !== null && armed.value && !listLoading.value,
+);
+const title = computed(() =>
+    replacement.value === null
+        ? `${props.device.identifier} ersetzen durch …`
+        : `${props.device.identifier} ersetzen durch ${replacement.value.identifier}`,
+);
+/** Was noch fehlt, solange „Tauschen“ gesperrt ist (U2: sonst ist der gesperrte Knopf unerklärt). */
+const missingText = computed(() => {
+    if (outStatus.value === null && replacement.value === null) {
+        return `Bitte wählen Sie den Zustand von ${props.device.identifier} und einen Ersatz.`;
+    }
+    if (outStatus.value === null) {
+        return `Bitte wählen Sie den Zustand von ${props.device.identifier}.`;
+    }
+    return replacement.value === null ? 'Bitte wählen Sie einen Ersatz.' : null;
+});
+const summaryText = computed(() => {
+    const chosen = replacement.value;
+    const status = SWAP_OUT_STATUSES.find((entry) => entry.value === outStatus.value);
+    return chosen === null || status === undefined
+        ? null
+        : `${props.device.identifier}: ${status.label} · ${chosen.identifier} kommt an den Standort.`;
+});
 const staleText = computed(() =>
     offlineData.syncedAt === null
         ? 'Keine Verbindung – die Vorschläge stammen aus der gespeicherten Kopie.'
@@ -145,12 +172,20 @@ const unsaved = computed(
 );
 useUnsavedInput(() => unsaved.value);
 
+/** Zweite Zeile einer Ersatz-Zeile: Standort und Wartungsdatum als Unterscheidung (U2). */
+function detailText(entry: DeviceListItem): string {
+    return entry.nextInspectionDue === null
+        ? entry.location.path
+        : `${entry.location.path} · Wartung ${germanDate(entry.nextInspectionDue)}`;
+}
+
 /** Der Server lehnt den Ersatz ab, weil der Sollbestand trotzdem unterschritten bliebe. */
 const stockBlock = computed(() => parseStockBlock(error.value?.details ?? null));
 
 async function submit(): Promise<void> {
     const chosen = replacement.value;
-    if (busy.value || chosen === null || !armed.value) {
+    const status = outStatus.value;
+    if (busy.value || chosen === null || status === null || !armed.value) {
         return;
     }
     const text = normalizeComment(comment.value);
@@ -161,7 +196,7 @@ async function submit(): Promise<void> {
         new Date(),
     );
     if (isOffline.value && (queueProblem === null || connectivity.browserOffline)) {
-        await queueSwap(chosen, text, queueProblem);
+        await queueSwap(chosen, text, queueProblem, status);
         return;
     }
     busy.value = true;
@@ -169,17 +204,17 @@ async function submit(): Promise<void> {
     const result = await swapEquipment({
         out: { id: props.device.id, version: props.device.version },
         in: { id: chosen.id, version: chosen.version },
-        outStatus: outStatus.value,
+        outStatus: status,
         ...(text !== '' && { comment: text }),
         ...(confirmedBelow.value && { confirmedBelowMinimum: true }),
         // Gleicher Inhalt = gleiche Kennung: Ein erneutes Senden wirkt nicht doppelt (wie beim Umbuchen).
-        clientRef: refs.refFor(swapContent(chosen, text)),
+        clientRef: refs.refFor(swapContent(chosen, text, status)),
     });
     busy.value = false;
     // Scheitert es an der Verbindung, kommt der Tausch (wenn offline gebucht werden darf) wie beim Umbuchen
     // in die Warteschlange: gleiche Kennung, Aktionszeit des ersten Versuchs.
     if (!result.ok && result.error.code === 'network' && queueProblem === null) {
-        await queueSwap(chosen, text, null);
+        await queueSwap(chosen, text, null, status);
         return;
     }
     if (!result.ok && result.error.code === 'network' && offlineData.syncedAt !== null) {
@@ -199,13 +234,13 @@ async function submit(): Promise<void> {
 }
 
 /** Inhalt des Tauschs für die Kennung (`ClientRefKeeper`): derselbe Inhalt behält Kennung und Zeit. */
-function swapContent(chosen: DeviceListItem, text: string): object {
+function swapContent(chosen: DeviceListItem, text: string, status: SwapOutStatus): object {
     return {
         out: props.device.id,
         outVersion: props.device.version,
         in: chosen.id,
         inVersion: chosen.version,
-        outStatus: outStatus.value,
+        outStatus: status,
         comment: text,
     };
 }
@@ -215,12 +250,13 @@ async function queueSwap(
     chosen: DeviceListItem,
     text: string,
     queueProblem: string | null,
+    status: SwapOutStatus,
 ): Promise<void> {
     if (queueProblem !== null) {
         offlineProblem.value = queueProblem;
         return;
     }
-    const attempt = refs.attemptFor(swapContent(chosen, text));
+    const attempt = refs.attemptFor(swapContent(chosen, text, status));
     const booking = {
         clientRef: attempt.ref,
         deviceId: props.device.id,
@@ -232,7 +268,7 @@ async function queueSwap(
             inId: chosen.id,
             inVersion: chosen.version,
             inIdentifier: chosen.identifier,
-            outStatus: outStatus.value,
+            outStatus: status,
         },
         ...(text !== '' && { comment: text }),
     };
@@ -259,8 +295,8 @@ function confirmBelow(): void {
     <FormDialog
         v-model:open="open"
         :unsaved="unsaved"
-        :title="`${device.identifier} tauschen`"
-        description="Die Ausrüstung geht heraus, der Ersatz kommt an ihren bisherigen Standort. Beides wird zusammen gebucht."
+        :title="title"
+        description="Der Ersatz kommt an den bisherigen Standort, beides wird zusammen gebucht."
         submit-label="Tauschen"
         :busy="busy"
         :can-submit="canSubmit"
@@ -268,8 +304,26 @@ function confirmBelow(): void {
         :return-focus="returnFocus"
         @submit="submit"
     >
+        <div class="field" role="group" :aria-label="`Zustand von ${device.identifier}`">
+            <span class="field-label">Zustand von {{ device.identifier }}?</span>
+            <div class="swap-states">
+                <button
+                    v-for="entry in SWAP_OUT_STATUSES"
+                    :key="entry.value"
+                    class="btn swap-state"
+                    :class="{ 'is-chosen': outStatus === entry.value }"
+                    type="button"
+                    :aria-pressed="outStatus === entry.value"
+                    :data-testid="`swap-state-${entry.value}`"
+                    @click="outStatus = entry.value"
+                >
+                    {{ entry.label }}
+                </button>
+            </div>
+        </div>
+
         <fieldset class="field">
-            <legend class="field-label">Ersatz</legend>
+            <legend class="field-label">Ersatz wählen</legend>
             <input
                 v-model="query"
                 class="input"
@@ -289,16 +343,22 @@ function confirmBelow(): void {
                 </p>
                 <ul class="swap-list" data-testid="swap-candidates">
                     <li v-for="candidate in candidates.suggested" :key="candidate.device.id">
-                        <label class="swap-option">
+                        <label class="check swap-option">
                             <input
                                 v-model="replacementId"
                                 type="radio"
                                 name="swap-replacement"
                                 :value="candidate.device.id"
                             />
-                            <span class="identifier">{{ candidate.device.identifier }}</span>
-                            <span class="type">{{ candidate.device.deviceType.name }}</span>
-                            <span class="where">{{ candidate.device.location.path }}</span>
+                            <span class="swap-text">
+                                <span class="identifier"
+                                    >{{ candidate.device.identifier }}
+                                    <span class="type">{{
+                                        candidate.device.deviceType.name
+                                    }}</span></span
+                                >
+                                <span class="where">{{ detailText(candidate.device) }}</span>
+                            </span>
                         </label>
                     </li>
                 </ul>
@@ -315,18 +375,24 @@ function confirmBelow(): void {
                     <p class="hint">Von anderen Fahrzeugen: Dort fehlt die Ausrüstung danach.</p>
                     <ul class="swap-list" data-testid="swap-others">
                         <li v-for="candidate in candidates.others" :key="candidate.device.id">
-                            <label class="swap-option">
+                            <label class="check swap-option">
                                 <input
                                     v-model="replacementId"
                                     type="radio"
                                     name="swap-replacement"
                                     :value="candidate.device.id"
                                 />
-                                <span class="identifier">{{ candidate.device.identifier }}</span>
-                                <span class="type">{{ candidate.device.deviceType.name }}</span>
-                                <span class="where">{{ candidate.device.location.path }}</span>
-                                <span v-if="candidate.belowMinimum" class="warn">
-                                    (Sollbestand dort unterschritten)
+                                <span class="swap-text">
+                                    <span class="identifier"
+                                        >{{ candidate.device.identifier }}
+                                        <span class="type">{{
+                                            candidate.device.deviceType.name
+                                        }}</span></span
+                                    >
+                                    <span class="where">{{ detailText(candidate.device) }}</span>
+                                    <span v-if="candidate.belowMinimum" class="warn">
+                                        Sollbestand dort unterschritten
+                                    </span>
                                 </span>
                             </label>
                         </li>
@@ -336,19 +402,6 @@ function confirmBelow(): void {
                     Achtung: Am Standort dieser Ausrüstung würde der Sollbestand unterschritten.
                 </p>
             </template>
-        </fieldset>
-
-        <fieldset class="field">
-            <legend class="field-label">{{ device.identifier }} ist danach</legend>
-            <label v-for="entry in SWAP_OUT_STATUSES" :key="entry.value" class="swap-status">
-                <input
-                    v-model="outStatus"
-                    type="radio"
-                    name="swap-out-status"
-                    :value="entry.value"
-                />
-                {{ entry.label }}
-            </label>
         </fieldset>
 
         <label class="field">
@@ -389,6 +442,14 @@ function confirmBelow(): void {
                 Trotzdem tauschen
             </button>
         </div>
+        <template #foot>
+            <p v-if="summaryText !== null" class="hint" data-testid="swap-summary">
+                {{ summaryText }}
+            </p>
+            <p v-else-if="missingText !== null" class="hint" data-testid="swap-missing">
+                {{ missingText }}
+            </p>
+        </template>
     </FormDialog>
 </template>
 
@@ -401,19 +462,58 @@ function confirmBelow(): void {
     overflow-y: auto;
 }
 
-.swap-option,
-.swap-status {
+/* Ganze Zeile antippbar (U2/U3), die gewählte hinterlegt; Text bricht um, kein Überstand bei 125 %. */
+.swap-option {
     display: flex;
-    align-items: center;
-    gap: var(--space-2, 8px);
-    min-height: var(--tap-min, 44px);
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 56px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
 }
 
+.swap-option:has(input:checked) {
+    border-color: var(--accent);
+}
+
+.swap-text {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.identifier {
+    font-weight: var(--font-weight-semibold);
+}
+
+.type,
 .where {
     color: var(--ink-muted);
+    font-weight: normal;
 }
 
 .warn {
     color: var(--status-defective-fg);
+}
+
+.swap-states {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.swap-state {
+    min-height: 56px;
+    padding-inline: 6px;
+    overflow-wrap: anywhere;
+}
+
+.swap-state.is-chosen {
+    border-color: var(--accent);
+    background: var(--selected-bg);
+    font-weight: var(--font-weight-bold);
+    box-shadow: inset 0 0 0 2px var(--accent);
 }
 </style>

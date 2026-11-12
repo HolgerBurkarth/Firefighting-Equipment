@@ -1492,6 +1492,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (Feuerwehr Musterstadt, Anna Beispiel), nie echte Daten; Markierungen (Rahmen mit Nummer) setzt `shoot` aus den
   Positionen der Elemente. Rechte der Rollen Gerätewart und Geräteträger wie in docs/MERKBLATT-EINRICHTUNG-PHASE-2.md,
   Abschnitt 6 (`RIGHTS` im Spec). Nach Änderungen an den gezeigten Seiten neu erzeugen und die PDFs committen.
+- Bedienziele (seit 12.11.2026, U3): Auswahlpunkte und Kästchen liegen in einem `<label class="check">` (mindestens 44 × 44 px, die gewählte Zeile hinterlegt, Symbol 24 px); Tests prüfen die tippbare Fläche mit `smallTargets` (`tests/e2e/support/layout.ts`: Fläche = `<label>` des Elements, sonst `[data-row-target]`, sonst es selbst).
 - Regel für ALLE Formulare: ungespeicherte Eingaben über `useUnsavedInput(() => …)`
   (`src/runtime/unsavedInput.ts`) melden: true, solange etwas eingegeben und nicht gespeichert ist;
   nach dem Speichern oder Leeren false. Nur so lädt die App nie mitten in einer Eingabe neu.
@@ -1506,7 +1507,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Fenster (`body:has([data-form-dialog])`) fest oben über die Abdunklung und macht sie trotz
   `pointer-events: none` von Reka UI bedienbar (auch am Handy und bei gescrollter Seite, Reka UI
   sperrt das Scrollen); das Fenster rückt um `--app-notice-height` nach unten (Höhe des Hinweises,
-  `ResizeObserver` in `AppNotices`, per CSSOM). Schichten: Abdunklung 10, Hinweis 20, Fenster 30,
+  `ResizeObserver` in `AppNotices`, per CSSOM). „Abbrechen" und der Absenden-Knopf stehen in `.form-foot` fest am unteren Rand des Fensters (`position: sticky`, Slot `foot` für einen Satz darüber; U2/U7). Schichten: Abdunklung 10, Hinweis 20, Fenster 30,
   `ConfirmDialog` 40/45, Auswahllisten (`AppSelect`) 50. Der Hinweis ist dabei für Bildschirmleser
   verborgen (Reka UI setzt `aria-hidden` außerhalb des Fensters), Browser-Tests klicken ihn über
   den Text. Grund: Live-Test 31.10.2026, ein Klick auf „Jetzt aktualisieren“ bei offenem Fenster
@@ -2906,7 +2907,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Sammelstelle für benutzte bzw. defekte Ausrüstung (auch außerhalb des Datenfilters, G4), sonst bleibt der Standort;
   der Ersatz „in“ muss einsatzbereit sein und kommt an den bisherigen Standort von „out“; beide in EINER Transaktion
   (gesperrt in der Reihenfolge der IDs), beide Ereignisse tragen dieselbe `swap_id`; die Prüfung gilt für beide zusammen.
-  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (beim Öffnen, auch nach einer Ablehnung, lädt er Ausrüstung und Standorte vom Server neu (`refresh('changed')`), bis dahin „Wird geladen …“ statt eines alten Stands; offline oder bei Fehler gilt die Kopie mit Hinweis `swap-stale` und ihrem Stand; Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Status danach, Kommentar), in `DevicePage` der
+  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (beim Öffnen, auch nach einer Ablehnung, lädt er Ausrüstung und Standorte vom Server neu (`refresh('changed')`), bis dahin „Wird geladen …“ statt eines alten Stands; offline oder bei Fehler gilt die Kopie mit Hinweis `swap-stale` und ihrem Stand; Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Seit 12.11.2026 (U2): Kopf „M5 ersetzen durch …“ (mit gewähltem Ersatz), zuerst „Zustand von M5?" als drei große Knöpfe (`aria-pressed`, OHNE Vorauswahl; „Tauschen" erst mit Zustand und Ersatz, solange fehlt ein Satz `swap-missing`, danach `swap-summary` im festen Fuß), Ersatz als ganze Zeilen mit Wartungsdatum; Kommentar), in `DevicePage` der
   Knopf „Tauschen …“ (`swap-open`, nur online) und bei 409 mit `details.stock` der Kasten `stock-block` mit „Tauschen …“
   und, mit `stock.override`, „Trotzdem buchen …“ (Rückfrage, sendet `confirmed_below_minimum`); `src/data/swap.ts`
   (`parseStockBlock`, `swapCandidates`: einsatzbereit, Typen der verletzten Regel zuerst). Offline (P2.9, Runde 11): `POST devices/swap`

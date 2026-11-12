@@ -628,7 +628,7 @@ test.describe('Offline-Modus: Tausch (Phase 2, P2.9)', () => {
         await page.getByTestId('swap-open').click();
         const dialog = page.getByTestId('form-dialog');
         await dialog.getByRole('radio', { name: /M4/ }).check();
-        await dialog.getByRole('radio', { name: 'defekt' }).check();
+        await dialog.getByRole('button', { name: 'Defekt' }).click();
         await dialog.getByRole('button', { name: 'Tauschen', exact: true }).click();
 
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
@@ -665,7 +665,7 @@ test.describe('Offline-Modus: Tausch (Phase 2, P2.9)', () => {
         await page.getByTestId('swap-open').click();
         const dialog = page.getByTestId('form-dialog');
         await dialog.getByRole('radio', { name: /M4/ }).check();
-        await dialog.getByRole('radio', { name: 'defekt' }).check();
+        await dialog.getByRole('button', { name: 'Defekt' }).click();
         // Die Verbindung bricht ab, bevor der Tausch gesendet wird: kein Streifen „Offline“, nur die Anfrage scheitert.
         state.mode = 'offline';
         await dialog.getByRole('button', { name: 'Tauschen', exact: true }).click();
