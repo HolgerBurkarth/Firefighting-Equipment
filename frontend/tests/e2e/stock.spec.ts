@@ -161,6 +161,34 @@ test.describe('Sollbestand mit Recht „Ändern“', () => {
         await expect(entry).toContainText('mindestens 3 Atemschutzmaske: 2 vorhanden, 1 fehlt');
     });
 
+    test('Standortliste: Chip „außer Betrieb“ am Fahrzeug, nach dem Erfüllen weg (T21)', async ({
+        page,
+    }) => {
+        await page.goto('/firefighting/test/standorte');
+        const node = page.getByTestId('location-10');
+        await expect(node.getByTestId('location-out-of-service').first()).toHaveText(
+            'außer Betrieb',
+        );
+        await expect(
+            page.getByTestId('location-11').getByTestId('location-out-of-service'),
+        ).toHaveCount(0);
+        await page.getByRole('button', { name: 'Sollbestand von HLF 20 bearbeiten' }).click();
+        await page.getByTestId('form-dialog').getByLabel('Regel 1: Soll-Anzahl').fill('2');
+        await page.getByTestId('form-dialog').getByRole('button', { name: 'Speichern' }).click();
+        await expect(page.getByTestId('stock-success')).toBeVisible();
+        await expect(page.getByTestId('location-out-of-service')).toHaveCount(0);
+    });
+
+    test('Dashboard: Kachel „Außer Betrieb“ führt zu Standorte (T21)', async ({ page }) => {
+        await page.goto('/firefighting/test/dashboard');
+        const tile = page.getByTestId('tile-stock');
+        await expect(tile).toContainText('Außer Betrieb');
+        await expect(tile).toContainText('1');
+        await expect(tile).toContainText('von 1 Standort mit Sollbestand');
+        await tile.click();
+        await expect(page).toHaveURL(/\/firefighting\/test\/standorte$/);
+    });
+
     test('Fenster: Regel ändern, zweite mit zwei Typen, speichern', async ({ page }) => {
         await page.goto('/firefighting/test/standorte');
         await page.getByRole('button', { name: 'Sollbestand von HLF 20 bearbeiten' }).click();
@@ -229,6 +257,23 @@ test.describe('Sollbestand mit Recht „Ändern“', () => {
         await page.goto('/firefighting/test/standorte');
         await expect(page.getByTestId('stock-entry')).toBeVisible();
         expect(await horizontalOverflow(page)).toBe(0);
+    });
+});
+
+test.describe('Dashboard ohne Regeln oder ohne Recht auf Standorte (T21)', () => {
+    test.describe('Stadt ohne Regeln', () => {
+        test.use({
+            api: {
+                'GET api/v1/auth/me': admin(),
+                ...ADMIN_OVERVIEW,
+            },
+        });
+
+        test('keine Kachel', async ({ page }) => {
+            await page.goto('/firefighting/test/dashboard');
+            await expect(page.getByTestId('tile-readiness')).toBeVisible();
+            await expect(page.getByTestId('tile-stock')).toHaveCount(0);
+        });
     });
 });
 

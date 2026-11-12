@@ -19,6 +19,7 @@ import {
     notReadyTile,
     openItemsTile,
     readinessTile,
+    stockTile,
 } from '../../src/data/dashboard';
 import { device } from './support/devices';
 import { respond } from './support/fetch';
@@ -231,6 +232,53 @@ function loaders(fail: { value: boolean }, calls: string[]): AdminOverviewLoader
     };
 }
 
+describe('AdminOverviewStore: Sollbestand (T21)', () => {
+    it('zählt Standorte mit Regeln und davon außer Betrieb, nur mit Bereich Standorte', async () => {
+        const calls: string[] = [];
+        const entry = (id: number, outOfService: boolean) => ({
+            location: { id, name: `S${String(id)}`, path: `S${String(id)}`, level: 1 as const },
+            rules: [],
+            outOfService,
+        });
+        const base = loaders({ value: false }, calls);
+        const withStock: AdminOverviewLoaders = {
+            ...base,
+            stock: () => {
+                calls.push('stock');
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    data: { entries: [entry(1, true), entry(2, false)], outOfService: 1 },
+                });
+            },
+        };
+        const allowed = new AdminOverviewStore(
+            withStock,
+            () => 1,
+            () => overviewScope(ADMIN_PERMISSIONS),
+        );
+        await allowed.refresh('open');
+        expect(allowed.state.overview?.stock).toEqual({ locations: 2, outOfService: 1 });
+        const denied = new AdminOverviewStore(
+            withStock,
+            () => 1,
+            () => overviewScope(USER_PERMISSIONS),
+        );
+        await denied.refresh('open');
+        expect(denied.state.overview?.stock).toBeNull();
+    });
+
+    it('Kachel', () => {
+        expect(stockTile({ locations: 3, outOfService: 1 })).toEqual({
+            value: '1',
+            detail: 'von 3 Standorten mit Sollbestand',
+        });
+        expect(stockTile({ locations: 1, outOfService: 0 }).detail).toBe(
+            'Alle 1 Standort mit Sollbestand vollständig',
+        );
+    });
+});
+
 describe('AdminOverviewStore', () => {
     it('fragt nur, was die Rolle darf; der Rest ist null (Schritt 1.7b)', async () => {
         const calls: string[] = [];
@@ -256,6 +304,7 @@ describe('AdminOverviewStore', () => {
             notReady: true,
             activity: true,
             loans: true,
+            stock: true,
         });
         expect(overviewScope(USER_PERMISSIONS)).toEqual({
             summary: true,
@@ -263,6 +312,7 @@ describe('AdminOverviewStore', () => {
             notReady: false,
             activity: false,
             loans: false,
+            stock: false,
         });
         const dashboardOnly = parsePermissions(permissionsJson({ dashboard: 'read' })) ?? null;
         expect(overviewScope(dashboardOnly)).toEqual({
@@ -271,6 +321,7 @@ describe('AdminOverviewStore', () => {
             notReady: false,
             activity: true,
             loans: false,
+            stock: false,
         });
     });
 

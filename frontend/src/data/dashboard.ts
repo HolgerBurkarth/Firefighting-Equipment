@@ -37,6 +37,21 @@ export function notReadyTile(summary: DeviceSummaryCounts): DashboardTile {
     };
 }
 
+/** „Außer Betrieb“ (T21): Zahl der Standorte unter Sollbestand, „von 3 Standorten mit Sollbestand“. */
+export function stockTile(counts: {
+    readonly locations: number;
+    readonly outOfService: number;
+}): DashboardTile {
+    const of = count(counts.locations, 'Standort', 'Standorten');
+    return {
+        value: String(counts.outOfService),
+        detail:
+            counts.outOfService === 0
+                ? `Alle ${of} mit Sollbestand vollständig`
+                : `von ${of} mit Sollbestand`,
+    };
+}
+
 /** „2 überfällig“ mit „4 in den nächsten 30 Tagen“. */
 export function inspectionTile(summary: DeviceSummaryCounts): DashboardTile {
     return {

@@ -2872,8 +2872,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Frontend: `StockPanel` unten auf „Standorte“ (`src/api/stock.ts`, `src/data/stock.ts`; Liste mit Chip „außer
   Betrieb“/„vollständig“ und „mindestens 3 Atemschutzmaske oder Funkgerät: 2 vorhanden, 1 fehlt“; Fenster „Sollbestand
   festlegen“ mit Standort, Regeln aus Anzahl und Typ-Kästchen; die Typen lädt erst das Fenster). Browser-Tests
-  fragen `GET api/v1/stock` ohne eigene Angabe mit „keine Regeln“ (`tests/e2e/fixtures.ts`). Nicht gebaut: Kachel im
-  Dashboard, Anzeige am Fahrzeug in der Baumzeile (`docs/TODO-SPAETER.md`, T21). Tests `stock.spec.ts` (Browser, Unit).
+  fragen `GET api/v1/stock` ohne eigene Angabe mit „keine Regeln“ (`tests/e2e/fixtures.ts`). Seit Runde 14 (T21): Kachel „Außer Betrieb“ im Dashboard
+  (`AdminOverview.stock`, `scope.stock` = Bereich Standorte, nur mit mindestens einer Regel, `stockTile`, führt zu `standorte`) und Chip „außer Betrieb“
+  am Fahrzeug bzw. Fach in der Baumzeile (`StockPanel` meldet `loaded`; kein Chip, wenn vollständig). Tests `stock.spec.ts` (Browser, Unit).
 - Prüfung gegen den Sollbestand und Tausch (Phase 2, P2.8, Runde 10; Migrationen 0061 `fe_device_events.swap_id`
   (CHAR(32) ascii, nur `state_changed`) und 0062 Arten `stock_below_minimum`, `swap_replacement_moved` in
   `fe_device_notices`; Aktionen `device.swap` und `stock.override`, beide `search` Ansehen, Gruppe Buchen, mit

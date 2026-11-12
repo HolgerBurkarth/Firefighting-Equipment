@@ -5,6 +5,7 @@ import { fetchDevicePage, type DeviceListItem, type DevicePage } from '../api/de
 import { fetchDeviceSummary, type DeviceSummaryCounts } from '../api/deviceSummary';
 import { allows, type Permissions } from '../api/permissions';
 import { fetchLoans, type LoanState } from '../api/loans';
+import { fetchStock, type StockState } from '../api/stock';
 import { fetchUsers, type AdminUser } from '../api/users';
 import { Refresher, type RefreshReason } from './refresher';
 
@@ -28,6 +29,8 @@ export interface AdminOverview {
     readonly activity: readonly TenantEventEntry[] | null;
     /** Verleih (Phase 2, P2.5): offene und überfällige; null ohne den Bereich. */
     readonly loans?: { readonly open: number; readonly overdue: number } | null;
+    /** Sollbestand (T21): Standorte mit Regeln und davon „außer Betrieb“; null ohne den Bereich. */
+    readonly stock?: { readonly locations: number; readonly outOfService: number } | null;
 }
 
 /** Welche der vier Abfragen die Rolle stellen darf (wie die Routen im Backend). */
@@ -42,6 +45,8 @@ export interface OverviewScope {
     readonly activity: boolean;
     /** GET loans: Bereich `loans` Ansehen (nur Städte mit Verleih). */
     readonly loans?: boolean;
+    /** GET stock: Bereich `locations` Ansehen. */
+    readonly stock?: boolean;
 }
 
 export const FULL_SCOPE: OverviewScope = {
@@ -59,6 +64,7 @@ export function overviewScope(permissions: Permissions | null): OverviewScope {
         notReady: dashboard && (allows(permissions, 'search') || allows(permissions, 'devices')),
         activity: dashboard || allows(permissions, 'log'),
         loans: allows(permissions, 'loans'),
+        stock: allows(permissions, 'locations'),
     };
 }
 
@@ -78,6 +84,7 @@ export interface AdminOverviewLoaders {
     readonly notReady: () => Promise<ApiResult<DevicePage>>;
     readonly activity: () => Promise<ApiResult<{ readonly events: readonly TenantEventEntry[] }>>;
     readonly loans?: () => Promise<ApiResult<LoanState>>;
+    readonly stock?: () => Promise<ApiResult<StockState>>;
 }
 
 const DEFAULT_LOADERS: AdminOverviewLoaders = {
@@ -94,10 +101,17 @@ const DEFAULT_LOADERS: AdminOverviewLoaders = {
         }),
     activity: () => fetchTenantEvents({ limit: ACTIVITY_LIMIT, offset: 0 }),
     loans: () => fetchLoans(),
+    stock: () => fetchStock(),
 };
 
 function loansCounts(state: LoanState | null): { open: number; overdue: number } | null {
     return state === null ? null : { open: state.open, overdue: state.overdue };
+}
+
+function stockCounts(state: StockState | null): { locations: number; outOfService: number } | null {
+    return state === null
+        ? null
+        : { locations: state.entries.length, outOfService: state.outOfService };
 }
 
 function firstError(results: readonly ApiResult<unknown>[]): ApiError | null {
@@ -147,17 +161,18 @@ export class AdminOverviewStore {
         this.current.value = { ...this.current.value, loading: true };
         const scope = this.scope();
         const skip = Promise.resolve(null);
-        const [summary, pendingUsers, notReady, activity, loans] = await Promise.all([
+        const [summary, pendingUsers, notReady, activity, loans, stock] = await Promise.all([
             scope.summary ? this.loaders.summary() : skip,
             scope.pendingUsers ? this.loaders.pendingUsers() : skip,
             scope.notReady ? this.loaders.notReady() : skip,
             scope.activity ? this.loaders.activity() : skip,
             scope.loans === true && this.loaders.loans !== undefined ? this.loaders.loans() : skip,
+            scope.stock === true && this.loaders.stock !== undefined ? this.loaders.stock() : skip,
         ]);
         if (generation !== this.generation) {
             return false;
         }
-        const results = [summary, pendingUsers, notReady, activity, loans].filter(
+        const results = [summary, pendingUsers, notReady, activity, loans, stock].filter(
             (result) => result !== null,
         );
         const error = firstError(results);
@@ -175,6 +190,7 @@ export class AdminOverviewStore {
                 notReady: page === null ? null : { devices: page.devices, total: page.total },
                 activity: data(activity)?.events ?? null,
                 loans: loansCounts(data(loans)),
+                stock: stockCounts(data(stock)),
             },
             loading: false,
             error: null,

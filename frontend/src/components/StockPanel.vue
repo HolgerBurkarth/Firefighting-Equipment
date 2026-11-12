@@ -27,6 +27,7 @@ import FormDialog from './FormDialog.vue';
  * (berechnet, nicht gesetzt). Die Liste zeigt Soll, Ist und Fehlendes; das Fenster ersetzt alle Regeln
  * eines Standorts.
  */
+const emit = defineEmits<{ loaded: [state: StockState] }>();
 const canWrite = computed(() => allows(currentPermissions.value, 'locations', 'write'));
 
 const state = shallowRef<StockState | null>(null);
@@ -38,6 +39,7 @@ async function load(): Promise<void> {
     if (result.ok) {
         state.value = result.data;
         error.value = null;
+        emit('loaded', result.data);
     } else {
         error.value = result.error;
     }
