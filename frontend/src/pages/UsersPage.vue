@@ -1372,8 +1372,8 @@ onMounted(() => {
 }
 
 .role-option input {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     margin: 2px 0 0;
     flex: none;
     accent-color: var(--accent);
@@ -1434,8 +1434,8 @@ onMounted(() => {
 }
 
 .select-box input {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     margin: 0;
     accent-color: var(--accent);
 }

@@ -3,7 +3,7 @@ import type { MockRequest, MockResponse } from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
 import { deviceJson, devicesEndpoint, fullDevice } from './support/devices';
 import { delegate } from './support/masterData';
-import { horizontalOverflow, unreachableControls } from './support/layout';
+import { horizontalOverflow, smallTargets, unreachableControls } from './support/layout';
 
 /**
  * Seite „Verleih“ (Phase 2, P2.5): offene Verleihe nach Leihnehmer, „Verleihen …“ mit Nummer, Leihnehmer,
@@ -484,6 +484,8 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
             expect(await unreachableControls(page, '[data-testid="return-place"]')).toEqual([]);
             expect(await unreachableControls(page, '[data-testid="in-returns"]')).toEqual([]);
             expect(await unreachableControls(page, '[data-testid="return-device"]')).toEqual([]);
+            // U3: Kästchen der Rückgabe-Liste sind mindestens 44 px große Flächen.
+            expect(await smallTargets(page, '[data-testid="in-returns"]')).toEqual([]);
         });
     }
 

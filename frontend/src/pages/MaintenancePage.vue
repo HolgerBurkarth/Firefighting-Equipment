@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import type { ApiError } from '../api/client';
 import type { DeviceListItem } from '../api/devices';
 import { fetchMaintenance, type MaintenanceStage, type MaintenanceState } from '../api/maintenance';
@@ -42,7 +42,13 @@ const progress = ref('');
 const resultText = ref<string | null>(null);
 const resultOk = ref(true);
 const failures = ref<{ id: number; identifier: string; text: string }[]>([]);
-const copied = ref<string | null>(null);
+/** Rückmeldung zum Kopieren der Transportliste (U5): Stufe und Text, verschwindet nach `COPY_NOTICE_MS`. */
+const copied = ref<{ key: StageKey; text: string; ok: boolean } | null>(null);
+const COPY_NOTICE_MS = 4000;
+let copyTimer: ReturnType<typeof setTimeout> | undefined;
+onBeforeUnmount(() => {
+    clearTimeout(copyTimer);
+});
 
 const confirmOpen = ref(false);
 const pending = ref<StageKey>('collection');
@@ -68,7 +74,7 @@ function selectableDevices(key: StageKey): DeviceListItem[] {
 }
 
 function allPicked(key: StageKey): boolean {
-    const available = selectableDevices(key);
+    const available = selectableDevices(key).filter((device) => !staysInWorkshop(device, key));
     return (
         available.length > 0 && available.every((device) => picked.value[key].includes(device.id))
     );
@@ -82,10 +88,19 @@ function togglePicked(key: StageKey, id: number): void {
     };
 }
 
+/** Defekte Ausrüstung in der Werkstatt gehört nicht „zurück ins Lager“ (U10): sie wird nie vorausgewählt. */
+function staysInWorkshop(device: DeviceListItem, key: StageKey): boolean {
+    return key === 'workshop' && device.status === 'defective';
+}
+
 function toggleAll(key: StageKey): void {
     picked.value = {
         ...picked.value,
-        [key]: allPicked(key) ? [] : selectableDevices(key).map((device) => device.id),
+        [key]: allPicked(key)
+            ? []
+            : selectableDevices(key)
+                  .filter((device) => !staysInWorkshop(device, key))
+                  .map((device) => device.id),
     };
 }
 
@@ -125,14 +140,30 @@ const confirmTitle = computed(() => {
     const count = confirmCount.value;
     const what = count === 1 ? '1 Ausrüstung' : `${String(count)} Ausrüstungen`;
     return pending.value === 'collection'
-        ? `${what} zur Werkstatt bringen?`
-        : `${what} zurück ins Lager bringen?`;
+        ? `${what} in die Werkstatt bringen?`
+        : `${what} ins Lager bringen?`;
 });
+const confirmLabel = computed(() =>
+    pending.value === 'collection' ? 'In die Werkstatt bringen' : 'Ins Lager bringen',
+);
+/** Defekte Ausrüstung, die der Lauf als einsatzbereit ins Lager bringen würde (U10). */
+const confirmDefective = computed(() =>
+    pending.value === 'workshop'
+        ? pickedDevices('workshop').filter((device) => device.status === 'defective')
+        : [],
+);
 const confirmDescription = computed(() => {
     const they = confirmCount.value === 1 ? 'Sie steht' : 'Sie stehen';
-    return pending.value === 'collection'
-        ? `${they} dann in „${stage('workshop')?.locations[0]?.name ?? 'der Werkstatt'}“ mit dem Status „in Wartung“.`
-        : `${they} dann in „${state.value?.defaultStore?.name ?? 'dem Lager'}“ mit dem Status „einsatzbereit“.`;
+    const warning =
+        confirmDefective.value.length === 0
+            ? ''
+            : ` Achtung: ${confirmDefective.value.map((device) => device.identifier).join(', ')} ${confirmDefective.value.length === 1 ? 'ist' : 'sind'} noch defekt und gilt danach als einsatzbereit.`;
+    return (
+        (pending.value === 'collection'
+            ? `${they} dann in „${stage('workshop')?.locations[0]?.name ?? 'der Werkstatt'}“ mit dem Status „in Wartung“.`
+            : `${they} dann in „${state.value?.defaultStore?.name ?? 'dem Lager'}“ mit dem Status „einsatzbereit“.`) +
+        warning
+    );
 });
 
 function ask(key: StageKey): void {
@@ -185,7 +216,17 @@ async function copyList(key: StageKey): Promise<void> {
     }
     const list = picked.value[key].length > 0 ? pickedDevices(key) : [...current.devices];
     const ok = await copyText(transportText(current.label, list));
-    copied.value = ok ? key : null;
+    clearTimeout(copyTimer);
+    copied.value = {
+        key,
+        ok,
+        text: ok
+            ? `Liste kopiert (${list.length === 1 ? '1 Ausrüstung' : `${String(list.length)} Ausrüstungen`})`
+            : 'Die Liste ließ sich nicht kopieren.',
+    };
+    copyTimer = setTimeout(() => {
+        copied.value = null;
+    }, COPY_NOTICE_MS);
 }
 </script>
 
@@ -256,7 +297,11 @@ async function copyList(key: StageKey): Promise<void> {
                         "
                         @click="ask(key)"
                     >
-                        {{ key === 'collection' ? 'Zur Werkstatt …' : 'Zurück ins Lager …' }}
+                        {{
+                            key === 'collection'
+                                ? 'In die Werkstatt bringen …'
+                                : 'Ins Lager bringen …'
+                        }}
                         <template v-if="picked[key].length > 0"
                             >({{ picked[key].length }})</template
                         >
@@ -269,8 +314,19 @@ async function copyList(key: StageKey): Promise<void> {
                     >
                         Transportliste kopieren
                     </button>
-                    <span v-if="copied === key" class="hint" role="status">Kopiert.</span>
+                    <span
+                        v-if="copied?.key === key"
+                        class="copy-note"
+                        :class="{ 'copy-note-error': !copied.ok }"
+                        role="status"
+                        :data-testid="`copy-note-${key}`"
+                        >{{ copied.ok ? '✓ ' : '' }}{{ copied.text }}</span
+                    >
                 </div>
+                <p v-if="canChange && key === 'collection'" class="hint">
+                    Reihenfolge: erst „Transportliste kopieren“, dann „In die Werkstatt bringen“ –
+                    danach steht die Ausrüstung nicht mehr in der Sammelstelle.
+                </p>
                 <p v-if="canChange && key === 'collection' && !toWorkshopPossible" class="hint">
                     Es gibt noch keine Werkstatt. Der Admin vergibt die Aufgabe „{{
                         state.workshop.label
@@ -299,14 +355,15 @@ async function copyList(key: StageKey): Promise<void> {
                         class="device"
                         data-testid="maintenance-device"
                     >
-                        <input
-                            v-if="canChange"
-                            type="checkbox"
-                            :checked="picked[key].includes(device.id)"
-                            :disabled="busy || !selectable(device, key)"
-                            :aria-label="`${device.identifier} auswählen`"
-                            @change="togglePicked(key, device.id)"
-                        />
+                        <label v-if="canChange" class="pick">
+                            <input
+                                type="checkbox"
+                                :checked="picked[key].includes(device.id)"
+                                :disabled="busy || !selectable(device, key)"
+                                :aria-label="`${device.identifier} auswählen`"
+                                @change="togglePicked(key, device.id)"
+                            />
+                        </label>
                         <RouterLink
                             class="identifier"
                             :to="{ name: 'device-details', params: { id: device.id } }"
@@ -323,6 +380,12 @@ async function copyList(key: StageKey): Promise<void> {
                         <StatusBadge :status="device.status" :label="device.statusLabel" />
                         <span class="place">{{ device.location.path }}</span>
                         <span class="since">{{ sinceText(device.stateChangedAt, now) }}</span>
+                        <span
+                            v-if="staysInWorkshop(device, key)"
+                            class="stays"
+                            data-testid="stays-in-workshop"
+                            >defekt – bleibt in der Werkstatt</span
+                        >
                     </li>
                 </ul>
                 <p v-if="state[key].total > state[key].devices.length" class="hint">
@@ -337,15 +400,57 @@ async function copyList(key: StageKey): Promise<void> {
         v-model:open="confirmOpen"
         :title="confirmTitle"
         :description="confirmDescription"
-        confirm-label="Bringen"
+        :confirm-label="confirmLabel"
         @confirm="confirm"
-    />
+    >
+        <div v-if="pending === 'collection'" class="confirm-copy">
+            <p class="hint">Transportliste vorher kopieren?</p>
+            <button
+                class="btn"
+                type="button"
+                data-testid="confirm-copy"
+                @click="copyList('collection')"
+            >
+                Transportliste kopieren
+            </button>
+            <p
+                v-if="copied?.key === 'collection'"
+                class="copy-note"
+                :class="{ 'copy-note-error': !copied.ok }"
+                role="status"
+            >
+                {{ copied.ok ? '✓ ' : '' }}{{ copied.text }}
+            </p>
+        </div>
+    </ConfirmDialog>
 </template>
 
 <style scoped>
 .hint {
     margin: 0;
     color: var(--muted);
+}
+
+.copy-note {
+    color: var(--status-ready-fg);
+    font-weight: var(--font-weight-semibold);
+}
+
+.copy-note-error {
+    color: var(--status-defective-fg);
+}
+
+.stays {
+    color: var(--status-defective-fg);
+    font-weight: var(--font-weight-semibold);
+}
+
+.confirm-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 12px;
 }
 
 .stage {
@@ -407,9 +512,8 @@ async function copyList(key: StageKey): Promise<void> {
     border-top: 1px solid var(--border-subtle);
 }
 
-.device input[type='checkbox'] {
-    width: 22px;
-    height: 22px;
+.device:has(input:checked) {
+    background: var(--selected-bg);
 }
 
 .identifier {

@@ -485,14 +485,15 @@ function printPoster(): void {
                         class="loan"
                         data-testid="return-device"
                     >
-                        <input
-                            v-if="canLend"
-                            type="checkbox"
-                            :checked="pickedReturns.includes(device.id)"
-                            :disabled="processBusy"
-                            :aria-label="`${device.identifier} auswählen`"
-                            @change="toggleReturn(device.id)"
-                        />
+                        <label v-if="canLend" class="pick">
+                            <input
+                                type="checkbox"
+                                :checked="pickedReturns.includes(device.id)"
+                                :disabled="processBusy"
+                                :aria-label="`${device.identifier} auswählen`"
+                                @change="toggleReturn(device.id)"
+                            />
+                        </label>
                         <RouterLink
                             class="identifier"
                             :to="{ name: 'device-details', params: { id: device.id } }"
@@ -576,6 +577,10 @@ function printPoster(): void {
     margin: 0;
     padding: 0;
     list-style: none;
+}
+
+.loan:has(input:checked) {
+    background: var(--selected-bg);
 }
 
 .loan {

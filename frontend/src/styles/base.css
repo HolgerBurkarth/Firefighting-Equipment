@@ -380,6 +380,24 @@ body:has([data-dialog-passthrough]) [data-form-dialog] {
     background: var(--selected-bg);
 }
 
+/* Kästchen in einer Listenzeile: das <label> ist das 44-px-Ziel (U3). */
+.pick {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-min);
+    height: var(--touch-min);
+    cursor: pointer;
+}
+
+.pick input {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
 /* Reiter einer Seite (Benutzer, Protokoll; Reka UI Tabs: Pfeiltasten, aria-selected). */
 .tabs-root {
     display: flex;

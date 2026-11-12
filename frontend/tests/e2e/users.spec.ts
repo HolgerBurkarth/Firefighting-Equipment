@@ -9,7 +9,7 @@ import {
     type MockResponse,
 } from './fixtures';
 import { adminOverview, assignableRolesJson, userJson } from './support/admin';
-import { horizontalOverflow, unreachableControls } from './support/layout';
+import { horizontalOverflow, smallTargets, unreachableControls } from './support/layout';
 import { delegate } from './support/masterData';
 
 /**
@@ -733,6 +733,11 @@ test.describe('Breiten (Runde 14, Punkt 2)', () => {
                 [],
             );
             expect(await unreachableControls(page, '.pending-card')).toEqual([]);
+            // U3: Kästchen der Liste mindestens 44 px.
+            expect(await smallTargets(page, '[data-testid="user-table"]')).toEqual([]);
+            await page.getByRole('button', { name: 'Max Neu freischalten' }).click();
+            await expect(page.getByRole('dialog', { name: 'Max Neu freischalten' })).toBeVisible();
+            expect(await smallTargets(page, '[data-form-dialog]')).toEqual([]);
         });
     }
 });

@@ -2825,7 +2825,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Tests `MaintenanceTest`. Frontend: `MaintenancePage` (`wartung`, Menü „Wartung“ nach „Ausrüstungstypen“,
   `PAGE_RIGHTS.maintenance`), `src/api/maintenance.ts`, `src/data/maintenance.ts` („seit“, Transportliste
   nur zum Kopieren; CSV/Druck und „Wartungsdatum setzen“ siehe `docs/TODO-SPAETER.md` T20), `maintenanceToWorkshop`/
-  `maintenanceBack` in `src/data/index.ts`. Tests `maintenance.spec.ts` (Browser, Unit).
+  `maintenanceBack` in `src/data/index.ts`. Seit 12.11.2026 (U5, U10): Knöpfe „In die Werkstatt bringen …" / „Ins Lager bringen …" (Bestätigung gleich benannt), Rückmeldung „Liste kopiert (N Ausrüstungen)" am Knopf (4 s), Satz zur Reihenfolge, im Fenster „In die Werkstatt" „Transportliste vorher kopieren?" mit Knopf; defekte Ausrüstung in der Werkstatt trägt „defekt – bleibt in der Werkstatt", „Alle auswählen" nimmt sie nie mit, von Hand gewählt warnt die Rückfrage. `ConfirmDialog` hat einen Standard-Slot unter dem Text. Tests `maintenance.spec.ts` (Browser, Unit).
 - Verleih (Phase 2, P2.5, Runde 9; Bereich `loans`, Seite „Verleih“): `Area::Loans` gibt es nur in einer Stadt mit
   freigeschalteter Aufgabe „Ausgeliehen an“ oder „Rückgabe“ (`Area::requiredTasks`); F3: mit Datenfilter kein
   Zugriff. Abweichung vom Plan: keine eigenen Aktionen `loan.lend`/`returns.process`, der Bereich Ändern genügt.
