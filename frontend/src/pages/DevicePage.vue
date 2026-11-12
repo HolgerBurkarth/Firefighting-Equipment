@@ -336,6 +336,8 @@ async function saveOffline(
     setBookingNotice({
         kind: 'info',
         text: `Gespeichert – wird gesendet, sobald eine Verbindung besteht: ${queuedText({ ...booking, state: 'waiting' })}`,
+        clientRef: booking.clientRef,
+        queuedLabel: queuedText({ ...booking, state: 'waiting' }),
     });
     saved.value = true;
     await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);
@@ -399,11 +401,13 @@ async function onSwapped(response: SwapResponse): Promise<void> {
     await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);
 }
 
-async function onSwapQueued(text: string): Promise<void> {
+async function onSwapQueued(text: string, clientRef: string): Promise<void> {
     rememberDevice(deviceId);
     setBookingNotice({
         kind: 'info',
         text: `Gespeichert – wird gesendet, sobald eine Verbindung besteht: ${text}`,
+        clientRef,
+        queuedLabel: text,
     });
     saved.value = true;
     await returnTo(router, ['search', 'inspections', 'devices', 'device-details', 'notice']);

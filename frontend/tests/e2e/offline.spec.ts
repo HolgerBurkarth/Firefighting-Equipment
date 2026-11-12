@@ -315,6 +315,16 @@ test.describe('Offline-Modus: Buchungen in der Warteschlange', () => {
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
     }
 
+    test('U9: der Hinweis „wird gesendet“ weicht dem Ankommen mit Uhrzeit', async ({ page }) => {
+        await bookOffline(page);
+        const notice = page.getByTestId('booking-notice');
+        await expect(notice).toContainText('Gespeichert – wird gesendet');
+        state.mode = 'online';
+        await page.evaluate(() => window.dispatchEvent(new Event('online')));
+        await expect(notice).toHaveText(/^✓ Angekommen um \d{2}:\d{2}: M1 → defekt$/);
+        await expect(notice).not.toContainText('wird gesendet');
+    });
+
     test('offline gebucht: wartet mit Uhr, Liste zeigt den Wunsch, bei Verbindung gesendet', async ({
         page,
         apiRequests,

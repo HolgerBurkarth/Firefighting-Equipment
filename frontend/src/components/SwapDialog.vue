@@ -37,7 +37,7 @@ const emit = defineEmits<{
     swapped: [response: SwapResponse];
     conflict: [device: DeviceListItem];
     /** Ohne Verbindung in die Warteschlange gelegt: Text der Buchung. */
-    queued: [text: string];
+    queued: [text: string, clientRef: string];
 }>();
 
 const query = ref('');
@@ -282,7 +282,7 @@ async function queueSwap(
     const queued = { ...booking, state: 'waiting' as const };
     deviceStore.upsert(pendingDevice(props.device, queued));
     open.value = false;
-    emit('queued', queuedText(queued));
+    emit('queued', queuedText(queued), queued.clientRef);
 }
 
 function confirmBelow(): void {

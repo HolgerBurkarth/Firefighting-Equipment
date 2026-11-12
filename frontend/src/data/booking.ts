@@ -82,6 +82,12 @@ export function confirmationText(device: DeviceListItem): string {
 export interface BookingNotice {
     readonly kind: 'success' | 'info';
     readonly text: string;
+    /**
+     * Nur bei einer in die Warteschlange gelegten Buchung (U9): ihre `client_ref` und ihr Text. Sobald sie
+     * angekommen ist, ersetzt die Anzeige „Gespeichert – wird gesendet …“ durch „Angekommen um 14:05 …“.
+     */
+    readonly clientRef?: string;
+    readonly queuedLabel?: string;
 }
 
 export function bookingNotice(response: BookingResponse): BookingNotice {
@@ -132,9 +138,14 @@ function parseNotice(text: string | null): BookingNotice | null {
         if (typeof value !== 'object' || value === null) {
             return null;
         }
-        const { kind, text: noticeText } = value as Record<string, unknown>;
+        const { kind, text: noticeText, clientRef, queuedLabel } = value as Record<string, unknown>;
         return (kind === 'success' || kind === 'info') && typeof noticeText === 'string'
-            ? { kind, text: noticeText }
+            ? {
+                  kind,
+                  text: noticeText,
+                  ...(typeof clientRef === 'string' &&
+                      typeof queuedLabel === 'string' && { clientRef, queuedLabel }),
+              }
             : null;
     } catch {
         return null;
