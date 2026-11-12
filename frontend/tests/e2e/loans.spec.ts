@@ -502,6 +502,32 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
         expect(pdf.match(/\/Type\s*\/Page[^s]/g)).toHaveLength(1);
     });
 
+    test('U6: Sprunglinks oben, Abschnitt „Rückgabe-Aushang“ mit Erklärung, „Aushang abschalten“', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 390, height: 700 });
+        await page.goto('/firefighting/test/verleih');
+        const jumps = page.getByTestId('loan-jumps');
+        await expect(jumps.getByRole('button')).toHaveText([
+            'Verliehen',
+            /In der Rückgabe \(\d+\)/,
+            'Rückgabe-Aushang',
+        ]);
+        await jumps.getByTestId('jump-poster').click();
+        const heading = page.getByRole('heading', { name: 'Rückgabe-Aushang', level: 2 });
+        await expect(heading).toBeFocused();
+        await expect(heading).toBeInViewport();
+        await expect(page.getByTestId('returns-section')).toContainText(
+            'Aushang ausdrucken und aufhängen',
+        );
+        await page.getByTestId('renew-key').click();
+        await page.getByTestId('issued-key').getByRole('button', { name: 'Schließen' }).click();
+        await expect(page.getByTestId('revoke-key')).toHaveText('Aushang abschalten …');
+        await expect(page.getByRole('button', { name: 'Widerrufen' })).toHaveCount(0);
+        await jumps.getByTestId('jump-loans').click();
+        await expect(page.getByRole('heading', { name: 'Verleih', level: 1 })).toBeFocused();
+    });
+
     test('Aushang erzeugen: Link mit Schlüssel im Fragment, danach erneuern und widerrufen', async ({
         page,
     }) => {
@@ -532,7 +558,7 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
         await place.getByTestId('revoke-key').click();
         await page
             .getByTestId('confirm-dialog')
-            .getByRole('button', { name: 'Ungültig machen' })
+            .getByRole('button', { name: 'Aushang abschalten', exact: true })
             .click();
         await expect(page.getByTestId('return-link-state')).toHaveText('Kein gültiger Aushang');
     });

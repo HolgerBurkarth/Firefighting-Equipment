@@ -129,14 +129,21 @@ async function confirmKey(): Promise<void> {
     }
 }
 
+/** Sprunglinks oben (U6): zu einem Abschnitt der langen Seite scrollen und seine Überschrift fokussieren. */
+function jump(id: string): void {
+    const target = document.getElementById(id);
+    target?.scrollIntoView({ block: 'start' });
+    target?.focus({ preventScroll: true });
+}
+
 const keyConfirmTitle = computed(() =>
     keyConfirm.value?.revoke === true
-        ? `Aushang für „${keyConfirm.value.place.name}“ ungültig machen?`
+        ? `Aushang für „${keyConfirm.value.place.name}“ abschalten?`
         : `Neuen Aushang für „${keyConfirm.value?.place.name ?? ''}“ erzeugen?`,
 );
 const keyConfirmText = computed(() =>
     keyConfirm.value?.revoke === true
-        ? 'Der QR-Code des Aushangs funktioniert danach nicht mehr.'
+        ? 'Der QR-Code des Aushangs funktioniert danach nicht mehr. Wer ihn scannt, kann nichts zurückgeben, bis Sie einen neuen Aushang erzeugen.'
         : 'Der bisherige Aushang gilt danach nicht mehr. Der neue Link erscheint nur einmal.',
 );
 
@@ -255,7 +262,7 @@ function printPoster(): void {
 
 <template>
     <div class="page-head">
-        <h1>Verleih</h1>
+        <h1 id="loan-top" tabindex="-1">Verleih</h1>
         <button
             v-if="canLend"
             ref="lendButton"
@@ -297,6 +304,32 @@ function printPoster(): void {
             Liste wird aktualisiert …
         </p>
         <p v-else class="summary" data-testid="loan-summary">{{ loansSummary(state) }}</p>
+        <nav
+            v-if="state.returns.length > 0"
+            class="jumps"
+            aria-label="Auf dieser Seite"
+            data-testid="loan-jumps"
+        >
+            <button class="btn" type="button" data-testid="jump-loans" @click="jump('loan-top')">
+                Verliehen
+            </button>
+            <button
+                class="btn"
+                type="button"
+                data-testid="jump-in-returns"
+                @click="jump('in-returns-title')"
+            >
+                In der Rückgabe ({{ inReturns.length }})
+            </button>
+            <button
+                class="btn"
+                type="button"
+                data-testid="jump-poster"
+                @click="jump('returns-title')"
+            >
+                Rückgabe-Aushang
+            </button>
+        </nav>
         <p v-if="canLend && !lendPossible" class="hint" data-testid="no-borrower">
             Es gibt noch keinen Leihnehmer. Der Admin vergibt die Aufgabe „{{
                 state.borrowerLabel
@@ -348,10 +381,12 @@ function printPoster(): void {
             data-testid="returns-section"
             aria-labelledby="returns-title"
         >
-            <h2 id="returns-title">{{ state.returnsLabel }}</h2>
+            <h2 id="returns-title" tabindex="-1">Rückgabe-Aushang</h2>
             <p class="hint">
-                Wer verliehene Ausrüstung zurückbringt, scannt den QR-Code des Aushangs und gibt sie
-                ohne Anmeldung zurück. Sie steht dann hier, bis sie weiterbewegt wird.
+                So bringen andere Wehren Ausrüstung zurück: Aushang ausdrucken und aufhängen. Wer
+                den QR-Code scannt, gibt die Ausrüstung ohne Anmeldung zurück; sie steht dann in „{{
+                    state.returnsLabel
+                }}“, bis sie weiterbewegt wird.
             </p>
             <ErrorNotice v-if="keyError !== null" :error="keyError" />
             <ul class="loans">
@@ -389,7 +424,7 @@ function printPoster(): void {
                             :disabled="keyBusy"
                             @click="askKey(place, true)"
                         >
-                            Widerrufen …
+                            Aushang abschalten …
                         </button>
                     </template>
                 </li>
@@ -437,7 +472,7 @@ function printPoster(): void {
             data-testid="in-returns"
             aria-labelledby="in-returns-title"
         >
-            <h2 id="in-returns-title">
+            <h2 id="in-returns-title" tabindex="-1">
                 In der Rückgabe
                 <span class="count">{{ inReturns.length }}</span>
             </h2>
@@ -516,7 +551,9 @@ function printPoster(): void {
         v-model:open="keyConfirmOpen"
         :title="keyConfirmTitle"
         :description="keyConfirmText"
-        :confirm-label="keyConfirm?.revoke === true ? 'Ungültig machen' : 'Neuen Aushang erzeugen'"
+        :confirm-label="
+            keyConfirm?.revoke === true ? 'Aushang abschalten' : 'Neuen Aushang erzeugen'
+        "
         @confirm="confirmKey"
     />
     <ConfirmDialog
@@ -540,6 +577,12 @@ function printPoster(): void {
 .hint {
     margin: 0 0 12px;
     color: var(--muted);
+}
+
+.jumps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .summary {
