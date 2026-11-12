@@ -31,3 +31,10 @@ Wünsche aus Live-Tests. Nicht vorziehen; erst nach Abschluss der Hauptabschnitt
 | T24 | Rückgabe ohne Anmeldung | „Code scannen“ mit der Kamera auf der Rückgabeseite (wie `CodeScanner` auf „Suchen“, ohne Anmeldung). | 09.11.2026 |
 | T25 | Mail-Auswahl | „Nur Wichtiges“ (Defekt, überfällige Rückgabe, Hinweise) und der Filter „Nur für diese Ausrüstungstypen“ der Mail-Auswahl (Mockup `Benachrichtigungen`, Plan Phase 2, 3.6); gebaut sind „Alle Vorgänge“ und „Nur ausgewählte“ (Themen). Holger 09.11.2026: erst später. | 09.11.2026 |
 | T26 | Browser-Tests (Offline) | `offline.spec.ts` „Abmelden mit ungesendeter Buchung fragt nach und löscht dann alles“ scheitert unter Windows in Firefox unter Last (`--repeat-each=10`, vier Worker) in 7–9 von 10 Läufen (`toContainText`/`toHaveURL`, einmal auch `storedDeviceIds` nach 5 s), schon mit dem Stand vor Runde 12 (per Vergleichslauf 09.11.2026); in Chromium, WebKit und einzeln meist grün, in CI bisher grün. Ursache im Trace suchen (nicht mit längeren Wartezeiten überdecken). | 09.11.2026 |
+
+## Aus der Wiederholung des Benutzertests (12.11.2026)
+- Wartung: „Liste anzeigen“ als Ausweg, wenn das Kopieren nicht geht; Meldung nicht doppelt (zusammen mit T20).
+- Tauschen am kleinen Handy (312 × 531 px): Fußleiste kompakter, Grund für den gesperrten Knopf am Knopf.
+- „Aushang abschalten …“ → „Link ungültig machen …“ erwägen; „Claude-Zugang“ mit Pfeil als aufklappbar kennzeichnen; „Konto beenden“ weiter oben.
+- Rückgabeseite: Name für weitere Ausrüstung merken; „nicht verliehen“ verständlicher; Name/Zustand ohne Scrollen.
+- „Angekommen um …“: Zeit des Servers statt der Erfassungszeit.

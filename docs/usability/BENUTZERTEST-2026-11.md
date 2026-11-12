@@ -210,3 +210,37 @@ Fotos: Pfade relativ zu `docs/usability/`.
 ## Wiederholung
 
 `node frontend/tests/usability/reset.mjs` setzt die lokale Testdatenbank (`config/config.test.php`) zurück und legt die Daten, Rollen und Konten an; ein lokaler Server mit `php -q -S localhost:4300 frontend/tests/usability/support/router.php`, dann je Persona `node frontend/tests/usability/driver.mjs --persona <name> --role <carrier|keeper|admin|courier> --device <iphone|pixel|tablet|laptop|desktop> [--zoom 1.25] --port <p> --out <ordner>` und Steuerung mit `node frontend/tests/usability/ut.mjs <port> <befehl>`. Die Anweisung an die Personas steht in `frontend/tests/usability/PERSONAS.md`. Die Datenbank der Tests (`firefighting_test`) wird dabei geleert; ein späterer `composer test` leert sie ohnehin vor jedem Test.
+
+## Wiederholung nach den Verbesserungen (12.11.2026, Runde 15)
+
+Stand: Build `cc8f6df5aa46` (Punkte U1–U7, U9–U11, U17, U20, U22). Wiederholt mit den **älteren** Personas (iPhone/Pixel/Laptop, 125 % Zoom) für
+die geänderten Aufgaben, je ein Durchgang, gleiche Anweisung (`frontend/tests/usability/PERSONAS.md`), frisch zurückgesetzte lokale Daten.
+Berichte und Bildschirmfotos: [wiederholung/](wiederholung/). Grenzen wie oben (KI-Personas, ein Durchgang, Chromium).
+
+| Persona / Aufgabe | Einfachheit vorher | nachher |
+|---|---|---|
+| Bote: 1 zwei Geräte zurückgeben (mit Tippfehler) | 6 | 6 |
+| Bote: 2 prüfen, ob es angekommen ist | **3** | **7** |
+| Geräteträger: 2 PA 3 defekt melden | 6 | 6 (Bestätigung „Bitte … herausnehmen“ sehr gut) |
+| Geräteträger: 4 Maske tauschen | 5 | 5 (Liste bei 312 × 531 px eng, siehe unten) |
+| Geräteträger: 5 offline umbuchen, Ankommen prüfen | 6 | 6 („Angekommen um …“ statt „wird gesendet“) |
+| Geräteträger: 7 Einmalgerät benutzt melden | 6 | 6 |
+| Gerätewart: 1 Sammelstelle → Werkstatt, Liste | 6 | 4 (Kopieren im Test-Browser nicht möglich, s. u.) |
+| Gerätewart: 2 Gewartetes zurück ins Lager | 5 | 6 |
+| Gerätewart: 4 Sollbestand LF 10 | **4** | **5** |
+| Gerätewart: 6 Rückgabe bearbeiten | 5 | 6 |
+| Gerätewart: 7 Hinweis erledigen | 5 | 6 |
+| Admin: 4 Kamerad entfernen | 5 | 5 |
+| Admin: 6 Rückgabe-Aushang erneuern | 5 | 6 |
+
+Bestätigt: Beleg und unterscheidbare Meldungen der Rückgabe (U1), Sprunglink und Folgemeldung beim Sollbestand (U4), Warnsatz zu defekter
+Ausrüstung und Kopier-Hinweis in der Wartung (U5/U10), „Angekommen um …“ (U9), „Bitte … herausnehmen“ (U11), Klartext im Protokoll (U17).
+
+Neue bzw. offene Befunde der Wiederholung (nicht Teil dieser Runde, nach `docs/TODO-SPAETER.md`):
+- „Transportliste kopieren“: Im Test-Browser scheitert das Kopieren (kein Zugriff auf die Zwischenablage); die Meldung steht dann doppelt (Seite und Fenster).
+  In echten Browsern ungeprüft; ein Ausweg „Liste anzeigen“ fehlt weiterhin (T20).
+- Tauschen bei 312 × 531 px (125 % am Handy): die feste Fußleiste lässt nur rund einen Ersatz sichtbar; „Tauschen“ ist gesperrt, der Grund steht nur im Satz darüber.
+- Uhrzeit in „Angekommen um …“ ist die Erfassungszeit, wird als Ankunftszeit gelesen (der Hinweis stimmt in der Regel auf wenige Sekunden).
+- „Aushang abschalten …“ klingt für eine Persona nach „Strom aus“ („Link ungültig machen“ wäre klarer); „Claude-Zugang (KI-Assistent)“ sieht eingeklappt wie eine Überschrift aus; „Konto beenden“ liegt erst nach Scrollen.
+- Rückgabeseite: Name, Zustand und „Zurückgeben“ liegen nach dem Suchen unter dem Bildrand; der Name muss für jedes Gerät neu getippt werden; „nicht verliehen“ ist für Boten unklar.
+- Mausrad im Bearbeiten-Fenster: das erste Scrollen blieb ohne Wirkung, nach einem Klick ins Fenster ging es (Treiber, Playwright-Test mit Mausrad grün).
