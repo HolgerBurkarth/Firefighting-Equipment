@@ -88,12 +88,36 @@ export interface BookingNotice {
      */
     readonly clientRef?: string;
     readonly queuedLabel?: string;
+    /** Zweite Zeile mit dem, was jetzt noch zu tun ist (U11: defekte Ausrüstung herausnehmen). */
+    readonly followUp?: string;
 }
 
-export function bookingNotice(response: BookingResponse): BookingNotice {
-    return response.result.outcome === 'applied'
-        ? { kind: 'success', text: confirmationText(response.device) }
-        : { kind: 'info', text: response.result.message };
+/**
+ * Hinweis nach einer Buchung. Wechselt die Ausrüstung auf „defekt“ und bleibt an ihrem Platz, folgt die
+ * Bitte, sie herauszunehmen (U11): sonst steht sie weiter im Fahrzeug, und niemand merkt es.
+ */
+export function bookingNotice(
+    response: BookingResponse,
+    before?: { readonly status: string; readonly locationId: number },
+    canSwap = false,
+): BookingNotice {
+    if (response.result.outcome !== 'applied') {
+        return { kind: 'info', text: response.result.message };
+    }
+    const device = response.device;
+    const notice: BookingNotice = { kind: 'success', text: confirmationText(device) };
+    if (
+        before !== undefined &&
+        device.status === 'defective' &&
+        before.status !== 'defective' &&
+        device.location.id === before.locationId
+    ) {
+        return {
+            ...notice,
+            followUp: `Bitte nehmen Sie ${device.identifier} aus „${device.location.path}“ heraus und geben Sie sie in der Wartung ab.${canSwap ? ' Einen Ersatz buchen Sie mit „Tauschen …“.' : ''}`,
+        };
+    }
+    return notice;
 }
 
 /**
@@ -138,13 +162,20 @@ function parseNotice(text: string | null): BookingNotice | null {
         if (typeof value !== 'object' || value === null) {
             return null;
         }
-        const { kind, text: noticeText, clientRef, queuedLabel } = value as Record<string, unknown>;
+        const {
+            kind,
+            text: noticeText,
+            clientRef,
+            queuedLabel,
+            followUp,
+        } = value as Record<string, unknown>;
         return (kind === 'success' || kind === 'info') && typeof noticeText === 'string'
             ? {
                   kind,
                   text: noticeText,
                   ...(typeof clientRef === 'string' &&
                       typeof queuedLabel === 'string' && { clientRef, queuedLabel }),
+                  ...(typeof followUp === 'string' && { followUp }),
               }
             : null;
     } catch {

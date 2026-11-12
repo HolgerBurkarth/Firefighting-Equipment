@@ -57,5 +57,8 @@ const shown = computed((): BookingNotice => {
             ><span v-if="shown.kind === 'success'" aria-hidden="true">✓ </span
             >{{ shown.text }}</span
         >
+        <span v-if="shown.followUp !== undefined" data-testid="booking-follow-up">{{
+            shown.followUp
+        }}</span>
     </p>
 </template>

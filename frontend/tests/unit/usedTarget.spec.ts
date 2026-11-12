@@ -22,7 +22,10 @@ describe('Sammelstelle für „Benutzt melden“', () => {
     });
 
     it('Text der Rückfrage', () => {
-        expect(usedTargetText('Wache')).toBe('Es kommt in die Sammelstelle Wache.');
+        expect(usedTargetText('Wache')).toBe('Es kommt zur Sammelstelle „Wache“.');
+        // U20: kein „Sammelstelle Sammelstelle“.
+        expect(usedTargetText('Sammelstelle')).toBe('Es kommt in die Sammelstelle.');
+        expect(usedTargetText(' sammelstelle ')).toBe('Es kommt in die Sammelstelle.');
         expect(usedTargetText(null)).toBe('Der Standort bleibt.');
         expect(usedTargetText(undefined)).toContain('falls es eine gibt');
     });

@@ -523,7 +523,13 @@ async function submit(
     void locationStore.refresh('changed');
     // Geräteliste der Admin-Konsole, falls schon geöffnet (sonst nichts).
     void adminDeviceList.refresh('changed');
-    setBookingNotice(bookingNotice(result.data));
+    setBookingNotice(
+        bookingNotice(
+            result.data,
+            { status: current.status, locationId: current.location.id },
+            canSwap.value,
+        ),
+    );
     saved.value = true;
     // Zurück, woher man kam (Suchen, Prüffristen, Geräteliste, Gerätedetail oder Hinweis der
     // Admin-Konsole), sonst zu „Suchen“ (Entscheidung 22).
