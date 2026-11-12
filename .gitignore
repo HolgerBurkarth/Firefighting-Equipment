@@ -29,3 +29,6 @@ Thumbs.db
 # Live-Lauf (npm run test:live-offline): Zugangsdaten und Sitzungen nur lokal, nie committen
 /frontend/tests/live/.env.local
 /frontend/tests/live/*.storage.json
+
+# Benutzertest: lokaler Schlüssel der Testdatenbank
+/frontend/tests/usability/state-return-link.txt
