@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, HTTP_ERROR_CONSOLE, meBody, test } from './fixtures';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { delegate } from './support/masterData';
 import { roleServer, type RoleServer } from './support/roles';
 import { serviceServer, type ServiceServer } from './support/service';
@@ -305,4 +305,20 @@ test('Handy: Liste und Editor ohne waagerechten Überstand', async ({ page }) =>
     await page.goto('/firefighting/service/staedte/2/rollen/3');
     await expect(page.getByTestId('role-preview')).toBeVisible();
     expect(await horizontalOverflow(page)).toBe(0);
+});
+
+test.describe('Breiten (Runde 14, Punkt 2)', () => {
+    for (const width of [390, 768, 1024]) {
+        test(`Rollen im Stadtdetail: ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/service/staedte/2?ansicht=rollen');
+            await expect(
+                page.getByTestId('role-table').or(page.getByTestId('role-1')).first(),
+            ).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '[data-testid^="role-"]')).toEqual([]);
+        });
+    }
 });

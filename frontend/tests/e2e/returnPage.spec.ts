@@ -62,6 +62,21 @@ test.describe('Mit Schlüssel', () => {
         },
     });
 
+    for (const width of [390, 768, 1024]) {
+        test(`Bildliche Anleitung (Runde 14): vier Schritte bei ${String(width)} px ohne Überstand`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto(`/firefighting/test/rueckgabe#schluessel=${KEY}`);
+            const steps = page.getByTestId('return-page').getByTestId('how-to-step');
+            await expect(steps).toHaveCount(4);
+            await expect(steps.first()).toContainText('QR-Code scannen');
+            await expect(steps.nth(3)).toContainText('Ablegen');
+            await expect(steps.first().getByRole('img')).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+        });
+    }
+
     test('Nummer prüfen, Name und Zustand angeben, zurückgeben, weitere Ausrüstung', async ({
         page,
     }) => {

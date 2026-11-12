@@ -801,7 +801,7 @@ function retry(): void {
 }
 
 /* Am Handy: Karten statt Tabelle, Knöpfe volle Breite (KONZEPT.md, "Listen"). */
-@media (max-width: 767.98px) {
+@media (max-width: 1279.98px) {
     .fresh-qr {
         width: min(240px, 100%);
         margin: 0 auto;

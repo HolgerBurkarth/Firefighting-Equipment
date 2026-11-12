@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, meBody, test, type MockRequest, type MockResponse } from './fixtures';
 import { adminOverview } from './support/admin';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { delegate } from './support/masterData';
 
 /**
@@ -252,7 +252,7 @@ test.describe('Einladungscodes', () => {
         await expect(poster.getByTestId('poster-valid')).toContainText(
             'Gültig bis 30.11.2026, 14:05 Uhr',
         );
-        await expect(poster).toContainText('QR-Code mit der Handy-Kamera scannen');
+        await expect(poster).toContainText('QR-Code scannen');
         await expect(poster).toContainText('feuerwehr-app@prodad.de');
         await expect(
             poster.getByRole('img', { name: 'QR-Code mit dem Link zur Registrierung' }),
@@ -313,6 +313,14 @@ test.describe('Einladungscodes', () => {
         ]);
     });
 
+    test('Aushang hat vier gezeichnete Schritte (Runde 14)', async ({ page }) => {
+        await openCodes(page);
+        await createCode(page);
+        const steps = page.getByTestId('invitation-poster').getByTestId('how-to-step');
+        await expect(steps).toHaveCount(4);
+        await expect(steps.nth(2)).toContainText('E-Mail bestätigen');
+    });
+
     test('Aushang als PDF genau eine A4-Seite', async ({ page, browserName }) => {
         test.skip(browserName !== 'chromium', 'page.pdf gibt es nur in Chromium');
         await openCodes(page);
@@ -329,4 +337,18 @@ test.describe('Einladungscodes', () => {
         await expect(page.getByTestId('code-3')).toBeVisible();
         expect(await horizontalOverflow(page)).toBe(0);
     });
+});
+
+test.describe('Breiten (Runde 14, Punkt 2)', () => {
+    for (const width of [390, 768, 1024]) {
+        test(`${String(width)} px: jedes Bedienelement jeder Zeile erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await openCodes(page);
+            await expect(page.locator('tbody tr[data-testid^="code-"]').first()).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, 'tbody tr[data-testid^="code-"]')).toEqual([]);
+        });
+    }
 });

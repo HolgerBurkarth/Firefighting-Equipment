@@ -10,7 +10,7 @@ import {
 } from './fixtures';
 import { adminOverview, noticeJson, summaryJson } from './support/admin';
 import { deviceDetail, deviceJson, devicesEndpoint, LOCATIONS } from './support/devices';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { delegate, deviceTypeServer, locationServer } from './support/masterData';
 
 /**
@@ -176,6 +176,18 @@ test.describe('Protokoll: Hinweise', () => {
             ),
         },
     });
+
+    for (const width of [390, 768, 1024]) {
+        test(`Hinweise (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/test/protokoll');
+            await expect(page.getByTestId('notice-list')).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '[data-testid="notice-list"] li')).toEqual([]);
+        });
+    }
 
     test('offene Hinweise, Filter in der Adresse, Menü und Reiter mit Zähler', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 900 });

@@ -14,6 +14,7 @@ import {
 import { allows } from '../api/permissions';
 import { currentPermissions } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
+import type { StockState } from '../api/stock';
 import StockPanel from '../components/StockPanel.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
@@ -42,6 +43,13 @@ const canWrite = computed(() => allows(currentPermissions.value, 'locations', 'w
 const canListDevices = computed(() => allows(currentPermissions.value, 'devices'));
 /** Sollbestand (P2.7): lesen mit dem Bereich, ändern nur mit Ändern (StockPanel). */
 const canListStock = computed(() => allows(currentPermissions.value, 'locations'));
+/** Standorte unter Sollbestand (T21): Chip „außer Betrieb“ am Fahrzeug bzw. Fach, sonst keiner. */
+const outOfService = ref<ReadonlySet<number>>(new Set());
+function onStockLoaded(stock: StockState): void {
+    outOfService.value = new Set(
+        stock.entries.filter((entry) => entry.outOfService).map((entry) => entry.location.id),
+    );
+}
 
 /**
  * Standorte der Stadt als Baum (KONZEPT.md, "Bereiche des Admins"): Fahrzeuge, Räume und Externe
@@ -481,6 +489,12 @@ onMounted(() => {
                     data-testid="task-chip"
                     >{{ taskChipText(group.location) }}</span
                 >
+                <span
+                    v-if="outOfService.has(group.location.id)"
+                    class="badge badge-defective"
+                    data-testid="location-out-of-service"
+                    >außer Betrieb</span
+                >
                 <span v-if="!group.location.active" class="badge badge-retired">gesperrt</span>
                 <button
                     v-if="canWrite && group.location.active"
@@ -557,6 +571,12 @@ onMounted(() => {
                         ><span v-else class="node-name">{{ child.name }}</span>
                         <span class="node-meta">{{ deviceCountText(child.deviceCount) }}</span>
                     </span>
+                    <span
+                        v-if="outOfService.has(child.id)"
+                        class="badge badge-defective"
+                        data-testid="location-out-of-service"
+                        >außer Betrieb</span
+                    >
                     <span v-if="!child.active" class="badge badge-retired">gesperrt</span>
                     <button
                         v-if="canWrite"
@@ -692,7 +712,7 @@ onMounted(() => {
         </template>
     </FormDialog>
 
-    <StockPanel v-if="canListStock" />
+    <StockPanel v-if="canListStock" @loaded="onStockLoaded" />
 
     <ConfirmDialog
         v-model:open="confirmOpen"

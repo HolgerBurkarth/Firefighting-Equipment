@@ -56,6 +56,23 @@ test.describe('Registrieren', () => {
     test.describe('erfolgreich', () => {
         test.use({ api: { [REGISTER]: { status: 202, body: { message: REGISTERED_MESSAGE } } } });
 
+        test('Bildliche Anleitung (Runde 14): vier Schritte über dem Formular', async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width: 390, height: 900 });
+            await page.goto('/firefighting/test/registrieren');
+            const steps = page.getByTestId('how-to-step');
+            await expect(steps).toHaveCount(4);
+            await expect(steps.nth(1)).toContainText('Formular ausfüllen');
+            await expect(steps.nth(3)).toContainText('Freischaltung');
+            const overflow = await page.evaluate(
+                () =>
+                    document.documentElement.scrollWidth -
+                    Math.ceil(document.body.getBoundingClientRect().width),
+            );
+            expect(overflow).toBeLessThanOrEqual(0);
+        });
+
         test('Code aus dem QR-Link: übernommen, aus der Adresszeile entfernt, per POST', async ({
             page,
             apiRequests,

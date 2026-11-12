@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue';
+import { RETURN_STEPS } from '../data/howTo';
+import HowToSteps from './HowToSteps.vue';
 import QrCode from './QrCode.vue';
 
 /**
@@ -46,11 +48,7 @@ onBeforeUnmount(() => {
                 <QrCode :value="link" label="QR-Code mit dem Link zur Rückgabe" />
             </div>
 
-            <ol class="poster-steps">
-                <li><strong>QR-Code</strong> mit der Handy-Kamera scannen</li>
-                <li><strong>Nummer</strong> der Ausrüstung eingeben</li>
-                <li><strong>Namen</strong> und Zustand angeben</li>
-            </ol>
+            <HowToSteps :steps="RETURN_STEPS" variant="poster" />
 
             <p class="poster-small">
                 Ohne Kamera: <strong data-testid="poster-address">{{ address }}</strong> öffnen. Die
@@ -115,33 +113,7 @@ onBeforeUnmount(() => {
 }
 
 .poster-qr {
-    width: 100mm;
-}
-
-.poster-steps {
-    display: flex;
-    gap: 5mm;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    counter-reset: step;
-}
-
-.poster-steps li {
-    flex: 1 1 0;
-    padding: 3mm;
-    border: 0.4mm solid var(--ink-muted);
-    border-radius: 3mm;
-    font-size: 13pt;
-    counter-increment: step;
-}
-
-.poster-steps li::before {
-    content: counter(step);
-    display: block;
-    color: var(--accent);
-    font-size: 20pt;
-    font-weight: var(--font-weight-bold);
+    width: 78mm;
 }
 
 .poster-small {

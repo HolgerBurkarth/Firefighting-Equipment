@@ -11,6 +11,7 @@
     "vitest.config.ts",
     "playwright.config.ts",
     "playwright.all.config.ts",
+    "playwright.docs.config.ts",
     "build/**/*.ts"
   ]
 }

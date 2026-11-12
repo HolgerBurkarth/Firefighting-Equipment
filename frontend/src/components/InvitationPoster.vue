@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue';
+import { REGISTER_STEPS } from '../data/howTo';
+import HowToSteps from './HowToSteps.vue';
 import QrCode from './QrCode.vue';
 
 /**
@@ -41,17 +43,13 @@ onBeforeUnmount(() => {
             </header>
 
             <h1 class="poster-title">Jetzt registrieren</h1>
-            <p class="poster-lead">Mit dem Handy in drei Schritten zum Zugang.</p>
+            <p class="poster-lead">Mit dem Handy in vier Schritten zum Zugang.</p>
 
             <div class="poster-qr">
                 <QrCode :value="link" label="QR-Code mit dem Link zur Registrierung" />
             </div>
 
-            <ol class="poster-steps">
-                <li><strong>QR-Code</strong> mit der Handy-Kamera scannen</li>
-                <li><strong>Formular</strong> ausfüllen</li>
-                <li><strong>E-Mail</strong> bestätigen</li>
-            </ol>
+            <HowToSteps :steps="REGISTER_STEPS" variant="poster" />
 
             <div class="poster-code-box">
                 <p class="poster-small">Einladungscode</p>
@@ -129,33 +127,7 @@ onBeforeUnmount(() => {
 }
 
 .poster-qr {
-    width: 100mm;
-}
-
-.poster-steps {
-    display: flex;
-    gap: 5mm;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    counter-reset: step;
-}
-
-.poster-steps li {
-    flex: 1 1 0;
-    padding: 3mm;
-    border: 0.4mm solid var(--ink-muted);
-    border-radius: 3mm;
-    font-size: 13pt;
-    counter-increment: step;
-}
-
-.poster-steps li::before {
-    content: counter(step);
-    display: block;
-    color: var(--accent);
-    font-size: 20pt;
-    font-weight: var(--font-weight-bold);
+    width: 78mm;
 }
 
 .poster-code-box {

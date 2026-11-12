@@ -507,7 +507,7 @@ watch(
     padding-left: 20px;
 }
 
-@media (max-width: 899px) {
+@media (max-width: 1279.98px) {
     .role-table thead {
         display: none;
     }

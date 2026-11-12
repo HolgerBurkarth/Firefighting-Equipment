@@ -3,7 +3,7 @@ import type { MockRequest, MockResponse } from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
 import { deviceJson, devicesEndpoint, fullDevice } from './support/devices';
 import { delegate } from './support/masterData';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 
 /**
  * Seite „Verleih“ (Phase 2, P2.5): offene Verleihe nach Leihnehmer, „Verleihen …“ mit Nummer, Leihnehmer,
@@ -311,6 +311,19 @@ test.describe('Verleih mit Recht „Ändern“', () => {
         await expect(page).toHaveURL(/\/firefighting\/test\/verleih$/);
     });
 
+    for (const width of [390, 768, 1024]) {
+        test(`Verleih (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/test/verleih');
+            await expect(page.getByTestId('loan-row').first()).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '[data-testid="loan-group"]')).toEqual([]);
+            expect(await unreachableControls(page, '[data-testid="loan-row"]')).toEqual([]);
+        });
+    }
+
     test('Handy-Breite: kein waagerechter Überstand', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 800 });
         await page.goto('/firefighting/test/verleih');
@@ -456,6 +469,35 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
     test.beforeEach(async ({ page }) => {
         returns = returnsServer();
         await page.setViewportSize({ width: 1280, height: 900 });
+    });
+
+    for (const width of [390, 768, 1024]) {
+        test(`Rückgabe und Aushang (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/test/verleih');
+            await expect(page.getByTestId('return-place')).toBeVisible();
+            await page.getByTestId('renew-key').click();
+            await expect(page.getByTestId('issued-key')).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '[data-testid="return-place"]')).toEqual([]);
+            expect(await unreachableControls(page, '[data-testid="in-returns"]')).toEqual([]);
+            expect(await unreachableControls(page, '[data-testid="return-device"]')).toEqual([]);
+        });
+    }
+
+    test('Aushang der Rückgabe als PDF: vier gezeichnete Schritte, genau eine A4-Seite', async ({
+        page,
+        browserName,
+    }) => {
+        test.skip(browserName !== 'chromium', 'page.pdf gibt es nur in Chromium');
+        await page.goto('/firefighting/test/verleih');
+        await page.getByTestId('return-place').getByTestId('renew-key').click();
+        await expect(page.getByTestId('issued-key')).toBeVisible();
+        await expect(page.getByTestId('return-poster').getByTestId('how-to-step')).toHaveCount(4);
+        const pdf = (await page.pdf({ format: 'A4' })).toString('latin1');
+        expect(pdf.match(/\/Type\s*\/Page[^s]/g)).toHaveLength(1);
     });
 
     test('Aushang erzeugen: Link mit Schlüssel im Fragment, danach erneuern und widerrufen', async ({

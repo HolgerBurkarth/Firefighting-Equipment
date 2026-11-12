@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { DATABASE_UNAVAILABLE, expect, HTTP_ERROR_CONSOLE, meBody, test } from './fixtures';
 import { adminOverview, summaryJson, tenantEventJson, userJson } from './support/admin';
 import { deviceDetail, deviceJson, eventsEndpoint } from './support/devices';
@@ -125,6 +126,22 @@ test.describe('Admin-Konsole', () => {
         await search.click();
         await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
     });
+
+    for (const width of [390, 768, 1024]) {
+        test(`Dashboard (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/test/dashboard');
+            await expect(page.getByTestId('tile-readiness')).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '.tiles > *')).toEqual([]);
+            expect(await unreachableControls(page, '[data-testid="not-ready-list"] li')).toEqual(
+                [],
+            );
+            expect(await unreachableControls(page, '[data-testid="activity-list"] li')).toEqual([]);
+        });
+    }
 
     test('Handy: Kopfleiste mit ☰, Schublade mit dem Menü', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });

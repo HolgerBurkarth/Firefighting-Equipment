@@ -14,6 +14,7 @@ import {
     notReadyTile,
     openItemsTile,
     readinessTile,
+    stockTile,
 } from '../data/dashboard';
 import { loansTile } from '../data/loans';
 import { useNow } from '../runtime/now';
@@ -66,8 +67,12 @@ const tiles = computed(() => {
             notReady: tileLink('devices', { name: 'devices', query: NOT_READY_QUERY }),
             inspection: tileLink('inspections', { name: 'inspections' }),
             loans: tileLink('loans', { name: 'loans' }),
+            stock: tileLink('locations', { name: 'locations' }),
         },
         loans: data.loans == null ? null : loansTile(data.loans),
+        // Nur wenn die Stadt Regeln hat und die Rolle Standorte sehen darf (stock sonst null).
+        stock: data.stock == null || data.stock.locations === 0 ? null : stockTile(data.stock),
+        stockOut: data.stock?.outOfService ?? 0,
     };
 });
 
@@ -158,6 +163,20 @@ onMounted(() => {
                 <span class="tile-label">Verliehen</span>
                 <span class="tile-value tile-value-maintenance">{{ tiles.loans.value }}</span>
                 <span class="tile-detail">{{ tiles.loans.detail }}</span>
+            </component>
+            <component
+                :is="tiles.links.stock.is"
+                v-if="tiles.stock !== null"
+                v-bind="tiles.links.stock.attrs"
+                class="tile"
+                :class="tiles.stockOut > 0 ? 'tile-defective' : 'tile-ready'"
+                data-testid="tile-stock"
+            >
+                <span class="tile-label">Außer Betrieb</span>
+                <span class="tile-value" :class="{ 'tile-value-defective': tiles.stockOut > 0 }">{{
+                    tiles.stock.value
+                }}</span>
+                <span class="tile-detail">{{ tiles.stock.detail }}</span>
             </component>
             <div class="tile tile-accent" data-testid="tile-open">
                 <span class="tile-label">Offene Hinweise</span>

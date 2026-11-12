@@ -328,6 +328,11 @@ function adminDeviceApi(area: string): Record<string, MockResponse> {
         'GET api/v1/auth/me': { status: 200, body: meBody('admin', 'Thomas Keller') },
         ...ADMIN_OVERVIEW,
         ...LOCATIONS,
+        // Das Dashboard und die Zähler im Menü fragen den Sollbestand (T21).
+        'GET api/v1/stock': {
+            status: 200,
+            body: { locations: [], summary: { locations: 0, out_of_service: 0 } },
+        },
         'GET api/v1/device-types': {
             status: 200,
             body: { device_types: [deviceTypeJson(1, 'Atemschutzmaske', 1)] },

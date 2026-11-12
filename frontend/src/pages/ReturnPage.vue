@@ -11,6 +11,8 @@ import {
 import type { ApiError } from '../api/client';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import { RETURN_CONDITIONS, returnProblem } from '../data/loans';
+import HowToSteps from '../components/HowToSteps.vue';
+import { RETURN_STEPS } from '../data/howTo';
 import { takeFragmentParam } from '../runtime/fragment';
 import { isTenantUnavailable, tenantState } from '../runtime/tenantState';
 import { useUnsavedInput } from '../runtime/unsavedInput';
@@ -172,7 +174,10 @@ async function onSubmit(): Promise<void> {
                     Weitere Ausrüstung zurückgeben
                 </button>
             </section>
-            <form v-else class="card" novalidate @submit.prevent="onSubmit">
+            <section v-else class="card" aria-label="So geht die Rückgabe">
+                <HowToSteps :steps="RETURN_STEPS" variant="screen" />
+            </section>
+            <form v-if="done === null" class="card" novalidate @submit.prevent="onSubmit">
                 <p class="hint">
                     Nummer der Ausrüstung eingeben (oder mit einem Handscanner einlesen), prüfen und
                     Ihren Namen angeben. Eine Anmeldung ist nicht nötig.

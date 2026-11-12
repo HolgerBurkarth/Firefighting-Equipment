@@ -7,6 +7,7 @@ import {
     type MockRequest,
     type MockResponse,
 } from './fixtures';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { CURRENT_SESSION_ONLY, sessionJson } from './support/profile';
 
 /** 29.10.2026 14:30 in Berlin (Zeitzone in playwright.config.ts). */
@@ -273,6 +274,18 @@ test.describe('Profil: angemeldete Geräte', () => {
             }),
         ];
     });
+
+    for (const width of [390, 768, 1024]) {
+        test(`Angemeldete Geräte (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto(PROFILE);
+            await expect(page.getByTestId('session').first()).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '[data-testid="session"]')).toEqual([]);
+        });
+    }
 
     test('dieses Gerät zuerst, andere einzeln oder alle abmelden', async ({
         page,
