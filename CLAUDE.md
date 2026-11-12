@@ -2885,7 +2885,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   gesperrter Standort 409, Typ einer anderen Stadt oder unbekannt 400, Standort unbekannt 404. Tests `StockTest`.
   Frontend: `StockPanel` unten auf „Standorte“ (`src/api/stock.ts`, `src/data/stock.ts`; Liste mit Chip „außer
   Betrieb“/„vollständig“ und „mindestens 3 Atemschutzmaske oder Funkgerät: 2 vorhanden, 1 fehlt“; Fenster „Sollbestand
-  festlegen“ mit Standort, Regeln aus Anzahl und Typ-Kästchen; die Typen lädt erst das Fenster). Browser-Tests
+  festlegen“ mit Standort, Regeln aus Anzahl und Typ-Kästchen; die Typen lädt erst das Fenster). Seit 12.11.2026 (U4): Knopf „Sollbestand (N außer Betrieb) ↓" oben auf „Standorte" (`stock-jump`, scrollt zur Überschrift und fokussiert sie), Fächer im Auswahlfeld mit Fahrzeug („HLF 20 / G1"), Satz „Mehrere Typen werden zusammen gezählt …" im Fenster, nach dem Speichern bei „außer Betrieb" die Folge in Worten (`stock-outage`, `outageText`: „… hat zurzeit nur 2 von 4 Atemschutzmaske (einsatzbereit) und gilt deshalb als außer Betrieb."). Browser-Tests
   fragen `GET api/v1/stock` ohne eigene Angabe mit „keine Regeln“ (`tests/e2e/fixtures.ts`). Seit Runde 14 (T21): Kachel „Außer Betrieb“ im Dashboard
   (`AdminOverview.stock`, `scope.stock` = Bereich Standorte, nur mit mindestens einer Regel, `stockTile`, führt zu `standorte`) und Chip „außer Betrieb“
   am Fahrzeug bzw. Fach in der Baumzeile (`StockPanel` meldet `loaded`; kein Chip, wenn vollständig). Tests `stock.spec.ts` (Browser, Unit).

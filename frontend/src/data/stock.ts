@@ -22,6 +22,22 @@ export function ruleText(rule: Pick<StockRule, 'minCount' | 'types' | 'have' | '
     return `mindestens ${String(rule.minCount)} ${types}: ${status}`;
 }
 
+/**
+ * Folge einer Regel in Worten (U4), sonst null: „LF 10“ hat zurzeit nur 2 von 4 Atemschutzmaske
+ * (einsatzbereit) und gilt deshalb als außer Betrieb.
+ */
+export function outageText(entry: StockEntry): string | null {
+    const missing = entry.rules.filter((rule) => rule.missing > 0);
+    if (!entry.outOfService || missing.length === 0) {
+        return null;
+    }
+    const parts = missing.map(
+        (rule) =>
+            `${String(rule.have)} von ${String(rule.minCount)} ${typesText(rule.types.map((type) => type.name))}`,
+    );
+    return `„${entry.location.path}“ hat zurzeit nur ${parts.join(' und ')} (einsatzbereit) und gilt deshalb als außer Betrieb.`;
+}
+
 /** Zusammenfassung über der Liste: „2 Standorte mit Sollbestand, 1 außer Betrieb“. */
 export function stockSummary(entries: readonly StockEntry[]): string {
     if (entries.length === 0) {
