@@ -566,7 +566,9 @@ test.describe('Fenster „Bearbeiten“ (U7)', () => {
     ] as const) {
         test(`${String(width)}×${String(height)}: Speichern fest am Rand, Mausrad scrollt, Abschnitt „Konto beenden“`, async ({
             page,
+            isMobile,
         }) => {
+            test.skip(isMobile, 'Mausrad gibt es in Playwright-WebKit für Handys nicht');
             await page.setViewportSize({ width, height });
             await open(page);
             await page.getByRole('button', { name: 'Anna Berg bearbeiten' }).click();
