@@ -160,3 +160,19 @@ des Standes vom 11.11.2026, beide Konten:
 - ☑ Regel wieder entfernt (Chip und Kachel weg, „Noch kein Sollbestand festgelegt.“).
 - ☑ Seite „Rückgabe“ (mit Platzhalter-Schlüssel, keine Buchung): vier gezeichnete Schritte über dem Formular.
 - ☐ Offen für Holger: Aushänge drucken (Einladungscode und Rückgabe, eine A4-Seite), Listen am Tablet (768 und 1024 px) und am iPhone, PDFs in docs/anleitungen/ lesen.
+
+## Runde 15: Verbesserungen aus dem Benutzertest (12.11.2026, Build `2923baad9b70`, Test-Stadt, Claude in Chrome)
+
+Punkte nach `docs/usability/BENUTZERTEST-2026-11.md`.
+
+- ☑ U5: „✓ Liste kopiert (8 Ausrüstungen)“ erscheint neben dem Knopf (Erfolgsfall im echten Browser; in der Wiederholung des Benutzertests scheiterte nur das Kopieren im Test-Browser).
+- ☑ U3: Kästchen in der Wartung mit Tippfläche 44 × 44 px; Ersatz-Zeilen beim Tauschen 408 × 59 px, die ganze Zeile ist antippbar.
+- ☑ U4: Sprunglink „Sollbestand ↓“ funktioniert, Erklärsatz im Fenster, Auswahl mit Pfaden („LF 10 / G1“).
+- ☑ U7: Fenster „Bearbeiten“ der Benutzer: Speichern ohne Scrollen sichtbar, „Konto beenden“ mit Sperren/Löschen darunter, Claude-Zugang eingeklappt.
+- ☑ U2: Fenster „Tauschen“ mit Titel „M90 ersetzen durch …“, Zustand ohne Vorauswahl, „Tauschen“ unten (nur Desktop-Breite).
+- ☑ U11: Bestätigung nach „defekt“ mit Hinweis zum Herausnehmen und auf „Tauschen …“.
+- ☑ U17: Protokoll „Buchung kam zu spät – Stand nicht geändert“.
+- ☑ U20: Rückfrage „Es kommt zur Sammelstelle „Kleiderkammer“.“
+- ☐ U1, U22, U6, U10: live nicht prüfbar, die Aufgaben Werkstatt, Ausgeliehen an und Rückgabe sind in der Test-Stadt seit dem Rücksetzen nach den Live-Tests vom 09.11.2026 abgeschaltet (Atemschutzwerkstatt, Hattingen, Ippingen ohne Aufgabe). Nicht geändert; ob sie wieder eingeschaltet werden, entscheidet Holger.
+- ☐ Offen für Holger: Fenster „Tauschen“ in Handy-Breite.
+- Zurückgesetzt: M90 wieder einsatzbereit in HLF 20 / G1.

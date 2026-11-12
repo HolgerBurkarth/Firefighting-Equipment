@@ -38,3 +38,5 @@ Wünsche aus Live-Tests. Nicht vorziehen; erst nach Abschluss der Hauptabschnitt
 - „Aushang abschalten …“ → „Link ungültig machen …“ erwägen; „Claude-Zugang“ mit Pfeil als aufklappbar kennzeichnen; „Konto beenden“ weiter oben.
 - Rückgabeseite: Name für weitere Ausrüstung merken; „nicht verliehen“ verständlicher; Name/Zustand ohne Scrollen.
 - „Angekommen um …“: Zeit des Servers statt der Erfassungszeit.
+- Anleitungen neu erzeugen (`npm run docs:anleitungen`), damit „Widerrufen“ verschwindet und die neuen Fenster (Tauschen, Benutzer „Bearbeiten“, Rückgabe-Beleg) in den Bildern stehen (Live-Prüfung 12.11.2026; mit der nächsten Änderung zusammen, kein eigener Deploy).
+- Fenster „Tauschen“: Zustandsknöpfe („benutzt“, „defekt“, „in Wartung“) so klein und einheitlich wie die übrigen Statusknöpfe der App (Live-Prüfung 12.11.2026).

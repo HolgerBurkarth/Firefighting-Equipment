@@ -238,7 +238,8 @@ Ausrüstung und Kopier-Hinweis in der Wartung (U5/U10), „Angekommen um …“ 
 
 Neue bzw. offene Befunde der Wiederholung (nicht Teil dieser Runde, nach `docs/TODO-SPAETER.md`):
 - „Transportliste kopieren“: Im Test-Browser scheitert das Kopieren (kein Zugriff auf die Zwischenablage); die Meldung steht dann doppelt (Seite und Fenster).
-  In echten Browsern ungeprüft; ein Ausweg „Liste anzeigen“ fehlt weiterhin (T20).
+  Im echten Browser live geprüft (12.11.2026, Build `2923baad9b70`): „✓ Liste kopiert (8 Ausrüstungen)“ erscheint am Knopf, der Erfolgsfall
+  funktioniert also; ein Ausweg „Liste anzeigen“ für Browser ohne Zugriff auf die Zwischenablage fehlt weiterhin (T20).
 - Tauschen bei 312 × 531 px (125 % am Handy): die feste Fußleiste lässt nur rund einen Ersatz sichtbar; „Tauschen“ ist gesperrt, der Grund steht nur im Satz darüber.
 - Uhrzeit in „Angekommen um …“ ist die Erfassungszeit, wird als Ankunftszeit gelesen (der Hinweis stimmt in der Regel auf wenige Sekunden).
 - „Aushang abschalten …“ klingt für eine Persona nach „Strom aus“ („Link ungültig machen“ wäre klarer); „Claude-Zugang (KI-Assistent)“ sieht eingeklappt wie eine Überschrift aus; „Konto beenden“ liegt erst nach Scrollen.
