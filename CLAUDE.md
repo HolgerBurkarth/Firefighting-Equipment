@@ -1485,6 +1485,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Einladungscodes und Rollen im Stadtdetail unter 1280 px. Jede Liste hat in ihrer Testdatei einen Test „Breiten
   (Runde 14)“ bei 390, 768 und 1024 px (`unreachableControls` und `horizontalOverflow` in `tests/e2e/support/layout.ts`:
   Mitte jedes Bedienelements liegt im Fenster und auf dem Element selbst). Neue Listen bekommen denselben Test.
+- Anleitungen als PDF (seit 12.11.2026, Runde 14, Punkt 4): `docs/anleitungen/anleitung-{benutzer,geraetetraeger,
+  geraetewart,admin}.pdf`, erzeugt von `npm run docs:anleitungen` (in `frontend/`, nach `npm run build`;
+  `playwright.docs.config.ts`, `tests/docs/anleitungen.spec.ts` und `guide.ts`; nur Chromium, nie in der CI und nicht
+  Teil von `test:e2e`). Bildschirmfotos der gebauten App gegen die API-Attrappe mit erfundenen Beispieldaten
+  (Feuerwehr Musterstadt, Anna Beispiel), nie echte Daten; Markierungen (Rahmen mit Nummer) setzt `shoot` aus den
+  Positionen der Elemente. Rechte der Rollen Gerätewart und Geräteträger wie in docs/MERKBLATT-EINRICHTUNG-PHASE-2.md,
+  Abschnitt 6 (`RIGHTS` im Spec). Nach Änderungen an den gezeigten Seiten neu erzeugen und die PDFs committen.
 - Regel für ALLE Formulare: ungespeicherte Eingaben über `useUnsavedInput(() => …)`
   (`src/runtime/unsavedInput.ts`) melden: true, solange etwas eingegeben und nicht gespeichert ist;
   nach dem Speichern oder Leeren false. Nur so lädt die App nie mitten in einer Eingabe neu.
