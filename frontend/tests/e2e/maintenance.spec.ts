@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import {
     ADMIN_RIGHTS,
     expect,
@@ -220,6 +221,21 @@ test.describe('Wartung mit Recht „Ändern“', () => {
         });
         await page.setViewportSize({ width: 1280, height: 800 });
     });
+
+    for (const width of [390, 768, 1024]) {
+        test(`Wartung (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/test/wartung');
+            await expect(page.getByTestId('maintenance-device').first()).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '[data-testid^="stage-"]')).toEqual([]);
+            expect(await unreachableControls(page, '[data-testid="maintenance-device"]')).toEqual(
+                [],
+            );
+        });
+    }
 
     test('Menü, beide Stufen, am längsten wartende zuerst, Einmalgerät nicht wählbar', async ({
         page,

@@ -9,7 +9,7 @@ import {
     type MockResponse,
 } from './fixtures';
 import { adminOverview, assignableRolesJson, userJson } from './support/admin';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { delegate } from './support/masterData';
 
 /**
@@ -716,4 +716,23 @@ test.describe('Handy', () => {
             .boundingBox();
         expect(approve?.width).toBe(reject?.width);
     });
+});
+
+test.describe('Breiten (Runde 14, Punkt 2)', () => {
+    useServer();
+
+    for (const width of [390, 768, 1024]) {
+        test(`${String(width)} px: jedes Bedienelement jeder Zeile erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await open(page);
+            await expect(names(page)).toHaveCount(4);
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '[data-testid="user-table"] tbody tr')).toEqual(
+                [],
+            );
+            expect(await unreachableControls(page, '.pending-card')).toEqual([]);
+        });
+    }
 });

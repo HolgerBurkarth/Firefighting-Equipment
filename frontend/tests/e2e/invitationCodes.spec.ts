@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, meBody, test, type MockRequest, type MockResponse } from './fixtures';
 import { adminOverview } from './support/admin';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { delegate } from './support/masterData';
 
 /**
@@ -329,4 +329,18 @@ test.describe('Einladungscodes', () => {
         await expect(page.getByTestId('code-3')).toBeVisible();
         expect(await horizontalOverflow(page)).toBe(0);
     });
+});
+
+test.describe('Breiten (Runde 14, Punkt 2)', () => {
+    for (const width of [390, 768, 1024]) {
+        test(`${String(width)} px: jedes Bedienelement jeder Zeile erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await openCodes(page);
+            await expect(page.locator('tbody tr[data-testid^="code-"]').first()).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, 'tbody tr[data-testid^="code-"]')).toEqual([]);
+        });
+    }
 });

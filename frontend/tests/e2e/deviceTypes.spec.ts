@@ -8,7 +8,7 @@ import {
     type MockResponse,
 } from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { delegate, deviceTypeServer, type TestDeviceType } from './support/masterData';
 
 const TYPES: readonly TestDeviceType[] = [
@@ -282,4 +282,20 @@ test('Handy: Karten mit Sortier-Knöpfen', async ({ page }) => {
     const edit = page.getByRole('button', { name: 'Atemschutzmaske bearbeiten' });
     const box = await edit.boundingBox();
     expect(Math.round(box?.height ?? 0)).toBeGreaterThanOrEqual(44);
+});
+
+test.describe('Breiten (Runde 14, Punkt 2)', () => {
+    for (const width of [390, 768, 1024]) {
+        test(`${String(width)} px: jedes Bedienelement jeder Zeile erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await open(page);
+            await expect(names(page).first()).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(
+                await unreachableControls(page, '[data-testid="device-type-table"] tbody tr'),
+            ).toEqual([]);
+        });
+    }
 });

@@ -1,7 +1,7 @@
 import { ADMIN_RIGHTS, expect, meBody, permissionsJson, test } from './fixtures';
 import type { MockRequest, MockResponse } from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { delegate } from './support/masterData';
 
 /**
@@ -188,6 +188,18 @@ test.describe('Sollbestand mit Recht „Ändern“', () => {
         await tile.click();
         await expect(page).toHaveURL(/\/firefighting\/test\/standorte$/);
     });
+
+    for (const width of [390, 768, 1024]) {
+        test(`Sollbestand (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/test/standorte');
+            await expect(page.getByTestId('stock-entry')).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '[data-testid="stock-entry"]')).toEqual([]);
+        });
+    }
 
     test('Fenster: Regel ändern, zweite mit zwei Typen, speichern', async ({ page }) => {
         await page.goto('/firefighting/test/standorte');

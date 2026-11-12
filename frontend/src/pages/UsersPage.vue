@@ -1459,7 +1459,7 @@ onMounted(() => {
 }
 
 /* Am Handy werden die Zeilen zu Karten (KONZEPT.md, "Listen"). */
-@media (max-width: 767.98px) {
+@media (max-width: 1023.98px) {
     .sort-buttons {
         display: flex;
     }

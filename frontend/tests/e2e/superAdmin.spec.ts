@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { DATABASE_UNAVAILABLE, expect, HTTP_ERROR_CONSOLE, meBody, test } from './fixtures';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { CURRENT_SESSION_ONLY } from './support/profile';
 import { delegate } from './support/masterData';
 import {
@@ -47,6 +47,35 @@ test.describe('Super-Admin', () => {
         await expect(page.locator('.tab-bar')).toHaveCount(0);
         await expect(nav.getByRole('link', { name: 'Suchen' })).toHaveCount(0);
     });
+
+    for (const width of [390, 768, 1024]) {
+        test(`Service-Dashboard (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/service/dashboard');
+            await expect(page.getByTestId('tenant-table')).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(
+                await unreachableControls(page, '[data-testid="tenant-table"] tbody tr'),
+            ).toEqual([]);
+            expect(await unreachableControls(page, '[data-testid^="invitation-"]')).toEqual([]);
+        });
+    }
+
+    for (const width of [390, 768, 1024]) {
+        test(`Städte (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/service/staedte');
+            await expect(page.getByTestId('tenant-table')).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(
+                await unreachableControls(page, '[data-testid="tenant-table"] tbody tr'),
+            ).toEqual([]);
+        });
+    }
 
     test('Dashboard: Kacheln, offene Einladung und Städte', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 800 });
@@ -432,6 +461,18 @@ test.describe('Stadtdetail', () => {
         server = serviceServer();
     });
 
+    for (const width of [390, 768, 1024]) {
+        test(`Stadtdetail, Konten (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/service/staedte/2?ansicht=konten');
+            await expect(page.locator('li[data-testid^="account-"]').first()).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, 'li[data-testid^="account-"]')).toEqual([]);
+        });
+    }
+
     test('aus der Liste: Angaben, Konten nur ansehen, Zurück', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 800 });
         await page.goto('/firefighting/service/staedte');
@@ -677,6 +718,18 @@ test.describe('Super-Admins', () => {
     test.beforeEach(() => {
         server = superAdminServer();
     });
+
+    for (const width of [390, 768, 1024]) {
+        test(`Super-Admins (Runde 14): ${String(width)} px alle Bedienelemente erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/firefighting/service/super-admins');
+            await expect(page.locator('[data-testid^="super-admin-"]').first()).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '[data-testid^="super-admin-"]')).toEqual([]);
+        });
+    }
 
     test('Liste: eigenes und geschütztes Konto ohne Knopf', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 800 });

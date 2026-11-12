@@ -11,7 +11,7 @@ import {
 } from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
 import { deviceDetail, deviceJson, eventsEndpoint } from './support/devices';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { deviceTypeServer, locationServer } from './support/masterData';
 
 /** Kalendertag in Europe/Berlin (wie die App) plus `days`, als JJJJ-MM-TT. */
@@ -471,4 +471,20 @@ test.describe('Buchung aus der Liste', () => {
         await page.getByRole('button', { name: 'Zurück' }).click();
         await expect(page).toHaveURL(/\/geraete\?status=ready$/);
     });
+});
+
+test.describe('Breiten (Runde 14, Punkt 2)', () => {
+    for (const width of [390, 768, 1024]) {
+        test(`${String(width)} px: jedes Bedienelement jeder Zeile erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await open(page);
+            await expect(identifiers(page).first()).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(
+                await unreachableControls(page, '[data-testid="device-table"] tbody tr'),
+            ).toEqual([]);
+        });
+    }
 });

@@ -8,7 +8,7 @@ import {
     type MockResponse,
 } from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
-import { horizontalOverflow } from './support/layout';
+import { horizontalOverflow, unreachableControls } from './support/layout';
 import { delegate, locationServer, type TestLocation } from './support/masterData';
 
 /**
@@ -380,4 +380,20 @@ test('Handy: Baum ohne waagerechtes Scrollen, Knöpfe mindestens 44 px', async (
     const box = await dialog(page).boundingBox();
     expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
     expect((box?.x ?? 0) + (box?.width ?? 1000)).toBeLessThanOrEqual(390);
+});
+
+test.describe('Breiten (Runde 14, Punkt 2)', () => {
+    for (const width of [390, 768, 1024]) {
+        test(`${String(width)} px: jedes Bedienelement jeder Zeile erreichbar`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await open(page);
+            await expect(page.locator('.node').first()).toBeVisible();
+            expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+            expect(await unreachableControls(page, '[data-testid="location-tree"] .node')).toEqual(
+                [],
+            );
+        });
+    }
 });
