@@ -1620,6 +1620,15 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 - Formatierung: Prettier (4 Leerzeichen laut `.editorconfig`, JSON 2), ESLint mit typgeprüften
   strikten Regeln, `no-console`, nur `<script setup lang="ts">`, kein `v-html`.
 
+- Verbesserungen aus dem Benutzertest (12.11.2026, Bericht `docs/usability/BENUTZERTEST-2026-11.md`, Runde 15; Einzelheiten bei den Abschnitten oben):
+  U1/U22 Rückgabeseite (Beleg „Danke“, „schon zurückgegeben“, Knopf „Nummer suchen“, Bilder in `<details>` unter dem Formular, Fokus ins Nummernfeld); U2 Tauschen; U3 `smallTargets`;
+  U4 Sollbestand; U5/U10 Wartung; U6 Verleih: Sprunglinks (`jump`, scrollt zur Überschrift und fokussiert sie) und „Rückgabe-Aushang“;
+  U7 Benutzer „Bearbeiten“: Abschnitt „Konto beenden“ mit „… löschen (ausgetreten) …“, Claude-Zugang als `<details>` (offen, wenn nicht „Aus“ oder gesperrt) mit Erklärung;
+  U9 `BookingNotice.clientRef/queuedLabel`: `BookingNoticeMessage` ersetzt „Gespeichert – wird gesendet …“ nach dem Senden durch „Angekommen um HH:MM: …“ (Uhrzeit nur, wenn das Ankommen miterlebt wurde);
+  U11 `BookingNotice.followUp`: Wechselt eine Ausrüstung auf „defekt“ und bleibt an ihrem Platz, bittet die Bestätigung, sie herauszunehmen und in der Wartung abzugeben (mit `device.swap` zusätzlich Hinweis auf „Tauschen …“);
+  U17 Protokoll: `history_only` heißt „Buchung kam zu spät – Stand nicht geändert“, gleiche Zeiten nur einmal, `afterResolveText` sagt nach „Erledigen“, ob noch etwas zu tun ist;
+  U20 `usedTargetText`: „Es kommt zur Sammelstelle „Wache“.“ bzw. „Es kommt in die Sammelstelle.“, wenn die Stelle selbst so heißt.
+
 ## Server und .htaccess
 - Die `.htaccess` in der Hauptebene des Webspace (`htdocs/.htaccess`) gehört NICHT zum
   Projekt. Sie steuert ganz www.prodad.de und darf von Agenten niemals angelegt,

@@ -933,3 +933,10 @@ jetzt auf `listItem` auf, seine Felder sind dieselben.
     Etikett, z. B. HRT 14.“ (vorher „Diese Ausrüstung ist nicht verliehen. Bitte Nummer prüfen.“).
 - Tests: `ReturnTest` (`testRepeatedNumberSaysAlreadyReturnedWithTimeButNoName`, Nummer ohne Leerzeichen), Browser
   `returnPage.spec.ts`.
+
+## 2026-11-12 – „U17 Protokoll: Klartext statt „Nur Historie““
+
+`kind_label` der Hinweisart `history_only` (Offline-Buchung, die zu spät kam; `NoticeKind::label()`) heißt jetzt
+„Buchung kam zu spät – Stand nicht geändert“ (vorher „Nur Historie (neuerer Stand vorhanden)“). Der Wert `kind`
+(`history_only`) und alle anderen Felder bleiben. Wirkt in der Hinweisliste, im Hinweis, in der Mail „Log“
+(Zeile „Hinweis: …“) und in den Claude-Werkzeugen. Test: `MailTemplatesTest`, Browser `notices.spec.ts`.

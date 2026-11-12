@@ -312,7 +312,7 @@ angelegt.", $mail->text);
 
         self::assertSame('Log Feuerwehr Immendingen: Hinweis – MA-01 nur Historie', $mail->subject);
         self::assertStringContainsString(
-            "Hinweis: Nur Historie (neuerer Stand vorhanden)\nAusrüstung: MA-01 (Atemschutzmaske)\n\n"
+            "Hinweis: Buchung kam zu spät – Stand nicht geändert\nAusrüstung: MA-01 (Atemschutzmaske)\n\n"
             . "Buchung vom Handy:\nWer: Gerätewart (geraetewart@example.org)\nAktionszeit: 01.07.2026 um 08:00 Uhr\n"
             . "Eingang: 02.07.2026 um 10:30 Uhr\nGewünscht: Status defekt\n\n"
             . "Stand beim Eingang:\nWer: –\nAktionszeit: 01.07.2026 um 09:15 Uhr\nStand: HLF 20 / G1, einsatzbereit\n\n"

@@ -100,6 +100,29 @@ export function noticeExplanation(notice: Notice): string | null {
     return text;
 }
 
+/**
+ * Was nach „Erledigen“ noch zu tun ist (U17): ein Satz je Art des Hinweises, damit der Admin nicht rätselt, ob
+ * die Ausrüstung noch angefasst werden muss.
+ */
+export function afterResolveText(notice: Notice): string {
+    switch (notice.kind) {
+        case 'history_only':
+            return 'Es ist nichts weiter zu tun: Die Ausrüstung hat den neueren Stand behalten.';
+        case 'overwritten':
+            return 'Die Buchung gilt. War der überschriebene Stand richtig, buchen Sie die Ausrüstung selbst zurück.';
+        case 'not_applied_retired':
+            return 'Die Ausrüstung bleibt ausgesondert; nehmen Sie sie bei Bedarf wieder auf.';
+        case 'not_applied_location_locked':
+            return 'Die Ausrüstung blieb am bisherigen Standort; buchen Sie sie bei Bedarf selbst um.';
+        case 'stock_below_minimum':
+            return 'Prüfen Sie, ob Ersatz nötig ist; die Ausrüstung selbst ist gebucht.';
+        case 'swap_replacement_moved':
+            return 'Der Tausch ist gebucht; prüfen Sie bei Bedarf den Bestand.';
+        default:
+            return 'Es ist nichts weiter zu tun.';
+    }
+}
+
 /** Überschrift des anderen Stands: bei `overwritten` der überschriebene, sonst der beim Eingang. */
 export function otherStateHeading(notice: Notice): string {
     return notice.kind === 'overwritten' ? 'Überschriebener Stand' : 'Stand beim Eingang';

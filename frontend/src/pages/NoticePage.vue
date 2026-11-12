@@ -19,6 +19,7 @@ import {
     noticeExplanation,
     noticeNote,
     noticeNoteProblem,
+    afterResolveText,
     otherStateHeading,
 } from '../data/notices';
 import { goBack } from '../router/back';
@@ -150,7 +151,7 @@ async function resolve(): Promise<void> {
         return;
     }
     notice.value = result.data;
-    success.value = 'Der Hinweis ist erledigt.';
+    success.value = `Der Hinweis ist erledigt. ${afterResolveText(result.data)}`;
     dialogOpen.value = false;
 }
 
@@ -261,8 +262,15 @@ onMounted(() => {
                     </dd>
                     <dt>Erfasst</dt>
                     <dd>{{ eventTimeText(notice.booking.occurredAt, now) }}</dd>
-                    <dt>Eingang beim Server</dt>
-                    <dd>{{ eventTimeText(notice.booking.receivedAt, now) }}</dd>
+                    <template
+                        v-if="
+                            eventTimeText(notice.booking.receivedAt, now) !==
+                            eventTimeText(notice.booking.occurredAt, now)
+                        "
+                    >
+                        <dt>Eingang beim Server</dt>
+                        <dd>{{ eventTimeText(notice.booking.receivedAt, now) }}</dd>
+                    </template>
                     <dt v-if="notice.booking.location !== null">Gewünschter Standort</dt>
                     <dd v-if="notice.booking.location !== null">
                         {{ notice.booking.location.path }}
@@ -299,8 +307,15 @@ onMounted(() => {
                             }}</span></template
                         >
                     </dd>
-                    <dt>Erfasst</dt>
-                    <dd>{{ eventTimeText(notice.other.occurredAt, now) }}</dd>
+                    <template
+                        v-if="
+                            eventTimeText(notice.other.occurredAt, now) !==
+                            eventTimeText(notice.booking.receivedAt, now)
+                        "
+                    >
+                        <dt>Erfasst</dt>
+                        <dd>{{ eventTimeText(notice.other.occurredAt, now) }}</dd>
+                    </template>
                     <dt>Standort</dt>
                     <dd>{{ notice.other.location.path }}</dd>
                     <dt>Status</dt>
