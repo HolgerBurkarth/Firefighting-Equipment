@@ -153,7 +153,10 @@ final class ReturnTest extends DeviceApiTestCase
         $response = $this->publicCall('returns', ['key' => $key, 'code' => 'HRT 16', 'name' => 'Herr Maier', 'condition' => 'ok', 'comment' => 'Danke']);
 
         self::assertSame(200, $response->statusCode(), $response->body());
-        self::assertSame(['identifier' => 'HRT 16', 'device_type' => 'Atemschutzmaske', 'location' => 'Rückgabe', 'status_label' => 'einsatzbereit'], self::json($response));
+        $body = self::json($response);
+        self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $body['returned_at']);
+        unset($body['returned_at']);
+        self::assertSame(['identifier' => 'HRT 16', 'device_type' => 'Atemschutzmaske', 'location' => 'Rückgabe', 'status_label' => 'einsatzbereit'], $body);
         $now = self::json($this->api('GET', 'devices/' . $device['id']))['device'];
         self::assertSame([$this->returnPoint, 'ready', 3], [$now['location']['id'], $now['status'], $now['version']]);
         self::assertSame(['open' => 0, 'overdue' => 0], self::json($this->api('GET', 'loans'))['summary']);
@@ -204,6 +207,28 @@ final class ReturnTest extends DeviceApiTestCase
 
         self::assertSame(200, $this->publicCall('returns', $body)->statusCode());
         self::assertSame(400, $this->publicCall('returns', $body)->statusCode());
+    }
+
+    public function testRepeatedNumberSaysAlreadyReturnedWithTimeButNoName(): void
+    {
+        [, $key] = $this->lentDevice();
+        $this->createViaApi('HRT 20');
+        $first = self::json($this->publicCall('returns', ['key' => $key, 'code' => 'HRT 16', 'name' => 'Herr Maier']));
+
+        foreach (['returns/check' => [], 'returns' => ['name' => 'Herr Maier']] as $path => $extra) {
+            $response = $this->publicCall($path, ['key' => $key, 'code' => 'HRT16'] + $extra);
+            self::assertSame(400, $response->statusCode());
+            $json = self::json($response);
+            self::assertSame('HRT 16 wurde bereits zurückgegeben. Sie müssen nichts weiter tun.', $json['message']);
+            self::assertSame(['identifier' => 'HRT 16', 'returned_at' => $first['returned_at']], $json['details']);
+            self::assertStringNotContainsString('Maier', $response->body());
+        }
+        // Nie verliehen oder unbekannt: gleiche Meldung, keine Auskunft über das Gerät.
+        foreach (['HRT 20', 'HRT 99'] as $code) {
+            $json = self::json($this->publicCall('returns/check', ['key' => $key, 'code' => $code]));
+            self::assertSame('Diese Nummer kennen wir nicht oder die Ausrüstung ist nicht verliehen. Bitte schreiben Sie sie so wie auf dem Etikett, z. B. HRT 14.', $json['message'], $code);
+            self::assertArrayNotHasKey('details', $json);
+        }
     }
 
     public function testKeyOfAnotherCityDoesNotWork(): void

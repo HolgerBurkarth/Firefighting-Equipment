@@ -916,3 +916,20 @@ jetzt auf `listItem` auf, seine Felder sind dieselben.
 - Tests: `DeviceListTest::testListContainsSearchableMasterData`; die Liste der Felder in
   `testUserSeesSummariesSortedNaturally` ist ergänzt.
 - Dokumentiert in `CLAUDE.md`, "Geräte (API)".
+
+## 2026-11-12 – „U1/U22 Rückgabe: Beleg, schon zurückgegeben, Nummer suchen“
+
+Öffentliche Rückgabe (`POST returns/check`, `POST returns`), nur Erweiterungen:
+
+- `POST returns` liefert zusätzlich `returned_at` (UTC `…Z`, Zeit der Buchung) für den Beleg der Seite „Danke“.
+- Nummer tolerant: `HRT16`, `hrt 16`, `HRT  16` finden „HRT 16“ (Leerzeichen und Groß-/Kleinschreibung egal; die
+  genaue Schreibweise gewinnt bei Gleichstand).
+- Neue Meldungen (400 `invalid_request`, wie bisher zählen sie in die Bremse `public_return`):
+  - schon zurückgegeben (die Ausrüstung steht in der Rückgabe dieses Schlüssels und ist nicht mehr verliehen):
+    „HRT 14 wurde bereits zurückgegeben. Sie müssen nichts weiter tun.“ mit `details {identifier, returned_at}`.
+    Keine Namen oder Zustände (Datenschutz).
+  - sonst (unbekannt oder nicht verliehen, bewusst nicht unterschieden, damit der Schlüssel keine Nummern verrät):
+    „Diese Nummer kennen wir nicht oder die Ausrüstung ist nicht verliehen. Bitte schreiben Sie sie so wie auf dem
+    Etikett, z. B. HRT 14.“ (vorher „Diese Ausrüstung ist nicht verliehen. Bitte Nummer prüfen.“).
+- Tests: `ReturnTest` (`testRepeatedNumberSaysAlreadyReturnedWithTimeButNoName`, Nummer ohne Leerzeichen), Browser
+  `returnPage.spec.ts`.

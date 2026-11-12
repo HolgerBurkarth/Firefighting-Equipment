@@ -88,3 +88,64 @@ export async function unreachableControls(page: Page, rows: string): Promise<Unr
         { rowSelector: rows, controlSelector: CONTROLS },
     );
 }
+
+/** Ein Bedienelement, dessen tippbare Fläche kleiner als `minimum` px ist (U3). */
+export interface SmallTarget {
+    readonly kind: string;
+    readonly text: string;
+    readonly width: number;
+    readonly height: number;
+}
+
+/**
+ * Sichtbare Auswahlpunkte und Kästchen (Fläche = ihr `<label>`, sonst sie selbst) und Knöpfe unter `root`, deren
+ * tippbare Fläche kleiner als `minimum` px (Standard 44, `--touch-min`) in Breite oder Höhe ist. Eine Fläche zählt
+ * auch, wenn das Eltern-Element des Kästchens eine Zeile ist, die per Klick wählt (`data-row-target`).
+ */
+export function smallTargets(page: Page, root = 'body', minimum = 44): Promise<SmallTarget[]> {
+    return page.evaluate(
+        ({ rootSelector, min }) => {
+            const out: SmallTarget[] = [];
+            const scope = document.querySelector(rootSelector);
+            if (scope === null) {
+                return out;
+            }
+            const visible = (element: Element): DOMRect | null => {
+                const style = getComputedStyle(element);
+                const rect = element.getBoundingClientRect();
+                if (style.visibility === 'hidden' || style.display === 'none') {
+                    return null;
+                }
+                return rect.width === 0 && rect.height === 0 ? null : rect;
+            };
+            for (const input of scope.querySelectorAll<HTMLInputElement>(
+                'input[type="radio"], input[type="checkbox"]',
+            )) {
+                if (visible(input) === null) {
+                    continue;
+                }
+                const target =
+                    input.closest('label') ??
+                    (input.id === ''
+                        ? null
+                        : document.querySelector(`label[for="${CSS.escape(input.id)}"]`)) ??
+                    input.closest('[data-row-target]') ??
+                    input;
+                const rect = visible(target) ?? input.getBoundingClientRect();
+                if (rect.width < min - 0.5 || rect.height < min - 0.5) {
+                    out.push({
+                        kind: input.type,
+                        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                        text: (target.textContent ?? input.getAttribute('aria-label') ?? '')
+                            .trim()
+                            .slice(0, 40),
+                        width: Math.round(rect.width),
+                        height: Math.round(rect.height),
+                    });
+                }
+            }
+            return out;
+        },
+        { rootSelector: root, min: minimum },
+    );
+}

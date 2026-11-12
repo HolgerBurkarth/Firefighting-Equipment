@@ -98,6 +98,7 @@ describe('Rückgabe: API', () => {
             device_type: 'Maske',
             location: 'Rückgabe',
             status_label: 'defekt',
+            returned_at: '2026-11-12T10:02:00Z',
         });
         const done = await postReturn(
             { key: 'K', code: 'M1', name: 'Herr Maier', condition: 'defective' },
@@ -111,6 +112,7 @@ describe('Rückgabe: API', () => {
             condition: 'defective',
         });
         expect(done.ok && done.data.statusLabel).toBe('defekt');
+        expect(done.ok && done.data.returnedAt).toBe('2026-11-12T10:02:00Z');
     });
 
     it('401 einer öffentlichen Rückgabe meldet nicht ab', async () => {
