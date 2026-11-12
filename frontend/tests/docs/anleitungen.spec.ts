@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
 import {
     ADMIN_RIGHTS,
@@ -37,6 +39,11 @@ import { DESKTOP, PHONE, renderGuide, shoot, type Step } from './guide';
  * `npm run build`). Rechte der Rollen Gerätewart und Geräteträger nach
  * docs/MERKBLATT-EINRICHTUNG-PHASE-2.md, Abschnitt 6.
  */
+
+/** Standard-Symbol der App (Flamme) statt des Platzhalter-Bildes der Browser-Tests. */
+const APP_ICON = readFileSync(
+    fileURLToPath(new URL('../../../resources/app-icon/app-icon-192.png', import.meta.url)),
+);
 
 const TODAY = new Date('2026-11-12T08:30:00+01:00');
 const TENANT = { ...TEST_TENANT, body: { ...TEST_TENANT.body, name: 'Feuerwehr Musterstadt' } };
@@ -272,6 +279,13 @@ function api(role: Role): Record<string, MockResponse | ((request: MockRequest) 
             ],
             devices: DEVICES,
         }),
+        'POST api/v1/auth/register': {
+            status: 202,
+            body: {
+                message:
+                    'Vielen Dank. Wir haben Ihnen eine E-Mail geschickt; bitte bestätigen Sie darin Ihre Adresse.',
+            },
+        },
         'GET api/v1/devices': (request) => {
             const params = new URL(request.url).searchParams;
             if (params.get('status') !== null) {
@@ -430,8 +444,37 @@ const login: Build = async (page) => {
     loggedIn = true;
     return {
         title: 'App aufs Handy holen und anmelden',
-        text: 'Öffnen Sie die Adresse Ihrer Feuerwehr im Browser Ihres Handys und tippen Sie auf „Zum Startbildschirm hinzufügen“. So starten Sie die App künftig wie jede andere. Melden Sie sich mit E-Mail-Adresse und Passwort an.',
+        text: 'Die Adresse bekommen Sie von Ihrer Feuerwehr, z. B. über den Aushang. Öffnen Sie sie im Browser. iPhone: Safari → Teilen-Symbol → „Zum Home-Bildschirm“. Android: Chrome → Menü ⋮ → „Zum Startbildschirm hinzufügen“. So starten Sie die App künftig wie jede andere. Melden Sie sich mit E-Mail-Adresse und Passwort an.',
         shot,
+    };
+};
+
+const account: Build = async (page) => {
+    await phone(page);
+    loggedIn = false;
+    await page.goto('/firefighting/test/registrieren#code=ABCD-EFGH-JKMN');
+    await expect(page.getByLabel('Einladungscode')).toBeVisible();
+    await page.getByLabel('Name', { exact: true }).fill('Anna Beispiel');
+    await page.getByLabel('E-Mail-Adresse').fill('anna.beispiel@example.org');
+    await page.getByLabel('Passwort', { exact: true }).fill('Kxq7-Lmw2!-lang');
+    const form = await shoot(page, [
+        {
+            target: page.getByLabel('Einladungscode'),
+            label: 'Einladungscode (steht schon da, wenn Sie den QR-Code scannen)',
+        },
+        { target: page.getByRole('button', { name: 'Registrieren' }), label: 'Registrieren' },
+    ]);
+    await page.getByRole('button', { name: 'Registrieren' }).click();
+    await expect(page.getByTestId('register-sent')).toBeVisible();
+    const sent = await shoot(page, [
+        { target: page.getByTestId('register-sent'), label: 'Bestätigungsmail kommt' },
+    ]);
+    loggedIn = true;
+    return {
+        title: 'Konto anlegen',
+        text: 'Scannen Sie den QR-Code auf dem Aushang Ihrer Feuerwehr (oder öffnen Sie den Link) und füllen Sie das Formular aus. Danach öffnen Sie die Bestätigungsmail und tippen auf den Link darin; kommt keine Mail, sehen Sie im Spam-Ordner nach. Zuletzt schaltet die Feuerwehr Ihr Konto frei; auch darüber bekommen Sie eine Mail. Erst dann können Sie sich anmelden.',
+        shot: form,
+        shot2: sent,
     };
 };
 
@@ -470,23 +513,28 @@ const rebook: Build = async (page) => {
     };
 };
 
-const used: Build = async (page) => {
-    await phone(page);
-    await page.goto('/firefighting/test/geraete/12');
-    await page.getByTestId('report-used').click();
-    const dialog = page.getByRole('alertdialog');
-    await expect(dialog).toBeVisible();
-    return {
-        title: 'Benutzt melden',
-        text: 'Wurde die Ausrüstung im Einsatz oder bei der Übung benutzt, tippen Sie auf „Benutzt melden“ und bestätigen Sie. Sie kommt in die Sammelstelle; dort kümmert sich der Gerätewart darum.',
-        shot: await shoot(page, [
-            {
-                target: dialog.getByRole('button', { name: 'Benutzt melden' }),
-                label: 'Bestätigen',
-            },
-        ]),
+function usedStep(after: string): Build {
+    return async (page) => {
+        await phone(page);
+        await page.goto('/firefighting/test/geraete/12');
+        await page.getByTestId('report-used').click();
+        const dialog = page.getByRole('alertdialog');
+        await expect(dialog).toBeVisible();
+        return {
+            title: 'Benutzt melden',
+            text: `Wurde die Ausrüstung im Einsatz oder bei der Übung benutzt, tippen Sie auf „Benutzt melden“ und bestätigen Sie. Sie kommt in die Sammelstelle; ${after}`,
+            shot: await shoot(page, [
+                {
+                    target: dialog.getByRole('button', { name: 'Benutzt melden' }),
+                    label: 'Bestätigen',
+                },
+            ]),
+        };
     };
-};
+}
+
+const used = usedStep('dort kümmert sich der Gerätewart darum.');
+const usedKeeper = usedStep('Sie finden sie danach unter „Wartung“.');
 
 const swap: Build = async (page) => {
     await phone(page);
@@ -517,7 +565,7 @@ const offline: Build = async (page) => {
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     return {
         title: 'Ohne Netz arbeiten',
-        text: 'Im Keller oder im Funkloch funktioniert die App weiter: Sie sehen den zuletzt geladenen Stand und können umbuchen. Die Buchungen werden gesendet, sobald wieder Netz da ist.',
+        text: 'Im Keller oder im Funkloch funktioniert die App weiter: Sie sehen den zuletzt geladenen Stand und können umbuchen. Die Buchungen werden gesendet, sobald wieder Netz da ist. Melden Sie sich nicht ab, solange Buchungen warten (Uhr-Symbol auf „Suchen“).',
         shot,
     };
 };
@@ -616,7 +664,7 @@ const loans: Build = async (page) => {
     await expect(page.getByTestId('loan-row').first()).toBeVisible();
     return {
         title: 'Verleih',
-        text: 'Mit „Verleihen“ erfassen Sie, welche Ausrüstung an wen ausgeliehen ist und bis wann. Überfällige Rückgaben sind rot. Kommt sie zurück, buchen Sie sie unter „Rückgabe“.',
+        text: 'Mit „Verleihen“ erfassen Sie, welche Ausrüstung an wen ausgeliehen ist und bis wann. Überfällige Rückgaben sind rot. Kommt sie zurück, geben Sie sie über den Aushang der Rückgabe zurück (Abschnitt „Rückgabe“), oder buchen Sie die Ausrüstung selbst ins Lager um.',
         shot: await shoot(page, [
             { target: page.getByTestId('lend-open'), label: 'Verleihen' },
             { target: page.getByTestId('loan-row').first(), label: 'Verliehen, überfällig' },
@@ -751,6 +799,13 @@ const poster: Build = async (page) => {
     };
 };
 
+const adminNote: Build = () =>
+    Promise.resolve({
+        title: 'Wartung, Verleih, Sollbestand und Standorte',
+        text: 'Alles zu Wartung, Verleih, Rückgaben, Sollbestand und Standorten steht in der Anleitung für Gerätewarte. Als Admin haben Sie dieselben Seiten.',
+        shot: null,
+    });
+
 const settings: Build = async (page) => {
     await desktop(page);
     await page.goto('/firefighting/test/einstellungen');
@@ -784,7 +839,7 @@ const GUIDES: readonly GuideSpec[] = [
             'Standort und Status umbuchen',
             'Termine (Wartungsdaten) ansehen',
         ],
-        steps: [login, search, rebook, terms, offline, profile],
+        steps: [account, login, search, rebook, terms, offline, profile],
     },
     {
         role: 'carrier',
@@ -797,7 +852,7 @@ const GUIDES: readonly GuideSpec[] = [
             'Benutzt melden und tauschen',
             'Auch ohne Netz arbeiten',
         ],
-        steps: [login, search, rebook, used, swap, offline, terms, profile],
+        steps: [account, login, search, rebook, used, swap, offline, terms, profile],
     },
     {
         role: 'keeper',
@@ -813,10 +868,11 @@ const GUIDES: readonly GuideSpec[] = [
             'Hinweise im Protokoll erledigen',
         ],
         steps: [
+            account,
             login,
             search,
             rebook,
-            used,
+            usedKeeper,
             swap,
             offline,
             dashboard,
@@ -836,22 +892,18 @@ const GUIDES: readonly GuideSpec[] = [
         title: 'Admin',
         intro: 'Die Feuerwehr einrichten: Benutzer, Einladungen, Aushänge und Einstellungen.',
         can: [
-            'Alles, was Gerätewart können',
+            'Alles, was Gerätewarte können (siehe deren Anleitung)',
             'Benutzer freischalten und Rollen zuweisen',
             'Einladungscodes erzeugen und Aushänge drucken',
             'Einstellungen: Farbe, Logo und Mails',
         ],
         steps: [
             login,
+            offline,
             dashboard,
             deviceList,
             newDevice,
-            maintenance,
-            loans,
-            returns,
-            posterReturn,
-            stock,
-            notices,
+            adminNote,
             users,
             codes,
             poster,
@@ -866,6 +918,9 @@ for (const guide of GUIDES) {
 
         test('PDF', async ({ page }) => {
             await page.clock.setFixedTime(TODAY);
+            await page.route(/\/api\/v1\/(app-icon|tenant\/logo)\/(512|192|180)/, (route) =>
+                route.fulfill({ status: 200, contentType: 'image/png', body: APP_ICON }),
+            );
             const steps: Step[] = [];
             for (const build of guide.steps) {
                 steps.push(await build(page));
