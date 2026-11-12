@@ -164,8 +164,8 @@ async function swapOffline(page: Page, out: string, replacement: string): Promis
     if (!(await radio.isVisible())) {
         await dialog.getByTestId('swap-show-others').click();
     }
-    await radio.check();
-    await dialog.getByRole('radio', { name: 'defekt' }).check();
+    await radio.check({ timeout: 15_000 });
+    await dialog.getByRole('button', { name: 'Defekt' }).click({ timeout: 15_000 });
     await dialog.getByRole('button', { name: 'Tauschen', exact: true }).click();
     await expect(page).toHaveURL(/\/firefighting\/test\/suchen$/);
     await expect(

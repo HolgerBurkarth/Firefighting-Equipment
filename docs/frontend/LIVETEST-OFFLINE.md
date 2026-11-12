@@ -150,6 +150,7 @@ Läufe:
   ☑ B8a, ☑ C6, ☑ C7, ☑ C8, ☑ C9, ☑ C10, ☑ W1, ☑ W2, ☑ W3, ☑ R1 (alle bestanden). Höchster Seitenspeicher 32 MB,
   Schutz nicht ausgelöst. M90–M95 danach auf dem Anfangsstand.
 - 11.11.2026, Lauf 3 nach dem Deploy von `50ba51898f18` (Hinweis Tausch „Grund“ live): ☑ C1–C10, ☑ B8a, ☑ W1–W3, ☑ R1 (alle bestanden, 48 s). M90–M95 danach auf dem Anfangsstand.
+- 12.11.2026, nach dem Deploy von `cc8f6df5aa46` (Benutzertest-Verbesserungen U1–U22): Lauf 1 ☒ C8 („Page crashed“) – Ursache wie am 11.11.: Das Skript wartete in `swapOffline` auf den Auswahlpunkt „defekt“, den es seit U2 nicht mehr gibt (jetzt drei Knöpfe), bis zum Ende der Testzeit, dann beendete Playwright den Browser; M94 blieb „in Wartung“ und wurde von Hand (Claude-Zugang, Test-Stadt) auf einsatzbereit zurückgesetzt. Skript korrigiert (Knopf „Defekt“, Zeitgrenze 15 s je Aktion). Lauf 2: ☑ C1–C10, ☑ B8a, ☑ W1–W3, ☑ R1 (alle bestanden). M90–M95 danach auf dem Anfangsstand.
 - Weitere Diagnose-Schalter: `FF_LIVE_MEM=1` (Speichermessung und Schutz, `test-results/live-memory.txt`).
 - Diagnose-Schalter des Skripts (Umgebungsvariablen): `FF_LIVE_DIAG=1` (Abstürze, Skriptfehler und
   Fehlermeldungen der Seiten), `FF_LIVE_NET=route` (API-Anfragen abbrechen statt `setOffline`),
