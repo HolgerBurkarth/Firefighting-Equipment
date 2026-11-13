@@ -173,6 +173,12 @@ Punkte nach `docs/usability/BENUTZERTEST-2026-11.md`.
 - ☑ U11: Bestätigung nach „defekt“ mit Hinweis zum Herausnehmen und auf „Tauschen …“.
 - ☑ U17: Protokoll „Buchung kam zu spät – Stand nicht geändert“.
 - ☑ U20: Rückfrage „Es kommt zur Sammelstelle „Kleiderkammer“.“
-- ☐ U1, U22, U6, U10: live nicht prüfbar, die Aufgaben Werkstatt, Ausgeliehen an und Rückgabe sind in der Test-Stadt seit dem Rücksetzen nach den Live-Tests vom 09.11.2026 abgeschaltet (Atemschutzwerkstatt, Hattingen, Ippingen ohne Aufgabe). Nicht geändert; ob sie wieder eingeschaltet werden, entscheidet Holger.
+- Teil 2 (13.11.2026, Build `2923baad9b70`, Holger): Abläufe Werkstatt, Rückgabe und Ausgeliehen an wieder eingeschaltet und dauerhaft vergeben (Atemschutzwerkstatt = Werkstatt, Hattingen = Ausgeliehen an, Ippingen = Rückgabe; CLAUDE.md „Abläufe der Test-Stadt“).
+- ☑ U6: Sprunglinks „Verliehen / In der Rückgabe / Rückgabe-Aushang“ oben, Abschnitt „Rückgabe-Aushang“ mit Erklärung, „Aushang abschalten …“.
+- ☑ U22: Formular zuerst, Bilder eingeklappt, Knopf „Nummer suchen“, nach „Weitere Ausrüstung zurückgeben“ Fokus im Nummernfeld.
+- ☑ U1: M91 an Hattingen verliehen, über den Aushang als „m91“ gefunden, Beleg „Danke – Ihre Rückgabe ist angekommen“ mit Ausrüstung, Zustand, Zeit, Ablageort und „Sie müssen nichts weiter tun“; zweite Eingabe „M91 wurde bereits zurückgegeben (heute 06:15) …“; unbekannte Nummer: gemeinsame Meldung mit Beispiel „HRT 14“.
+- ☑ U10: Werkstatt „Alle auswählen“ wählt 6 von 7, PA 11 (defekt) bleibt frei mit „defekt – bleibt in der Werkstatt“; Knopf „Ins Lager bringen … (6)“.
+- Zurückgesetzt (Teil 2): M91 aus der Rückgabe ins Lager Gerätehaus (einsatzbereit), M90–M95 auf Anfangsstand, Testaushang Ippingen abgeschaltet; Abläufe und Aufgaben bleiben stehen.
+- Wunsch (nach `docs/TODO-SPAETER.md`): Rückfrage zu „In Ordnung ins Lager …“ bzw. „… in die Sammelstelle …“ mit Knopf „Ins Lager bringen“ bzw. „In die Sammelstelle bringen“ statt nur „Bringen“.
 - ☐ Offen für Holger: Fenster „Tauschen“ in Handy-Breite.
 - Zurückgesetzt: M90 wieder einsatzbereit in HLF 20 / G1.

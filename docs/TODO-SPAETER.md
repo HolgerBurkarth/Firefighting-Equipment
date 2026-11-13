@@ -40,3 +40,4 @@ Wünsche aus Live-Tests. Nicht vorziehen; erst nach Abschluss der Hauptabschnitt
 - „Angekommen um …“: Zeit des Servers statt der Erfassungszeit.
 - Anleitungen neu erzeugen (`npm run docs:anleitungen`), damit „Widerrufen“ verschwindet und die neuen Fenster (Tauschen, Benutzer „Bearbeiten“, Rückgabe-Beleg) in den Bildern stehen (Live-Prüfung 12.11.2026; mit der nächsten Änderung zusammen, kein eigener Deploy).
 - Fenster „Tauschen“: Zustandsknöpfe („benutzt“, „defekt“, „in Wartung“) so klein und einheitlich wie die übrigen Statusknöpfe der App (Live-Prüfung 12.11.2026).
+- Verleih, „In der Rückgabe“: In der Rückfrage zu „In Ordnung ins Lager …“ bzw. „Benutzte und Defekte in die Sammelstelle …“ heißt der Bestätigungsknopf nur „Bringen“; bitte „Ins Lager bringen“ bzw. „In die Sammelstelle bringen“ wie in der Wartung (Live-Prüfung 13.11.2026; mit den beiden Punkten oben, kein eigener Deploy).

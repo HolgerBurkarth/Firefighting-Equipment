@@ -144,6 +144,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
        Speichern abfangen).
      - Testgeräte: Kennungen M90–M99 bzw. Gerätetyp „Live-Testtyp 2“; an bestehenden Geräten
        geänderte Werte danach zurücksetzen.
+     - Abläufe der Test-Stadt (seit 12.11.2026, Vorgabe Holger; Voraussetzung für alle Live-Tests):
+       dauerhaft freigeschaltet und vergeben sind die Aufgaben Lager („Lager Gerätehaus“),
+       Sammelstelle („Kleiderkammer“), Werkstatt („Atemschutzwerkstatt“), Ausgeliehen an
+       („Hattingen“) und Rückgabe („Ippingen“, seit 13.11.2026). Einschalten
+       erledigt Claude, sobald Holger als Super-Admin angemeldet ist. Zurücksetzen nach einem Test
+       heißt: M90–M99 bzw. „Live-Testtyp 2“ auf den Anfangsstand, verliehene Testgeräte zurück;
+       Aufgaben und Abläufe bleiben stehen. Ausnahme nur, wenn ein Test ausdrücklich das Abschalten
+       prüft – dann danach wieder einschalten.
      - Ergebnis je geprüftem Punkt (☑/☒) in die passende LIVETEST-Datei (z. B.
        `docs/frontend/LIVETEST-ADMIN-KONSOLE.md`) eintragen; Fehler beheben, Wünsche nach
        `docs/TODO-SPAETER.md`.
@@ -170,8 +178,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
        App-Logik, IndexedDB, Warteschlange, Senden; kein echtes Offline). Ausgabe ☑/☒/☐ je Punkt
        (auch in `frontend/test-results/live-offline.txt`); der Agent trägt sie in
        `docs/frontend/LIVETEST-OFFLINE.md` bzw. `LIVETEST-PHASE-2.md` ein. Voraussetzung in der
-       Test-Stadt (richtet Claude ein): Lager Gerätehaus (Aufgabe Lager) und Kleiderkammer (Sammelstelle)
-       dauerhaft freigeschaltet, Rolle „Live-Test Geräteträger“ (ID 23) mit `device.used` und
+       Test-Stadt (richtet Claude ein): die Abläufe der Test-Stadt (siehe oben, u. a. Lager Gerätehaus
+       und Kleiderkammer als Sammelstelle) dauerhaft freigeschaltet, Rolle „Live-Test Geräteträger“ (ID 23) mit `device.used` und
        `device.swap`. Diagnose-Schalter (nur Fehlersuche): `FF_LIVE_ONE=1` nur Konto 1, `FF_LIVE_MEM=1` misst alle 500 ms den Speicher der Seite und aller Chromium-Prozesse (`tests/live/support/memoryGuard.ts`, Ausgabe `test-results/live-memory.txt`) und schließt den Browser bei über 1 GB Seite, über 3 GB gesamt, 10 s ununterbrochenem Wachstum oder 10 s ohne Antwort. Der „Absturz“ vom 11.11.2026 war kein Speicherproblem der App: Der Klick auf die Karte wartete wegen eines falschen Musters (`` im zusammengesetzten Kartentext, jetzt `cardTextPattern`) bis zum Ende der Testzeit, dann beendete Playwright den Browser. Ein Test, der in der Live-Umgebung hängt, braucht eine kurze Zeitgrenze je Aktion. Ein echtes iPhone entfällt als regelmäßige Prüfung („nur bei gemeldeten
        Problemen“). Nach jedem Deploy, der Offline, Warteschlange, Tausch, Benutzt melden, Service
        Worker oder Updates betrifft, führt der Agent den Lauf selbst aus (Befehl in `frontend/`, Dauer
