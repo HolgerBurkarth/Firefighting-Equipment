@@ -311,7 +311,10 @@ function confirmBelow(): void {
                     v-for="entry in SWAP_OUT_STATUSES"
                     :key="entry.value"
                     class="btn swap-state"
-                    :class="{ 'is-chosen': outStatus === entry.value }"
+                    :class="[
+                        `swap-state-${entry.value}`,
+                        { 'is-chosen': outStatus === entry.value },
+                    ]"
                     type="button"
                     :aria-pressed="outStatus === entry.value"
                     :data-testid="`swap-state-${entry.value}`"
@@ -498,22 +501,32 @@ function confirmBelow(): void {
     color: var(--status-defective-fg);
 }
 
+/* Wie die Statusknöpfe der Ausrüstungsliste (`status-chip`): normale Knopfhöhe, gewählt in der Farbe des Status. */
 .swap-states {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
 }
 
-.swap-state {
-    min-height: 56px;
-    padding-inline: 6px;
-    overflow-wrap: anywhere;
+.swap-state.is-chosen {
+    font-weight: var(--font-weight-bold);
 }
 
-.swap-state.is-chosen {
-    border-color: var(--accent);
-    background: var(--selected-bg);
-    font-weight: var(--font-weight-bold);
-    box-shadow: inset 0 0 0 2px var(--accent);
+.swap-state-used.is-chosen {
+    border-color: var(--status-used-fg);
+    background: var(--status-used-bg);
+    color: var(--status-used-fg);
+}
+
+.swap-state-defective.is-chosen {
+    border-color: var(--status-defective-fg);
+    background: var(--status-defective-bg);
+    color: var(--status-defective-fg);
+}
+
+.swap-state-maintenance.is-chosen {
+    border-color: var(--status-maintenance-fg);
+    background: var(--status-maintenance-bg);
+    color: var(--status-maintenance-fg);
 }
 </style>
