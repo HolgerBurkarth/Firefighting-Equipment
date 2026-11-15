@@ -2881,12 +2881,20 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Status, sonst `used`/`defective`; Verlauf „Rückgabe“ von „<Name> (ohne Anmeldung)“ (`DeviceEvent::$userId` null,
   `type_label` „Rückgabe“, JSON `user.id` null; keine Mail „Log“). Ungültiger Schlüssel oder Code → 400 `invalid_request`
   (gleiche Meldungen, zählt in die Bremse `PublicReturnThrottle`: 20 Fehlversuche je IP-Präfix in 15 Minuten, sonst
-  429). Seit 12.11.2026 (U1): Nummer ohne Rücksicht auf Leerzeichen und Groß-/Kleinschreibung („HRT16" = „HRT 16"); `POST returns` liefert `returned_at`; eine Ausrüstung, die in der Rückgabe des Schlüssels steht und nicht mehr verliehen ist, ergibt 400 „… wurde bereits zurückgegeben …" mit `details {identifier, returned_at}` (keine Namen), sonst eine gemeinsame Meldung „Diese Nummer kennen wir nicht oder die Ausrüstung ist nicht verliehen …". Bekannte Stelle von `DeviceVisibility::all()`: `PublicReturnHandler`. Tests `ReturnTest`. Frontend: öffentliche
+  429). Rückgabe direkt in die Sammelstelle (seit 15.11.2026, Runde 16, Wunsch Immendingen, ohne Migration): Auch ein aktiver
+  Standort mit der Aufgabe Sammelstelle kann einen Aushang haben (`ReturnPointRepository::TASKS`; `GET loans` nennt ihn in
+  `returns` mit `kind` `collection` nach den Rückgabe-Standorten, `in_returns` bleibt bei diesen). Mit seinem Schlüssel bucht
+  `POST returns` direkt dorthin; `POST returns/check` liefert `conditions` (Standard zuerst; Rückgabe-Standort `ok`, `used`,
+  `defective`, Sammelstelle nach `collection_accepts` nur `used`/`defective`, `PublicReturnHandler::conditions`), ein anderer
+  Zustand → 400. „In Ordnung“ gibt es dort nicht: alles in der Sammelstelle prüft der Gerätewart (Seite Wartung). „Schon
+  zurückgegeben“ an der Sammelstelle nur, wenn der letzte Eintrag eine Rückgabe ohne Anmeldung ist. Seit 12.11.2026 (U1): Nummer ohne Rücksicht auf Leerzeichen und Groß-/Kleinschreibung („HRT16" = „HRT 16"); `POST returns` liefert `returned_at`; eine Ausrüstung, die in der Rückgabe des Schlüssels steht und nicht mehr verliehen ist, ergibt 400 „… wurde bereits zurückgegeben …" mit `details {identifier, returned_at}` (keine Namen), sonst eine gemeinsame Meldung „Diese Nummer kennen wir nicht oder die Ausrüstung ist nicht verliehen …". Bekannte Stelle von `DeviceVisibility::all()`: `PublicReturnHandler`. Tests `ReturnTest`. Frontend: öffentliche
   Seite `ReturnPage` (`rueckgabe#schluessel=…`, `meta.public`, nur unter Städten; Schlüssel aus dem Fragment per
   `takeFragmentParam`, übersteht ein Neuladen in sessionStorage `ff-return-key`; Nummer prüfen, Name, Zustand, Hinweis),
   in `LoansPage` die Abschnitte „Rückgabe“ (Aushang erzeugen/erneuern/widerrufen, Link und QR-Code nur einmal,
-  `ReturnPoster` zum Drucken, `returnLink` in `src/data/loans.ts`) und „In der Rückgabe“ (Auswahl, „In Ordnung ins Lager“,
-  „Benutzte und Defekte in die Sammelstelle“, `processReturns`). Seite „Danke" als Beleg (Nummer, Zustand, Hinweis, Zeit, „Sie müssen nichts weiter tun"), Hinweis „schon zurückgegeben" (`return-already`), Knopf „Nummer suchen", Formular zuerst, Bilder darunter in `<details>` (U1/U22). Tests `returnPage.spec.ts`, `loans.spec.ts`, Unit
+  `ReturnPoster` zum Drucken, `returnLink` in `src/data/loans.ts`; Sammelstellen mit Hinweis `returns-collection-hint`) und „In
+  der Rückgabe“ (nur mit einem Rückgabe-Standort; Auswahl, „In Ordnung ins Lager“, „Benutzte und Defekte in die Sammelstelle“,
+  Bestätigung „Ins Lager bringen“ bzw. „In die Sammelstelle bringen“, `processReturns`). Die Rückgabeseite zeigt nur die
+  Zustände aus `conditions` (`ReturnFound.conditions`, fehlt = alle drei) und wählt den ersten vor. Seite „Danke" als Beleg (Nummer, Zustand, Hinweis, Zeit, „Sie müssen nichts weiter tun"), Hinweis „schon zurückgegeben" (`return-already`), Knopf „Nummer suchen", Formular zuerst, Bilder darunter in `<details>` (U1/U22). Tests `returnPage.spec.ts`, `loans.spec.ts`, Unit
   `returns.spec.ts`.
 - Sollbestand (Phase 2, P2.7, Runde 9; Plan 3.5, ohne Tausch und ohne Prüfung der Buchungen, die kommen mit P2.8):
   Migrationen 0059 `fe_stock_rules` (Standort, `min_count` 1–99) und 0060 `fe_stock_rule_types` (Typen einer Regel,

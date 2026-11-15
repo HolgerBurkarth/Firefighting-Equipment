@@ -65,6 +65,13 @@ onMounted(() => {
 });
 
 const groups = computed(() => groupLoans(state.value?.loans ?? []));
+/** Gibt es Standorte mit der Aufgabe „Rückgabe“? Nur dann „In der Rückgabe“ (Sammelstellen: Seite Wartung). */
+const hasReturnLocations = computed(
+    () => state.value?.returns.some((place) => place.kind === 'returns') ?? false,
+);
+const hasCollectionPlaces = computed(
+    () => state.value?.returns.some((place) => place.kind === 'collection') ?? false,
+);
 const lendPossible = computed(() => (state.value?.borrowers.length ?? 0) > 0);
 
 // --- Rückgabe (P2.6): Aushang der Rückgabestellen und „Rückgaben bearbeiten“ ---
@@ -314,6 +321,7 @@ function printPoster(): void {
                 Verliehen
             </button>
             <button
+                v-if="hasReturnLocations"
                 class="btn"
                 type="button"
                 data-testid="jump-in-returns"
@@ -384,9 +392,17 @@ function printPoster(): void {
             <h2 id="returns-title" tabindex="-1">Rückgabe-Aushang</h2>
             <p class="hint">
                 So bringen andere Wehren Ausrüstung zurück: Aushang ausdrucken und aufhängen. Wer
-                den QR-Code scannt, gibt die Ausrüstung ohne Anmeldung zurück; sie steht dann in „{{
-                    state.returnsLabel
-                }}“, bis sie weiterbewegt wird.
+                den QR-Code scannt, gibt die Ausrüstung ohne Anmeldung zurück<template
+                    v-if="hasReturnLocations"
+                    >; mit dem Aushang einer Rückgabestelle steht sie dann in „{{
+                        state.returnsLabel
+                    }}“, bis sie weiterbewegt wird</template
+                >.
+            </p>
+            <p v-if="hasCollectionPlaces" class="hint" data-testid="returns-collection-hint">
+                Mit dem Aushang einer Sammelstelle kommt die Ausrüstung direkt dorthin, als
+                „benutzt“ oder „defekt“ („In Ordnung“ gibt es dort nicht). Sie erscheint dann auf
+                der Seite „Wartung“.
             </p>
             <ErrorNotice v-if="keyError !== null" :error="keyError" />
             <ul class="loans">
@@ -397,6 +413,9 @@ function printPoster(): void {
                     data-testid="return-place"
                 >
                     <strong class="identifier">{{ place.name }}</strong>
+                    <span class="type" data-testid="return-place-kind">{{
+                        place.kind === 'collection' ? 'Sammelstelle' : state.returnsLabel
+                    }}</span>
                     <span class="since" data-testid="return-link-state">{{
                         place.linkCreatedAt === null
                             ? 'Kein gültiger Aushang'
@@ -467,7 +486,7 @@ function printPoster(): void {
         </section>
 
         <section
-            v-if="state.returns.length > 0"
+            v-if="hasReturnLocations"
             class="group"
             data-testid="in-returns"
             aria-labelledby="in-returns-title"
@@ -560,7 +579,9 @@ function printPoster(): void {
         v-model:open="processConfirmOpen"
         :title="processTitle"
         :description="processText"
-        confirm-label="Bringen"
+        :confirm-label="
+            processKind === 'to-store' ? 'Ins Lager bringen' : 'In die Sammelstelle bringen'
+        "
         @confirm="runProcess"
     />
     <LendDialog

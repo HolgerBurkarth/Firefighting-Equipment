@@ -119,11 +119,13 @@ final readonly class LoanRepository
     /**
      * Ausrüstung, die zu Nummer (Leerzeichen und Groß-/Kleinschreibung egal) oder Scan-Code gehört, nicht verliehen
      * ist und gerade in der Rückgabe `$locationId` steht: „schon zurückgegeben“ (U1). Nur Nummer und Zeit der
-     * letzten Änderung von Standort oder Status, keine Namen.
+     * letzten Änderung von Standort oder Status, keine Namen. `$publicReturnOnly` (Sammelstelle, Runde 16): nur, wenn
+     * der letzte Eintrag im Verlauf eine Rückgabe ohne Anmeldung ist – in der Sammelstelle liegt auch, was per
+     * „Benutzt melden“ oder Tausch hineinkam.
      *
      * @return array{identifier: string, at: \DateTimeImmutable}|null
      */
-    public function findReturned(Tenant $tenant, string $code, int $locationId): ?array
+    public function findReturned(Tenant $tenant, string $code, int $locationId, bool $publicReturnOnly = false): ?array
     {
         $code = trim($code);
         if ($code === '' || mb_strlen($code) > 200 || !mb_check_encoding($code, 'UTF-8')) {
@@ -137,6 +139,10 @@ final readonly class LoanRepository
             . " OR REPLACE(d.identifier_key, ' ', '') = REPLACE(REPLACE(LOWER(?), 'ẞ', 'ß'), ' ', ''))"
             . ' AND NOT EXISTS (SELECT 1 FROM fe_device_loans l WHERE l.tenant_id = d.tenant_id AND l.device_id = d.id AND l.returned_at IS NULL'
             . ' AND d.location_id = l.borrower_location_id)'
+            . ($publicReturnOnly
+                ? ' AND (SELECT e.user_id IS NULL AND e.actor_name IS NOT NULL FROM fe_device_events e'
+                    . ' WHERE e.tenant_id = d.tenant_id AND e.device_id = d.id ORDER BY e.id DESC LIMIT 1) = 1'
+                : '')
             . ' ORDER BY d.id LIMIT 1',
         );
         $stmt->execute([$tenant->id, $locationId, $identifier, $code, $identifier]);
