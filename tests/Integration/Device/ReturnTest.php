@@ -110,8 +110,9 @@ final class ReturnTest extends DeviceApiTestCase
         self::assertSame($device['id'], self::json($this->api('GET', 'loans'))['loans'][0]['device']['id']);
     }
 
-    public function testOnlyReturnLocationsGetAKeyAndOnlyWithRights(): void
+    public function testOnlyReturnLocationsAndCollectionPointsGetAKeyAndOnlyWithRights(): void
     {
+        self::assertSame(409, $this->api('POST', 'return-points/' . $this->store . '/renew', [])->statusCode());
         self::assertSame(409, $this->api('POST', 'return-points/' . $this->nachbar . '/renew', [])->statusCode());
         self::assertSame(404, $this->api('POST', 'return-points/999999/renew', [])->statusCode());
         self::assertSame(403, $this->api('POST', 'return-points/' . $this->returnPoint . '/renew', [], $this->user)->statusCode());
@@ -125,7 +126,7 @@ final class ReturnTest extends DeviceApiTestCase
         foreach (['HRT 16', 'hrt  16', "  HRT 16\n", '0104006381333931'] as $code) {
             $response = $this->publicCall('returns/check', ['key' => $key, 'code' => $code]);
             self::assertSame(200, $response->statusCode(), $code . ': ' . $response->body());
-            self::assertSame(['identifier' => 'HRT 16', 'device_type' => 'Atemschutzmaske', 'location' => 'Rückgabe'], self::json($response), $code);
+            self::assertSame(['identifier' => 'HRT 16', 'device_type' => 'Atemschutzmaske', 'location' => 'Rückgabe', 'conditions' => ['ok', 'used', 'defective']], self::json($response), $code);
         }
     }
 
@@ -297,6 +298,94 @@ final class ReturnTest extends DeviceApiTestCase
         self::assertStringContainsString('nicht in der Rückgabe', $body['results'][0]['error']['message']);
         $this->pdo()->prepare('UPDATE fe_locations SET is_default_store = 0 WHERE id = ?')->execute([$this->store]);
         self::assertSame(409, $this->api('POST', 'loans/to-store', ['devices' => [['id' => $outside['id'], 'version' => 1]]])->statusCode());
+    }
+
+    private function collectionKey(): string
+    {
+        $response = $this->api('POST', 'return-points/' . $this->collection . '/renew', []);
+        self::assertSame(200, $response->statusCode(), $response->body());
+
+        return self::json($response)['key'];
+    }
+
+    public function testCollectionPointIsOfferedAfterTheReturnLocations(): void
+    {
+        $list = self::json($this->api('GET', 'loans'));
+
+        self::assertSame(
+            [[$this->returnPoint, 'returns', null], [$this->collection, 'collection', null]],
+            array_map(static fn (array $p): array => [$p['id'], $p['kind'], $p['link_created_at']], $list['returns']),
+        );
+        $this->collectionKey();
+        self::assertNotNull(self::json($this->api('GET', 'loans'))['returns'][1]['link_created_at']);
+    }
+
+    public function testReturnDirectlyIntoTheCollectionPoint(): void
+    {
+        $a = $this->lend('A-1');
+        $b = $this->lend('B-2');
+        $key = $this->collectionKey();
+
+        $check = self::json($this->publicCall('returns/check', ['key' => $key, 'code' => 'A-1']));
+        self::assertSame(['identifier' => 'A-1', 'device_type' => 'Atemschutzmaske', 'location' => 'Sammelstelle', 'conditions' => ['used', 'defective']], $check);
+
+        $first = $this->publicCall('returns', ['key' => $key, 'code' => 'A-1', 'name' => 'Herr Maier']);
+        self::assertSame(200, $first->statusCode(), $first->body());
+        self::assertSame(['Sammelstelle', 'benutzt'], [self::json($first)['location'], self::json($first)['status_label']]);
+        self::assertSame(200, $this->publicCall('returns', ['key' => $key, 'code' => 'B-2', 'name' => 'Herr Maier', 'condition' => 'defective'])->statusCode());
+
+        $now = fn (array $d): array => self::json($this->api('GET', 'devices/' . $d['id']))['device'];
+        self::assertSame([$this->collection, 'used'], [$now($a)['location']['id'], $now($a)['status']]);
+        self::assertSame([$this->collection, 'defective'], [$now($b)['location']['id'], $now($b)['status']]);
+        $list = self::json($this->api('GET', 'loans'));
+        self::assertSame(['open' => 0, 'overdue' => 0], $list['summary']);
+        self::assertSame([], $list['in_returns'], 'nicht „In der Rückgabe“, sondern auf der Seite Wartung');
+        $events = self::json($this->api('GET', 'devices/' . $a['id'] . '/events'))['events'];
+        self::assertSame(['Rückgabe', 'Herr Maier (ohne Anmeldung)'], [$events[0]['type_label'], $events[0]['user']['name']]);
+        $maintenance = self::json($this->api('GET', 'maintenance'));
+        self::assertEqualsCanonicalizing([$a['id'], $b['id']], array_column($maintenance['collection']['devices'], 'id'));
+    }
+
+    public function testCollectionPointHasNoConditionOkAndOffersOnlyWhatItAccepts(): void
+    {
+        $this->lend('A-1');
+        $key = $this->collectionKey();
+        $before = $this->deviceSnapshot();
+
+        $ok = $this->publicCall('returns', ['key' => $key, 'code' => 'A-1', 'name' => 'Herr Maier', 'condition' => 'ok']);
+        self::assertSame(400, $ok->statusCode());
+        self::assertSame('Hier kann Ausrüstung nur als „benutzt“ oder „defekt“ zurückgegeben werden.', self::json($ok)['message']);
+        self::assertSame($before, $this->deviceSnapshot());
+
+        $this->pdo()->prepare("UPDATE fe_locations SET collection_accepts = 'defective' WHERE id = ?")->execute([$this->collection]);
+        self::assertSame(['defective'], self::json($this->publicCall('returns/check', ['key' => $key, 'code' => 'A-1']))['conditions']);
+        self::assertSame(400, $this->publicCall('returns', ['key' => $key, 'code' => 'A-1', 'name' => 'Herr Maier', 'condition' => 'used'])->statusCode());
+        $done = self::json($this->publicCall('returns', ['key' => $key, 'code' => 'A-1', 'name' => 'Herr Maier']));
+        self::assertSame('defekt', $done['status_label'], 'Standard = was die Sammelstelle annimmt');
+    }
+
+    public function testCollectionKeyStopsWhenTheTaskIsRemoved(): void
+    {
+        $this->lend('A-1');
+        $key = $this->collectionKey();
+        $this->pdo()->prepare('UPDATE fe_locations SET task = NULL, collection_accepts = NULL WHERE id = ?')->execute([$this->collection]);
+
+        self::assertSame(400, $this->publicCall('returns/check', ['key' => $key, 'code' => 'A-1'])->statusCode());
+    }
+
+    public function testAlreadyReturnedAtTheCollectionPointOnlyAfterAPublicReturn(): void
+    {
+        $this->lend('A-1');
+        $reported = $this->createViaApi('U-7');
+        $key = $this->collectionKey();
+        $used = $this->api('POST', 'devices/' . $reported['id'] . '/used', ['version' => $reported['version']]);
+        self::assertSame(200, $used->statusCode(), $used->body());
+        self::assertSame(200, $this->publicCall('returns', ['key' => $key, 'code' => 'A-1', 'name' => 'Herr Maier'])->statusCode());
+
+        $again = self::json($this->publicCall('returns/check', ['key' => $key, 'code' => 'A-1']));
+        self::assertSame('A-1', $again['details']['identifier'] ?? null);
+        $other = self::json($this->publicCall('returns/check', ['key' => $key, 'code' => 'U-7']));
+        self::assertArrayNotHasKey('details', $other, 'per „Benutzt melden“ in die Sammelstelle: nicht „schon zurückgegeben“');
     }
 
     public function testProcessNeedsTheRightAndNoDataFilter(): void

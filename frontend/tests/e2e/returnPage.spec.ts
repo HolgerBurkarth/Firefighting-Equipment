@@ -206,6 +206,52 @@ test.describe('Mit Schlüssel', () => {
     });
 });
 
+test.describe('Aushang an der Sammelstelle (Runde 16)', () => {
+    test.use({
+        api: {
+            'POST api/v1/returns/check': (): MockResponse => ({
+                status: 200,
+                body: {
+                    identifier: 'PA07',
+                    device_type: 'Atemschutzgerät',
+                    location: 'benutzt',
+                    conditions: ['used', 'defective'],
+                },
+            }),
+            'POST api/v1/returns': (request: MockRequest): MockResponse => {
+                returns.push(request.body);
+                return {
+                    status: 200,
+                    body: {
+                        identifier: 'PA07',
+                        device_type: 'Atemschutzgerät',
+                        location: 'benutzt',
+                        status_label: 'benutzt',
+                        returned_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+                    },
+                };
+            },
+        },
+    });
+
+    test('nur „Benutzt“ (vorgewählt) und „Defekt“, kein „In Ordnung“', async ({ page }) => {
+        await page.goto(`/firefighting/test/rueckgabe#schluessel=${KEY}`);
+        await page.getByTestId('return-code').fill('PA07');
+        await page.getByTestId('return-check').click();
+        await expect(page.getByTestId('return-found')).toContainText('„benutzt“');
+        await expect(page.getByLabel('In Ordnung')).toHaveCount(0);
+        await expect(page.getByLabel('Benutzt')).toBeChecked();
+        await expect(page.getByLabel('Defekt')).not.toBeChecked();
+        await page.getByTestId('return-name').fill('Herr Maier');
+        await page.getByTestId('return-submit').click();
+        await expect(page.getByTestId('return-receipt')).toContainText('Benutzt');
+        await expect(page.getByTestId('return-receipt')).toContainText('„benutzt“');
+        expect(returns).toEqual([
+            { key: KEY, code: 'PA07', name: 'Herr Maier', condition: 'used' },
+        ]);
+    });
+});
+
 test.describe('Ohne oder mit ungültigem Schlüssel', () => {
     test('ohne Schlüssel: Hinweis, kein Formular', async ({ page }) => {
         await page.goto('/firefighting/test/rueckgabe');

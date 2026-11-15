@@ -26,8 +26,10 @@ use FirefightingEquipment\Time\SystemClock;
  * Antwort {today, summary {open, overdue}, shown, loans [{id, device (wie GET devices), borrower {id, name},
  * contact, due_back_on, overdue, days_overdue, comment, lent_at, lent_by {id, name}}], borrowers [{id, name}]}.
  * `borrowers` sind die aktiven Standorte mit der Aufgabe „Ausgeliehen an“ (Ziele für „Verleihen“),
- * `returns` die mit der Aufgabe „Rückgabe“ ({id, name, link_created_at}: wann der gültige Schlüssel des
- * Aushangs angelegt wurde, null = keiner); `in_returns` die Ausrüstung in der Rückgabe (Einträge wie GET
+ * `returns` die Standorte, die einen Aushang haben können ({id, name, kind, link_created_at}: `kind` `returns` =
+ * Aufgabe „Rückgabe“, `collection` = Sammelstelle (Rückgabe direkt in die Sammelstelle, Runde 16, nach den
+ * Rückgabe-Standorten); `link_created_at` = wann der gültige Schlüssel des Aushangs angelegt wurde, null =
+ * keiner); `in_returns` die Ausrüstung an den Standorten mit der Aufgabe „Rückgabe“ (Einträge wie GET
  * devices, am längsten wartende zuerst, höchstens 200). Sortiert nach Leihnehmer, dann „Rückgabe bis“; höchstens
  * MAX_SHOWN, `summary` zählt alle. „Überfällig“ = „Rückgabe bis“ vor heute (Europe/Berlin).
  */
@@ -71,8 +73,12 @@ final readonly class LoanListHandler implements RequestHandler
         }
         $since = new ReturnPointRepository($pdo)->activeSince($tenant);
         $returnPlaces = array_map(
-            static fn (array $place): array => [...$place, 'link_created_at' => $since[$place['id']] ?? null],
+            static fn (array $place): array => [...$place, 'kind' => 'returns', 'link_created_at' => $since[$place['id']] ?? null],
             $locations->withTask($tenant, LocationTask::Returns),
+        );
+        $collectionPlaces = array_map(
+            static fn (array $place): array => [...$place, 'kind' => 'collection', 'link_created_at' => $since[$place['id']] ?? null],
+            $locations->withTask($tenant, LocationTask::Collection),
         );
         $inReturns = [];
         foreach ($returnPlaces as $place) {
@@ -91,7 +97,7 @@ final readonly class LoanListHandler implements RequestHandler
             'shown' => count($items),
             'loans' => $items,
             'borrowers' => $locations->withTask($tenant, LocationTask::Borrower),
-            'returns' => $returnPlaces,
+            'returns' => [...$returnPlaces, ...$collectionPlaces],
             'in_returns' => array_map(DeviceJson::listItem(...), array_slice($inReturns, 0, 200)),
             'labels' => ['borrower' => $labels[LocationTask::Borrower->value] ?? LocationTask::Borrower->label(), 'returns' => $labels[LocationTask::Returns->value] ?? LocationTask::Returns->label()],
         ]);

@@ -144,6 +144,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
        Speichern abfangen).
      - Testgeräte: Kennungen M90–M99 bzw. Gerätetyp „Live-Testtyp 2“; an bestehenden Geräten
        geänderte Werte danach zurücksetzen.
+     - Abläufe der Test-Stadt (seit 12.11.2026, Vorgabe Holger; Voraussetzung für alle Live-Tests):
+       dauerhaft freigeschaltet und vergeben sind die Aufgaben Lager („Lager Gerätehaus“),
+       Sammelstelle („Kleiderkammer“), Werkstatt („Atemschutzwerkstatt“), Ausgeliehen an
+       („Hattingen“) und Rückgabe („Ippingen“, seit 13.11.2026). Einschalten
+       erledigt Claude, sobald Holger als Super-Admin angemeldet ist. Zurücksetzen nach einem Test
+       heißt: M90–M99 bzw. „Live-Testtyp 2“ auf den Anfangsstand, verliehene Testgeräte zurück;
+       Aufgaben und Abläufe bleiben stehen. Ausnahme nur, wenn ein Test ausdrücklich das Abschalten
+       prüft – dann danach wieder einschalten.
      - Ergebnis je geprüftem Punkt (☑/☒) in die passende LIVETEST-Datei (z. B.
        `docs/frontend/LIVETEST-ADMIN-KONSOLE.md`) eintragen; Fehler beheben, Wünsche nach
        `docs/TODO-SPAETER.md`.
@@ -170,8 +178,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
        App-Logik, IndexedDB, Warteschlange, Senden; kein echtes Offline). Ausgabe ☑/☒/☐ je Punkt
        (auch in `frontend/test-results/live-offline.txt`); der Agent trägt sie in
        `docs/frontend/LIVETEST-OFFLINE.md` bzw. `LIVETEST-PHASE-2.md` ein. Voraussetzung in der
-       Test-Stadt (richtet Claude ein): Lager Gerätehaus (Aufgabe Lager) und Kleiderkammer (Sammelstelle)
-       dauerhaft freigeschaltet, Rolle „Live-Test Geräteträger“ (ID 23) mit `device.used` und
+       Test-Stadt (richtet Claude ein): die Abläufe der Test-Stadt (siehe oben, u. a. Lager Gerätehaus
+       und Kleiderkammer als Sammelstelle) dauerhaft freigeschaltet, Rolle „Live-Test Geräteträger“ (ID 23) mit `device.used` und
        `device.swap`. Diagnose-Schalter (nur Fehlersuche): `FF_LIVE_ONE=1` nur Konto 1, `FF_LIVE_MEM=1` misst alle 500 ms den Speicher der Seite und aller Chromium-Prozesse (`tests/live/support/memoryGuard.ts`, Ausgabe `test-results/live-memory.txt`) und schließt den Browser bei über 1 GB Seite, über 3 GB gesamt, 10 s ununterbrochenem Wachstum oder 10 s ohne Antwort. Der „Absturz“ vom 11.11.2026 war kein Speicherproblem der App: Der Klick auf die Karte wartete wegen eines falschen Musters (`` im zusammengesetzten Kartentext, jetzt `cardTextPattern`) bis zum Ende der Testzeit, dann beendete Playwright den Browser. Ein Test, der in der Live-Umgebung hängt, braucht eine kurze Zeitgrenze je Aktion. Ein echtes iPhone entfällt als regelmäßige Prüfung („nur bei gemeldeten
        Problemen“). Nach jedem Deploy, der Offline, Warteschlange, Tausch, Benutzt melden, Service
        Worker oder Updates betrifft, führt der Agent den Lauf selbst aus (Befehl in `frontend/`, Dauer
@@ -2873,12 +2881,20 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Status, sonst `used`/`defective`; Verlauf „Rückgabe“ von „<Name> (ohne Anmeldung)“ (`DeviceEvent::$userId` null,
   `type_label` „Rückgabe“, JSON `user.id` null; keine Mail „Log“). Ungültiger Schlüssel oder Code → 400 `invalid_request`
   (gleiche Meldungen, zählt in die Bremse `PublicReturnThrottle`: 20 Fehlversuche je IP-Präfix in 15 Minuten, sonst
-  429). Seit 12.11.2026 (U1): Nummer ohne Rücksicht auf Leerzeichen und Groß-/Kleinschreibung („HRT16" = „HRT 16"); `POST returns` liefert `returned_at`; eine Ausrüstung, die in der Rückgabe des Schlüssels steht und nicht mehr verliehen ist, ergibt 400 „… wurde bereits zurückgegeben …" mit `details {identifier, returned_at}` (keine Namen), sonst eine gemeinsame Meldung „Diese Nummer kennen wir nicht oder die Ausrüstung ist nicht verliehen …". Bekannte Stelle von `DeviceVisibility::all()`: `PublicReturnHandler`. Tests `ReturnTest`. Frontend: öffentliche
+  429). Rückgabe direkt in die Sammelstelle (seit 15.11.2026, Runde 16, Wunsch Immendingen, ohne Migration): Auch ein aktiver
+  Standort mit der Aufgabe Sammelstelle kann einen Aushang haben (`ReturnPointRepository::TASKS`; `GET loans` nennt ihn in
+  `returns` mit `kind` `collection` nach den Rückgabe-Standorten, `in_returns` bleibt bei diesen). Mit seinem Schlüssel bucht
+  `POST returns` direkt dorthin; `POST returns/check` liefert `conditions` (Standard zuerst; Rückgabe-Standort `ok`, `used`,
+  `defective`, Sammelstelle nach `collection_accepts` nur `used`/`defective`, `PublicReturnHandler::conditions`), ein anderer
+  Zustand → 400. „In Ordnung“ gibt es dort nicht: alles in der Sammelstelle prüft der Gerätewart (Seite Wartung). „Schon
+  zurückgegeben“ an der Sammelstelle nur, wenn der letzte Eintrag eine Rückgabe ohne Anmeldung ist. Seit 12.11.2026 (U1): Nummer ohne Rücksicht auf Leerzeichen und Groß-/Kleinschreibung („HRT16" = „HRT 16"); `POST returns` liefert `returned_at`; eine Ausrüstung, die in der Rückgabe des Schlüssels steht und nicht mehr verliehen ist, ergibt 400 „… wurde bereits zurückgegeben …" mit `details {identifier, returned_at}` (keine Namen), sonst eine gemeinsame Meldung „Diese Nummer kennen wir nicht oder die Ausrüstung ist nicht verliehen …". Bekannte Stelle von `DeviceVisibility::all()`: `PublicReturnHandler`. Tests `ReturnTest`. Frontend: öffentliche
   Seite `ReturnPage` (`rueckgabe#schluessel=…`, `meta.public`, nur unter Städten; Schlüssel aus dem Fragment per
   `takeFragmentParam`, übersteht ein Neuladen in sessionStorage `ff-return-key`; Nummer prüfen, Name, Zustand, Hinweis),
   in `LoansPage` die Abschnitte „Rückgabe“ (Aushang erzeugen/erneuern/widerrufen, Link und QR-Code nur einmal,
-  `ReturnPoster` zum Drucken, `returnLink` in `src/data/loans.ts`) und „In der Rückgabe“ (Auswahl, „In Ordnung ins Lager“,
-  „Benutzte und Defekte in die Sammelstelle“, `processReturns`). Seite „Danke" als Beleg (Nummer, Zustand, Hinweis, Zeit, „Sie müssen nichts weiter tun"), Hinweis „schon zurückgegeben" (`return-already`), Knopf „Nummer suchen", Formular zuerst, Bilder darunter in `<details>` (U1/U22). Tests `returnPage.spec.ts`, `loans.spec.ts`, Unit
+  `ReturnPoster` zum Drucken, `returnLink` in `src/data/loans.ts`; Sammelstellen mit Hinweis `returns-collection-hint`) und „In
+  der Rückgabe“ (nur mit einem Rückgabe-Standort; Auswahl, „In Ordnung ins Lager“, „Benutzte und Defekte in die Sammelstelle“,
+  Bestätigung „Ins Lager bringen“ bzw. „In die Sammelstelle bringen“, `processReturns`). Die Rückgabeseite zeigt nur die
+  Zustände aus `conditions` (`ReturnFound.conditions`, fehlt = alle drei) und wählt den ersten vor. Seite „Danke" als Beleg (Nummer, Zustand, Hinweis, Zeit, „Sie müssen nichts weiter tun"), Hinweis „schon zurückgegeben" (`return-already`), Knopf „Nummer suchen", Formular zuerst, Bilder darunter in `<details>` (U1/U22). Tests `returnPage.spec.ts`, `loans.spec.ts`, Unit
   `returns.spec.ts`.
 - Sollbestand (Phase 2, P2.7, Runde 9; Plan 3.5, ohne Tausch und ohne Prüfung der Buchungen, die kommen mit P2.8):
   Migrationen 0059 `fe_stock_rules` (Standort, `min_count` 1–99) und 0060 `fe_stock_rule_types` (Typen einer Regel,
@@ -2916,7 +2932,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Sammelstelle für benutzte bzw. defekte Ausrüstung (auch außerhalb des Datenfilters, G4), sonst bleibt der Standort;
   der Ersatz „in“ muss einsatzbereit sein und kommt an den bisherigen Standort von „out“; beide in EINER Transaktion
   (gesperrt in der Reihenfolge der IDs), beide Ereignisse tragen dieselbe `swap_id`; die Prüfung gilt für beide zusammen.
-  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (beim Öffnen, auch nach einer Ablehnung, lädt er Ausrüstung und Standorte vom Server neu (`refresh('changed')`), bis dahin „Wird geladen …“ statt eines alten Stands; offline oder bei Fehler gilt die Kopie mit Hinweis `swap-stale` und ihrem Stand; Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Seit 12.11.2026 (U2): Kopf „M5 ersetzen durch …“ (mit gewähltem Ersatz), zuerst „Zustand von M5?" als drei große Knöpfe (`aria-pressed`, OHNE Vorauswahl; „Tauschen" erst mit Zustand und Ersatz, solange fehlt ein Satz `swap-missing`, danach `swap-summary` im festen Fuß), Ersatz als ganze Zeilen mit Wartungsdatum; Kommentar), in `DevicePage` der
+  Antwort `{out, in, swap_id}`. Frontend: `SwapDialog` (beim Öffnen, auch nach einer Ablehnung, lädt er Ausrüstung und Standorte vom Server neu (`refresh('changed')`), bis dahin „Wird geladen …“ statt eines alten Stands; offline oder bei Fehler gilt die Kopie mit Hinweis `swap-stale` und ihrem Stand; Ersatz suchen, nur passende Typen: der des Geräts bzw. die Typen der verletzten Regel; Vorschläge aus Lagern und Räumen, Lager mit Aufgabe zuerst, nichts vom eigenen Standort; Ausrüstung anderer Fahrzeuge erst hinter „Andere Standorte anzeigen“ mit Warnung, wenn deren Sollbestand unterschritten würde, `swapCandidates` in `src/data/swap.ts`; „Tauschen“ erst 400 ms nach dem Öffnen; Seit 12.11.2026 (U2): Kopf „M5 ersetzen durch …“ (mit gewähltem Ersatz), zuerst „Zustand von M5?" als drei Knöpfe (`aria-pressed`, OHNE Vorauswahl; seit Runde 16 in normaler Knopfhöhe und gewählt in der Farbe des Status wie die Statusknöpfe der Ausrüstungsliste; „Tauschen" erst mit Zustand und Ersatz, solange fehlt ein Satz `swap-missing`, danach `swap-summary` im festen Fuß), Ersatz als ganze Zeilen mit Wartungsdatum; Kommentar), in `DevicePage` der
   Knopf „Tauschen …“ (`swap-open`, nur online) und bei 409 mit `details.stock` der Kasten `stock-block` mit „Tauschen …“
   und, mit `stock.override`, „Trotzdem buchen …“ (Rückfrage, sendet `confirmed_below_minimum`); `src/data/swap.ts`
   (`parseStockBlock`, `swapCandidates`: einsatzbereit, Typen der verletzten Regel zuerst). Offline (P2.9, Runde 11): `POST devices/swap`

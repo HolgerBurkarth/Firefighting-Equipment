@@ -9,11 +9,15 @@ use FirefightingEquipment\Device\LocationNotFoundException;
 use FirefightingEquipment\Tenant\Tenant;
 
 /**
- * Rückgabestellen (Phase 2, P2.6, fe_return_points): je Standort mit der Aufgabe „Rückgabe“ höchstens ein
- * gültiger Schlüssel. Erneuern widerruft den alten. Gespeichert wird nur der Hash.
+ * Rückgabestellen (Phase 2, P2.6, fe_return_points): je Standort mit der Aufgabe „Rückgabe“ oder (seit Runde 16,
+ * Rückgabe direkt in die Sammelstelle) „Sammelstelle“ höchstens ein gültiger Schlüssel. Erneuern widerruft den
+ * alten. Gespeichert wird nur der Hash.
  */
 final readonly class ReturnPointRepository
 {
+    /** Aufgaben, deren Standorte einen Aushang haben können. */
+    public const array TASKS = ['returns', 'collection'];
+
     public function __construct(private \PDO $pdo)
     {
     }
@@ -22,7 +26,7 @@ final readonly class ReturnPointRepository
      * Neuer Schlüssel für den Standort (der alte gilt nicht mehr).
      *
      * @throws LocationNotFoundException    unbekannt oder fremd
-     * @throws DeviceRuleViolationException ohne die Aufgabe „Rückgabe“ oder gesperrt
+     * @throws DeviceRuleViolationException ohne die Aufgabe „Rückgabe“ bzw. „Sammelstelle“ oder gesperrt
      */
     public function renew(Tenant $tenant, int $locationId, int $userId): ReturnKey
     {
@@ -34,8 +38,8 @@ final readonly class ReturnPointRepository
             if (!is_array($row)) {
                 throw LocationNotFoundException::forId($locationId);
             }
-            if ($row['task'] !== 'returns' || (int) $row['active'] !== 1) {
-                throw DeviceRuleViolationException::because(sprintf('„%s“ ist keine Rückgabestelle.', (string) $row['name']));
+            if (!in_array($row['task'], self::TASKS, true) || (int) $row['active'] !== 1) {
+                throw DeviceRuleViolationException::because(sprintf('„%s“ ist weder eine Rückgabestelle noch eine Sammelstelle.', (string) $row['name']));
             }
             $this->pdo->prepare('UPDATE fe_return_points SET revoked_at = UTC_TIMESTAMP() WHERE tenant_id = ? AND location_id = ? AND revoked_at IS NULL')
                 ->execute([$tenant->id, $locationId]);
@@ -70,20 +74,27 @@ final readonly class ReturnPointRepository
     }
 
     /**
-     * Der aktive Standort mit der Aufgabe „Rückgabe“ zu diesem Schlüssel.
+     * Der aktive Standort mit der Aufgabe „Rückgabe“ bzw. „Sammelstelle“ zu diesem Schlüssel; `task` ist
+     * `returns` oder `collection`, `accepts` bei der Sammelstelle `used`, `defective` oder `both`.
      *
-     * @return array{id: int, name: string}|null null: unbekannt, widerrufen, Standort gesperrt oder ohne die Aufgabe
+     * @return array{id: int, name: string, task: string, accepts: ?string}|null null: unbekannt, widerrufen,
+     *                                                                          Standort gesperrt oder ohne die Aufgabe
      */
     public function locationFor(Tenant $tenant, ReturnKey $key): ?array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT l.id, l.name FROM fe_return_points r JOIN fe_locations l ON l.id = r.location_id AND l.tenant_id = r.tenant_id"
-            . " WHERE r.tenant_id = ? AND r.secret_hash = ? AND r.revoked_at IS NULL AND l.active = 1 AND l.task = 'returns'",
+            "SELECT l.id, l.name, l.task, l.collection_accepts FROM fe_return_points r JOIN fe_locations l ON l.id = r.location_id AND l.tenant_id = r.tenant_id"
+            . " WHERE r.tenant_id = ? AND r.secret_hash = ? AND r.revoked_at IS NULL AND l.active = 1 AND l.task IN ('returns', 'collection')",
         );
         $stmt->execute([$tenant->id, $key->hash()]);
         $row = $stmt->fetch();
 
-        return is_array($row) ? ['id' => (int) $row['id'], 'name' => (string) $row['name']] : null;
+        return is_array($row) ? [
+            'id' => (int) $row['id'],
+            'name' => (string) $row['name'],
+            'task' => (string) $row['task'],
+            'accepts' => $row['collection_accepts'] === null ? null : (string) $row['collection_accepts'],
+        ] : null;
     }
 
     /**

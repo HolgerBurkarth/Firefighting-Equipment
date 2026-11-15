@@ -27,12 +27,14 @@ describe('Rückgabe: Liste', () => {
             returns: [
                 { id: 7, name: 'Rückgabe', link_created_at: '2026-11-09T09:00:00Z' },
                 { id: 8, name: 'Kiste', link_created_at: null },
+                { id: 9, name: 'benutzt', kind: 'collection', link_created_at: null },
             ],
             in_returns: [deviceJson(1)],
         });
         expect(state?.returns).toEqual([
-            { id: 7, name: 'Rückgabe', linkCreatedAt: '2026-11-09T09:00:00Z' },
-            { id: 8, name: 'Kiste', linkCreatedAt: null },
+            { id: 7, name: 'Rückgabe', kind: 'returns', linkCreatedAt: '2026-11-09T09:00:00Z' },
+            { id: 8, name: 'Kiste', kind: 'returns', linkCreatedAt: null },
+            { id: 9, name: 'benutzt', kind: 'collection', linkCreatedAt: null },
         ]);
         expect(state?.inReturns.map((device) => device.identifier)).toEqual(['M1']);
         expect(state?.returnsLabel).toBe('Rückgabe');
@@ -46,6 +48,7 @@ describe('Rückgabe: Liste', () => {
 
     it.each([
         ['Aushang kein Text', { ...BASE, returns: [{ id: 7, name: 'x', link_created_at: 5 }] }],
+        ['Art unbekannt', { ...BASE, returns: [{ id: 7, name: 'x', kind: 'lager' }] }],
         ['Ausrüstung unbrauchbar', { ...BASE, returns: [], in_returns: [{ id: 1 }] }],
     ])('lehnt ab: %s', (_label, json) => {
         expect(parseLoans(json)).toBeNull();
@@ -92,7 +95,29 @@ describe('Rückgabe: API', () => {
             identifier: 'M1',
             deviceType: 'Maske',
             location: 'Rückgabe',
+            conditions: ['ok', 'used', 'defective'],
         });
+        // Sammelstelle (Runde 16): nur die Zustände des Servers, in seiner Reihenfolge.
+        const collection = await checkReturn(
+            'K',
+            'M1',
+            respond(200, {
+                identifier: 'M1',
+                device_type: 'Maske',
+                location: 'benutzt',
+                conditions: ['used', 'defective'],
+            }).fetch,
+        );
+        expect(collection.ok && collection.data.conditions).toEqual(['used', 'defective']);
+        for (const conditions of [[], ['kaputt'], 'used']) {
+            const bad = await checkReturn(
+                'K',
+                'M1',
+                respond(200, { identifier: 'M1', device_type: 'Maske', location: 'x', conditions })
+                    .fetch,
+            );
+            expect(bad.ok).toBe(false);
+        }
         const give = respond(200, {
             identifier: 'M1',
             device_type: 'Maske',

@@ -27,17 +27,24 @@ use FirefightingEquipment\User\PersonName;
 /**
  * Rückgabe ohne Anmeldung (Phase 2, P2.6; `Access::Public`, nur unter Städten, keine Sitzung, kein Cookie).
  * Der geheime Schlüssel des Aushangs gibt NUR die Rückgabe an dem einen Standort mit der Aufgabe „Rückgabe“
- * frei, nichts sonst:
+ * bzw. „Sammelstelle“ frei, nichts sonst:
  * - POST returns/check {key, code}: findet die verliehene Ausrüstung zu Nummer oder Scan-Code und nennt nur
- *   Nummer und Typ ({identifier, device_type});
+ *   Nummer und Typ ({identifier, device_type, location, conditions}); `conditions` = die Zustände, die hier
+ *   wählbar sind (der erste ist der Standard);
  * - POST returns {key, code, name, condition (ok|used|defective), comment?}: bucht sie in die Rückgabe, beendet
  *   den Verleih und trägt „<Name> (ohne Anmeldung)“ als Urheber in den Verlauf ein. condition `ok` lässt den
- *   Status, `used`/`defective` setzt ihn. Antwort {identifier, device_type, location, status_label, returned_at}. Schon zurückgegeben (U1): 400 mit `details {identifier, returned_at}`.
+ *   Status, `used`/`defective` setzt ihn. Rückgabe direkt in die Sammelstelle (Runde 16, Aushang an einem
+ *   Standort mit der Aufgabe „Sammelstelle“): nur `used` (Standard) bzw. `defective`, soweit die Sammelstelle sie
+ *   annimmt; „in Ordnung“ gibt es dort nicht (alles in der Sammelstelle prüft der Gerätewart, bevor es ins Lager
+ *   kommt). Antwort {identifier, device_type, location, status_label, returned_at}. Schon zurückgegeben (U1): 400 mit `details {identifier, returned_at}`.
  * Ungültiger Schlüssel oder Code → 400 `invalid_request` (zählt in die Bremse `public_return`, 20 je
  * IP-Präfix und 15 Minuten, sonst 429); Verlauf und Ausrüstung bleiben unberührt.
  */
 final readonly class PublicReturnHandler implements RequestHandler
 {
+    /** Bezeichnungen der Zustände wie die Knöpfe der Seite (für Meldungen). */
+    private const array LABELS = ['ok' => 'in Ordnung', 'used' => 'benutzt', 'defective' => 'defekt'];
+
     public function __construct(private bool $check)
     {
     }
@@ -48,13 +55,13 @@ final readonly class PublicReturnHandler implements RequestHandler
         $keyValue = $context->stringField('key');
         $code = $context->stringField('code');
         $name = null;
-        $condition = 'ok';
+        $condition = null;
         $comment = null;
         if (!$this->check) {
             DeviceFields::rejectUnknown($context, ['key', 'code', 'name', 'condition', 'comment']);
             $nameValue = $context->stringField('name');
-            $condition = $context->optionalStringField('condition') ?? 'ok';
-            if (!in_array($condition, ['ok', 'used', 'defective'], true)) {
+            $condition = $context->optionalStringField('condition');
+            if ($condition !== null && !in_array($condition, ['ok', 'used', 'defective'], true)) {
                 throw HttpException::invalidRequest('Das Feld "condition" muss "ok", "used" oder "defective" sein.');
             }
             try {
@@ -81,11 +88,19 @@ final readonly class PublicReturnHandler implements RequestHandler
             $throttle->record($tenant->id, $ip, false);
             throw HttpException::invalidRequest('Dieser Rückgabe-Link gilt nicht (mehr). Bitte den aktuellen Aushang verwenden.');
         }
+        $conditions = self::conditions($place['task'], $place['accepts']);
+        if ($condition !== null && !in_array($condition, $conditions, true)) {
+            throw HttpException::invalidRequest(sprintf(
+                'Hier kann Ausrüstung nur als %s zurückgegeben werden.',
+                implode(' oder ', array_map(static fn (string $c): string => '„' . self::LABELS[$c] . '“', $conditions)),
+            ));
+        }
+        $condition ??= $conditions[0];
         $loans = new LoanRepository($pdo);
         $found = $loans->findLoaned($tenant, $code);
         if ($found === null) {
             $throttle->record($tenant->id, $ip, false);
-            $returned = $loans->findReturned($tenant, $code, $place['id']);
+            $returned = $loans->findReturned($tenant, $code, $place['id'], $place['task'] === 'collection');
             if ($returned !== null) {
                 throw HttpException::invalidRequest(
                     sprintf('%s wurde bereits zurückgegeben. Sie müssen nichts weiter tun.', $returned['identifier']),
@@ -98,7 +113,12 @@ final readonly class PublicReturnHandler implements RequestHandler
         if ($this->check) {
             $throttle->record($tenant->id, $ip, true);
 
-            return new JsonResponse(['identifier' => $found['identifier'], 'device_type' => $found['device_type'], 'location' => $place['name']]);
+            return new JsonResponse([
+                'identifier' => $found['identifier'],
+                'device_type' => $found['device_type'],
+                'location' => $place['name'],
+                'conditions' => $conditions,
+            ]);
         }
 
         $devices = new DeviceRepository($pdo, DeviceVisibility::all(), null, $context->channel());
@@ -130,5 +150,24 @@ final readonly class PublicReturnHandler implements RequestHandler
             'status_label' => $device->status->label(),
             'returned_at' => AuthJson::time($device->stateChangedAt ?? $device->updatedAt),
         ]);
+    }
+
+    /**
+     * Wählbare Zustände an diesem Standort, der erste ist der Standard: Rückgabe-Standort alle drei (wie bisher),
+     * Sammelstelle nur, was sie annimmt (benutzt vor defekt).
+     *
+     * @return non-empty-list<'ok'|'used'|'defective'>
+     */
+    public static function conditions(string $task, ?string $accepts): array
+    {
+        if ($task !== 'collection') {
+            return ['ok', 'used', 'defective'];
+        }
+
+        return match ($accepts) {
+            'used' => ['used'],
+            'defective' => ['defective'],
+            default => ['used', 'defective'],
+        };
     }
 }

@@ -160,3 +160,25 @@ des Standes vom 11.11.2026, beide Konten:
 - ☑ Regel wieder entfernt (Chip und Kachel weg, „Noch kein Sollbestand festgelegt.“).
 - ☑ Seite „Rückgabe“ (mit Platzhalter-Schlüssel, keine Buchung): vier gezeichnete Schritte über dem Formular.
 - ☐ Offen für Holger: Aushänge drucken (Einladungscode und Rückgabe, eine A4-Seite), Listen am Tablet (768 und 1024 px) und am iPhone, PDFs in docs/anleitungen/ lesen.
+
+## Runde 15: Verbesserungen aus dem Benutzertest (12.11.2026, Build `2923baad9b70`, Test-Stadt, Claude in Chrome)
+
+Punkte nach `docs/usability/BENUTZERTEST-2026-11.md`.
+
+- ☑ U5: „✓ Liste kopiert (8 Ausrüstungen)“ erscheint neben dem Knopf (Erfolgsfall im echten Browser; in der Wiederholung des Benutzertests scheiterte nur das Kopieren im Test-Browser).
+- ☑ U3: Kästchen in der Wartung mit Tippfläche 44 × 44 px; Ersatz-Zeilen beim Tauschen 408 × 59 px, die ganze Zeile ist antippbar.
+- ☑ U4: Sprunglink „Sollbestand ↓“ funktioniert, Erklärsatz im Fenster, Auswahl mit Pfaden („LF 10 / G1“).
+- ☑ U7: Fenster „Bearbeiten“ der Benutzer: Speichern ohne Scrollen sichtbar, „Konto beenden“ mit Sperren/Löschen darunter, Claude-Zugang eingeklappt.
+- ☑ U2: Fenster „Tauschen“ mit Titel „M90 ersetzen durch …“, Zustand ohne Vorauswahl, „Tauschen“ unten (nur Desktop-Breite).
+- ☑ U11: Bestätigung nach „defekt“ mit Hinweis zum Herausnehmen und auf „Tauschen …“.
+- ☑ U17: Protokoll „Buchung kam zu spät – Stand nicht geändert“.
+- ☑ U20: Rückfrage „Es kommt zur Sammelstelle „Kleiderkammer“.“
+- Teil 2 (13.11.2026, Build `2923baad9b70`, Holger): Abläufe Werkstatt, Rückgabe und Ausgeliehen an wieder eingeschaltet und dauerhaft vergeben (Atemschutzwerkstatt = Werkstatt, Hattingen = Ausgeliehen an, Ippingen = Rückgabe; CLAUDE.md „Abläufe der Test-Stadt“).
+- ☑ U6: Sprunglinks „Verliehen / In der Rückgabe / Rückgabe-Aushang“ oben, Abschnitt „Rückgabe-Aushang“ mit Erklärung, „Aushang abschalten …“.
+- ☑ U22: Formular zuerst, Bilder eingeklappt, Knopf „Nummer suchen“, nach „Weitere Ausrüstung zurückgeben“ Fokus im Nummernfeld.
+- ☑ U1: M91 an Hattingen verliehen, über den Aushang als „m91“ gefunden, Beleg „Danke – Ihre Rückgabe ist angekommen“ mit Ausrüstung, Zustand, Zeit, Ablageort und „Sie müssen nichts weiter tun“; zweite Eingabe „M91 wurde bereits zurückgegeben (heute 06:15) …“; unbekannte Nummer: gemeinsame Meldung mit Beispiel „HRT 14“.
+- ☑ U10: Werkstatt „Alle auswählen“ wählt 6 von 7, PA 11 (defekt) bleibt frei mit „defekt – bleibt in der Werkstatt“; Knopf „Ins Lager bringen … (6)“.
+- Zurückgesetzt (Teil 2): M91 aus der Rückgabe ins Lager Gerätehaus (einsatzbereit), M90–M95 auf Anfangsstand, Testaushang Ippingen abgeschaltet; Abläufe und Aufgaben bleiben stehen.
+- Wunsch (nach `docs/TODO-SPAETER.md`): Rückfrage zu „In Ordnung ins Lager …“ bzw. „… in die Sammelstelle …“ mit Knopf „Ins Lager bringen“ bzw. „In die Sammelstelle bringen“ statt nur „Bringen“.
+- ☐ Offen für Holger: Fenster „Tauschen“ in Handy-Breite.
+- Zurückgesetzt: M90 wieder einsatzbereit in HLF 20 / G1.

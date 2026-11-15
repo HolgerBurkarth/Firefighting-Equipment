@@ -577,7 +577,10 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
         await expect(page.getByTestId('confirm-dialog')).toContainText(
             '2 Ausrüstungen in die Sammelstelle bringen?',
         );
-        await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Bringen' }).click();
+        await page
+            .getByTestId('confirm-dialog')
+            .getByRole('button', { name: 'In die Sammelstelle bringen' })
+            .click();
         await expect(page.getByTestId('loan-result')).toHaveText(
             'In die Sammelstelle: 2 Ausrüstungen geändert.',
         );
@@ -589,11 +592,72 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
             '1 Ausrüstung ins Lager bringen?',
         );
         await expect(page.getByTestId('confirm-dialog')).toContainText('Sie steht dann');
-        await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Bringen' }).click();
+        await page
+            .getByTestId('confirm-dialog')
+            .getByRole('button', { name: 'Ins Lager bringen' })
+            .click();
         await expect(page.getByTestId('loan-result')).toHaveText(
             'Ins Lager: 1 Ausrüstung geändert.',
         );
         await expect(list).toContainText('Zurzeit steht nichts in der Rückgabe.');
         expect(returns.posted.map((entry) => entry.path)).toEqual(['to-collection', 'to-store']);
+    });
+});
+
+test.describe('Rückgabe direkt in die Sammelstelle (Runde 16)', () => {
+    let linkCreatedAt: string | null = null;
+
+    test.use({
+        api: {
+            'GET api/v1/auth/me': admin(),
+            ...ADMIN_OVERVIEW,
+            'GET api/v1/loans': (): MockResponse => ({
+                status: 200,
+                body: {
+                    today: '2026-11-15',
+                    summary: { open: 0, overdue: 0 },
+                    shown: 0,
+                    loans: [],
+                    borrowers: [NACHBAR],
+                    returns: [
+                        {
+                            id: 91,
+                            name: 'benutzt',
+                            kind: 'collection',
+                            link_created_at: linkCreatedAt,
+                        },
+                    ],
+                    in_returns: [],
+                    labels: { borrower: 'Ausgeliehen an', returns: 'Rückgabe' },
+                },
+            }),
+            'POST api/v1/return-points/91/renew': (): MockResponse => {
+                linkCreatedAt = '2026-11-15T09:00:00Z';
+                return { status: 200, body: { key: 'k'.repeat(43) } };
+            },
+        },
+    });
+
+    test.beforeEach(async ({ page }) => {
+        linkCreatedAt = null;
+        await page.setViewportSize({ width: 1280, height: 900 });
+    });
+
+    test('Aushang an der Sammelstelle, ohne „In der Rückgabe“', async ({ page }) => {
+        await page.goto('/firefighting/test/verleih');
+        const place = page.getByTestId('return-place');
+        await expect(place).toContainText('benutzt');
+        await expect(place.getByTestId('return-place-kind')).toHaveText('Sammelstelle');
+        await expect(page.getByTestId('returns-collection-hint')).toContainText(
+            'kommt die Ausrüstung direkt dorthin',
+        );
+        await expect(page.getByTestId('in-returns')).toHaveCount(0);
+        await expect(page.getByTestId('loan-jumps').getByRole('button')).toHaveText([
+            'Verliehen',
+            'Rückgabe-Aushang',
+        ]);
+        await place.getByTestId('renew-key').click();
+        await expect(page.getByTestId('issued-link')).toHaveText(/rueckgabe#schluessel=k{43}$/);
+        await expect(page.getByTestId('return-poster')).toContainText('benutzt – ohne Anmeldung');
     });
 });

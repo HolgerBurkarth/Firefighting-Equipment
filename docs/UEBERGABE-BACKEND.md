@@ -8,6 +8,30 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-15 – „Rückgabe direkt in die Sammelstelle (Aushang an der Sammelstelle), Knöpfe „Ins Lager bringen“/„In die Sammelstelle bringen““
+
+Rückgabe ohne Anmeldung direkt in die Sammelstelle (Wunsch Immendingen, Runde 16; keine Migration):
+
+- `POST return-points/{id}/renew` erlaubt jetzt auch Standorte mit der Aufgabe `collection` (Sammelstelle); andere bleiben 409
+  (Meldung jetzt „… ist weder eine Rückgabestelle noch eine Sammelstelle.“).
+- `GET loans`: jeder Eintrag in `returns` hat das neue Feld `kind` (`returns` bzw. `collection`); nach den Rückgabe-Standorten
+  folgen die aktiven Sammelstellen. `in_returns` bleibt auf die Rückgabe-Standorte beschränkt.
+- `POST returns/check`: neues Feld `conditions` (wählbare Zustände, der erste ist der Standard): Rückgabe-Standort
+  `["ok","used","defective"]` wie bisher, Sammelstelle nach `collection_accepts` (`["used","defective"]`, `["used"]` bzw.
+  `["defective"]`).
+- `POST returns` mit dem Schlüssel einer Sammelstelle: `condition` fehlt → erster Wert von `conditions` (`used`); ein Zustand
+  außerhalb von `conditions` (z. B. `ok`) → 400 „Hier kann Ausrüstung nur als „benutzt“ oder „defekt“ zurückgegeben werden.“
+  (zählt nicht in die Bremse). Die Ausrüstung kommt an die Sammelstelle, der Verleih endet wie bisher, Verlauf „Rückgabe“ von
+  „<Name> (ohne Anmeldung)“. „Schon zurückgegeben“ meldet die Sammelstelle nur, wenn der letzte Eintrag der Ausrüstung eine
+  Rückgabe ohne Anmeldung ist (`LoanRepository::findReturned(…, publicReturnOnly)`).
+- Warum ohne „In Ordnung“: alles in der Sammelstelle prüft der Gerätewart, bevor es ins Lager kommt; „einsatzbereit“ im Regal
+  „benutzt“ wäre ein Widerspruch.
+- Unverändert: Rückgabe-Standorte (Aufgabe `returns`) samt „Rückgaben bearbeiten“.
+- Tests: `ReturnTest` (`testReturnDirectlyIntoTheCollectionPoint`, `testCollectionPointHasNoConditionOkAndOffersOnlyWhatItAccepts`,
+  `testCollectionKeyStopsWhenTheTaskIsRemoved`, `testAlreadyReturnedAtTheCollectionPointOnlyAfterAPublicReturn`,
+  `testCollectionPointIsOfferedAfterTheReturnLocations`), Frontend `returns.spec.ts`, Browser `returnPage.spec.ts`, `loans.spec.ts`.
+- Stelle: `CLAUDE.md`, „Rückgabe (Phase 2, P2.6 …)“.
+
 ## 2026-11-11 – „Hinweis Tausch: Bezeichnung „Grund“ statt „Unterschritten“, kein doppelter Punkt“
 
 `GET notices`/`GET notices/{id}` liefern zusätzlich `detail_label` (`null` ohne `detail`, sonst „Sollbestand“

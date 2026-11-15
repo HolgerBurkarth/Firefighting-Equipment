@@ -73,6 +73,11 @@ useUnsavedInput(() => done.value === null && (found.value !== null || name.value
 
 const formHidden = computed(() => isTenantUnavailable(tenantState.value.error));
 
+/** Die Knöpfe „Zustand“, die dieser Aushang erlaubt (an der Sammelstelle ohne „In Ordnung“). */
+const offeredConditions = computed(() =>
+    RETURN_CONDITIONS.filter((entry) => found.value?.conditions.includes(entry.value) ?? true),
+);
+
 function reset(): void {
     code.value = '';
     found.value = null;
@@ -129,6 +134,10 @@ async function onCheck(): Promise<void> {
     busy.value = false;
     if (result.ok) {
         found.value = result.data;
+        // Standard = erster wählbarer Zustand (Sammelstelle: „Benutzt“, Runde 16).
+        if (!result.data.conditions.includes(condition.value)) {
+            condition.value = result.data.conditions[0] ?? 'ok';
+        }
         nameInput.value?.focus();
         return;
     }
@@ -284,7 +293,7 @@ async function onSubmit(): Promise<void> {
                     </div>
                     <fieldset class="field conditions">
                         <legend class="field-label">Zustand</legend>
-                        <label v-for="entry in RETURN_CONDITIONS" :key="entry.value" class="check">
+                        <label v-for="entry in offeredConditions" :key="entry.value" class="check">
                             <input
                                 v-model="condition"
                                 type="radio"

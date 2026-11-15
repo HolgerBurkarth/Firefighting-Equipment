@@ -541,10 +541,12 @@ const swap: Build = async (page) => {
     await page.goto('/firefighting/test/geraete/12');
     await page.getByTestId('swap-open').click();
     await expect(page.getByTestId('swap-candidates')).toBeVisible();
+    await page.getByTestId('swap-state-used').click();
     return {
         title: 'Tauschen',
-        text: 'Ist eine Ausrüstung kaputt oder aufgebraucht, tauschen Sie sie: Tippen Sie auf „Tauschen …“ und wählen Sie den Ersatz aus dem Lager. Beide werden in einem Zug umgebucht.',
+        text: 'Ist eine Ausrüstung kaputt oder aufgebraucht, tauschen Sie sie: Tippen Sie auf „Tauschen …“, sagen Sie, in welchem Zustand sie ist (benutzt, defekt oder in Wartung), und wählen Sie den Ersatz aus dem Lager. Beide werden in einem Zug umgebucht; die alte kommt in die Sammelstelle.',
         shot: await shoot(page, [
+            { target: page.getByTestId('swap-state-used'), label: 'Zustand wählen' },
             { target: page.getByTestId('swap-search'), label: 'Ersatz suchen' },
             { target: page.getByTestId('swap-candidates'), label: 'Ersatz auswählen' },
         ]),
@@ -664,7 +666,7 @@ const loans: Build = async (page) => {
     await expect(page.getByTestId('loan-row').first()).toBeVisible();
     return {
         title: 'Verleih',
-        text: 'Mit „Verleihen“ erfassen Sie, welche Ausrüstung an wen ausgeliehen ist und bis wann. Überfällige Rückgaben sind rot. Kommt sie zurück, geben Sie sie über den Aushang der Rückgabe zurück (Abschnitt „Rückgabe“), oder buchen Sie die Ausrüstung selbst ins Lager um.',
+        text: 'Mit „Verleihen“ erfassen Sie, welche Ausrüstung an wen ausgeliehen ist und bis wann. Überfällige Rückgaben sind rot. Kommt sie zurück, gibt der Bote sie über den Aushang zurück (Abschnitt „Rückgabe-Aushang“), oder Sie buchen die Ausrüstung selbst ins Lager um.',
         shot: await shoot(page, [
             { target: page.getByTestId('lend-open'), label: 'Verleihen' },
             { target: page.getByTestId('loan-row').first(), label: 'Verliehen, überfällig' },
@@ -678,7 +680,7 @@ const returns: Build = async (page) => {
     await expect(page.getByTestId('in-returns')).toBeVisible();
     return {
         title: 'Rückgaben bearbeiten',
-        text: 'Wer Ausrüstung am Aushang zurückgibt, braucht kein Konto. Die Rückgaben erscheinen hier: In Ordnung geht ins Lager, Benutzte und Defekte in die Sammelstelle. Den Aushang (QR-Code) erzeugen oder erneuern Sie im Abschnitt „Rückgabe“.',
+        text: 'Wer Ausrüstung am Aushang zurückgibt, braucht kein Konto. Die Rückgaben erscheinen hier: In Ordnung geht ins Lager, Benutzte und Defekte in die Sammelstelle. Den Aushang (QR-Code) erzeugen oder erneuern Sie im Abschnitt „Rückgabe-Aushang“. Ohne eigenen Rückgabe-Platz hängt der Aushang an der Sammelstelle; dann kommt die Ausrüstung direkt dorthin (benutzt oder defekt) und erscheint unter „Wartung“.',
         shot: await shoot(page, [
             { target: page.getByTestId('renew-key'), label: 'Aushang erzeugen oder erneuern' },
             { target: page.getByTestId('in-returns'), label: 'Zurückgegebene Ausrüstung' },
@@ -771,7 +773,7 @@ const posterReturn: Build = async (page) => {
     await page.emulateMedia({ media: 'screen' });
     return {
         title: 'Aushang der Rückgabe drucken',
-        text: 'Unter „Rückgabe“ erzeugen Sie den Aushang und drucken ihn (A4). Er zeigt den QR-Code und in vier Bildern, wie die Rückgabe geht. Hängen Sie ihn dort auf, wo die Ausrüstung abgelegt wird.',
+        text: 'Unter „Rückgabe-Aushang“ erzeugen Sie den Aushang und drucken ihn (A4). Er zeigt den QR-Code und in vier Bildern, wie die Rückgabe geht. Hängen Sie ihn dort auf, wo die Ausrüstung abgelegt wird.',
         shot,
     };
 };

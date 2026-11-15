@@ -12,8 +12,13 @@ export interface LoanPlace {
     readonly name: string;
 }
 
-/** Standort mit der Aufgabe „Rückgabe“; `linkCreatedAt` = wann der gültige Schlüssel entstand (null = keiner). */
+/**
+ * Standort, der einen Aushang haben kann: `kind` `returns` = Aufgabe „Rückgabe“, `collection` = Sammelstelle
+ * (Rückgabe direkt in die Sammelstelle, Runde 16; fehlt das Feld: `returns`); `linkCreatedAt` = wann der
+ * gültige Schlüssel entstand (null = keiner).
+ */
 export interface ReturnPlace extends LoanPlace {
+    readonly kind: 'returns' | 'collection';
     readonly linkCreatedAt: string | null;
 }
 
@@ -38,7 +43,7 @@ export interface LoanState {
     readonly loans: readonly Loan[];
     /** Ziele von „Verleihen“. */
     readonly borrowers: readonly LoanPlace[];
-    /** Standorte mit der Aufgabe „Rückgabe“ und der Stand ihres Aushangs. */
+    /** Standorte mit der Aufgabe „Rückgabe“, danach Sammelstellen, und der Stand ihres Aushangs. */
     readonly returns: readonly ReturnPlace[];
     /** Ausrüstung in der Rückgabe, am längsten wartende zuerst (P2.6). */
     readonly inReturns: readonly DeviceListItem[];
@@ -76,13 +81,15 @@ function parseReturnPlaces(json: unknown): ReturnPlace[] | null {
     for (const entry of json) {
         const place = parsePlace(entry);
         const created = isRecord(entry) ? entry['link_created_at'] : undefined;
+        const kind = isRecord(entry) ? (entry['kind'] ?? 'returns') : undefined;
         if (
             place === null ||
-            (created !== null && created !== undefined && typeof created !== 'string')
+            (created !== null && created !== undefined && typeof created !== 'string') ||
+            (kind !== 'returns' && kind !== 'collection')
         ) {
             return null;
         }
-        places.push({ ...place, linkCreatedAt: created ?? null });
+        places.push({ ...place, kind, linkCreatedAt: created ?? null });
     }
     return places;
 }
@@ -265,19 +272,50 @@ export interface ReturnFound {
     readonly deviceType: string;
     /** Name der Rückgabestelle. */
     readonly location: string;
+    /**
+     * Hier wählbare Zustände, der erste ist der Standard (Sammelstelle: nur benutzt/defekt, Runde 16). Fehlt das
+     * Feld (älterer Server), alle drei.
+     */
+    readonly conditions: readonly ReturnCondition[];
+}
+
+const ALL_CONDITIONS: readonly ReturnCondition[] = ['ok', 'used', 'defective'];
+
+function parseConditions(json: unknown): readonly ReturnCondition[] | null {
+    if (json === undefined) {
+        return ALL_CONDITIONS;
+    }
+    if (!Array.isArray(json) || json.length === 0) {
+        return null;
+    }
+    const conditions: ReturnCondition[] = [];
+    for (const entry of json) {
+        if (entry !== 'ok' && entry !== 'used' && entry !== 'defective') {
+            return null;
+        }
+        conditions.push(entry);
+    }
+    return conditions;
 }
 
 function parseReturnFound(json: unknown): ReturnFound | null {
-    return isRecord(json) &&
-        typeof json['identifier'] === 'string' &&
-        typeof json['device_type'] === 'string' &&
-        typeof json['location'] === 'string'
-        ? {
+    if (
+        !isRecord(json) ||
+        typeof json['identifier'] !== 'string' ||
+        typeof json['device_type'] !== 'string' ||
+        typeof json['location'] !== 'string'
+    ) {
+        return null;
+    }
+    const conditions = parseConditions(json['conditions']);
+    return conditions === null
+        ? null
+        : {
               identifier: json['identifier'],
               deviceType: json['device_type'],
               location: json['location'],
-          }
-        : null;
+              conditions,
+          };
 }
 
 /** POST returns/check (öffentlich, ohne Anmeldung): Nummer und Typ einer verliehenen Ausrüstung. */
