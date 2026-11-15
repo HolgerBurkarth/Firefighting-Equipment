@@ -81,21 +81,22 @@ Funkgerät, Wärmebildkamera.
 - [ ] Typen umbenennen bzw. anlegen. Der Name muss später in der CSV-Datei genau so stehen (Groß-/Kleinschreibung
   egal).
 - [ ] Nicht gebrauchte Start-Typen (Funkgerät, Wärmebildkamera) deaktivieren, wenn sie stören.
-- [ ] Kästchen **Einmalgerät**: siehe unbedingt die folgende Warnung, bevor Sie es setzen.
+- [ ] Kästchen **Einmalgerät**: bei PA, M und E-LA **nicht** setzen (entschieden, siehe unten).
 
-> **⚠ Achtung – „nur benutzt melden“ und Werkstatt passen heute nicht zusammen.** Die Einschränkung der Rolle
+> **Entschieden (Holger, 15.11.2026, Runde 16): „Nur benutzt melden“ wird für PA, M und E-LA nicht
+> eingerichtet** – kein Einmalgerät, keine Einschränkung der Rolle. Die Rechte der Geräteträger (Benutzt melden,
+> Status setzen, Tauschen, kein Umbuchen, siehe 8) reichen. Hintergrund:
+>
+> „Nur benutzt melden“ und Werkstatt passen heute nicht zusammen. Die Einschränkung der Rolle
 > „Bei Einmalgeräten nur „Benutzt melden““ wirkt nur bei Typen mit dem Kästchen **Einmalgerät**. Einmalgeräte
 > lassen sich aber auf der Seite **Wartung** nicht in die Werkstatt bringen („Einmalgeräte werden nicht gewartet,
 > sondern ersetzt.“). PA, Masken und Lungenautomaten gehen in Immendingen nach der Benutzung zur ASW TUT – mit
 > „Einmalgerät“ ginge das nicht mehr. Außerdem könnten Geräteträger bei diesen Typen dann auch keinen Status
 > mehr setzen (z. B. „defekt“), nur „Benutzt melden“.
 >
-> **Empfehlung (ohne Programmänderung):** PA, M und E-LA **nicht** als Einmalgerät markieren und die Rolle
-> Geräteträger **ohne** Einschränkung anlegen. Weil Geräteträger nicht umbuchen dürfen (siehe 8), bleibt ihnen
-> ohnehin nur: „Benutzt melden“ (kommt nach „benutzt“), „Status setzen“ (z. B. defekt) und „Tauschen“. Das ist
-> fast genau Phils Wunsch.
-> Soll es wirklich „nur benutzt melden“ sein (kein „defekt“ am Fahrzeug), braucht es eine kleine Änderung:
-> die Einschränkung an einem eigenen Kästchen des Typs statt an „Einmalgerät“ – Rückfrage im Bericht der Runde 16.
+> Ohne Einmalgerät und ohne Einschränkung bleibt Geräteträgern, weil sie nicht umbuchen dürfen, ohnehin nur:
+> „Benutzt melden“ (kommt nach „benutzt“), „Status setzen“ (z. B. defekt) und „Tauschen“. Eine Programmänderung
+> (eigenes Kästchen am Typ statt „Einmalgerät“) ist damit nicht nötig.
 
 - **⚠ offen:** PLF – Einschränkung ja/nein (Rückfrage an Phil läuft). Ohne Einschränkung gilt für PLF dasselbe wie
   oben.
@@ -168,7 +169,7 @@ Ort: Admin-Konsole → **Standorte** → unten **Sollbestand festlegen …** (od
 - Wirkung: Jede Buchung, die den einsatzbereiten Bestand eines Fahrzeugs unter die Zahl drückt, lehnt der Server
   ab und bietet **Tauschen …** an („Benutzt melden“ und „Status setzen“ eingeschlossen). „Trotzdem buchen …“ gibt
   es nur mit der Aktion „Sollbestand ohne Ersatz unterschreiten“ – die bekommt keine eigene Rolle.
-- Grenzen (bitte bewusst sein): Die Rolle **Admin** hat immer alle Rechte, also auch „Trotzdem buchen“ (Phil,
+- Grenzen (von Holger am 15.11.2026 als in Ordnung bestätigt): Die Rolle **Admin** hat immer alle Rechte, also auch „Trotzdem buchen“ (Phil,
   Holger); das lässt sich nicht abschalten. Und **offline** gebuchte Vorgänge lehnt der Server nie ab (die
   Wirklichkeit gilt), es entsteht dann ein Hinweis „Sollbestand unterschritten“ im Protokoll.
 - **⚠ offen:** Zuordnung LF 20 / KatS (gleiche Zahlen für beide Fahrzeuge?).
@@ -196,7 +197,7 @@ Ort: `…/service/` → **Städte** → **Immendingen** → Reiter **Rollen** �
   (damit gibt es kein Konsolen-Menü, nur die Handy-Seiten).
 - [ ] „2 · Aktionen“: **Status setzen**, **Benutzt melden**, **Tauschen**. **Nicht**: Umbuchen, „Sollbestand ohne
   Ersatz unterschreiten“.
-- [ ] „3 · Einschränkungen“: nach der Empfehlung in 4 **keine** (**⚠ offen**, Rückfrage Runde 16).
+- [ ] „3 · Einschränkungen“: **keine** (entschieden 15.11.2026, siehe 4).
 - [ ] „4 · Sieht nur …“: Alle / Alle.
 
 Geprüft in Runde 16 (Code und Tests): Eine Rolle mit „Tauschen“ und „Status setzen“ ohne „Umbuchen“ funktioniert
@@ -269,10 +270,10 @@ Mit einem Gerätewart- und einem Geräteträger-Konto, an einem Gerät, das dana
 
 1. **Zuordnung LF 20 / KatS** zu IMM 1/44 und IMM 1/45 und ob der Sollbestand (6 M, 4 PA) für beide gilt (3, 7).
 2. **PLF**: Einschränkung „nur benutzt melden“ ja/nein (Rückfrage an Phil) (4).
-3. **„Nur benutzt melden“ und Werkstatt**: Empfehlung ohne Einmalgerät/ohne Einschränkung, oder Programmänderung
-   (eigenes Kästchen am Typ) (4, 8).
-4. **Inhalt des Barcodes/QR** an den Geräten: Nummer, Seriennummer oder etwas anderes (5.2).
-5. **Excel-Liste** von Phil (5).
-6. **Datenschutz bei der Gemeinde** (Verantwortlicher, Information der Aktiven, siehe
+3. **Inhalt des Barcodes/QR** an den Geräten: Nummer, Seriennummer oder etwas anderes (5.2).
+4. **Excel-Liste** von Phil (5).
+5. **Datenschutz bei der Gemeinde** (Verantwortlicher, Information der Aktiven, siehe
    `docs/DATENSCHUTZ-BESTANDSAUFNAHME.md`) – vor dem Einladen der Aktiven.
-7. „Trotzdem buchen“ bleibt für Admins (Phil, Holger) möglich, und offline wird nie abgelehnt – so in Ordnung? (7)
+
+Erledigt (Holger, 15.11.2026): „Nur benutzt melden“ für PA, M und E-LA wird nicht eingerichtet (4, 8);
+„Trotzdem buchen“ für Admins und dass offline nie abgelehnt wird, ist in Ordnung (7).

@@ -191,6 +191,8 @@ Punkte nach `docs/usability/BENUTZERTEST-2026-11.md`.
 - ☑ Zurückgegeben als benutzt: Beleg mit Zustand „Benutzt“, Zeit, „Abgelegt in „Kleiderkammer““; M91 danach in Kleiderkammer, Status benutzt, Verlauf „Rückgabe“ von „Live-Test Runde 16 (ohne Anmeldung)“, auf der Seite Wartung unter der Sammelstelle, Verleih beendet, „In der Rückgabe“ 0.
 - ☑ Zweite Eingabe „m91“: „M91 wurde bereits zurückgegeben. Sie müssen nichts weiter tun.“ (mit Zeit, ohne Namen); `condition` „ok“ am Sammelstellen-Aushang → 400 „Hier kann Ausrüstung nur als „benutzt“ oder „defekt“ zurückgegeben werden.“
 - ☑ Aushang abgeschaltet (Rückfrage) → Link gilt nicht mehr.
-- Nicht live geprüft (nichts in der Rückgabe): Knöpfe „Ins Lager bringen“ / „In die Sammelstelle bringen“ (Browser-Test grün); Zustandsknöpfe im Tauschen-Fenster (Browser-Test in fünf Profilen grün, Bild in der Anleitung).
+- ☑ Rückgabe über den Aushang eines Rückgabe-Standorts (Ippingen) unverändert: „In Ordnung“ wählbar, Beleg „Abgelegt in „Ippingen““.
+- ☑ Verleih → In der Rückgabe: Bestätigungsknöpfe „Ins Lager bringen“ bzw. „In die Sammelstelle bringen“; M91 per „Ins Lager bringen“ ins Lager Gerätehaus.
+- Nicht live geprüft: Zustandsknöpfe im Tauschen-Fenster (Browser-Test in fünf Profilen grün, Bild in der Anleitung).
 - ☐ Offen für Holger: Rückgabe am Handy über einen gedruckten Aushang an einer Sammelstelle; Fenster „Tauschen“ am Handy.
-- Zurückgesetzt: M91 einsatzbereit im Lager Gerätehaus, Aushang der Kleiderkammer abgeschaltet, nichts verliehen; Abläufe und Aufgaben bleiben stehen.
+- Zurückgesetzt: M91 einsatzbereit im Lager Gerätehaus, Aushänge der Kleiderkammer und von Ippingen abgeschaltet, nichts verliehen; Abläufe und Aufgaben bleiben stehen.
