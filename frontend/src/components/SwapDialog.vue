@@ -508,6 +508,11 @@ function confirmBelow(): void {
     gap: 8px;
 }
 
+/* 48 px: Reserve über der Mindestgröße von 44 px (Playwright-WebKit maß mit 44 px 43,99 px, Runde 16). */
+.swap-state {
+    min-height: 48px;
+}
+
 .swap-state.is-chosen {
     font-weight: var(--font-weight-bold);
 }
