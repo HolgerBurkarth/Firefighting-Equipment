@@ -81,9 +81,9 @@ Funkgerät, Wärmebildkamera.
 - [ ] Typen umbenennen bzw. anlegen. Der Name muss später in der CSV-Datei genau so stehen (Groß-/Kleinschreibung
   egal).
 - [ ] Nicht gebrauchte Start-Typen (Funkgerät, Wärmebildkamera) deaktivieren, wenn sie stören.
-- [ ] Kästchen **Einmalgerät**: bei PA, M und E-LA **nicht** setzen (entschieden, siehe unten).
+- [ ] Kästchen **Einmalgerät**: bei PA, M, E-LA und PLF **nicht** setzen (entschieden, siehe unten).
 
-> **Entschieden (Holger, 15.11.2026, Runde 16): „Nur benutzt melden“ wird für PA, M und E-LA nicht
+> **Entschieden (Holger, 15.11.2026, Runde 16): „Nur benutzt melden“ wird für PA, M, E-LA und PLF nicht
 > eingerichtet** – kein Einmalgerät, keine Einschränkung der Rolle. Die Rechte der Geräteträger (Benutzt melden,
 > Status setzen, Tauschen, kein Umbuchen, siehe 8) reichen. Hintergrund:
 >
@@ -98,8 +98,8 @@ Funkgerät, Wärmebildkamera.
 > „Benutzt melden“ (kommt nach „benutzt“), „Status setzen“ (z. B. defekt) und „Tauschen“. Eine Programmänderung
 > (eigenes Kästchen am Typ statt „Einmalgerät“) ist damit nicht nötig.
 
-- **⚠ offen:** PLF – Einschränkung ja/nein (Rückfrage an Phil läuft). Ohne Einschränkung gilt für PLF dasselbe wie
-  oben.
+- PLF: wie PA, M und E-LA kein Einmalgerät, keine Einschränkung (entschieden, Holger 15.11.2026). Offen ist bei PLF
+  nur, ob es einen Mindestbestand auf den Fahrzeugen gibt (siehe 7).
 
 ## 5. Erstbefüllung per CSV-Import (Admin)
 
@@ -173,6 +173,8 @@ Ort: Admin-Konsole → **Standorte** → unten **Sollbestand festlegen …** (od
   Holger); das lässt sich nicht abschalten. Und **offline** gebuchte Vorgänge lehnt der Server nie ab (die
   Wirklichkeit gilt), es entsteht dann ein Hinweis „Sollbestand unterschritten“ im Protokoll.
 - **⚠ offen:** Zuordnung LF 20 / KatS (gleiche Zahlen für beide Fahrzeuge?).
+- **⚠ offen:** PLF – gibt es einen Mindestbestand auf den Fahrzeugen? Wenn ja, je Fahrzeug eine weitere Regel
+  „mindestens N Arbeitsluftflasche (PLF)“ (Rückfrage an Phil läuft).
 
 ## 8. Rollen anlegen (Super-Admin)
 
@@ -269,11 +271,11 @@ Mit einem Gerätewart- und einem Geräteträger-Konto, an einem Gerät, das dana
 ## Sammlung: offene Punkte
 
 1. **Zuordnung LF 20 / KatS** zu IMM 1/44 und IMM 1/45 und ob der Sollbestand (6 M, 4 PA) für beide gilt (3, 7).
-2. **PLF**: Einschränkung „nur benutzt melden“ ja/nein (Rückfrage an Phil) (4).
+2. **PLF**: Mindestbestand auf den Fahrzeugen ja/nein und wie viele (Rückfrage an Phil) (7).
 3. **Inhalt des Barcodes/QR** an den Geräten: Nummer, Seriennummer oder etwas anderes (5.2).
 4. **Excel-Liste** von Phil (5).
 5. **Datenschutz bei der Gemeinde** (Verantwortlicher, Information der Aktiven, siehe
    `docs/DATENSCHUTZ-BESTANDSAUFNAHME.md`) – vor dem Einladen der Aktiven.
 
-Erledigt (Holger, 15.11.2026): „Nur benutzt melden“ für PA, M und E-LA wird nicht eingerichtet (4, 8);
+Erledigt (Holger, 15.11.2026): „Nur benutzt melden“ für PA, M, E-LA und PLF wird nicht eingerichtet (4, 8);
 „Trotzdem buchen“ für Admins und dass offline nie abgelehnt wird, ist in Ordnung (7).
