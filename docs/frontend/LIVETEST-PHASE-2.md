@@ -182,3 +182,15 @@ Punkte nach `docs/usability/BENUTZERTEST-2026-11.md`.
 - Wunsch (nach `docs/TODO-SPAETER.md`): Rückfrage zu „In Ordnung ins Lager …“ bzw. „… in die Sammelstelle …“ mit Knopf „Ins Lager bringen“ bzw. „In die Sammelstelle bringen“ statt nur „Bringen“.
 - ☐ Offen für Holger: Fenster „Tauschen“ in Handy-Breite.
 - Zurückgesetzt: M90 wieder einsatzbereit in HLF 20 / G1.
+
+## Runde 16: Rückgabe direkt in die Sammelstelle (15.11.2026, Build `f5973aa3b9dc`, Test-Stadt, Claude in Chrome)
+
+- ☑ Verleih: „Rückgabe-Aushang“ nennt Ippingen mit „Rückgabe“ und Kleiderkammer mit „Sammelstelle“, dazu der Hinweis „Mit dem Aushang einer Sammelstelle kommt die Ausrüstung direkt dorthin …“.
+- ☑ Aushang an der Kleiderkammer erzeugt (Link und QR-Code einmal), Rückgabeseite in neuem Tab (Schlüssel aus der Adresszeile entfernt, übersteht Neuladen).
+- ☑ M91 an Hattingen verliehen; Rückgabeseite: „✓ M91 · Live-Testtyp 2 – wird in „Kleiderkammer“ abgegeben.“, Zustand nur „Benutzt“ (vorgewählt) und „Defekt“, kein „In Ordnung“.
+- ☑ Zurückgegeben als benutzt: Beleg mit Zustand „Benutzt“, Zeit, „Abgelegt in „Kleiderkammer““; M91 danach in Kleiderkammer, Status benutzt, Verlauf „Rückgabe“ von „Live-Test Runde 16 (ohne Anmeldung)“, auf der Seite Wartung unter der Sammelstelle, Verleih beendet, „In der Rückgabe“ 0.
+- ☑ Zweite Eingabe „m91“: „M91 wurde bereits zurückgegeben. Sie müssen nichts weiter tun.“ (mit Zeit, ohne Namen); `condition` „ok“ am Sammelstellen-Aushang → 400 „Hier kann Ausrüstung nur als „benutzt“ oder „defekt“ zurückgegeben werden.“
+- ☑ Aushang abgeschaltet (Rückfrage) → Link gilt nicht mehr.
+- Nicht live geprüft (nichts in der Rückgabe): Knöpfe „Ins Lager bringen“ / „In die Sammelstelle bringen“ (Browser-Test grün); Zustandsknöpfe im Tauschen-Fenster (Browser-Test in fünf Profilen grün, Bild in der Anleitung).
+- ☐ Offen für Holger: Rückgabe am Handy über einen gedruckten Aushang an einer Sammelstelle; Fenster „Tauschen“ am Handy.
+- Zurückgesetzt: M91 einsatzbereit im Lager Gerätehaus, Aushang der Kleiderkammer abgeschaltet, nichts verliehen; Abläufe und Aufgaben bleiben stehen.
