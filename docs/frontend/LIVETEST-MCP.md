@@ -4,6 +4,19 @@ Nur in der Test-Stadt `https://www.prodad.de/firefighting/test/`, nie in echten 
 [`../MCP-KONZEPT.md`](../MCP-KONZEPT.md), Plan: [`../PLAN-MCP.md`](../PLAN-MCP.md). Je Schritt wird
 ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holger).
 
+## T17: Claude-Zugang je Stadt (16.11.2026, Build `51b22db37943`, vom Agenten)
+
+- ☑ Migration 0066 auf dem Server gelaufen (Sicherung vorher); `GET test/api/v1/tenant` → `claude_available: true`,
+  `immendingen` → `false`.
+- ☑ Stadtdetail der Test-Stadt (Super-Admin, Chrome): Abschnitt „Claude-Zugang“, Kästchen „Claude-Zugang für diese Stadt
+  erlauben“ angehakt, Hinweis auf die Daten an Anthropic. Nicht umgeschaltet.
+- ☑ Konten der Test-Stadt unverändert: Konto #4 „Ändern“ mit 3 Verbindungen, Konto #8 „Lesen“.
+- ☑ `…/.well-known/openid-configuration`: Test-Stadt 200, Immendingen 404; Vermittler `ff-mcp.pl/test` ohne Token 401,
+  `ff-mcp.pl/immendingen` 404.
+- ☐ Holger: Konnektor „Ausrüstung Test“ in claude.ai neu verbinden und eine Frage stellen (z. B. „Zeig mir M12“).
+- ☐ Holger bzw. Claude nach Freigabe: Immendingen im Stadtdetail einschalten (Rückfrage „Erlauben“), danach
+  `claude_available: true`, Konten bleiben „Aus“.
+
 ## Runde 12 und 14: Ergebnisse (Claude im Chat, Test-Stadt, 09.11.2026, Build `97f497f5cee8`)
 
 - ☑ `report_used`: M93 → Kleiderkammer, benutzt; Verlauf „Benutzt gemeldet“, `via_claude`.
