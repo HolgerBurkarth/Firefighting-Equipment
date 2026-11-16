@@ -13,9 +13,13 @@ ergänzt, was live geprüft ist (☑ bestanden, ☒ Fehler, ☐ offen für Holge
 - ☑ Konten der Test-Stadt unverändert: Konto #4 „Ändern“ mit 3 Verbindungen, Konto #8 „Lesen“.
 - ☑ `…/.well-known/openid-configuration`: Test-Stadt 200, Immendingen 404; Vermittler `ff-mcp.pl/test` ohne Token 401,
   `ff-mcp.pl/immendingen` 404.
-- ☐ Holger: Konnektor „Ausrüstung Test“ in claude.ai neu verbinden und eine Frage stellen (z. B. „Zeig mir M12“).
-- ☐ Holger bzw. Claude nach Freigabe: Immendingen im Stadtdetail einschalten (Rückfrage „Erlauben“), danach
-  `claude_available: true`, Konten bleiben „Aus“.
+- ☐ Holger: Konnektor „Ausrüstung Test“ in claude.ai neu verbinden und eine Frage stellen (z. B. „Zeig mir M12“);
+  das Ergebnis trägt Holger bzw. Claude hier nach.
+- ☑ Immendingen im Stadtdetail eingeschaltet (16.11.2026, Claude im Browser auf Holgers Anweisung; einmalige
+  Ausnahme von „nur in der Test-Stadt“, nur das Einschalten): Rückfrage „Erlauben“, danach `claude_available: true`,
+  `openid-configuration` 200, `ff-mcp.pl/immendingen` ohne Token 401, Konten unverändert „Aus“.
+- Festlegung bestätigt (Holger, 16.11.2026): Verbieten setzt alle Konten der Stadt auf „Aus“, damit beim
+  Wiedereinschalten nichts unbeabsichtigt auflebt.
 
 ## Runde 12 und 14: Ergebnisse (Claude im Chat, Test-Stadt, 09.11.2026, Build `97f497f5cee8`)
 
