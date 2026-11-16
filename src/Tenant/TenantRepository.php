@@ -16,7 +16,7 @@ use FirefightingEquipment\Role\RoleRepository;
 final readonly class TenantRepository
 {
     private const int ER_DUP_ENTRY = 1062;
-    private const string COLUMNS = 'id, slug, name, active, created_at, updated_at';
+    private const string COLUMNS = 'id, slug, name, active, claude_enabled, created_at, updated_at';
 
     public function __construct(private \PDO $pdo)
     {
@@ -195,6 +195,52 @@ final readonly class TenantRepository
     }
 
     /**
+     * Erlaubt (true) oder verbietet (false) den Claude-Zugang der Stadt (T17). Beim Verbieten werden
+     * in derselben Transaktion alle Claude-Verbindungen und offenen Codes der Stadt beendet und der
+     * Zugang aller Konten auf „Aus“ gesetzt (auch wenn er schon verboten war); ein späteres Erlauben
+     * ändert keine Konten, den Zugang setzt danach wieder ein Admin.
+     *
+     * @return bool ob sich etwas geändert hat
+     *
+     * @throws TenantNotFoundException
+     */
+    public function setClaudeEnabled(TenantSlug $slug, bool $enabled): bool
+    {
+        if ($this->pdo->inTransaction()) {
+            throw new \LogicException('TenantRepository::setClaudeEnabled startet eine eigene Transaktion; keine offene Transaktion erlaubt.');
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare('SELECT id, claude_enabled FROM fe_tenants WHERE slug = ? FOR UPDATE');
+            $stmt->execute([$slug->value]);
+            $row = $stmt->fetch();
+            if (!is_array($row)) {
+                throw TenantNotFoundException::for($slug);
+            }
+
+            $changed = ((int) $row['claude_enabled'] === 1) !== $enabled;
+            if ($changed) {
+                $this->pdo->prepare('UPDATE fe_tenants SET claude_enabled = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?')
+                    ->execute([(int) $enabled, $row['id']]);
+            }
+            if (!$enabled) {
+                new ClaudeConnectionRepository($this->pdo)->deleteForTenant((int) $row['id']);
+                $this->pdo->prepare("UPDATE fe_users SET claude_access = 'off' WHERE tenant_id = ? AND claude_access <> 'off'")
+                    ->execute([$row['id']]);
+            }
+            $this->pdo->commit();
+
+            return $changed;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
      * Gezählt wird in einer abgeleiteten Tabelle je Stadt (MariaDB erkennt unter
      * ONLY_FULL_GROUP_BY keine funktionale Abhängigkeit von t.id).
      *
@@ -206,7 +252,7 @@ final readonly class TenantRepository
     private function fetchSummaries(string $where, array $params): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT t.id, t.slug, t.name, t.active, t.created_at, t.updated_at,'
+            'SELECT t.id, t.slug, t.name, t.active, t.claude_enabled, t.created_at, t.updated_at,'
             . ' COALESCE(c.active_users, 0) AS active_users, COALESCE(c.active_admins, 0) AS active_admins,'
             . ' COALESCE(c.invited_admins, 0) AS invited_admins'
             . ' FROM fe_tenants t LEFT JOIN ('
@@ -243,6 +289,7 @@ final readonly class TenantRepository
             (int) $row['active'] === 1,
             self::utc((string) $row['created_at']),
             self::utc((string) $row['updated_at']),
+            (int) $row['claude_enabled'] === 1,
         );
     }
 

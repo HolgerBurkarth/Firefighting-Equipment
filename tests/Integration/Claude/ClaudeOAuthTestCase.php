@@ -34,6 +34,7 @@ abstract class ClaudeOAuthTestCase extends AuthTestCase
         parent::setUp();
 
         $this->createTenant(self::CITY);
+        $this->allowClaude(self::CITY);
         $this->user = $this->account(self::CITY, self::EMAIL, ['claude_access' => 'write']);
         $this->admin = $this->account(self::CITY, 'admin@example.org', ['role' => 'admin']);
     }

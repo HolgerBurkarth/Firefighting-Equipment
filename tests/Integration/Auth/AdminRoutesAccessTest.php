@@ -46,7 +46,7 @@ MA-01;defekt
         yield 'Rolle ändern' => ['POST', 'users/{user}/role', ['role' => 'admin']];
         yield 'Anzeigename ändern' => ['POST', 'users/{user}/display-name', ['display_name' => 'Max']];
         yield 'löschen' => ['DELETE', 'users/{user}', []];
-        // Kommt durch, lehnt in Immendingen aber fachlich ab (Claude-Zugang nur in der Test-Stadt,
+        // Kommt durch, lehnt in Immendingen aber fachlich ab (Claude-Zugang dort nicht erlaubt,
         // ClaudeAvailability); die Wirkung prüft ClaudeAccessTest.
         yield 'Claude-Zugang setzen' => ['POST', 'users/{user}/claude-access', ['access' => 'read'], [409]];
         yield 'Claude-Verbindungen trennen' => ['POST', 'users/{user}/claude-connections/end', [], [409]];

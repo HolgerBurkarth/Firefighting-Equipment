@@ -1,13 +1,15 @@
 # Einrichtung Immendingen – Plan zum Abhaken
 
-Für Holger (Super-Admin bzw. Admin der Stadt). Stand: 15.11.2026, nach Runde 16. Grundlage sind Phils
+Für Holger (Super-Admin bzw. Admin der Stadt). Stand: 16.11.2026 abends (Schritte 2–5, 6.1 und 8 erledigt). Grundlage sind Phils
 Angaben; allgemeine Erklärungen stehen im [Merkblatt Phase 2](MERKBLATT-EINRICHTUNG-PHASE-2.md). Bezeichnungen
 stehen so da, wie sie in der Oberfläche heißen.
 
-Dieser Plan führt nichts aus. Agenten ändern in Immendingen nichts; jeder Schritt ist für Holger zum Abhaken.
+Dieser Plan führt nichts aus; jeder Schritt ist für Holger zum Abhaken. Agenten ändern in Immendingen nur auf
+Holgers ausdrückliche Anweisung. Am 16.11.2026 hat Claude auf Holgers Anweisung im Browser die Schritte 2–5, 6.1
+und 8 eingerichtet (abgehakt unten).
 Mit **⚠ offen** sind Punkte markiert, die noch geklärt werden müssen (Sammlung am Ende).
 
-Reihenfolge: 1 Vorher → 2 Abläufe → 3 Standorte → 4 Ausrüstungstypen → 5 Erstbefüllung (CSV) → 6 Fahrzeuge
+Reihenfolge: 1 Vorher → 2 Abläufe → 3 Standorte → 4 Ausrüstungstypen → 5 Erstbefüllung (CSV) → 6 Verleihen und Fahrzeuge
 bestücken → 7 Sollbestand → 8 Rollen → 9 Konten → 10 Mails → 11 Rückgabe-Aushang → 12 Probelauf → 13 Einweisung.
 Der Sollbestand kommt bewusst nach dem Bestücken der Fahrzeuge (sonst stehen die Fahrzeuge bis dahin als
 „außer Betrieb“ da).
@@ -20,24 +22,27 @@ Der Sollbestand kommt bewusst nach dem Bestücken der Fahrzeuge (sonst stehen di
   Stand von Runde 16 sein (Rückgabe direkt in die Sammelstelle).
 - [ ] Sicherung der Datenbank (per SSH):
   `cd ~/htdocs/apps/firefighting-equipment && php85 bin/db-dump.php --suffix=vor-einrichtung-immendingen`
-- [ ] Holger ist in Immendingen als **Admin** angemeldet (Admin-Konsole), als Super-Admin getrennt unter
+  – **nicht gemacht** (16.11.2026): Die Stadt war vor der Einrichtung leer. Vor den nächsten Schritten mit Daten
+  (6.2, Konten) eine Sicherung mit `--suffix=nach-erstbefuellung-immendingen` anlegen.
+- [x] Holger ist in Immendingen als **Admin** angemeldet (Admin-Konsole), als Super-Admin getrennt unter
   `https://www.prodad.de/firefighting/service/`.
-- [ ] Phils Excel-Liste liegt vor (siehe 5) – **⚠ offen**.
+- [x] Importdatei liegt vor (siehe 5): von Claude aus Phils 112-Datenbank erstellt, liegt bei Holger, nicht im
+  Repository (echte Daten).
 - [ ] Datenschutz bei der Gemeinde geklärt (siehe Sammlung) – **⚠ offen**, vor dem Einladen der Aktiven.
 
 ## 2. Abläufe freischalten (Super-Admin)
 
 Ort: `…/firefighting/service/` → **Städte** → **Immendingen** → Reiter **Abläufe**.
 
-- [ ] **Lager** einschalten.
-- [ ] **Sammelstelle** einschalten.
-- [ ] **Werkstatt** einschalten.
-- [ ] **Ausgeliehen an** einschalten.
-- [ ] **Rückgabe** NICHT einschalten. Immendingen hat keinen eigenen Rückgabe-Platz; zurückgebrachte Ausrüstung
+- [x] **Lager** einschalten.
+- [x] **Sammelstelle** einschalten.
+- [x] **Werkstatt** einschalten.
+- [x] **Ausgeliehen an** einschalten.
+- [x] **Rückgabe** NICHT einschalten. Immendingen hat keinen eigenen Rückgabe-Platz; zurückgebrachte Ausrüstung
   kommt direkt in die Sammelstelle „benutzt“ (Aushang an der Sammelstelle, siehe 11, seit Runde 16 möglich). Die
   Seite **Verleih** gibt es trotzdem (sie kommt mit „Ausgeliehen an“).
-- [ ] Anzeigenamen: Standard lassen (oder nach Wunsch ändern).
-- [ ] „Die Abläufe sind gespeichert.“ erscheint.
+- [x] Anzeigenamen: Standard lassen (oder nach Wunsch ändern).
+- [x] „Die Abläufe sind gespeichert.“ erscheint.
 
 ## 3. Standorte anlegen (Admin)
 
@@ -51,20 +56,21 @@ Fenster „… bearbeiten“ (Feld **Aufgabe**, nur Ebene 1).
 | ASW TUT | Extern | Werkstatt | (Atemschutzzentrum Tuttlingen) |
 | Hattingen | Extern | Ausgeliehen an | |
 | Ippingen | Extern | Ausgeliehen an | |
-| IMM 1/44 | Fahrzeug | keine | Fach **Fahrerhaus** |
-| IMM 1/45 | Fahrzeug | keine | Fach **Fahrerhaus** |
+| 1/44 | Fahrzeug | keine | Fach **Fahrerhaus** (Name ohne „IMM“) |
+| 1/45 | Fahrzeug | keine | Fach **Fahrerhaus** |
 
-- [ ] Pool angelegt, Aufgabe Lager, Standard-Lager.
-- [ ] benutzt angelegt, Aufgabe Sammelstelle, nimmt benutzte und defekte an. Damit kommen „Benutzt melden“,
+Weitere Fahrzeuge gibt es in Immendingen nicht (Angabe 16.11.2026).
+
+- [x] Pool angelegt, Aufgabe Lager, Standard-Lager.
+- [x] benutzt angelegt, Aufgabe Sammelstelle, nimmt benutzte und defekte an. Damit kommen „Benutzt melden“,
   Tausch und Rückgaben ohne Anmeldung hierher.
-- [ ] ASW TUT angelegt, Aufgabe Werkstatt.
-- [ ] Hattingen und Ippingen angelegt, je Aufgabe Ausgeliehen an.
-- [ ] IMM 1/44 mit Fach Fahrerhaus, IMM 1/45 mit Fach Fahrerhaus. Buchen auf das ganze Fahrzeug („Ganzes
+- [x] ASW TUT angelegt, Aufgabe Werkstatt.
+- [x] Hattingen und Ippingen angelegt, je Aufgabe Ausgeliehen an.
+- [x] 1/44 mit Fach Fahrerhaus, 1/45 mit Fach Fahrerhaus. Buchen auf das ganze Fahrzeug („Ganzes
   Fahrzeug, ohne Fach“) bleibt erlaubt; der Sollbestand zählt das Fahrerhaus mit.
-- [ ] Gibt es schon Standorte aus der Probezeit, die nicht mehr gebraucht werden: leeren und sperren (Stift →
-  „… sperren …“; geht nur, wenn leer).
-- **⚠ offen:** Zuordnung LF 20 / KatS zu IMM 1/44 bzw. 1/45 (Name der Fahrzeuge ggf. ergänzen, z. B.
-  „IMM 1/44 (LF 20)“; das Umbenennen geht jederzeit).
+- [x] Standorte aus der Probezeit: keine (die Stadt war leer).
+- **⚠ offen:** Zuordnung LF 20 / KatS zu 1/44 bzw. 1/45 (Name der Fahrzeuge ggf. ergänzen, z. B.
+  „1/44 (LF 20)“; das Umbenennen geht jederzeit).
 
 ## 4. Ausrüstungstypen (Admin)
 
@@ -73,102 +79,110 @@ Funkgerät, Wärmebildkamera.
 
 | Typ | Nummern | Vorschlag |
 |---|---|---|
-| Atemschutzgerät (PA) | PA01, PA07 … | vorhandenen Typ „Atemschutzgerät“ umbenennen |
-| Atemschutzmaske (M) | M01, M07 … | vorhandenen Typ „Atemschutzmaske“ umbenennen |
-| Ersatz-Lungenautomat (E-LA) | E-LA01, E-LA12 … | neu anlegen |
-| Arbeitsluftflasche (PLF) | PLF… | neu anlegen |
+| Atemschutzgerät (PA) | PA01 … (26 Stück) | vorhandenen Typ „Atemschutzgerät“ umbenennen |
+| Atemschutzmaske (M) | M01 … (92 Stück) | vorhandenen Typ „Atemschutzmaske“ umbenennen |
+| Ersatz-Lungenautomat (E-LA) | E-LA01 … (20 Stück) | neu anlegen |
+| Arbeitsluftflasche (PLF) | PLF38–PLF43 (6 Stück, nur die Arbeitsluftflaschen) | neu anlegen |
 
-- [ ] Typen umbenennen bzw. anlegen. Der Name muss später in der CSV-Datei genau so stehen (Groß-/Kleinschreibung
-  egal).
-- [ ] Nicht gebrauchte Start-Typen (Funkgerät, Wärmebildkamera) deaktivieren, wenn sie stören.
-- [ ] Kästchen **Einmalgerät**: siehe unbedingt die folgende Warnung, bevor Sie es setzen.
+- [x] Typen umbenennen bzw. anlegen. Der Name muss in der Importdatei genau so stehen (Groß-/Kleinschreibung
+  egal); vor dem Import mit der Spalte Ausrüstungstyp der Datei vergleichen.
+- [x] **Wärmebildkamera** und **Funkgerät** deaktiviert (spielen in Immendingen keine Rolle).
+- [x] Kästchen **Einmalgerät**: bei PA, M, E-LA und PLF **nicht** setzen (entschieden, siehe unten).
 
-> **⚠ Achtung – „nur benutzt melden“ und Werkstatt passen heute nicht zusammen.** Die Einschränkung der Rolle
+> **Entschieden (Holger, 15.11.2026, Runde 16): „Nur benutzt melden“ wird für PA, M, E-LA und PLF nicht
+> eingerichtet** – kein Einmalgerät, keine Einschränkung der Rolle. Die Rechte der Geräteträger (Benutzt melden,
+> Status setzen, Tauschen, kein Umbuchen, siehe 8) reichen. Hintergrund:
+>
+> „Nur benutzt melden“ und Werkstatt passen heute nicht zusammen. Die Einschränkung der Rolle
 > „Bei Einmalgeräten nur „Benutzt melden““ wirkt nur bei Typen mit dem Kästchen **Einmalgerät**. Einmalgeräte
 > lassen sich aber auf der Seite **Wartung** nicht in die Werkstatt bringen („Einmalgeräte werden nicht gewartet,
 > sondern ersetzt.“). PA, Masken und Lungenautomaten gehen in Immendingen nach der Benutzung zur ASW TUT – mit
 > „Einmalgerät“ ginge das nicht mehr. Außerdem könnten Geräteträger bei diesen Typen dann auch keinen Status
 > mehr setzen (z. B. „defekt“), nur „Benutzt melden“.
 >
-> **Empfehlung (ohne Programmänderung):** PA, M und E-LA **nicht** als Einmalgerät markieren und die Rolle
-> Geräteträger **ohne** Einschränkung anlegen. Weil Geräteträger nicht umbuchen dürfen (siehe 8), bleibt ihnen
-> ohnehin nur: „Benutzt melden“ (kommt nach „benutzt“), „Status setzen“ (z. B. defekt) und „Tauschen“. Das ist
-> fast genau Phils Wunsch.
-> Soll es wirklich „nur benutzt melden“ sein (kein „defekt“ am Fahrzeug), braucht es eine kleine Änderung:
-> die Einschränkung an einem eigenen Kästchen des Typs statt an „Einmalgerät“ – Rückfrage im Bericht der Runde 16.
+> Ohne Einmalgerät und ohne Einschränkung bleibt Geräteträgern, weil sie nicht umbuchen dürfen, ohnehin nur:
+> „Benutzt melden“ (kommt nach „benutzt“), „Status setzen“ (z. B. defekt) und „Tauschen“. Eine Programmänderung
+> (eigenes Kästchen am Typ statt „Einmalgerät“) ist damit nicht nötig.
 
-- **⚠ offen:** PLF – Einschränkung ja/nein (Rückfrage an Phil läuft). Ohne Einschränkung gilt für PLF dasselbe wie
-  oben.
+- PLF: wie PA, M und E-LA kein Einmalgerät, keine Einschränkung (entschieden, Holger 15.11.2026). In der App
+  nur die 6 Arbeitsluftflaschen; Sollbestand 1 PLF auf 1/44 (siehe 7).
 
 ## 5. Erstbefüllung per CSV-Import (Admin)
 
 Ort: Admin-Konsole → **Ausrüstung** → **Import (CSV)**. Vorher müssen Standorte (3) und Typen (4) bestehen; der
 Import legt keine Standorte oder Typen an.
 
-### 5.1 Vorlage holen
-- [ ] „1. Vorlage ausfüllen“ → **Vorlage herunterladen** (`ausruestung-vorlage-immendingen.csv`) und
-  **Gültige Werte herunterladen** (die genauen Namen der Typen und Standorte).
-- Spalten der Vorlage: Nummer, Scan-Code, Ausrüstungstyp, Standort, Status, Nächste Wartung, Seriennummer,
-  Hersteller, Modell, Beschaffungsdatum, Notiz. Spalten, die nicht gebraucht werden, dürfen fehlen (außer
-  Nummer); für neue Ausrüstung sind **Ausrüstungstyp** und **Standort** Pflicht.
-- [ ] Die zwei Beispielzeilen `BEISPIEL-1` und `BEISPIEL-2` löschen.
+### 5.1 Die Importdatei
+Die Datei hat Claude aus Phils 112-Datenbank erstellt; sie liegt bei Holger, nicht im Repository (echte Daten).
+Inhalt: **144 Ausrüstungen** – 92 M, 26 PA, 20 E-LA, 6 PLF.
 
-### 5.2 Phils Liste übertragen
-Phils Excel hat Nummer, Seriennummer, Hersteller/Modell, nächste Prüfung – ohne Standort und ohne Typ.
+- **Nummer** in Phils Form: M01 …, PA01 …, E-LA01 …, PLF38–PLF43.
+- **Ausrüstungstyp** wie in 4.
+- **Standort**: alle „Pool“ (Verleih und Fahrzeuge folgen danach, 6).
+- **Status**: einsatzbereit.
+- **Scan-Code** = Barcode der 112-Datenbank (8 Ziffern mit führender 0, z. B. `01332711`); vorhanden bei Masken
+  und PA, leer bei E-LA und PLF. Masken und PA findet „Code scannen“ damit über den Barcode, E-LA und PLF über die
+  Nummer.
+- **Beschaffungsdatum** = Indienststellung laut 112-Datenbank.
+- **Notiz**: die letzten Prüfungen laut 112-Datenbank.
+- **Nächste Wartung**: leer. Die Prüffristen legt Immendingen später fest; dann in der Ausrüstungsliste je Typ
+  filtern, alle auswählen und **Wartungsdatum setzen …** (Sammelaktion).
 
-- [ ] **Nummer**: so wie auf dem Etikett, ohne Leerzeichen (M07, PA07, E-LA12). Nur Buchstaben, Ziffern, `-`,
-  `/`, `.`; höchstens 30 Zeichen. Achtung Excel: Nummern, die nur aus Ziffern bestehen oder wie ein Datum
-  aussehen, vorher als **Text** formatieren (die Vorschau warnt davor).
-- [ ] **Ausrüstungstyp**: aus dem Präfix der Nummer ergänzen (PA → „Atemschutzgerät (PA)“, M → „Atemschutzmaske
-  (M)“, E-LA → „Ersatz-Lungenautomat (E-LA)“, PLF → „Arbeitsluftflasche (PLF)“). In Excel z. B. nach Nummer
-  sortieren und blockweise ausfüllen.
-- [ ] **Standort** – zwei Wege, **Vorschlag A**:
-  - **A (empfohlen):** Alle Zeilen „Pool“. Den Fahrzeugbestand danach in der Ausrüstungsliste umbuchen (6).
-    Einfach, und Phil muss nicht wissen, was gerade wo liegt.
-  - **B:** Spalte vor dem Import richtig füllen („IMM 1/44“, „IMM 1/44 / Fahrerhaus“, „Pool“, „benutzt“ …,
-    Schreibweise wie in „Gültige Werte“). Spart Schritt 6, braucht aber den aktuellen Stand.
-- [ ] **Hersteller / Modell**: Steht beides in einer Spalte, trennen (Excel → Daten → **Text in Spalten**, z. B.
-  am ersten Leerzeichen: „Dräger PSS 7000“ → Hersteller „Dräger“, Modell „PSS 7000“). Lässt es sich nicht sauber
-  trennen, alles in **Modell** schreiben und **Hersteller** leer lassen – beides ist freiwillig und nur für die
-  Suche und die Detailseite.
-- [ ] **Nächste Wartung** (= nächste Prüfung): Format **TT.MM.JJJJ** (auch `T.M.JJJJ` und `JJJJ-MM-TT` gehen; keine
-  zweistelligen Jahre). In Excel die Spalte als Datum mit Format `TT.MM.JJJJ` formatieren; leer = keine.
-- [ ] **Status**: leer lassen (= einsatzbereit) oder „in Wartung“ / „defekt“ / „benutzt“, wenn bekannt.
-- [ ] **Scan-Code** (Barcode/QR an den Geräten) – **⚠ offen**, was er enthält:
-  - Enthält er die **Seriennummer**: Spalte Scan-Code = Kopie der Spalte Seriennummer (Excel: Spalte kopieren).
-    Achtung: lange Ziffernfolgen zeigt Excel als `4,00638E+12` – Spalte vorher als **Text** formatieren (die
-    Vorschau warnt bei wissenschaftlicher Schreibweise).
-  - Enthält er die **Nummer** (z. B. „PA07“): Scan-Code leer lassen. Die Suche und „Code scannen“ finden die
-    Ausrüstung dann schon über die Nummer.
-  - Etwas anderes (z. B. GS1-Code des Herstellers): Scan-Code leer lassen und später je Gerät auf der Detailseite
-    mit **Code zuordnen** (Handscanner oder Kamera) einlesen.
-- [ ] Speichern als **CSV UTF-8 (durch Trennzeichen getrennt)** (Excel: „Speichern unter“). Ein Excel-CSV mit
-  Semikolon in Windows-Kodierung geht ebenfalls; die App erkennt Kodierung und Trennzeichen.
+> **Achtung: Die Datei nicht in Excel öffnen und speichern.** Excel macht aus `01332711` die Zahl `1332711`
+> (führende Null weg); der Scan-Code passte dann nicht mehr zum Barcode, und die Vorschau kann das bei neuer
+> Ausrüstung nicht erkennen. Ansehen höchstens im Editor (z. B. Notepad). Muss doch etwas geändert werden: in
+> Excel über Daten → **Aus Text/CSV** mit der Spalte Scan-Code als **Text** laden, oder Claude die Datei neu
+> erstellen lassen.
+
+### 5.2 Vor dem Import
+- [x] Standorte (3) und Typen (4) bestehen; die Typnamen in der Datei stimmen mit 4 überein.
+- [x] Optional zum Abgleich: „1. Vorlage ausfüllen“ → **Gültige Werte herunterladen** (genaue Namen der Typen und
+  Standorte).
 
 ### 5.3 Prüfen und übernehmen
-- [ ] „2. Datei prüfen“ → **CSV-Datei wählen …**. Die Vorschau zeigt Fehler, Warnungen und „Unbekannte Werte“
-  (mit „Meinten Sie …?“). Fehler in Excel beheben, **Erneut prüfen**.
-- [ ] Erst ohne Fehler: Kommentar „Erstbefüllung aus Phils Liste“ und **Import übernehmen (N neu, …)**.
-- [ ] Stichprobe in der Ausrüstungsliste: Anzahl je Typ stimmt mit Phils Liste.
+- [x] „2. Datei prüfen“ → **CSV-Datei wählen …**. Die Vorschau zeigt Fehler, Warnungen und „Unbekannte Werte“
+  (mit „Meinten Sie …?“). Erwartet: **144 neu**, keine Fehler. Unbekannte Typen bzw. Standorte in der App
+  anlegen bzw. umbenennen (nicht die Datei in Excel ändern, siehe 5.1), dann **Erneut prüfen**.
+- [x] Erst ohne Fehler (16.11.2026: 144 neu, keine Fehler, keine Warnungen): Kommentar „Erstbefüllung aus der 112-Datenbank“ und **Import übernehmen (144 neu)**.
+- [x] Stichprobe in der Ausrüstungsliste: 92 M, 26 PA, 20 E-LA, 6 PLF, alle in „Pool“. Bei einer Maske die
+  Detailseite öffnen: Scan-Code mit führender 0 (8 Ziffern), Beschaffungsdatum und Notiz da.
 
-## 6. Fahrzeuge bestücken (nur bei Weg A)
+## 6. Nach dem Import: verleihen und Fahrzeuge bestücken
 
+### 6.1 Verliehene PA an Hattingen und Ippingen
+Diese PA sind derzeit in den Ortsteilen und kommen nach Benutzung zurück. Der Import kennt keinen Verleih (siehe
+Kasten), deshalb über die Seite **Verleih**:
+- [x] Admin-Konsole → **Verleih** → **Verleihen …** → Nummern **PA14, PA19, PA20, PA21, PA22** (Nummer bzw.
+  Scan-Code eingeben, Enter), Leihnehmer **Ippingen**, Kommentar „Bestand bei Einrichtung“; „Rückgabe bis“ leer.
+- [x] Ebenso **PA15, PA16, PA17, PA18** an **Hattingen**.
+- [x] Die Seite **Verleih** zeigt 9 offene Verleihe (5 Ippingen, 4 Hattingen).
+
+> **Geprüft (16.11.2026, Code): Der Import legt keinen Verleih an.** Eine Zeile mit Standort „Hattingen“ würde die
+> Ausrüstung nur dorthin buchen (Ereignis „Importiert“); ein Verleih (Eintrag in der Verleihliste) entsteht nur über
+> **Verleihen …** (`POST loans`). Ebenso entsteht durch gewöhnliches Umbuchen nach „Hattingen“ kein Verleih. Folgen
+> ohne Verleih: Die Ausrüstung fehlt auf der Seite **Verleih**, und die Rückgabe über den Aushang (11) lehnt sie ab
+> („… ist nicht verliehen …“), weil nur verliehene Ausrüstung zurückgegeben werden kann. Der Weg über
+> **Verleihen …** bleibt also nötig; deshalb stehen alle Zeilen der Datei auf „Pool“.
+
+### 6.2 Fahrzeuge bestücken
 Ort: Admin-Konsole → **Ausrüstung**.
-- [ ] Filter Standort „Pool“, Suche bzw. Typ eingrenzen, die Geräte eines Fahrzeugs ankreuzen.
-- [ ] **Umbuchen / Status ändern …** → Neuer Standort „IMM 1/44“ (bzw. „IMM 1/44 / Fahrerhaus“), Status nicht
-  ändern, Kommentar „Bestückung“. Für IMM 1/45 ebenso.
+- [ ] Filter Standort „Pool“, Suche bzw. Typ eingrenzen, die Ausrüstung eines Fahrzeugs ankreuzen.
+- [ ] **Umbuchen / Status ändern …** → Neuer Standort „1/44“ (bzw. „1/44 / Fahrerhaus“), Status nicht
+  ändern, Kommentar „Bestückung“. Für 1/45 ebenso.
+- [ ] Auf 1/44 zusätzlich mindestens **1 PLF** (Sollbestand, siehe 7).
 - [ ] Was gerade benutzt ist bzw. in Tuttlingen liegt, nach „benutzt“ bzw. „ASW TUT“ buchen.
 
 ## 7. Sollbestand (Admin)
 
 Ort: Admin-Konsole → **Standorte** → unten **Sollbestand festlegen …** (oder Knopf „Sollbestand“ oben).
-- [ ] IMM 1/44: Regel **mindestens 6** „Atemschutzmaske (M)“; Regel **mindestens 4** „Atemschutzgerät (PA)“.
-- [ ] IMM 1/45: dieselben zwei Regeln.
-- [ ] Danach beide Fahrzeuge „vollständig“ (sonst fehlt Ausrüstung im Fahrzeug, siehe 6).
+- [ ] 1/44: Regel **mindestens 6** „Atemschutzmaske (M)“; Regel **mindestens 4** „Atemschutzgerät (PA)“.
+- [ ] 1/44: zusätzlich Regel **mindestens 1** „Arbeitsluftflasche (PLF)“ (Angabe Phil, 16.11.2026).
+- [ ] 1/45: Regeln 6 M und 4 PA (keine PLF-Regel).
+- [ ] Danach beide Fahrzeuge „vollständig“ (sonst fehlt Ausrüstung im Fahrzeug, siehe 6.2).
 - Wirkung: Jede Buchung, die den einsatzbereiten Bestand eines Fahrzeugs unter die Zahl drückt, lehnt der Server
   ab und bietet **Tauschen …** an („Benutzt melden“ und „Status setzen“ eingeschlossen). „Trotzdem buchen …“ gibt
   es nur mit der Aktion „Sollbestand ohne Ersatz unterschreiten“ – die bekommt keine eigene Rolle.
-- Grenzen (bitte bewusst sein): Die Rolle **Admin** hat immer alle Rechte, also auch „Trotzdem buchen“ (Phil,
+- Grenzen (von Holger am 15.11.2026 als in Ordnung bestätigt): Die Rolle **Admin** hat immer alle Rechte, also auch „Trotzdem buchen“ (Phil,
   Holger); das lässt sich nicht abschalten. Und **offline** gebuchte Vorgänge lehnt der Server nie ab (die
   Wirklichkeit gilt), es entsteht dann ein Hinweis „Sollbestand unterschritten“ im Protokoll.
 - **⚠ offen:** Zuordnung LF 20 / KatS (gleiche Zahlen für beide Fahrzeuge?).
@@ -176,28 +190,29 @@ Ort: Admin-Konsole → **Standorte** → unten **Sollbestand festlegen …** (od
 ## 8. Rollen anlegen (Super-Admin)
 
 Ort: `…/service/` → **Städte** → **Immendingen** → Reiter **Rollen** → **Neue Rolle**. *Admin* ist fest
-(alle Rechte). *Benutzer* bleibt unverändert und wird in Immendingen nicht gebraucht.
+(alle Rechte). *Benutzer* bleibt unverändert und wird in Immendingen nicht gebraucht. Beide Rollen sind am
+16.11.2026 gespeichert, noch ohne Konten.
 
 ### Gerätewart (Nils, Paddy, Sven; Phil ist Admin)
-- [ ] Name „Gerätewart“, Kurzbeschreibung „Verwaltet die Ausrüstung, keine Konten“.
-- [ ] „1 · Ansichten und Bereiche“:
+- [x] Name „Gerätewart“, Kurzbeschreibung „Verwaltet die Ausrüstung, keine Konten“.
+- [x] „1 · Ansichten und Bereiche“:
   - **Ändern**: Ausrüstungsliste, Standorte, Ausrüstungstypen, Termine, Protokoll und Hinweise, Wartung,
     Verleih und Rückgaben.
   - **Ansehen**: Dashboard, Suchen und Ausrüstung ansehen.
   - **Kein Zugriff**: Benutzer, Einstellungen der Stadt.
-- [ ] „2 · Aktionen“: Umbuchen, Status setzen, Benutzt melden, Tauschen, Ausrüstung anlegen, Stammdaten
+- [x] „2 · Aktionen“: Umbuchen, Status setzen, Benutzt melden, Tauschen, Ausrüstung anlegen, Stammdaten
   bearbeiten, **Aussondern und wieder aufnehmen**, Code zuordnen, Sammelaktionen, CSV-Import, CSV-Export,
   Log-Mails empfangen. **Nicht**: „Sollbestand ohne Ersatz unterschreiten“.
-- [ ] „3 · Einschränkungen“: keine. „4 · Sieht nur …“: Alle / Alle.
+- [x] „3 · Einschränkungen“: keine. „4 · Sieht nur …“: Alle / Alle.
 
 ### Geräteträger (alle Aktiven)
-- [ ] Name „Geräteträger“, Kurzbeschreibung „Meldet Benutzung, setzt Status, tauscht“.
-- [ ] „1 · Ansichten und Bereiche“: **Ansehen**: Suchen und Ausrüstung ansehen, Termine. Alles andere kein Zugriff
+- [x] Name „Geräteträger“, Kurzbeschreibung „Meldet Benutzung, setzt Status, tauscht“.
+- [x] „1 · Ansichten und Bereiche“: **Ansehen**: Suchen und Ausrüstung ansehen, Termine. Alles andere kein Zugriff
   (damit gibt es kein Konsolen-Menü, nur die Handy-Seiten).
-- [ ] „2 · Aktionen“: **Status setzen**, **Benutzt melden**, **Tauschen**. **Nicht**: Umbuchen, „Sollbestand ohne
+- [x] „2 · Aktionen“: **Status setzen**, **Benutzt melden**, **Tauschen**. **Nicht**: Umbuchen, „Sollbestand ohne
   Ersatz unterschreiten“.
-- [ ] „3 · Einschränkungen“: nach der Empfehlung in 4 **keine** (**⚠ offen**, Rückfrage Runde 16).
-- [ ] „4 · Sieht nur …“: Alle / Alle.
+- [x] „3 · Einschränkungen“: **keine** (entschieden 15.11.2026, siehe 4).
+- [x] „4 · Sieht nur …“: Alle / Alle.
 
 Geprüft in Runde 16 (Code und Tests): Eine Rolle mit „Tauschen“ und „Status setzen“ ohne „Umbuchen“ funktioniert
 vollständig. Die Detailseite zeigt dann nur die Statusknöpfe (keinen Standort), dazu „Benutzt melden“ und
@@ -207,7 +222,9 @@ Platz – auch offline.
 
 ## 9. Konten
 
-- [ ] **Admins** (Phil, Holger): Phil als Admin einladen, falls noch nicht (`…/service/` → Immendingen →
+Erst nach der Freigabe des Datenschutzes durch die Gemeinde (siehe Sammlung); das gilt auch für 10.
+
+- [ ] **Admins** (Phil, Holger): Phil als Admin einladen (noch offen) (`…/service/` → Immendingen →
   „Admin einladen …“).
 - [ ] **Einladungscodes** (Admin-Konsole → **Benutzer** → Reiter **Einladungscodes** → „Neuer Einladungscode“):
   einen Code mit **Rolle nach der Freischaltung = Geräteträger** für den Dienstabend (Gültigkeit z. B. 14 Tage,
@@ -267,12 +284,22 @@ Mit einem Gerätewart- und einem Geräteträger-Konto, an einem Gerät, das dana
 
 ## Sammlung: offene Punkte
 
-1. **Zuordnung LF 20 / KatS** zu IMM 1/44 und IMM 1/45 und ob der Sollbestand (6 M, 4 PA) für beide gilt (3, 7).
-2. **PLF**: Einschränkung „nur benutzt melden“ ja/nein (Rückfrage an Phil) (4).
-3. **„Nur benutzt melden“ und Werkstatt**: Empfehlung ohne Einmalgerät/ohne Einschränkung, oder Programmänderung
-   (eigenes Kästchen am Typ) (4, 8).
-4. **Inhalt des Barcodes/QR** an den Geräten: Nummer, Seriennummer oder etwas anderes (5.2).
-5. **Excel-Liste** von Phil (5).
-6. **Datenschutz bei der Gemeinde** (Verantwortlicher, Information der Aktiven, siehe
+1. **Zuordnung LF 20 / KatS** zu 1/44 und 1/45 und ob der Sollbestand (6 M, 4 PA) für beide gilt (3, 7).
+2. **Prüffristen** (Nächste Wartung) legt Immendingen später fest; danach per Sammelaktion setzen (5.1).
+3. **Datenschutz bei der Gemeinde** (Verantwortlicher, Information der Aktiven, siehe
    `docs/DATENSCHUTZ-BESTANDSAUFNAHME.md`) – vor dem Einladen der Aktiven.
-7. „Trotzdem buchen“ bleibt für Admins (Phil, Holger) möglich, und offline wird nie abgelehnt – so in Ordnung? (7)
+
+Noch zu tun (Stand 16.11.2026 abends): Sicherung (1), Phil als Admin einladen (9), Fahrzeuge bestücken (6.2),
+Sollbestand (7), Aushang an „benutzt“ (11), dann nach der Freigabe des Datenschutzes Konten (9) und Mails (10),
+Probelauf (12) und Einweisung (13).
+
+Erledigt (Holger, 15.11.2026): „Nur benutzt melden“ für PA, M, E-LA und PLF wird nicht eingerichtet (4, 8);
+„Trotzdem buchen“ für Admins und dass offline nie abgelehnt wird, ist in Ordnung (7).
+
+Erledigt (16.11.2026): Importdatei aus der 112-Datenbank liegt vor (5); Scan-Code = Barcode der 112-Datenbank
+(5.1); PLF nur die 6 Arbeitsluftflaschen, Sollbestand 1 PLF auf 1/44 (7); nur die Fahrzeuge 1/44 und 1/45,
+Wärmebildkamera deaktivieren (3, 4); verliehene PA über „Verleihen …“, weil der Import keinen Verleih anlegt (6.1).
+
+Erledigt (16.11.2026 abends, Claude im Browser auf Holgers Anweisung): Abläufe (2), Standorte mit den Fahrzeugen
+„1/44“ und „1/45“ (3), Ausrüstungstypen (4), Import 144 neu ohne Fehler und Warnungen (5), Verleih der 9 PA an
+Ippingen und Hattingen (6.1), Rollen Gerätewart und Geräteträger ohne Konten (8).

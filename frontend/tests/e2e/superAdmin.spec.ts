@@ -682,6 +682,50 @@ test.describe('Stadtdetail', () => {
         });
     });
 
+    test('Claude-Zugang der Stadt erlauben und verbieten', async ({ page, apiRequests }) => {
+        await page.goto('/firefighting/service/staedte/2');
+        const toggle = page.getByRole('checkbox', {
+            name: 'Claude-Zugang für diese Stadt erlauben',
+        });
+        await expect(toggle).not.toBeChecked();
+        await expect(page.getByTestId('claude-city')).toContainText('gehen an Anthropic');
+
+        await toggle.click();
+        const allow = page.getByRole('alertdialog', { name: /^Claude-Zugang für .* erlauben\?$/ });
+        await expect(allow).toContainText('Der Zugang bleibt „Aus“');
+        // Das Kästchen folgt erst der Antwort, nicht dem Klick (hinter der Rückfrage verborgen).
+        await expect(page.getByTestId('claude-city-toggle')).not.toBeChecked();
+        await allow.getByRole('button', { name: 'Erlauben' }).click();
+        await expect(page.getByTestId('success-notice')).toContainText('Claude-Zugang ist für');
+        await expect(toggle).toBeChecked();
+
+        await page.getByRole('tab', { name: 'Admins und Benutzer' }).click();
+        await expect(
+            page.getByRole('button', { name: 'Claude-Zugang von Thomas Keller …' }),
+        ).toBeVisible();
+        await page.getByRole('tab', { name: 'Übersicht' }).click();
+
+        await toggle.click();
+        const forbid = page.getByRole('alertdialog', {
+            name: /^Claude-Zugang für .* verbieten\?$/,
+        });
+        await expect(forbid).toContainText('sofort getrennt');
+        await forbid.getByRole('button', { name: 'Verbieten' }).click();
+        await expect(page.getByTestId('success-notice')).toContainText('verboten');
+        await expect(toggle).not.toBeChecked();
+
+        await page.getByRole('tab', { name: 'Admins und Benutzer' }).click();
+        await expect(page.getByTestId('account-21')).toBeVisible();
+        await expect(page.getByRole('button', { name: /Claude/ })).toHaveCount(0);
+
+        expect(apiRequests.filter((r) => r.method === 'POST').map((r) => [r.path, r.body])).toEqual(
+            [
+                ['api/v1/tenants/2/claude', { enabled: true }],
+                ['api/v1/tenants/2/claude', { enabled: false }],
+            ],
+        );
+    });
+
     test('ohne Claude-Zugang der Stadt keine Knöpfe', async ({ page }) => {
         await page.goto('/firefighting/service/staedte/2?ansicht=konten');
         await expect(page.getByTestId('account-21')).toBeVisible();

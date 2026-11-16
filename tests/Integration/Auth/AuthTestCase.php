@@ -52,6 +52,15 @@ abstract class AuthTestCase extends AuthSchemaTestCase
         $this->createTenant('tuttlingen');
     }
 
+    /**
+     * Erlaubt den Claude-Zugang der Stadt (fe_tenants.claude_enabled, wie es der Super-Admin tut;
+     * die Test-Stadt hat ihn nur per Migration 0066, Städte der Tests legt createTenant ohne an).
+     */
+    protected function allowClaude(string $slug): void
+    {
+        $this->pdo()->prepare('UPDATE fe_tenants SET claude_enabled = 1 WHERE slug = ?')->execute([$slug]);
+    }
+
     protected function tenant(string $slug): Tenant
     {
         return new TenantRepository($this->pdo())->findBySlug(TenantSlug::fromString($slug))

@@ -206,6 +206,22 @@ export function setTenantLocked(
     });
 }
 
+/**
+ * POST tenants/{id}/claude {enabled}: Claude-Zugang der Stadt erlauben bzw. verbieten (T17). Verbieten
+ * trennt alle Claude-Verbindungen der Stadt und setzt den Zugang aller Konten auf „Aus“.
+ */
+export function setTenantClaudeEnabled(
+    id: number,
+    enabled: boolean,
+    fetchFn?: typeof fetch,
+): Promise<ApiResult<ManagedTenant>> {
+    return apiRequest(`tenants/${String(id)}/claude`, parseTenantResponse, {
+        method: 'POST',
+        body: { enabled },
+        ...(fetchFn && { fetchFn }),
+    });
+}
+
 /** POST tenants/{id}/admins {email} → 201: weiteren Admin einladen. */
 export function inviteAdmin(
     id: number,

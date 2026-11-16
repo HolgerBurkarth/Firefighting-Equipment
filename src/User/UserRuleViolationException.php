@@ -90,7 +90,7 @@ final class UserRuleViolationException extends UserException
 
     public static function claudeUnavailable(): self
     {
-        return new self('Den Claude-Zugang gibt es bisher nur in der Test-Stadt.');
+        return new self('Der Claude-Zugang ist für diese Stadt nicht freigeschaltet.');
     }
 
     public static function deleted(int $id): self

@@ -22,6 +22,7 @@ import {
     renameTenant,
     resendInvitation,
     setClaudeAccessOfAdmin,
+    setTenantClaudeEnabled,
     setTenantLocked,
     tenantList,
 } from '../data/service';
@@ -346,6 +347,37 @@ async function confirmEnd(): Promise<void> {
     await loadUsers();
 }
 
+// Claude-Zugang der Stadt (T17): nur der Super-Admin; Verbieten trennt alle Verbindungen.
+const claudeCityOpen = ref(false);
+
+function askClaudeCity(event: Event): void {
+    // Das Kästchen folgt erst der Antwort des Servers, nicht dem Klick.
+    event.preventDefault();
+    remember(event);
+    claudeCityOpen.value = true;
+}
+
+async function confirmClaudeCity(): Promise<void> {
+    const current = tenant.value;
+    if (current === null) {
+        return;
+    }
+    const enable = !current.claudeAvailable;
+    busy.value = true;
+    const result = await setTenantClaudeEnabled(current.id, enable);
+    busy.value = false;
+    if (!applyTenant(result)) {
+        if (!result.ok) {
+            pageError.value = result.error;
+        }
+        return;
+    }
+    success.value = enable
+        ? `Der Claude-Zugang ist für „${current.name}“ erlaubt. Den Zugang je Konto setzen die Admins der Stadt.`
+        : `Der Claude-Zugang ist für „${current.name}“ verboten. Alle Claude-Verbindungen der Stadt sind getrennt.`;
+    await loadUsers();
+}
+
 // Sperren und Entsperren
 const lockOpen = ref(false);
 const lockDescription = computed(() =>
@@ -517,6 +549,29 @@ onMounted(() => {
                     </div>
                     <p v-if="!tenant.active" class="hint">
                         In eine gesperrte Stadt kann niemand eingeladen werden.
+                    </p>
+                </section>
+
+                <section
+                    class="card"
+                    aria-labelledby="claude-city-heading"
+                    data-testid="claude-city"
+                >
+                    <h2 id="claude-city-heading">Claude-Zugang</h2>
+                    <label class="check">
+                        <input
+                            type="checkbox"
+                            data-testid="claude-city-toggle"
+                            :checked="tenant.claudeAvailable"
+                            :disabled="busy"
+                            @click="askClaudeCity"
+                        />
+                        <span>Claude-Zugang für diese Stadt erlauben</span>
+                    </label>
+                    <p class="hint">
+                        Dann können Konten der Stadt Claude verbinden, und Daten der Stadt (Verlauf
+                        mit Namen, Kommentare, Notizen) gehen an Anthropic. Den Zugang je Konto
+                        setzen danach die Admins der Stadt (Standard „Aus“).
                     </p>
                 </section>
 
@@ -766,6 +821,22 @@ onMounted(() => {
             description="Claude kann danach nicht mehr für dieses Konto auf die Ausrüstung zugreifen, bis es Claude neu verbindet. Der Claude-Zugang bleibt."
             confirm-label="Trennen"
             @confirm="confirmEnd"
+        />
+
+        <ConfirmDialog
+            v-model:open="claudeCityOpen"
+            :title="
+                tenant.claudeAvailable
+                    ? `Claude-Zugang für ${tenant.name} verbieten?`
+                    : `Claude-Zugang für ${tenant.name} erlauben?`
+            "
+            :description="
+                tenant.claudeAvailable
+                    ? 'Alle Claude-Verbindungen der Stadt werden sofort getrennt, und der Claude-Zugang aller Konten wird auf „Aus“ gesetzt. Claude verbinden ist dort danach nicht mehr möglich.'
+                    : 'Daten der Stadt (Verlauf mit Namen, Kommentare, Notizen) gehen an Anthropic, sobald ein Konto Claude verbindet. Konten ändern sich dabei nicht: Der Zugang bleibt „Aus“, bis ein Admin ihn setzt.'
+            "
+            :confirm-label="tenant.claudeAvailable ? 'Verbieten' : 'Erlauben'"
+            @confirm="confirmClaudeCity"
         />
 
         <ConfirmDialog

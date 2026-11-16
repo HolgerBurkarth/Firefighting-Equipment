@@ -17,6 +17,8 @@ use FirefightingEquipment\User\UserRepository;
  * Super-Admin auf eine Stadt, siehe TenantAction. Antwort immer {"tenant": …} mit dem Stand danach.
  * Unbekannte ID: 404 not_found. Umbenannt wird nur der Name (das Kürzel ist unveränderlich).
  * Sperren und Entsperren sind wiederholbar; Sperren beendet alle Sitzungen der Konten der Stadt.
+ * Claude-Zugang erlauben bzw. verbieten ist ebenso wiederholbar; Verbieten beendet alle
+ * Claude-Verbindungen der Stadt und setzt den Zugang aller Konten auf „Aus“.
  */
 final readonly class TenantActionHandler implements RequestHandler
 {
@@ -29,6 +31,7 @@ final readonly class TenantActionHandler implements RequestHandler
         $id = $context->param('id');
         // Felder vor der Suche der Stadt lesen (400 vor 404).
         $name = $this->action === TenantAction::Rename ? TenantFields::name($context) : null;
+        $claude = $this->action === TenantAction::SetClaude ? $context->boolField('enabled') : null;
 
         $pdo = $context->db->get();
         $admin = new TenantAdministration(new TenantRepository($pdo), new UserRepository($pdo));
@@ -39,6 +42,7 @@ final readonly class TenantActionHandler implements RequestHandler
                 TenantAction::Rename => $admin->rename($tenant, $name ?? throw new \LogicException('Name fehlt.')),
                 TenantAction::Lock => $admin->setActive($tenant, false),
                 TenantAction::Unlock => $admin->setActive($tenant, true),
+                TenantAction::SetClaude => $admin->setClaudeEnabled($tenant, $claude ?? throw new \LogicException('Wert fehlt.')),
             };
 
             return new JsonResponse(['tenant' => TenantJson::tenant($admin->summary($id))]);

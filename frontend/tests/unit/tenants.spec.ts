@@ -10,6 +10,7 @@ import {
     parseSuperAdminList,
     parseTenantList,
     resendInvitation,
+    setTenantClaudeEnabled,
     setTenantLocked,
     type ManagedTenant,
 } from '../../src/api/tenants';
@@ -266,6 +267,12 @@ describe('API', () => {
         expect((await setTenantLocked(1, true, lock.fetch)).ok).toBe(true);
         expect(lock.requests[0]?.url).toMatch(/tenants\/1\/lock$/);
         expect(lock.requests[0]?.body).toEqual({});
+
+        const claude = respond(200, { tenant: tenantJson({ claude_available: true }) });
+        const allowed = await setTenantClaudeEnabled(1, true, claude.fetch);
+        expect(allowed.ok && allowed.data.claudeAvailable).toBe(true);
+        expect(claude.requests[0]?.url).toMatch(/tenants\/1\/claude$/);
+        expect(claude.requests[0]?.body).toEqual({ enabled: true });
 
         const users = respond(200, { users: [userJson(4)] });
         expect((await fetchTenantUsers(1, 'invited', users.fetch)).ok).toBe(true);
