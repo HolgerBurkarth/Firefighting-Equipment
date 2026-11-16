@@ -22,7 +22,7 @@ use FirefightingEquipment\User\UserStatus;
  * - Städte per ID; unbekannte IDs → TenantNotFoundException.
  * - Konten nur der jeweiligen Stadt; fremde und unbekannte IDs → UserNotFoundException.
  * - In eine gesperrte Stadt wird nicht eingeladen (der Link führte dort zu 403).
- * - Claude-Zugang (F12): nur in der Test-Stadt; der Super-Admin setzt ihn nur für Konten mit der
+ * - Claude-Zugang (F12): nur in Städten, die ihn erlauben (ClaudeAvailability); der Super-Admin setzt ihn nur für Konten mit der
  *   Rolle Admin, trennt aber die Verbindungen jedes Kontos der Stadt.
  */
 final readonly class TenantAdministration
@@ -82,6 +82,16 @@ final readonly class TenantAdministration
     public function setActive(Tenant $tenant, bool $active): void
     {
         $this->tenants->setActive($tenant->slug, $active);
+    }
+
+    /**
+     * Claude-Zugang der Stadt erlauben oder verbieten (T17, TenantRepository::setClaudeEnabled).
+     *
+     * @throws TenantNotFoundException
+     */
+    public function setClaudeEnabled(Tenant $tenant, bool $enabled): void
+    {
+        $this->tenants->setClaudeEnabled($tenant->slug, $enabled);
     }
 
     /**

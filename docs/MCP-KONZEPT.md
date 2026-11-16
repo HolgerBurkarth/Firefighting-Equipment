@@ -17,8 +17,10 @@ Claude arbeitet dabei immer **als die Person**, die die Verbindung hergestellt h
 deren Datenfilter („Sieht nur …“) und höchstens dem Claude-Zugang, den ein Admin bzw. der
 Super-Admin für dieses Konto freigegeben hat. Jede Änderung steht im Verlauf mit „über Claude“.
 
-Bis der Datenschutz geklärt ist (`TODO-SPAETER.md`, T17), gibt es den Zugang **nur in der
-Test-Stadt** (`test`).
+Den Zugang gibt es nur in Städten, für die ihn der Super-Admin erlaubt (Stadtdetail, „Übersicht“,
+Kästchen „Claude-Zugang für diese Stadt erlauben“; seit 16.11.2026, T17). Standard aus; die
+Test-Stadt ist eingeschaltet. Verbieten trennt sofort alle Verbindungen der Stadt und setzt den
+Zugang aller Konten auf „Aus“; Erlauben ändert keine Konten.
 
 ## 2. Claude-Zugang je Konto
 
@@ -204,7 +206,9 @@ Registrierung abgelehnt; die Seite springt nie zu einer nicht geprüften Adresse
 
 Bei Nutzung fließen Daten der Stadt (Ausrüstung, Standorte, Namen von Personen im Verlauf,
 Kommentare) zu Anthropic. Vor einer Freigabe in echten Städten zu klären (Auftragsverarbeitung,
-Hinweis für Nutzer, Datenschutzerklärung): `TODO-SPAETER.md`, T17. Bis dahin nur in der Test-Stadt.
+Hinweis für Nutzer, Datenschutzerklärung): `TODO-SPAETER.md`, T17. Seit 16.11.2026 schaltet der
+Super-Admin den Zugang je Stadt frei (Abschnitt 1); für Immendingen entschieden ohne vorherige
+Zustimmung der Gemeinde, die Zustimmung wird nachgeholt (`DATENSCHUTZ-BESTANDSAUFNAHME.md`, E5).
 
 ## 9. Nicht Teil dieses Konzepts
 

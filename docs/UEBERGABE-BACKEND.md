@@ -8,6 +8,27 @@ Eintrag: Datum, Commit-Betreff (der Agent trägt den Betreff seines Commits ein;
 committet er selbst, pushen tut nur der Nutzer), was sich geändert hat, warum, Tests, Stelle in
 `CLAUDE.md`.
 
+## 2026-11-16 – „Claude-Zugang je Stadt freischaltbar (T17)“
+
+Claude-Zugang je Stadt statt fest nur `test` (Entscheidung Holger 16.11.2026, T17):
+
+- Migration `0066`: `fe_tenants.claude_enabled` (TINYINT 0/1, Standard 0, CHECK) und ein UPDATE, das genau die Test-Stadt
+  (`slug = 'test'`) einschaltet (Freigabe Holger). Andere Städte bleiben aus.
+- Neu `POST tenants/{id}/claude {enabled}` (nur Super-Admin unter `service`, `TenantAction::SetClaude`): Antwort `{tenant}` wie
+  die anderen Aktionen, wiederholbar; `enabled` nur echte JSON-Werte (sonst 400), unbekannte Stadt 404. `false` beendet in
+  derselben Transaktion alle Claude-Verbindungen und offenen Codes der Stadt und setzt `claude_access` aller Konten auf `off`;
+  `true` ändert keine Konten.
+- `claude_available` in `GET tenant` und in `TenantJson` folgt jetzt dieser Einstellung (`ClaudeAvailability::for` liest
+  `Tenant::$claudeEnabled`). Die Prüfungen von OAuth, Metadaten, `mcp` (404) und das Setzen des Zugangs am Konto (409) sind
+  unverändert, gelten aber für jede Stadt mit Claude-Zugang. Die Meldung von 409 lautet jetzt „Der Claude-Zugang ist für diese
+  Stadt nicht freigeschaltet.“ (vorher „… gibt es bisher nur in der Test-Stadt.“). Ausschalten wirkt sofort: jede Anfrage
+  lädt die Stadt neu.
+- Der Vermittler `scripts/cgi-bin/ff-mcp.pl` prüft keine Städte (nur das Format des Kürzels); keine Änderung, nichts hochzuladen.
+- Tests: `ClaudeAccessTest` (`testSuperAdminAllowsAndForbidsClaudeForTheCity`, `testNewCitiesHaveNoClaudeAccess`),
+  `McpEndpointTest::testForbiddenClaudeAccessOfTheCityEndsConnections`, `TenantClaudeEnabledMigrationTest`,
+  `SuperAdminRoutesAccessTest`; Frontend `superAdmin.spec.ts` („Claude-Zugang der Stadt erlauben und verbieten“), Unit
+  `tenants.spec.ts`. CLAUDE.md: "Claude-Zugang (MCP, im Aufbau)", "Städte verwalten und Admins einladen", "Mandanten (Städte)".
+
 ## 2026-11-15 – „Rückgabe direkt in die Sammelstelle (Aushang an der Sammelstelle), Knöpfe „Ins Lager bringen“/„In die Sammelstelle bringen““
 
 Rückgabe ohne Anmeldung direkt in die Sammelstelle (Wunsch Immendingen, Runde 16; keine Migration):

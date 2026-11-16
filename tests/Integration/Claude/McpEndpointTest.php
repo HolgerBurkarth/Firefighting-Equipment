@@ -262,6 +262,15 @@ final class McpEndpointTest extends ClaudeOAuthTestCase
         self::assertSame(403, $this->mcp($tokens['access_token'], self::request('ping'))->statusCode());
     }
 
+    public function testForbiddenClaudeAccessOfTheCityEndsConnections(): void
+    {
+        $tokens = $this->connect();
+        new TenantRepository($this->pdo())->setClaudeEnabled(TenantSlug::fromString(self::CITY), false);
+
+        self::assertSame(404, $this->mcp($tokens['access_token'], self::request('ping'))->statusCode());
+        self::assertSame(0, $this->connectionCount($this->user));
+    }
+
     public function testReadAccessIsShownAfterDowngrade(): void
     {
         $tokens = $this->connect();

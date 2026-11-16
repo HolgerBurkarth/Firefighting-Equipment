@@ -11,7 +11,7 @@ use FirefightingEquipment\Tenant\Tenant;
 
 /**
  * Die Stadt einer Route des Claude-Zugangs (OAuth, Metadaten): nur dort, wo es den Zugang gibt
- * (ClaudeAvailability, bis T17 nur die Test-Stadt); sonst gibt es die Adresse nicht (404).
+ * (ClaudeAvailability, Einstellung der Stadt); sonst gibt es die Adresse nicht (404).
  */
 final class ClaudeTenant
 {

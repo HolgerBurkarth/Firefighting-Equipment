@@ -38,7 +38,7 @@ final class AppearanceJson
             'accent_color_is_default' => $appearance->accentColor === null,
             'logo_url' => $logoUrls === null ? null : $logoUrls[(string) LogoSize::Large->value],
             'logo_urls' => $logoUrls,
-            // Claude-Zugang verfügbar (bisher nur die Test-Stadt, ClaudeAvailability).
+            // Claude-Zugang verfügbar (Einstellung der Stadt, ClaudeAvailability).
             'claude_available' => ClaudeAvailability::for($tenant),
         ];
     }

@@ -125,6 +125,7 @@ final class Routes
             ->add('POST', 'api/v1/tenants/{id}/rename', Access::SuperAdmin, new TenantActionHandler(TenantAction::Rename))
             ->add('POST', 'api/v1/tenants/{id}/lock', Access::SuperAdmin, new TenantActionHandler(TenantAction::Lock))
             ->add('POST', 'api/v1/tenants/{id}/unlock', Access::SuperAdmin, new TenantActionHandler(TenantAction::Unlock))
+            ->add('POST', 'api/v1/tenants/{id}/claude', Access::SuperAdmin, new TenantActionHandler(TenantAction::SetClaude))
             ->add('POST', 'api/v1/tenants/{id}/admins', Access::SuperAdmin, new AdminInvitationHandler(resend: false))
             ->add('GET', 'api/v1/tenants/{id}/users', Access::SuperAdmin, new TenantUserListHandler())
             ->add('POST', 'api/v1/tenants/{id}/users/{user}/resend-invitation', Access::SuperAdmin, new AdminInvitationHandler(resend: true))

@@ -24,8 +24,8 @@ use FirefightingEquipment\Tenant\Tenant;
  *   Anzeigenamen. Wer eine Rolle zuweist oder freischaltet, braucht alle ihre Rechte
  *   (Permissions::covers); wer eine Rolle ändert, auch alle Rechte der bisherigen (sonst ließe sich
  *   jemandem mit mehr Rechten die Rolle nehmen, wie bei Admin).
- * - Claude-Zugang (F12, docs/MCP-KONZEPT.md, Abschnitt 2): nur in der Test-Stadt
- *   (ClaudeAvailability), nur ein Konto mit der Rolle Admin, nur für Konten ohne Admin (deren Zugang
+ * - Claude-Zugang (F12, docs/MCP-KONZEPT.md, Abschnitt 2): nur in Städten mit
+ *   Claude-Zugang (ClaudeAvailability), nur ein Konto mit der Rolle Admin, nur für Konten ohne Admin (deren Zugang
  *   setzt der Super-Admin), nie am eigenen Konto.
  */
 final readonly class UserAdministration

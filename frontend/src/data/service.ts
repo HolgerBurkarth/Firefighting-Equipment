@@ -10,6 +10,7 @@ import {
     resendInvitation as postResendInvitation,
     setSuperAdminLocked as postSuperAdminLocked,
     setTenantUserClaudeAccess,
+    setTenantClaudeEnabled as postTenantClaudeEnabled,
     setTenantLocked as postTenantLocked,
     type CreatedTenant,
     type InvitationResult,
@@ -140,6 +141,14 @@ export async function setTenantLocked(
     locked: boolean,
 ): Promise<ApiResult<ManagedTenant>> {
     return afterTenantChange(await postTenantLocked(id, locked));
+}
+
+/** Claude-Zugang der Stadt erlauben bzw. verbieten (T17); danach lädt die Liste der Städte neu. */
+export async function setTenantClaudeEnabled(
+    id: number,
+    enabled: boolean,
+): Promise<ApiResult<ManagedTenant>> {
+    return afterTenantChange(await postTenantClaudeEnabled(id, enabled));
 }
 
 export async function inviteAdmin(

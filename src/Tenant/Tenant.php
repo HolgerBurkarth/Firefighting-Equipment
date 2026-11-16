@@ -19,6 +19,8 @@ final readonly class Tenant
         public \DateTimeImmutable $createdAt,
         /** UTC */
         public \DateTimeImmutable $updatedAt,
+        /** Claude-Zugang erlaubt (nur der Super-Admin schaltet ihn, T17). */
+        public bool $claudeEnabled = false,
     ) {
     }
 }

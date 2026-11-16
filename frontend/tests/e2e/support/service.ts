@@ -301,6 +301,19 @@ export function serviceServer(): ServiceServer {
         };
         server.handlers[`POST ${base}/lock`] = (request) => update(request, { active: false });
         server.handlers[`POST ${base}/unlock`] = (request) => update(request, { active: true });
+        // Claude-Zugang der Stadt (T17): Verbieten trennt alle Verbindungen, Zugang der Konten aus.
+        server.handlers[`POST ${base}/claude`] = (request) => {
+            const enabled = (request.body as { enabled: boolean }).enabled;
+            if (!enabled) {
+                for (const user of users.get(id) ?? []) {
+                    Object.assign(user, {
+                        claude_access: 'off',
+                        claude_connections: noConnections,
+                    });
+                }
+            }
+            return update(request, { claude_available: enabled });
+        };
         server.handlers[`POST ${base}/admins`] = (request) => {
             const tenant = find(request);
             if (tenant === undefined) {

@@ -36,10 +36,11 @@ final class SuperAdminRoutesAccessTest extends AuthTestCase
         yield 'umbenennen' => ['POST', 'tenants/{tenant}/rename', ['name' => 'Freiwillige Feuerwehr Immendingen']];
         yield 'sperren' => ['POST', 'tenants/{tenant}/lock', []];
         yield 'entsperren' => ['POST', 'tenants/{tenant}/unlock', []];
+        yield 'Claude-Zugang der Stadt' => ['POST', 'tenants/{tenant}/claude', ['enabled' => false]];
         yield 'Admin einladen' => ['POST', 'tenants/{tenant}/admins', ['email' => 'zweiter@example.org']];
         yield 'Benutzer ansehen' => ['GET', 'tenants/{tenant}/users', null];
         yield 'Einladung erneut senden' => ['POST', 'tenants/{tenant}/users/{user}/resend-invitation', []];
-        // Kommt durch, lehnt in Immendingen aber fachlich ab (Claude-Zugang nur in der Test-Stadt,
+        // Kommt durch, lehnt in Immendingen aber fachlich ab (Claude-Zugang dort nicht erlaubt,
         // ClaudeAvailability); die Wirkung prüft ClaudeAccessTest.
         yield 'Claude-Zugang setzen' => ['POST', 'tenants/{tenant}/users/{user}/claude-access', ['access' => 'read'], [409]];
         yield 'Claude-Verbindungen trennen' => ['POST', 'tenants/{tenant}/users/{user}/claude-connections/end', [], [409]];

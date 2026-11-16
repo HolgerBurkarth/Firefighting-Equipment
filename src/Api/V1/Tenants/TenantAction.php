@@ -17,4 +17,6 @@ enum TenantAction
     case Lock;
     /** POST api/v1/tenants/{id}/unlock {} */
     case Unlock;
+    /** POST api/v1/tenants/{id}/claude {enabled} (Claude-Zugang der Stadt, T17) */
+    case SetClaude;
 }

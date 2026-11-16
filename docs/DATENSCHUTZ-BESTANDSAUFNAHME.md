@@ -141,7 +141,8 @@ gemeinsam genutzten Handys der Wache), dass ohne Abmelden E-Mail und Name im Bro
 
 ### 1.6 Claude-Zugang (MCP)
 
-Heute nur in der Test-Stadt (`ClaudeAvailability::SLUG` = `test`, fest im Code). Bei Nutzung liest
+Je Stadt vom Super-Admin freigeschaltet (`fe_tenants.claude_enabled`, seit 16.11.2026; Standard aus,
+an in der Test-Stadt). Bei Nutzung liest
 Claude über die Werkzeuge (`src/Mcp/Tool/`) im Namen einer Person: Ausrüstung, Standorte, Termine,
 Verlauf mit **Anzeigenamen** („Wer“, auch Namen der Rückgabe ohne Anmeldung), Kommentare, Notizen,
 Hinweise (**ohne E-Mail**, `ToolFormat`), Verleihe mit Ansprechpartner. Keine Werkzeuge für Benutzer,
@@ -278,6 +279,10 @@ Je Punkt: Frage, Vorschlag, Begründung. Die Vorschläge sind keine rechtliche B
   für die ein Vertrag besteht.
 - **Begründung:** Mit dem Zugang verlassen Namen im Verlauf, Kommentare und Notizen den Server von
   STRATO; die Verantwortung dafür liegt bei der Stadt (E1), sie muss zustimmen.
+- **Entschieden (Holger, 16.11.2026):** Claude-Zugang für Immendingen ohne vorherige Zustimmung der
+  Gemeinde einschalten; Zustimmung wird nachgeholt. Umgesetzt: Einstellung je Stadt, nur der
+  Super-Admin schaltet sie (Stadtdetail, „Übersicht“, mit Hinweis auf die Daten an Anthropic);
+  Verbieten trennt sofort alle Verbindungen der Stadt.
 
 ### E6 – Auskunft und Löschung auf Anfrage
 

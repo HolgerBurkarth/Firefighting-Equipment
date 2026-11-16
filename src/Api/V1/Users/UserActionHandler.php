@@ -35,8 +35,8 @@ use FirefightingEquipment\User\UserRuleViolationException;
  * schickt „Ihr Konto wurde freigeschaltet“, Ablehnen „Ihre Registrierung wurde nicht freigegeben“
  * (an die Adresse, die vor dem Anonymisieren gespeichert war).
  *
- * Claude-Zugang (claude-access, claude-connections/end; F12 in UserAdministration): nur in der
- * Test-Stadt, nur die Rolle Admin, nur für Konten ohne Admin, nie am eigenen Konto; sonst 409.
+ * Claude-Zugang (claude-access, claude-connections/end; F12 in UserAdministration): nur in Städten
+ * mit Claude-Zugang, nur die Rolle Admin, nur für Konten ohne Admin, nie am eigenen Konto; sonst 409.
  */
 final readonly class UserActionHandler implements RequestHandler
 {

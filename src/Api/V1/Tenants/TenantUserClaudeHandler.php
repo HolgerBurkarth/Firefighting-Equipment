@@ -23,7 +23,7 @@ use FirefightingEquipment\User\UserRuleViolationException;
  * - POST api/v1/tenants/{id}/users/{user}/claude-connections/end {}: jedes Konto der Stadt.
  *
  * Antwort {"user": …}. Unbekannte Stadt bzw. Konto einer anderen Stadt 404, ungültiges access 400,
- * nicht die Test-Stadt, Konto ohne Admin, nicht aktiv oder gelöscht 409 rule_violation.
+ * Claude-Zugang der Stadt nicht erlaubt, Konto ohne Admin, nicht aktiv oder gelöscht 409 rule_violation.
  */
 final readonly class TenantUserClaudeHandler implements RequestHandler
 {

@@ -52,6 +52,7 @@ final class ClaudeAccessTest extends AuthTestCase
         parent::setUp();
 
         $this->createTenant(self::CITY);
+        $this->allowClaude(self::CITY);
         $this->admin = $this->account(self::CITY, 'admin@example.org', ['role' => 'admin']);
         $this->user = $this->account(self::CITY, 'erika@example.org');
         $this->cookie = $this->loginCookie(self::CITY, 'admin@example.org');
@@ -171,7 +172,7 @@ final class ClaudeAccessTest extends AuthTestCase
         self::assertSame(404, $this->post(999999, 'claude-access', ['access' => 'read'])->statusCode());
     }
 
-    public function testOnlyInTheTestCity(): void
+    public function testOnlyInCitiesThatAllowIt(): void
     {
         $this->account('immendingen', 'chef@example.org', ['role' => 'admin']);
         $user = $this->account('immendingen', 'erika@example.org');
@@ -180,7 +181,7 @@ final class ClaudeAccessTest extends AuthTestCase
         foreach (['claude-access' => ['access' => 'read'], 'claude-connections/end' => []] as $action => $body) {
             $response = $this->send('POST', self::url('immendingen', 'users/' . $user . '/' . $action), $body, $cookie);
             self::assertSame(409, $response->statusCode(), $response->body());
-            self::assertSame('Den Claude-Zugang gibt es bisher nur in der Test-Stadt.', self::json($response)['message']);
+            self::assertSame('Der Claude-Zugang ist für diese Stadt nicht freigeschaltet.', self::json($response)['message']);
         }
         self::assertSame('off', $this->accessOf($user));
 
@@ -218,7 +219,7 @@ final class ClaudeAccessTest extends AuthTestCase
         self::assertSame(404, $this->send('POST', $path($other, 'claude-access'), ['access' => 'read'], $cookie)->statusCode(), 'Konto einer anderen Stadt');
         $immendingen = $this->account('immendingen', 'chef@example.org', ['role' => 'admin']);
         $response = $this->send('POST', self::url(null, sprintf('tenants/%d/users/%d/claude-access', $this->tenant('immendingen')->id, $immendingen)), ['access' => 'read'], $cookie);
-        self::assertSame(409, $response->statusCode(), 'nur in der Test-Stadt');
+        self::assertSame(409, $response->statusCode(), 'nur in Städten mit Claude-Zugang');
         self::assertSame(400, $this->send('POST', $path($this->admin, 'claude-access'), ['access' => 'x'], $cookie)->statusCode());
     }
 
@@ -310,6 +311,59 @@ final class ClaudeAccessTest extends AuthTestCase
         self::assertSame(0, $this->codeCount($this->user));
         self::assertSame(1, $this->connectionCount($neighbour), 'andere Stadt unberührt');
         self::assertSame('write', $this->accessOf($this->user), 'der Zugang bleibt');
+    }
+
+    // ---- Claude-Zugang der Stadt (T17) -----------------------------------------------------------
+
+    public function testSuperAdminAllowsAndForbidsClaudeForTheCity(): void
+    {
+        $this->account(null, 'super@example.org');
+        $cookie = $this->loginCookie(null, 'super@example.org');
+        $immendingen = $this->tenant('immendingen')->id;
+        $path = self::url(null, sprintf('tenants/%d/claude', $immendingen));
+        $chef = $this->account('immendingen', 'chef@example.org', ['role' => 'admin']);
+        $user = $this->account('immendingen', 'erika@example.org');
+
+        $response = $this->send('POST', $path, ['enabled' => true], $cookie);
+        self::assertSame(200, $response->statusCode(), $response->body());
+        self::assertTrue(self::json($response)['tenant']['claude_available']);
+        self::assertTrue(self::json($this->send('GET', self::url('immendingen', 'tenant')))['claude_available']);
+        self::assertSame('off', $this->accessOf($user), 'Erlauben ändert keine Konten');
+        self::assertSame(200, $this->send('POST', $path, ['enabled' => true], $cookie)->statusCode(), 'wiederholbar');
+
+        $chefCookie = $this->loginCookie('immendingen', 'chef@example.org');
+        $response = $this->send('POST', self::url('immendingen', 'users/' . $user . '/claude-access'), ['access' => 'read'], $chefCookie);
+        self::assertSame(200, $response->statusCode(), $response->body());
+        $this->connect($user, 'immendingen');
+        $this->setAccess($this->user, 'write');
+        $this->connect($this->user);
+
+        $response = $this->send('POST', $path, ['enabled' => false], $cookie);
+        self::assertSame(200, $response->statusCode(), $response->body());
+        self::assertFalse(self::json($response)['tenant']['claude_available']);
+        self::assertSame(0, $this->connectionCount($user), 'Verbindungen beendet');
+        self::assertSame(0, $this->codeCount($user));
+        self::assertSame('off', $this->accessOf($user), 'Zugang der Konten aus');
+        self::assertSame(1, $this->connectionCount($this->user), 'andere Stadt unberührt');
+        self::assertSame('write', $this->accessOf($this->user));
+        self::assertSame(409, $this->send('POST', self::url('immendingen', 'users/' . $user . '/claude-access'), ['access' => 'read'], $chefCookie)->statusCode());
+        self::assertSame(404, $this->send('GET', '/firefighting/immendingen/.well-known/openid-configuration')->statusCode());
+
+        self::assertSame(200, $this->send('POST', $path, ['enabled' => true], $cookie)->statusCode());
+        self::assertSame('off', $this->accessOf($user), 'nach erneutem Erlauben bleibt der Zugang aus');
+        self::assertSame('off', $this->accessOf($chef));
+
+        self::assertSame(400, $this->send('POST', $path, ['enabled' => 1], $cookie)->statusCode());
+        self::assertSame(400, $this->send('POST', $path, [], $cookie)->statusCode());
+        self::assertSame(404, $this->send('POST', self::url(null, 'tenants/999999/claude'), ['enabled' => true], $cookie)->statusCode());
+    }
+
+    public function testNewCitiesHaveNoClaudeAccess(): void
+    {
+        $this->createTenant('nachbar');
+
+        self::assertFalse($this->tenant('nachbar')->claudeEnabled);
+        self::assertTrue($this->tenant(self::CITY)->claudeEnabled);
     }
 
     // ---- Datenbank -------------------------------------------------------------------------------

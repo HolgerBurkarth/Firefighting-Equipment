@@ -1798,7 +1798,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
 
 ## Mandanten (Städte)
 - Tabelle `fe_tenants` (Migration `0001`): `id`, `slug`, `name`, `active`, `created_at`,
-  `updated_at` (UTC), dazu `accent_color` (Migration `0021`, siehe "Erscheinungsbild (API)"). Code
+  `updated_at` (UTC), dazu `accent_color` (Migration `0021`, siehe "Erscheinungsbild (API)") und
+  `claude_enabled` (Migration `0066`, siehe "Claude-Zugang (MCP, im Aufbau)"). Code
   in `src/Tenant/` (`TenantSlug`, `TenantName`, `Tenant`, `TenantRepository`, `TenantSummary`,
   `TenantAdministration`; Erscheinungsbild getrennt in `TenantAppearanceRepository`, damit
   `TenantRepository` nie Bilddaten lädt).
@@ -2451,8 +2452,15 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   O2–O14; Runden 4 = M1 + M2, 5 = M3 + M4, 6 = M5, 7 = M6 + M7), Live-Tests
   `docs/frontend/LIVETEST-MCP.md`. Ergebnis der Vorklärung (O1, 07.11.2026): Claude findet die
   Metadaten unter `<issuer>/.well-known/openid-configuration` ohne Änderung der Webroot.
-- Nur in der Test-Stadt (`ClaudeAvailability::for`, `SLUG` = `TestCityData::SLUG`, fest im Code; T17
-  Datenschutz): sonst lehnen die Routen zum Setzen und Trennen mit 409 `rule_violation` ab, die
+- Nur in Städten, die ihn erlauben (seit 16.11.2026, T17, Entscheidung Holger; vorher fest nur
+  `test`): `fe_tenants.claude_enabled` (Migration `0066`, Standard 0; deren UPDATE hat genau die
+  Test-Stadt eingeschaltet), `Tenant::$claudeEnabled`, `ClaudeAvailability::for`. Schalten nur der
+  Super-Admin: `POST tenants/{id}/claude {enabled}` (`TenantAction::SetClaude`, wiederholbar, Antwort
+  `{tenant}`; `TenantRepository::setClaudeEnabled`, eigene Transaktion): Verbieten beendet in derselben
+  Transaktion alle Claude-Verbindungen und Codes der Stadt und setzt `claude_access` aller Konten auf
+  `off` (auch wenn schon verboten); Erlauben ändert keine Konten. App: Stadtdetail, Reiter „Übersicht“,
+  Kästchen „Claude-Zugang für diese Stadt erlauben“ mit Hinweis auf die Daten an Anthropic und
+  `ConfirmDialog` (`setTenantClaudeEnabled`). Live-Tests weiterhin nur in der Test-Stadt. Sonst lehnen die Routen zum Setzen und Trennen mit 409 `rule_violation` ab, die
   Routen von OAuth, Metadaten und `mcp` gibt es nicht (404 `not_found`, `ClaudeTenant::of` bzw. in
   `Application` vor der Anmeldung); `GET tenant` und `TenantJson` melden `claude_available`.
 - Schritt M1 (Backend, Runde 4): `fe_users.claude_access` (Migration `0041`, `ClaudeAccess` in
@@ -2703,6 +2711,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `admins_active`, `admins_invited`), `GET tenants/{id}`, `POST tenants {slug, name, admin_email}`
   → 201 `{tenant, user, mail_sent}`, `POST tenants/{id}/rename {name}`, `POST tenants/{id}/lock`
   bzw. `unlock {}` (wiederholbar; Sperren beendet alle Sitzungen der Stadt), `POST
+  tenants/{id}/claude {enabled}` (Claude-Zugang der Stadt, siehe "Claude-Zugang (MCP, im Aufbau)"), `POST
   tenants/{id}/admins {email}` → 201 `{user, mail_sent}`, `POST
   tenants/{id}/users/{user}/resend-invitation {}` → `{user, mail_sent}`, `GET
   tenants/{id}/users[?status=…]` (nur lesend, kein Aufräumen; Filter wie `GET users`).
