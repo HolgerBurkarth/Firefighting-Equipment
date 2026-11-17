@@ -303,3 +303,10 @@ Wärmebildkamera deaktivieren (3, 4); verliehene PA über „Verleihen …“, w
 Erledigt (16.11.2026 abends, Claude im Browser auf Holgers Anweisung): Abläufe (2), Standorte mit den Fahrzeugen
 „1/44“ und „1/45“ (3), Ausrüstungstypen (4), Import 144 neu ohne Fehler und Warnungen (5), Verleih der 9 PA an
 Ippingen und Hattingen (6.1), Rollen Gerätewart und Geräteträger ohne Konten (8).
+
+Erledigt (16.11.2026, Claude im Browser auf Holgers Anweisung): Claude-Zugang für Immendingen eingeschaltet
+(Super-Admin, Stadtdetail → Übersicht → „Claude-Zugang für diese Stadt erlauben“, Rückfrage „Erlauben“; T17,
+Entscheidung Holger ohne vorherige Zustimmung der Gemeinde, Zustimmung wird nachgeholt, siehe
+`docs/DATENSCHUTZ-BESTANDSAUFNAHME.md`, E5). Danach `claude_available` true, `.well-known/openid-configuration`
+200, `cgi-bin/ff-mcp.pl/immendingen` ohne Token 401; alle Konten unverändert Zugang „Aus“ (den setzt der Admin
+je Konto). Wird der Zugang der Stadt wieder verboten, gehen alle Konten auf „Aus“ und alle Verbindungen enden.
