@@ -134,6 +134,7 @@ body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; color: #1b2430; fo
 .figs { display: flex; gap: 4mm; flex: none; }
 .step { break-inside: avoid; display: flex; gap: 7mm; margin: 0 0 9mm; align-items: flex-start; }
 .step.stack { flex-direction: column; gap: 3mm; }
+.sheet .step.stack:only-child .text { flex: none; }
 .step .head { display: flex; gap: 3mm; align-items: center; }
 .step .no { flex: none; width: 8mm; height: 8mm; border-radius: 50%; background: #b71c1c; color: #fff; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; font-size: 12pt; }
 .step h2 { margin: 0; font-size: 15pt; }

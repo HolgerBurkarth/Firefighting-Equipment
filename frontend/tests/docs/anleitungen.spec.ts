@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import {
     ADMIN_RIGHTS,
     DEFAULT_CLIENT_CONFIG,
@@ -16,6 +16,7 @@ import {
 } from '../e2e/fixtures';
 import {
     adminOverview,
+    assignableRolesJson,
     noticeJson,
     summaryJson,
     tenantEventJson,
@@ -27,6 +28,7 @@ import {
     devicesEndpoint,
     fullDevice,
     LOCATIONS,
+    locationJson,
 } from '../e2e/support/devices';
 import { deviceTypeJson } from '../e2e/support/masterData';
 import { CURRENT_SESSION_ONLY } from '../e2e/support/profile';
@@ -147,6 +149,16 @@ const DEVICES = [
 ];
 const SELECTED = DEVICES[0] ?? {};
 
+/** Ausrüstung im Raum „Pool“ (nur Admin-Anleitung: viele auf einmal umbuchen). */
+const POOL = { id: 40, name: 'Pool', path: 'Pool' };
+const POOL_DEVICES = [20, 21, 22, 23].map((n) =>
+    deviceJson(30 + n, {
+        identifier: `M${String(n)}`,
+        location: POOL,
+        next_inspection_due: '2027-05-15',
+    }),
+);
+
 const STOCK_ENTRY = {
     location: { id: 10, name: 'HLF 20', path: 'HLF 20', level: 1 },
     rules: [
@@ -207,6 +219,9 @@ const USERS = [
         status_label: 'aktiv',
         role_id: 3,
         role_name: 'Gerätewart',
+        claude_access: 'read',
+        claude_access_label: 'Lesen',
+        claude_connections: { count: 1, last_used_at: '2026-11-12T07:00:00Z' },
     }),
     userJson(21, {
         label: 'Erika Probe',
@@ -228,6 +243,35 @@ const CODE = {
     revoked_at: null,
     created_by: { id: 7, label: 'Anna Beispiel' },
     role: { id: 2, name: 'Benutzer' },
+};
+
+const IMPORT_PREVIEW = {
+    token: 'c'.repeat(64),
+    encoding: 'utf-8',
+    delimiter: ';',
+    delimiter_label: 'Semikolon',
+    columns: ['Nummer', 'Scan-Code', 'Ausrüstungstyp', 'Standort', 'Status', 'Nächste Wartung'],
+    summary: { rows: 3, new: 3, changed: 0, unchanged: 0, skipped: 0, errors: 0, warnings: 1 },
+    unknown: { device_types: [], locations: [] },
+    suggestions: { device_types: [], locations: [] },
+    rows: ['M30', 'M31', 'M32'].map((identifier, index) => ({
+        line: index + 2,
+        identifier,
+        result: 'new',
+        result_label: 'Neu',
+        device: null,
+        changes: [
+            { field: 'device_type', label: 'Ausrüstungstyp', old: null, new: 'Atemschutzmaske' },
+            { field: 'location', label: 'Standort', old: null, new: 'Pool' },
+        ],
+        messages: [],
+        warnings:
+            index === 2
+                ? [
+                      'Der Scan-Code „4006381333931“ entspricht ohne führende Nullen einem vorhandenen Scan-Code („04006381333931“). Hat Excel die Nullen entfernt?',
+                  ]
+                : [],
+    })),
 };
 
 let loggedIn = true;
@@ -288,6 +332,17 @@ function api(role: Role): Record<string, MockResponse | ((request: MockRequest) 
         },
         'GET api/v1/devices': (request) => {
             const params = new URL(request.url).searchParams;
+            if (params.get('location_id') === String(POOL.id)) {
+                return {
+                    status: 200,
+                    body: {
+                        devices: POOL_DEVICES,
+                        total: POOL_DEVICES.length,
+                        limit: 50,
+                        offset: 0,
+                    },
+                };
+            }
             if (params.get('status') !== null) {
                 const list = [DEVICES[4] ?? {}, DEVICES[5] ?? {}];
                 return {
@@ -297,7 +352,19 @@ function api(role: Role): Record<string, MockResponse | ((request: MockRequest) 
             }
             return catalog(request);
         },
-        ...LOCATIONS,
+        ...(role === 'admin'
+            ? {
+                  'GET api/v1/locations': {
+                      status: 200,
+                      body: {
+                          locations: [
+                              ...LOCATIONS['GET api/v1/locations'].body.locations,
+                              locationJson(POOL.id, POOL.name, [], 'room', POOL_DEVICES.length),
+                          ],
+                      },
+                  },
+              }
+            : LOCATIONS),
         ...CURRENT_SESSION_ONLY,
         ...deviceDetail(SELECTED),
         'GET api/v1/client-config': {
@@ -389,6 +456,22 @@ function api(role: Role): Record<string, MockResponse | ((request: MockRequest) 
             };
         },
         'GET api/v1/invitation-codes': { status: 200, body: { invitation_codes: [CODE] } },
+        'GET api/v1/roles': () => {
+            const roles = assignableRolesJson();
+            const list = roles['roles'] as Record<string, unknown>[];
+            return {
+                status: 200,
+                body: { ...roles, roles: list.filter((r) => Number(r['id']) <= 3) },
+            };
+        },
+        'POST api/v1/auth/invitation/accept': {
+            status: 200,
+            body: {
+                message:
+                    'Ihr Konto ist eingerichtet. Bitte melden Sie sich mit Ihrer E-Mail-Adresse und dem neuen Passwort an.',
+            },
+        },
+        'POST api/v1/devices/import/preview': { status: 200, body: IMPORT_PREVIEW },
         'POST api/v1/invitation-codes': {
             status: 201,
             body: { invitation_code: { ...CODE, id: 5, label: null }, code: 'ABCD-EFGH-JKMN' },
@@ -638,8 +721,12 @@ const newDevice: Build = async (page) => {
         shot: await shoot(page, [
             { target: page.getByLabel('Nummer', { exact: false }).first(), label: 'Nummer' },
             {
-                target: page.getByRole('button', { name: /Speichern und nächstes/ }),
-                label: 'Speichern und nächstes',
+                target: page.getByRole('combobox', { name: /Ausrüstungstyp/ }).first(),
+                label: 'Ausrüstungstyp',
+            },
+            {
+                target: page.getByRole('combobox', { name: /Standort/ }).first(),
+                label: 'Standort',
             },
         ]),
     };
@@ -819,6 +906,200 @@ const settings: Build = async (page) => {
     };
 };
 
+const invitationAccept: Build = async (page) => {
+    await phone(page);
+    loggedIn = false;
+    await page.goto(
+        '/firefighting/test/einladung-annehmen#token=Einladung-aus-der-Mail_0123456789abcdefghij',
+    );
+    const name = page.getByLabel('Name', { exact: true });
+    await expect(name).toBeVisible();
+    await name.fill('Anna Beispiel');
+    await page.getByLabel('Neues Passwort', { exact: true }).fill('Kxq7-Lmw2!-lang');
+    const form = await shoot(page, [
+        { target: name, label: 'Ihr Name (nicht die E-Mail-Adresse)' },
+        { target: page.getByLabel('Neues Passwort', { exact: true }), label: 'Neues Passwort' },
+        {
+            target: page.getByRole('button', { name: 'Konto einrichten' }),
+            label: 'Konto einrichten',
+        },
+    ]);
+    await page.getByRole('button', { name: 'Konto einrichten' }).click();
+    await expect(page.getByTestId('login-notice')).toBeVisible();
+    const done = await shoot(page, [
+        { target: page.getByTestId('login-notice'), label: 'Danach anmelden' },
+    ]);
+    loggedIn = true;
+    return {
+        title: 'Einladung annehmen (neue Admins)',
+        text: 'Als neuer Admin bekommen Sie eine Einladung per E-Mail. Der Link darin gilt 24 Stunden; ist er abgelaufen, bitten Sie um eine neue Einladung. Tragen Sie bei „Name“ Ihren eigenen Vor- und Nachnamen ein, nicht Ihre E-Mail-Adresse: Der Name erscheint im Verlauf bei jeder Ihrer Buchungen. Wählen Sie ein Passwort und melden Sie sich danach an.',
+        shot: form,
+        shot2: done,
+    };
+};
+
+const phoneConsole: Build = async (page) => {
+    await phone(page);
+    await page.goto('/firefighting/test/suchen');
+    await expect(page.getByTestId('scan-button')).toBeVisible();
+    const tab = page
+        .getByRole('navigation', { name: 'Hauptmenü' })
+        .getByRole('link', { name: 'Dashboard' });
+    const first = await shoot(page, [{ target: tab, label: '„Dashboard“ in der Leiste unten' }]);
+    await tab.click();
+    await expect(page.getByTestId('tile-readiness')).toBeVisible();
+    const menu = page.getByRole('button', { name: 'Menü öffnen' });
+    const second = await shoot(page, [{ target: menu, label: '☰ „Menü“: alle Seiten' }]);
+    return {
+        title: 'Am Handy: Wo ist die Admin-Konsole?',
+        text: 'Am Handy sehen Sie zuerst dieselben Seiten wie alle anderen: Suchen, Termine und Profil. Zur Admin-Konsole kommen Sie über „Dashboard“ in der Leiste unten; dort öffnet ☰ („Menü“) oben links alle Seiten der Konsole, z. B. Ausrüstung, Benutzer und Einstellungen. Für viele Ausrüstungen auf einmal ist der PC bequemer.',
+        shot: first,
+        shot2: second,
+    };
+};
+
+const csvImport: Build = async (page) => {
+    await desktop(page);
+    await page.goto('/firefighting/test/geraete/import');
+    await expect(page.getByRole('button', { name: 'Vorlage herunterladen' })).toBeVisible();
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: /Datei wählen/ }).click();
+    await (
+        await chooser
+    ).setFiles({
+        name: 'ausruestung.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('\uFEFFNummer;Scan-Code\r\nM30;\r\n', 'utf-8'),
+    });
+    await expect(page.getByTestId('summary')).toBeVisible();
+    return {
+        title: 'Erstbefüllung per CSV-Import',
+        text: 'Zuerst Ausrüstungstypen und Standorte anlegen. Dann Ausrüstung → „Import (CSV)“ → „Vorlage herunterladen“ und in Excel ausfüllen; die Spalten Nummer und Scan-Code als Text formatieren (sonst fallen führende Nullen weg). „CSV-Datei wählen …“ zeigt eine Vorschau mit Fehlern und Warnungen; erst „Import übernehmen“ speichert.',
+        shot: await shoot(page, [
+            { target: page.getByTestId('import-rows'), label: 'Vorschau: Warnungen prüfen' },
+            {
+                target: page.getByRole('button', { name: /Import übernehmen/ }),
+                label: 'Import übernehmen',
+            },
+        ]),
+    };
+};
+
+const bulkRebook: Build = async (page) => {
+    await desktop(page);
+    await page.goto(`/firefighting/test/geraete?standort=${String(POOL.id)}`);
+    await expect(page.getByRole('checkbox', { name: 'M20 auswählen' })).toBeVisible();
+    const all = page.getByRole('checkbox', { name: 'Alle angezeigten Ausrüstungen auswählen' });
+    await all.check();
+    const button = page.getByRole('button', { name: 'Umbuchen / Status ändern …' });
+    await expect(button).toBeVisible();
+    return {
+        title: 'Viele Ausrüstungen auf einmal umbuchen',
+        text: 'Beispiel Fahrzeug bestücken: Ausrüstungsliste filtern (z. B. Standort „Pool“), Ausrüstungen anhaken (das Kästchen oben wählt alle angezeigten), dann „Umbuchen / Status ändern …“, den neuen Standort wählen (z. B. „HLF 20 / G1“) und speichern.',
+        shot: await shoot(page, [
+            { target: page.getByRole('combobox', { name: 'Standort' }), label: 'Filter Standort' },
+            { target: all, label: 'Alle angezeigten auswählen' },
+            { target: button, label: 'Umbuchen / Status ändern …' },
+        ]),
+    };
+};
+
+async function openUserDialog(page: Page, small = false): Promise<Locator> {
+    await (small ? phone(page) : desktop(page));
+    await page.goto('/firefighting/test/benutzer');
+    await page.getByRole('button', { name: 'Max Muster bearbeiten' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Max Muster bearbeiten' });
+    await expect(dialog.getByRole('radio', { name: 'Gerätewart' })).toBeVisible();
+    return dialog;
+}
+
+const userEdit: Build = async (page) => {
+    const dialog = await openUserDialog(page, true);
+    const top = await shoot(page, [
+        { target: dialog.getByLabel('Anzeigename'), label: 'Anzeigename' },
+        { target: dialog.getByRole('group', { name: 'Rolle' }), label: 'Rolle' },
+    ]);
+    await dialog.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+    });
+    const bottom = await shoot(page, [
+        {
+            target: dialog.getByRole('heading', { name: 'Konto beenden' }),
+            label: 'Konto beenden: sperren oder löschen',
+        },
+    ]);
+    return {
+        title: 'Benutzer bearbeiten',
+        text: 'Der Stift in der Benutzerliste öffnet das Fenster „Bearbeiten“ (am PC wie am Handy): Anzeigenamen korrigieren (so erscheint die Person im Verlauf), Rolle ändern und, falls erlaubt, den Claude-Zugang setzen. Ganz unten unter „Konto beenden“ sperren Sie das Konto (lässt sich wieder entsperren) oder löschen es bei Austritt; im Verlauf steht dann „Gelöschter Benutzer“.',
+        shot: top,
+        shot2: bottom,
+    };
+};
+
+const claude: Build = async (page) => {
+    const dialog = await openUserDialog(page);
+    const access = dialog.getByTestId('claude-access');
+    await expect(access).toBeVisible();
+    return {
+        title: 'Claude-Zugang',
+        text: 'Nur wenn der Super-Admin ihn für Ihre Stadt erlaubt hat; sonst fehlt die Einstellung. Im Fenster „Bearbeiten“ setzen Sie je Konto Aus, Lesen oder Ändern. Die Person fügt dann in claude.ai einen Konnektor mit der Adresse https://www.prodad.de/cgi-bin/ff-mcp.pl/<kürzel> hinzu (Kürzel = Teil der App-Adresse nach /firefighting/) und meldet sich an. Achtung: Dann gehen Daten der Stadt (Verlauf mit Namen, Kommentare, Notizen) an Anthropic. „Aus“ beendet die Verbindung sofort.',
+        shot: await shoot(page, [{ target: access, label: 'Aus, Lesen oder Ändern' }]),
+    };
+};
+
+const accountSwitch: Build = async (page) => {
+    await page.addInitScript(() => {
+        localStorage.setItem(
+            'ff-accounts',
+            JSON.stringify({
+                format: 1,
+                accounts: [
+                    {
+                        slug: 'nachbarstadt',
+                        tenantName: 'FF Nachbarstadt',
+                        accountId: 9,
+                        displayName: 'Anna Beispiel',
+                        roleName: 'Gerätewart',
+                    },
+                ],
+            }),
+        );
+        localStorage.setItem(
+            'ff-session:nachbarstadt',
+            JSON.stringify({
+                user: {
+                    id: 9,
+                    email: null,
+                    name: 'Anna Beispiel',
+                    display_name: 'Anna Beispiel',
+                    role: 'user',
+                },
+                tenant: { slug: 'nachbarstadt', name: 'FF Nachbarstadt' },
+            }),
+        );
+        localStorage.setItem(
+            'ff-tenant:nachbarstadt',
+            JSON.stringify({ name: 'FF Nachbarstadt', accent_color: '#1d3557' }),
+        );
+    });
+    await desktop(page);
+    await page.goto('/firefighting/test/dashboard');
+    await expect(page.getByTestId('tile-readiness')).toBeVisible();
+    const trigger = page.getByTitle(/Konto wechseln/).first();
+    await trigger.click();
+    const popover = page.getByTestId('account-switch');
+    await expect(popover.getByTestId('account-nachbarstadt')).toBeVisible();
+    return {
+        title: 'Mehrere Städte: Konto wechseln',
+        text: 'Haben Sie Konten in mehreren Feuerwehren, wechseln Sie über Ihren Namen unten im Menü. Oben links steht immer, in welcher Feuerwehr Sie gerade sind.',
+        shot: await shoot(page, [
+            { target: page.getByTestId('menu-tenant').first(), label: 'Aktuelle Feuerwehr' },
+            { target: trigger, label: 'Ihr Name: Konto wechseln' },
+            { target: popover.getByTestId('account-nachbarstadt'), label: 'Andere Feuerwehr' },
+        ]),
+    };
+};
+
 // --- Anleitungen -------------------------------------------------------------------------------------
 
 interface GuideSpec {
@@ -895,28 +1176,43 @@ const GUIDES: readonly GuideSpec[] = [
         intro: 'Die Feuerwehr einrichten: Benutzer, Einladungen, Aushänge und Einstellungen.',
         can: [
             'Alles, was Gerätewarte können (siehe deren Anleitung)',
-            'Benutzer freischalten und Rollen zuweisen',
+            'Die Admin-Konsole auch am Handy finden',
+            'Viele Ausrüstungen auf einmal umbuchen, per CSV importieren',
+            'Benutzer freischalten, bearbeiten und Rollen zuweisen',
             'Einladungscodes erzeugen und Aushänge drucken',
             'Einstellungen: Farbe, Logo und Mails',
+            'Claude-Zugang je Konto, Konto wechseln',
         ],
         steps: [
+            invitationAccept,
             login,
+            phoneConsole,
             offline,
             dashboard,
             deviceList,
             newDevice,
+            bulkRebook,
+            csvImport,
             adminNote,
             users,
+            userEdit,
             codes,
             poster,
             settings,
+            claude,
+            accountSwitch,
         ],
     },
 ];
 
 for (const guide of GUIDES) {
     test.describe(`Anleitung ${guide.title}`, () => {
-        test.use({ api: api(guide.role) });
+        test.use({
+            api: api(guide.role),
+            ...(guide.role === 'admin' && {
+                tenant: { ...TENANT, body: { ...TENANT.body, claude_available: true } },
+            }),
+        });
 
         test('PDF', async ({ page }) => {
             await page.clock.setFixedTime(TODAY);
