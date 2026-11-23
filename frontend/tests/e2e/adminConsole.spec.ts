@@ -174,6 +174,23 @@ test.describe('Admin-Konsole', () => {
         await expect(page.getByRole('heading', { level: 1, name: 'Suchen' })).toBeVisible();
     });
 
+    test('Handy: Kopfleiste mit ☰ bleibt beim Scrollen oben (G3)', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 500 });
+        await page.goto('/firefighting/test/dashboard');
+        await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
+        await page.evaluate(() => {
+            window.scrollTo(0, 600);
+        });
+        await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+        const open = page.getByRole('button', { name: 'Menü öffnen' });
+        await expect(open).toBeInViewport();
+        // Oben im Bild. Playwright-WebKit im Handy-Profil unter Windows kürzt die Breite um eine
+        // Bildlaufleiste und verkleinert die Seite; dort verschiebt sich die Leiste um bis zu 26 px.
+        const box = await open.boundingBox();
+        expect(box?.y ?? -999).toBeGreaterThan(-(box?.height ?? 0) / 2);
+        expect(box?.y ?? 999).toBeLessThan(20);
+    });
+
     test('Handy: Abmelden aus der Schublade', async ({ page, apiRequests }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto('/firefighting/test/dashboard');

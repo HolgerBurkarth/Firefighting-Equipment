@@ -18,7 +18,7 @@ import {
 } from '../data/deviceBulk';
 import { sinceText, transportText } from '../data/maintenance';
 import { useNow } from '../runtime/now';
-import { copyText } from '../runtime/share';
+import { canShareText, copyText, shareText, type ShareOutcome } from '../runtime/share';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 
 /**
@@ -46,6 +46,9 @@ const failures = ref<{ id: number; identifier: string; text: string }[]>([]);
 const copied = ref<{ key: StageKey; text: string; ok: boolean } | null>(null);
 const COPY_NOTICE_MS = 4000;
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
+/** Scheitern Kopieren und Teilen, steht die Liste zum Markieren da (G4); bleibt bis zur nächsten Aktion. */
+const fallbackList = ref<{ key: StageKey; text: string } | null>(null);
+const shareAvailable = canShareText();
 onBeforeUnmount(() => {
     clearTimeout(copyTimer);
 });
@@ -209,20 +212,56 @@ async function confirm(): Promise<void> {
     await load();
 }
 
-async function copyList(key: StageKey): Promise<void> {
+function transportList(key: StageKey): { text: string; count: number } | null {
     const current = stage(key);
     if (current === null) {
-        return;
+        return null;
     }
     const list = picked.value[key].length > 0 ? pickedDevices(key) : [...current.devices];
-    const ok = await copyText(transportText(current.label, list));
+    return { text: transportText(current.label, list), count: list.length };
+}
+
+function countText(count: number): string {
+    return count === 1 ? '1 Ausrüstung' : `${String(count)} Ausrüstungen`;
+}
+
+async function copyList(key: StageKey): Promise<void> {
+    const list = transportList(key);
+    if (list === null) {
+        return;
+    }
+    const ok = await copyText(list.text);
+    showOutcome(key, list, ok ? 'copied' : 'failed');
+}
+
+async function shareList(key: StageKey): Promise<void> {
+    const list = transportList(key);
+    if (list === null) {
+        return;
+    }
+    const outcome = await shareText({ title: 'Transportliste', text: list.text });
+    if (outcome !== 'cancelled') {
+        showOutcome(key, list, outcome);
+    }
+}
+
+function showOutcome(
+    key: StageKey,
+    list: { text: string; count: number },
+    outcome: ShareOutcome,
+): void {
+    const ok = outcome !== 'failed';
+    fallbackList.value = ok ? null : { key, text: list.text };
     clearTimeout(copyTimer);
     copied.value = {
         key,
         ok,
-        text: ok
-            ? `Liste kopiert (${list.length === 1 ? '1 Ausrüstung' : `${String(list.length)} Ausrüstungen`})`
-            : 'Die Liste ließ sich nicht kopieren.',
+        text:
+            outcome === 'shared'
+                ? `Liste geteilt (${countText(list.count)})`
+                : ok
+                  ? `Liste kopiert (${countText(list.count)})`
+                  : 'Die Liste ließ sich nicht kopieren. Sie steht unten zum Markieren.',
     };
     copyTimer = setTimeout(() => {
         copied.value = null;
@@ -314,6 +353,15 @@ async function copyList(key: StageKey): Promise<void> {
                     >
                         Transportliste kopieren
                     </button>
+                    <button
+                        v-if="shareAvailable"
+                        class="btn"
+                        type="button"
+                        :data-testid="`share-${key}`"
+                        @click="shareList(key)"
+                    >
+                        Transportliste teilen …
+                    </button>
                     <span
                         v-if="copied?.key === key"
                         class="copy-note"
@@ -323,6 +371,17 @@ async function copyList(key: StageKey): Promise<void> {
                         >{{ copied.ok ? '✓ ' : '' }}{{ copied.text }}</span
                     >
                 </div>
+                <label v-if="fallbackList?.key === key" class="fallback-list">
+                    Transportliste
+                    <textarea
+                        class="input"
+                        readonly
+                        rows="6"
+                        :value="fallbackList.text"
+                        :data-testid="`fallback-list-${key}`"
+                        @focus="($event.target as HTMLTextAreaElement).select()"
+                    ></textarea>
+                </label>
                 <p v-if="canChange && key === 'collection'" class="hint">
                     Reihenfolge: erst „Transportliste kopieren“, dann „In die Werkstatt bringen“ –
                     danach steht die Ausrüstung nicht mehr in der Sammelstelle.
@@ -440,6 +499,19 @@ async function copyList(key: StageKey): Promise<void> {
     color: var(--status-defective-fg);
 }
 
+.fallback-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-weight: var(--font-weight-semibold);
+}
+
+.fallback-list textarea {
+    width: 100%;
+    font: inherit;
+    font-weight: normal;
+}
+
 .stays {
     color: var(--status-defective-fg);
     font-weight: var(--font-weight-semibold);
@@ -487,10 +559,16 @@ async function copyList(key: StageKey): Promise<void> {
 }
 
 .actions {
+    /* Bleibt sichtbar, solange die Liste der Stufe gescrollt wird (G2). */
+    position: sticky;
+    z-index: 4;
+    top: var(--admin-sticky-top, 0px);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+    padding: 8px 0;
+    background: var(--surface);
 }
 
 .devices {

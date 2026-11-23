@@ -500,20 +500,25 @@ onMounted(() => {
                         {{ group.location.kindLabel }} ·
                         {{ deviceCountText(group.location.deviceCountTotal) }}
                     </span>
+                    <!-- Chips unter dem Namen, damit er am Handy Platz hat (G5). -->
+                    <span class="node-chips">
+                        <span
+                            v-if="taskLabel(group.location.task) !== null"
+                            class="badge badge-ready"
+                            data-testid="task-chip"
+                            >{{ taskChipText(group.location) }}</span
+                        >
+                        <span
+                            v-if="outOfService.has(group.location.id)"
+                            class="badge badge-defective"
+                            data-testid="location-out-of-service"
+                            >außer Betrieb</span
+                        >
+                        <span v-if="!group.location.active" class="badge badge-retired"
+                            >gesperrt</span
+                        >
+                    </span>
                 </span>
-                <span
-                    v-if="taskLabel(group.location.task) !== null"
-                    class="badge badge-ready"
-                    data-testid="task-chip"
-                    >{{ taskChipText(group.location) }}</span
-                >
-                <span
-                    v-if="outOfService.has(group.location.id)"
-                    class="badge badge-defective"
-                    data-testid="location-out-of-service"
-                    >außer Betrieb</span
-                >
-                <span v-if="!group.location.active" class="badge badge-retired">gesperrt</span>
                 <button
                     v-if="canWrite && group.location.active"
                     class="icon-btn"
@@ -588,14 +593,16 @@ onMounted(() => {
                             >{{ child.name }}</RouterLink
                         ><span v-else class="node-name">{{ child.name }}</span>
                         <span class="node-meta">{{ deviceCountText(child.deviceCount) }}</span>
+                        <span class="node-chips">
+                            <span
+                                v-if="outOfService.has(child.id)"
+                                class="badge badge-defective"
+                                data-testid="location-out-of-service"
+                                >außer Betrieb</span
+                            >
+                            <span v-if="!child.active" class="badge badge-retired">gesperrt</span>
+                        </span>
                     </span>
-                    <span
-                        v-if="outOfService.has(child.id)"
-                        class="badge badge-defective"
-                        data-testid="location-out-of-service"
-                        >außer Betrieb</span
-                    >
-                    <span v-if="!child.active" class="badge badge-retired">gesperrt</span>
                     <button
                         v-if="canWrite"
                         class="icon-btn"
@@ -804,7 +811,18 @@ onMounted(() => {
     color: var(--text);
     font-weight: var(--font-weight-bold);
     text-decoration: none;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+}
+
+.node-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.node-chips:empty {
+    display: none;
 }
 
 /* Klick auf den Namen zeigt die Geräte dort (Geräteliste mit Filter, KONZEPT.md). */

@@ -416,4 +416,27 @@ test.describe('Sammelaktionen (Handy)', () => {
         await expect(page.getByTestId('device-row-2')).toContainText('in Wartung');
         expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
     });
+
+    test('Karten: „Alle angezeigten Ausrüstungen auswählen“ über der Liste (G1)', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await open(page);
+        const all = page.getByRole('checkbox', { name: 'Alle angezeigten Ausrüstungen auswählen' });
+        await expect(all).toBeVisible();
+        await all.check();
+        await expect(page.getByTestId('selection-bar')).toContainText('3 Ausrüstungen ausgewählt');
+        await expect(page.getByRole('checkbox', { name: 'M2 auswählen' })).toBeChecked();
+        await page.getByRole('checkbox', { name: 'M2 auswählen' }).uncheck();
+        await expect(all).toHaveJSProperty('indeterminate', true);
+        // Wie im Tabellenkopf: halb gewählt → alle, dann keine.
+        await all.click();
+        await expect(page.getByTestId('selection-bar')).toContainText('3 Ausrüstungen ausgewählt');
+        await all.uncheck();
+        await expect(page.getByTestId('selection-bar')).toBeHidden();
+        // Am PC steht das Kästchen im Tabellenkopf, nicht doppelt.
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await expect(page.getByTestId('select-all-cards')).toBeHidden();
+        await expect(all).toBeVisible();
+    });
 });

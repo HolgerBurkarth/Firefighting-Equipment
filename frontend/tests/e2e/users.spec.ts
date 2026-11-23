@@ -435,6 +435,13 @@ test.describe('Benutzer', () => {
         await expect(page.getByRole('alertdialog')).toHaveCount(0);
     });
 
+    test('Karten: „Alle angezeigten Konten auswählen“ über der Liste (G1)', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await open(page);
+        await page.getByRole('checkbox', { name: 'Alle angezeigten Konten auswählen' }).check();
+        await expect(page.getByTestId('selection-bar')).toContainText('3 Konten ausgewählt');
+    });
+
     test('Handy: ein Klick auf die Karte öffnet „Bearbeiten“ (A2)', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await open(page);

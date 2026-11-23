@@ -133,6 +133,10 @@ onMounted(() => {
 
 /* Admin-Konsole: am Handy untereinander, ab 768 px Menü links und Inhalt rechts. */
 .admin-shell {
+    /* Höhe der festen Kopfleiste am Handy (AdminMenu); darunter kleben feste Leisten der Seiten
+       (Auswahl, Aktionen der Wartung), am PC ohne Kopfleiste ganz oben. */
+    --admin-sticky-top: calc(var(--touch-min) + 20px);
+
     display: flex;
     flex: 1 0 auto;
     flex-direction: column;
@@ -158,6 +162,8 @@ onMounted(() => {
     }
 
     .admin-shell {
+        --admin-sticky-top: 0px;
+
         flex-direction: row;
         align-items: flex-start;
     }

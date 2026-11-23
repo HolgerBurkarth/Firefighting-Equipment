@@ -824,7 +824,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   verbindlich bleibt der Server (409 `name_taken` am Feld). Standorte als Baum (`filterLocationTree`:
   Wörter mit UND im Namen bzw. Pfad, gesperrte nur mit „Gesperrte anzeigen (N)“), Symbol je Art
   (`src/components/locationIcons.ts`, auch in `LocationPicker`), Gerätezahl (Ebene 1
-  `device_count_total`); Knöpfe „Fach in … anlegen“ (nur aktive Ebene 1) und „… bearbeiten“
+  `device_count_total`); Chips (Aufgabe, außer Betrieb, gesperrt) unter dem Namen (`node-chips`, G5, 23.11.2026: sonst
+  brach der Name am Handy Buchstabe für Buchstabe um); Knöpfe „Fach in … anlegen“ (nur aktive Ebene 1) und „… bearbeiten“
   (Stift). Fenster `FormDialog` (Reka UI `Dialog`, Slot `extra` für Sperren/Deaktivieren abseits,
   `returnFocus` = öffnender Knopf, da WebKit beim Klick nicht fokussiert; `variant="danger"` = roter
   Knopf, z. B. Aussondern; `unsaved` siehe „Fenster mit Eingaben“ unten). Sperren nur leer
@@ -1497,6 +1498,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Einladungscodes und Rollen im Stadtdetail unter 1280 px. Jede Liste hat in ihrer Testdatei einen Test „Breiten
   (Runde 14)“ bei 390, 768 und 1024 px (`unreachableControls` und `horizontalOverflow` in `tests/e2e/support/layout.ts`:
   Mitte jedes Bedienelements liegt im Fenster und auf dem Element selbst). Neue Listen bekommen denselben Test.
+  Seit 23.11.2026 (Benutzertest Gerätewart am Handy, G1–G3): In der Kartenansicht (ohne Tabellenkopf) steht
+  „Alle angezeigten … auswählen“ über der Liste (`select-all-cards`; Ausrüstung, Benutzer); die Leiste „N ausgewählt“ klebt
+  beim Scrollen unter der Kopfleiste (`position: sticky`). Am Handy steht die Kopfleiste der Konsole fest oben, ihre Höhe ist
+  `--admin-sticky-top` (`App.vue`, ab 768 px 0); feste Leisten der Seiten kleben darunter.
 - Anleitungen als PDF (seit 12.11.2026, Runde 14, Punkt 4): `docs/anleitungen/anleitung-{benutzer,geraetetraeger,
   geraetewart,admin}.pdf`, erzeugt von `npm run docs:anleitungen` (in `frontend/`, nach `npm run build`;
   `playwright.docs.config.ts`, `tests/docs/anleitungen.spec.ts` und `guide.ts`; nur Chromium, nie in der CI und nicht
@@ -2855,7 +2860,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Tests `MaintenanceTest`. Frontend: `MaintenancePage` (`wartung`, Menü „Wartung“ nach „Ausrüstungstypen“,
   `PAGE_RIGHTS.maintenance`), `src/api/maintenance.ts`, `src/data/maintenance.ts` („seit“, Transportliste
   nur zum Kopieren; CSV/Druck und „Wartungsdatum setzen“ siehe `docs/TODO-SPAETER.md` T20), `maintenanceToWorkshop`/
-  `maintenanceBack` in `src/data/index.ts`. Seit 12.11.2026 (U5, U10): Knöpfe „In die Werkstatt bringen …" / „Ins Lager bringen …" (Bestätigung gleich benannt), Rückmeldung „Liste kopiert (N Ausrüstungen)" am Knopf (4 s), Satz zur Reihenfolge, im Fenster „In die Werkstatt" „Transportliste vorher kopieren?" mit Knopf; defekte Ausrüstung in der Werkstatt trägt „defekt – bleibt in der Werkstatt", „Alle auswählen" nimmt sie nie mit, von Hand gewählt warnt die Rückfrage. `ConfirmDialog` hat einen Standard-Slot unter dem Text. Tests `maintenance.spec.ts` (Browser, Unit).
+  `maintenanceBack` in `src/data/index.ts`. Seit 12.11.2026 (U5, U10): Knöpfe „In die Werkstatt bringen …" / „Ins Lager bringen …" (Bestätigung gleich benannt), Rückmeldung „Liste kopiert (N Ausrüstungen)" am Knopf (4 s), Satz zur Reihenfolge, im Fenster „In die Werkstatt" „Transportliste vorher kopieren?" mit Knopf; defekte Ausrüstung in der Werkstatt trägt „defekt – bleibt in der Werkstatt", „Alle auswählen" nimmt sie nie mit, von Hand gewählt warnt die Rückfrage. `ConfirmDialog` hat einen Standard-Slot unter dem Text. Seit 23.11.2026 (G2, G4): Die Knöpfe einer Stufe kleben beim Scrollen; „Transportliste teilen …“ (`shareText` in `src/runtime/share.ts`, nur mit Web Share API); scheitert das Kopieren, steht die Liste als Text zum Markieren da (`fallback-list-<stufe>`). Tests `maintenance.spec.ts` (Browser, Unit).
 - Verleih (Phase 2, P2.5, Runde 9; Bereich `loans`, Seite „Verleih“): `Area::Loans` gibt es nur in einer Stadt mit
   freigeschalteter Aufgabe „Ausgeliehen an“ oder „Rückgabe“ (`Area::requiredTasks`); F3: mit Datenfilter kein
   Zugriff. Abweichung vom Plan: keine eigenen Aktionen `loan.lend`/`returns.process`, der Bereich Ändern genügt.
@@ -2876,7 +2881,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Tests `LoanTest`. Der Verlauf nennt einen Verleih „Verliehen“ (`DeviceEvent::$lent`, seit Runde 13 aus der gespeicherten Spalte `fe_device_events.action` = `lent`, Migration 0065, `EventAction`; nur Standort, kein Status; auch in CSV, „Letzte Aktivitäten", Log-Mail und Claude-Werkzeugen). Die Bezeichnung hängt NICHT mehr von der heutigen Aufgabe des Standorts ab: Schaltet eine Stadt die Aufgabe ab, heißt der Eintrag weiter „Verliehen“; Einträge aus der Zeit vor der Spalte (NULL) heißen „Umgebucht“. `action` wird nur für den Verleih gesetzt (`DeviceStateChange::$action`, `LoanLendHandler`); Rückgabe (Konto fehlt), „Benutzt gemeldet“ (Zielstatus) und Tausch (`swap_id`) beruhen schon auf gespeicherten Angaben, daher dafür kein Wert (CHECK erlaubt bisher nur `lent`, nur bei `state_changed`). Frontend: `LoansPage` (nach einer Aktion zeigt die Seite bis zum neuen Stand „Liste wird aktualisiert …“ statt des alten, womöglich leeren Stands; Meldung „N Ausrüstungen an „X“ verliehen.“; `verleih`, Menü „Verleih“ mit rotem Zähler der überfälligen
   Rückgaben, `PAGE_RIGHTS.loans`), `LendDialog` (Nummer oder Scan-Code per Enter hinzufügen, Leihnehmer, Ansprechpartner,
   „Rückgabe bis“, Kommentar), `src/api/loans.ts`, `src/data/loans.ts`, `lendEquipment` in `src/data/index.ts`,
-  Kachel „Verliehen“ im Dashboard (`AdminOverview.loans`, nur mit dem Bereich). Tests `loans.spec.ts` (Browser, Unit).
+  Kachel „Verliehen“ im Dashboard (`AdminOverview.loans`, nur mit dem Bereich). „Rückgabe bis“ in der Vergangenheit zeigt
+  „Dieses Datum liegt in der Vergangenheit.“ (`due-past`, nur ein Hinweis, G6, 23.11.2026). Tests `loans.spec.ts` (Browser, Unit).
 - Rückgabe (Phase 2, P2.6, Runde 9; Plan 3.4): Migrationen 0056 `fe_return_points` (je Standort mit der Aufgabe
   „Rückgabe“ höchstens ein gültiger Schlüssel, nur der SHA-256 gespeichert, `revoked_at`), 0057 Aktion
   `public_return` in `fe_auth_attempts`, 0058 `fe_device_events.user_id` darf NULL sein und `actor_name`

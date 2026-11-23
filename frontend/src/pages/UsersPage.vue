@@ -800,6 +800,21 @@ onMounted(() => {
                 }}
             </p>
 
+            <!-- Karten haben keinen Tabellenkopf: „Alle auswählen“ darüber (G1). -->
+            <label
+                v-if="canWrite && visibleSelectable.length > 0"
+                class="check select-all-cards"
+                data-testid="select-all-cards"
+            >
+                <input
+                    type="checkbox"
+                    :checked="allVisibleSelected"
+                    :indeterminate="someVisibleSelected"
+                    @change="toggleVisible"
+                />
+                Alle angezeigten Konten auswählen
+            </label>
+
             <div v-if="rows.length > 0" class="table-card">
                 <table class="list-table" data-testid="user-table">
                     <thead>
@@ -1533,6 +1548,13 @@ onMounted(() => {
     accent-color: var(--accent);
 }
 
+/* Nur in der Kartenansicht (dort fehlt der Tabellenkopf mit seinem Kästchen). */
+.select-all-cards {
+    display: none;
+    align-self: flex-start;
+    font-weight: var(--font-weight-semibold);
+}
+
 /* Am Handy sortieren Knöpfe statt Spaltenköpfe (kein <select>, siehe CLAUDE.md, CSP). */
 .sort-buttons {
     display: none;
@@ -1555,6 +1577,10 @@ onMounted(() => {
 @media (max-width: 1023.98px) {
     .sort-buttons {
         display: flex;
+    }
+
+    .select-all-cards {
+        display: inline-flex;
     }
 
     .pending-actions,
@@ -1632,5 +1658,13 @@ onMounted(() => {
         grid-column: 3;
         width: auto;
     }
+}
+
+/* Bleibt beim Scrollen sichtbar (G2): klebt unter der Kopfleiste. */
+.selection-bar {
+    position: sticky;
+    z-index: 4;
+    top: calc(var(--admin-sticky-top, 0px) + 8px);
+    box-shadow: var(--shadow-raised);
 }
 </style>
