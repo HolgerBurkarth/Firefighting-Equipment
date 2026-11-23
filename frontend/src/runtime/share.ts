@@ -50,3 +50,31 @@ export async function shareLink(
     }
     return (await copyText(data.url, nav)) ? 'copied' : 'failed';
 }
+
+/** Kann dieser Browser Text teilen (Web Share API)? */
+export function canShareText(nav: ShareNavigator = navigator): boolean {
+    return nav.share !== undefined;
+}
+
+/**
+ * Teilt einen Text (z. B. die Transportliste der Wartung an einen Messenger, Benutzertest Gerätewart
+ * am Handy, G4). Ohne Web Share API oder bei Ablehnung kommt der Text in die Zwischenablage.
+ */
+export async function shareText(
+    data: { readonly title: string; readonly text: string },
+    nav: ShareNavigator = navigator,
+): Promise<ShareOutcome> {
+    const shareData: ShareData = { title: data.title, text: data.text };
+    const share = nav.share;
+    if (share !== undefined && (nav.canShare?.call(nav, shareData) ?? true)) {
+        try {
+            await share.call(nav, shareData);
+            return 'shared';
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                return 'cancelled';
+            }
+        }
+    }
+    return (await copyText(data.text, nav)) ? 'copied' : 'failed';
+}

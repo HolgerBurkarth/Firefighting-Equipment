@@ -393,6 +393,66 @@ test.describe('Wartung mit Recht „Ändern“', () => {
     });
 });
 
+test.describe('Wartung: Transportliste teilen und ohne Zwischenablage (G4)', () => {
+    test.use({
+        api: {
+            'GET api/v1/auth/me': admin(),
+            ...ADMIN_OVERVIEW,
+            ...delegate(() => server.api),
+        },
+    });
+
+    test.beforeEach(async ({ page }) => {
+        server = maintenanceServer();
+        await page.clock.install({ time: NOW });
+        await page.setViewportSize({ width: 390, height: 900 });
+    });
+
+    test('Teilen gibt die Liste an den Teilen-Dienst des Handys', async ({ page }) => {
+        await page.addInitScript(() => {
+            const list: string[] = [];
+            Object.assign(window, { __copied: list });
+            Object.defineProperty(navigator, 'share', {
+                configurable: true,
+                value: (data: ShareData) => Promise.resolve(void list.push(data.text ?? '')),
+            });
+        });
+        await page.goto('/firefighting/test/wartung');
+        const collection = page.getByTestId('stage-collection');
+        await collection.getByLabel('M2 auswählen').check();
+        await collection.getByTestId('share-collection').click();
+        await expect(collection.getByTestId('copy-note-collection')).toHaveText(
+            '✓ Liste geteilt (1 Ausrüstung)',
+        );
+        await expect
+            .poll(() => copied(page))
+            .toEqual(['Sammelstelle (1)\nM2 · Atemschutzmaske · benutzt · Sammelstelle / Kiste']);
+    });
+
+    test('Ohne Zwischenablage und Teilen: Liste zum Markieren, kein Knopf „teilen“', async ({
+        page,
+    }) => {
+        await page.addInitScript(() => {
+            Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+            Object.defineProperty(navigator, 'clipboard', {
+                configurable: true,
+                value: { writeText: () => Promise.reject(new Error('blockiert')) },
+            });
+        });
+        await page.goto('/firefighting/test/wartung');
+        const collection = page.getByTestId('stage-collection');
+        await expect(collection.getByTestId('copy-collection')).toBeVisible();
+        await expect(collection.getByTestId('share-collection')).toHaveCount(0);
+        await collection.getByTestId('copy-collection').click();
+        await expect(collection.getByTestId('copy-note-collection')).toHaveText(
+            'Die Liste ließ sich nicht kopieren. Sie steht unten zum Markieren.',
+        );
+        await expect(collection.getByTestId('fallback-list-collection')).toHaveValue(
+            /^Sammelstelle \(3\)\nM1 · Atemschutzmaske · defekt/,
+        );
+    });
+});
+
 test.describe('Wartung: Rückfragen und defekte Ausrüstung (U5, U10)', () => {
     test.use({
         api: {
