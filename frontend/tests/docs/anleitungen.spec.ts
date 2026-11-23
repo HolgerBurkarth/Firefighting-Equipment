@@ -812,12 +812,12 @@ const users: Build = async (page) => {
     await expect(page.getByTestId('pending')).toBeVisible();
     return {
         title: 'Benutzer freischalten und Rolle zuweisen',
-        text: 'Wer sich mit einem Einladungscode registriert, wartet hier auf Freischaltung. Mit „Freischalten“ vergeben Sie Anzeigenamen und Rolle (z. B. Geräteträger). Die Rolle ändern Sie später mit dem Stift oder für mehrere Personen mit „Rolle zuweisen“.',
+        text: 'Wer sich mit einem Einladungscode registriert, wartet hier auf Freischaltung. Mit „Freischalten“ vergeben Sie Anzeigenamen und Rolle (z. B. Geräteträger). Vorgewählt ist die Rolle des Aushangs – bitte prüfen. Die Rolle ändern Sie später mit „Bearbeiten“ (oder einem Klick auf die Zeile) oder für mehrere Personen mit „Rolle zuweisen“.',
         shot: await shoot(page, [
             { target: page.getByTestId('pending'), label: 'Neue Anmeldung freischalten' },
             {
                 target: page.getByTestId('user-table'),
-                label: 'Alle Benutzer (Stift = Rolle ändern)',
+                label: 'Alle Benutzer („Bearbeiten“ = Name und Rolle)',
             },
         ]),
     };
@@ -883,7 +883,7 @@ const poster: Build = async (page) => {
     await page.emulateMedia({ media: 'screen' });
     return {
         title: 'Aushang für Einladungscodes drucken',
-        text: 'Nach dem Erzeugen können Sie den Aushang drucken: QR-Code, Code im Klartext und vier Bilder zur Registrierung. Er gilt nur so lange wie der Code.',
+        text: 'Nach dem Erzeugen können Sie den Aushang drucken: QR-Code, Code im Klartext und vier Bilder zur Registrierung. „Vorschau des Aushangs“ zeigt die Seite vorher verkleinert. Er gilt nur so lange wie der Code.',
         shot,
     };
 };
@@ -1030,7 +1030,7 @@ const userEdit: Build = async (page) => {
     ]);
     return {
         title: 'Benutzer bearbeiten',
-        text: 'Der Stift in der Benutzerliste öffnet das Fenster „Bearbeiten“ (am PC wie am Handy): Anzeigenamen korrigieren (so erscheint die Person im Verlauf), Rolle ändern und, falls erlaubt, den Claude-Zugang setzen. Ganz unten unter „Konto beenden“ sperren Sie das Konto (lässt sich wieder entsperren) oder löschen es bei Austritt; im Verlauf steht dann „Gelöschter Benutzer“.',
+        text: 'Ein Klick auf eine Zeile der Benutzerliste (oder „Bearbeiten“) öffnet das Fenster „Bearbeiten“ (am PC wie am Handy): Anzeigenamen korrigieren (so erscheint die Person im Verlauf), Rolle ändern und, falls erlaubt, den Claude-Zugang setzen. Unter „Konto beenden“ (oben im Fenster führt „Sperren oder löschen ↓“ dorthin) sperren Sie das Konto (lässt sich wieder entsperren) oder löschen es bei Austritt; im Verlauf steht dann „Gelöschter Benutzer“.',
         shot: top,
         shot2: bottom,
     };
