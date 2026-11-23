@@ -403,6 +403,38 @@ test.describe('Benutzer', () => {
         expect(sent(apiRequests, 'POST', 'api/v1/users/23/reject')).toEqual([{}]);
     });
 
+    test('ein Klick in die Zeile öffnet „Bearbeiten“, das Kästchen nur die Auswahl (A2)', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await open(page);
+        const row = page.getByTestId('user-8');
+        await expect(row.getByRole('button', { name: 'Anna Berg bearbeiten' })).toHaveText(
+            'Bearbeiten',
+        );
+        // Kästchen: nur auswählen, kein Fenster.
+        await row.getByRole('checkbox', { name: 'Anna Berg auswählen' }).check();
+        await expect(page.getByTestId('selection-bar')).toBeVisible();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        // Andere Zelle (E-Mail) wie der Knopf.
+        await row.locator('.col-email').click();
+        const dialog = page.getByRole('dialog', { name: 'Anna Berg bearbeiten' });
+        await expect(dialog).toBeVisible();
+        await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+        await expect(dialog).toBeHidden();
+        // Unbestätigte Konten haben keinen Link: Klick in die Zeile tut nichts.
+        await page.getByTestId('user-23').locator('.col-email').click();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    });
+
+    test('Handy: ein Klick auf die Karte öffnet „Bearbeiten“ (A2)', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await open(page);
+        await page.getByTestId('user-8').locator('.col-name').click();
+        await expect(page.getByRole('dialog', { name: 'Anna Berg bearbeiten' })).toBeVisible();
+    });
+
     test('Anzeigename und Rolle ändern, nur Geändertes senden', async ({ page, apiRequests }) => {
         await open(page);
         await page.getByRole('button', { name: 'Anna Berg bearbeiten' }).click();

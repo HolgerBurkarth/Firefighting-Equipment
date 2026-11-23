@@ -16,6 +16,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
 import InvitationCodesPanel from '../components/InvitationCodesPanel.vue';
+import { vRowLink } from '../components/rowLink';
 import {
     adminLocationStore,
     approveUser,
@@ -61,7 +62,7 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
  * Schritt 1.6, Mockups „Benutzer“ und „Benutzer-Rolle“): oben die wartenden Registrierungen mit
  * „Freischalten“ (Anzeigename und Rolle, die des Einladungscodes vorausgewählt) und „Ablehnen“,
  * darunter alle Konten der Stadt mit Rollenfilter, sortierbar wie im Explorer (am Handy Karten mit
- * Sortier-Knöpfen). Kästchen je Konto (nicht am eigenen) für „Rolle zuweisen …“ (F6). Der Stift
+ * Sortier-Knöpfen; ein Klick in die Zeile öffnet „Bearbeiten“ wie der Knopf, A2). Kästchen je Konto (nicht am eigenen) für „Rolle zuweisen …“ (F6). Der Stift
  * öffnet Anzeigename und Rolle, abseits Sperren/Entsperren und Löschen (= anonymisieren). Welche
  * Rollen es gibt, legt der Super-Admin fest; welche das Konto vergeben darf, sagt der Server (F5).
  * Zweiter Reiter „Einladungscodes“ (`?ansicht=einladungscodes`, InvitationCodesPanel).
@@ -806,6 +807,7 @@ onMounted(() => {
                         <tr
                             v-for="user in rows"
                             :key="user.id"
+                            v-row-link
                             :class="{ 'row-locked': user.locked }"
                             :data-testid="`user-${String(user.id)}`"
                         >
@@ -874,10 +876,10 @@ onMounted(() => {
                                 </button>
                                 <button
                                     v-else
-                                    class="icon-btn"
+                                    class="btn small-btn edit-btn"
                                     type="button"
                                     :aria-label="`${user.label} bearbeiten`"
-                                    :title="`${user.label} bearbeiten`"
+                                    data-row-link
                                     @click="openDialog(user, 'edit', $event)"
                                 >
                                     <svg
@@ -892,6 +894,7 @@ onMounted(() => {
                                         <path d="M4 20h4L19 9l-4-4L4 16z" />
                                         <path d="M13.5 6.5l4 4" />
                                     </svg>
+                                    <span aria-hidden="true">Bearbeiten</span>
                                 </button>
                             </td>
                         </tr>
@@ -1302,7 +1305,7 @@ onMounted(() => {
 }
 
 .col-actions {
-    width: 72px;
+    width: 1%;
     text-align: right;
     white-space: nowrap;
 }
@@ -1310,6 +1313,13 @@ onMounted(() => {
 .small-btn {
     min-height: var(--touch-min);
     padding: 0 12px;
+}
+
+/* Stift mit Text (Benutzertest Admin, A2); ein Klick in die Zeile tut dasselbe (v-row-link). */
+.edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .roles {

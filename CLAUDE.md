@@ -1482,8 +1482,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   nur mit Link (`[data-row-open]:has([data-row-link])` in `base.css`). Bisher: Geräteliste,
   `TenantTable` (Dashboard und „Städte“ des Super-Admins), Rollen im Stadtdetail, Gerätetypen,
   Standorte (Ebene 1 und Fächer), „Letzte Aktivitäten“ des Dashboards; „Nicht einsatzbereit“,
-  Hinweise und `DeviceCard` sind schon ganz ein Link. Nicht in der Benutzerliste (Name ist kein Link,
-  dort der Stift). Neue Listen dieser Art in `tests/unit/rowLinkLists.spec.ts` eintragen (prüft auch
+  Hinweise und `DeviceCard` sind schon ganz ein Link. Benutzerliste (seit 23.11.2026, Benutzertest
+  Admin A2): Ziel ist der Knopf „Bearbeiten“ (Stift mit Text, `data-row-link`), ein Klick in die Zeile
+  öffnet das Fenster; unbestätigte Konten (nur „Ablehnen …“) haben keinen Link. Neue Listen dieser Art in `tests/unit/rowLinkLists.spec.ts` eintragen (prüft auch
   je Zeile genau einen Link); je Liste ein Browser-Test am PC (Tabelle) und in Handy-Breite (Karte):
   Klick in eine andere Zelle öffnet das Ziel, ein Knopf der Zeile nur sein Eigenes. Unit-Test
   `rowLink.spec.ts`.

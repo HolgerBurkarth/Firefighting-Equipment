@@ -35,6 +35,7 @@ describe('Listen mit ganzer Zeile als Link', () => {
             'pages/DeviceTypesPage.vue',
             'pages/DevicesPage.vue',
             'pages/LocationsPage.vue',
+            'pages/UsersPage.vue',
         ]);
     });
 
