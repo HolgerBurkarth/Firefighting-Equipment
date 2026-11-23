@@ -12,7 +12,10 @@ import {
     AssignableRoleStore,
     codeRoles,
     defaultRole,
+    DEFAULT_ROLE_DESCRIPTIONS,
     filterText,
+    mayText,
+    roleDescription,
     roleFilterOptions,
     roleNameOf,
     seesText,
@@ -86,6 +89,9 @@ function catalog(): PermissionCatalog {
     return parsed.catalog;
 }
 
+/** Default-Aktionen von `roleJson` (nur „Umbuchen“). */
+const MAY_STANDARD = 'Umbuchen';
+
 function roles(): readonly AssignableRole[] {
     const parsed = parseAssignableRoles(RESPONSE);
     if (parsed === null) {
@@ -155,6 +161,49 @@ describe('Anzeige', () => {
         const [admin, standard] = roles();
         expect(admin && seesText(catalog, admin)).toBe('alles');
         expect(standard && seesText(catalog, standard)).toBe('Suchen, Termine, Profil');
+    });
+
+    it('Darf: … unterscheidet Rollen, die dasselbe sehen (A3)', () => {
+        const catalog = parseAssignableRoles(RESPONSE)?.catalog;
+        if (catalog === undefined) {
+            throw new Error('Katalog fehlt');
+        }
+        const [admin, standard] = roles();
+        expect(admin && mayText(catalog, admin)).toBe('alles');
+        expect(standard && mayText(catalog, standard)).toBe(MAY_STANDARD);
+    });
+
+    it('Beschreibung der Standard-Rollen für Admins, eigene Beschreibungen unverändert (A3)', () => {
+        const parsed = parseAssignableRoles({
+            roles: [
+                roleJson(1, {
+                    system_key: 'admin',
+                    all_rights: true,
+                    description: DEFAULT_ROLE_DESCRIPTIONS.admin,
+                }),
+                roleJson(2, { system_key: 'user', description: DEFAULT_ROLE_DESCRIPTIONS.user }),
+                // Hat der Super-Admin die Beschreibung geändert, gilt seine.
+                roleJson(3, { system_key: 'user', description: 'Alle Aktiven' }),
+                roleJson(4, { description: 'Wie bisher; bekommt jede neue Stadt' }),
+                roleJson(5),
+            ],
+            catalog: CATALOG,
+        });
+        expect(parsed?.roles.map(roleDescription)).toEqual([
+            'Alle Rechte, auch Benutzer und Einstellungen.',
+            'Standard-Rolle für neue Mitglieder.',
+            'Alle Aktiven',
+            'Wie bisher; bekommt jede neue Stadt',
+            null,
+        ]);
+    });
+
+    it('DEFAULT_ROLE_DESCRIPTIONS gleich DefaultRoles.php', () => {
+        const php = readFileSync(resolve(process.cwd(), '../src/Role/DefaultRoles.php'), 'utf8');
+        const constant = (name: string): string | undefined =>
+            new RegExp(`const string ${name} = '([^']*)';`).exec(php)?.[1];
+        expect(DEFAULT_ROLE_DESCRIPTIONS.admin).toBe(constant('ADMIN_DESCRIPTION'));
+        expect(DEFAULT_ROLE_DESCRIPTIONS.user).toBe(constant('USER_DESCRIPTION'));
     });
 
     it('Sieht nur … mit Namen, unbekannte als #ID, leere Auswahl', () => {

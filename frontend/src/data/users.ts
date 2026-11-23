@@ -157,13 +157,24 @@ export function bulkRoleText(
 
 /**
  * Text unter einer wartenden Registrierung: „Registriert am 01.11.2026 mit dem Aushang
- * „Geräteträger“; die Rolle ist vorausgewählt.“ (Mockup „Benutzer“).
+ * „Geräteträger“.“ (Mockup „Benutzer“; die Vorwahl der Rolle nennt `preselectText`, A3).
  */
 export function registrationText(user: AdminUser): string {
     const label = user.invitationCode?.label ?? null;
     return label === null
         ? `Registriert am ${createdText(user)}`
-        : `Registriert am ${createdText(user)} mit dem Aushang „${label}“; die Rolle ist vorausgewählt.`;
+        : `Registriert am ${createdText(user)} mit dem Aushang „${label}“.`;
+}
+
+/**
+ * Satz über der Rollenwahl beim Freischalten (Benutzertest Admin A3): welche Rolle vorgewählt ist,
+ * woher sie kommt, und die Bitte, sie zu prüfen.
+ */
+export function preselectText(user: AdminUser, roleName: string): string {
+    const label = user.invitationCode?.label ?? null;
+    return label === null
+        ? `Vorgewählt ist „${roleName}“. Bitte prüfen Sie, ob die Rolle passt.`
+        : `Vorgewählt ist „${roleName}“, die Rolle des Aushangs „${label}“. Bitte prüfen Sie, ob sie passt.`;
 }
 
 /** Datum der Registrierung in Ortszeit („12.10.2026“). */

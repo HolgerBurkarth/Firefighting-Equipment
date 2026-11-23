@@ -59,7 +59,12 @@ watch(saved, (next, previous) => {
 
 const savingAccent = ref(false);
 const accentError = shallowRef<ApiError | null>(null);
-const success = ref<string | null>(null);
+/**
+ * Erfolgsmeldung mit ihrem Ort (Benutzertest Admin A5): Sie erscheint dort, wo die Knöpfe der Farbe
+ * bzw. des Logos standen, nicht oben über allem; sonst verschob sie die Seite, und der nächste
+ * Klick traf etwas anderes.
+ */
+const success = ref<{ readonly area: 'accent' | 'logo'; readonly text: string } | null>(null);
 
 function chooseSwatch(color: string | null): void {
     input.value = display(color);
@@ -81,7 +86,10 @@ async function onSaveAccent(): Promise<void> {
         if (candidate.value === sent) {
             input.value = display(accentSelection(result.data.accentColor));
         }
-        success.value = 'Akzentfarbe gespeichert. Sie gilt ab jetzt für alle Benutzer der Stadt.';
+        success.value = {
+            area: 'accent',
+            text: 'Akzentfarbe gespeichert. Sie gilt ab jetzt für alle Benutzer der Stadt.',
+        };
     } else {
         accentError.value = result.error;
     }
@@ -161,8 +169,10 @@ async function onSaveLogo(): Promise<void> {
     savingLogo.value = false;
     if (result.ok) {
         dropPending();
-        success.value =
-            'Logo gespeichert. Es erscheint ab jetzt im Menü, auf der Anmeldeseite und als App-Symbol.';
+        success.value = {
+            area: 'logo',
+            text: 'Logo gespeichert. Es erscheint ab jetzt im Menü, auf der Anmeldeseite und als App-Symbol.',
+        };
     } else {
         logoError.value = result.error;
     }
@@ -175,7 +185,10 @@ async function onRemoveLogo(): Promise<void> {
     const result = await removeLogo();
     savingLogo.value = false;
     if (result.ok) {
-        success.value = 'Logo entfernt. Die App zeigt wieder das Standard-Symbol.';
+        success.value = {
+            area: 'logo',
+            text: 'Logo entfernt. Die App zeigt wieder das Standard-Symbol.',
+        };
     } else {
         logoError.value = result.error;
     }
@@ -191,15 +204,6 @@ async function onRemoveLogo(): Promise<void> {
                 defekt) bleiben immer gleich.
             </p>
         </div>
-
-        <p
-            v-if="success !== null"
-            class="notice notice-success"
-            role="status"
-            data-testid="success-notice"
-        >
-            {{ success }}
-        </p>
 
         <div class="appearance">
             <div class="controls">
@@ -273,6 +277,14 @@ async function onRemoveLogo(): Promise<void> {
                             Verwerfen
                         </button>
                     </div>
+                    <p
+                        v-else-if="success?.area === 'accent'"
+                        class="saved-note"
+                        role="status"
+                        data-testid="success-notice"
+                    >
+                        {{ success.text }}
+                    </p>
                 </div>
 
                 <div class="group">
@@ -362,6 +374,14 @@ async function onRemoveLogo(): Promise<void> {
                             </template>
                         </div>
                     </div>
+                    <p
+                        v-if="success?.area === 'logo' && pending === null"
+                        class="notice notice-success"
+                        role="status"
+                        data-testid="success-notice"
+                    >
+                        {{ success.text }}
+                    </p>
                     <p v-if="pending !== null" class="hint" data-testid="logo-pending">
                         So wird das Logo gespeichert (512 × 512 Pixel). Noch nicht gespeichert.
                     </p>
@@ -511,6 +531,24 @@ async function onRemoveLogo(): Promise<void> {
 
 .accent-ok {
     color: var(--status-ready-fg);
+}
+
+/* Meldung an der Stelle der Knöpfe, gleich hoch wie sie (zwei Zeilen passen), damit darunter nichts
+   verrutscht (Benutzertest Admin A5). */
+.saved-note {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    margin: 0;
+    color: var(--status-ready-fg);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.35;
+}
+
+.saved-note::before {
+    content: '✓';
+    margin-right: 8px;
 }
 
 .actions,

@@ -17,6 +17,7 @@ import {
     nameHint,
     pendingText,
     pendingUsers,
+    preselectText,
     registrationText,
     selectable,
     selectedText,
@@ -243,11 +244,23 @@ describe('Bearbeiten und Texte', () => {
     it('registrationText nennt den Aushang', () => {
         expect(
             registrationText(user(3, { invitation_code: { id: 4, label: 'Geräteträger' } })),
-        ).toBe(
-            'Registriert am 01.10.2026 mit dem Aushang „Geräteträger“; die Rolle ist vorausgewählt.',
-        );
+        ).toBe('Registriert am 01.10.2026 mit dem Aushang „Geräteträger“.');
         expect(registrationText(user(3, { invitation_code: { id: 4, label: null } }))).toBe(
             'Registriert am 01.10.2026',
+        );
+    });
+
+    it('preselectText nennt die vorgewählte Rolle und bittet um Prüfung (A3)', () => {
+        expect(
+            preselectText(
+                user(3, { invitation_code: { id: 4, label: 'Dienstabend' } }),
+                'Benutzer',
+            ),
+        ).toBe(
+            'Vorgewählt ist „Benutzer“, die Rolle des Aushangs „Dienstabend“. Bitte prüfen Sie, ob sie passt.',
+        );
+        expect(preselectText(user(3), 'Benutzer')).toBe(
+            'Vorgewählt ist „Benutzer“. Bitte prüfen Sie, ob die Rolle passt.',
         );
     });
 

@@ -16,6 +16,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
 import InvitationCodesPanel from '../components/InvitationCodesPanel.vue';
+import { vRowLink } from '../components/rowLink';
 import {
     adminLocationStore,
     approveUser,
@@ -31,7 +32,14 @@ import {
     userStore,
     type BulkRoleRun,
 } from '../data';
-import { filterText, roleFilterOptions, roleNameOf, seesText } from '../data/assignableRoles';
+import {
+    filterText,
+    mayText,
+    roleDescription,
+    roleFilterOptions,
+    roleNameOf,
+    seesText,
+} from '../data/assignableRoles';
 import { phpTrim } from '../data/masterData';
 import {
     bulkRoleText,
@@ -43,6 +51,7 @@ import {
     nameHint,
     pendingText,
     pendingUsers,
+    preselectText,
     registrationText,
     selectable,
     selectedText,
@@ -61,7 +70,7 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
  * Schritt 1.6, Mockups „Benutzer“ und „Benutzer-Rolle“): oben die wartenden Registrierungen mit
  * „Freischalten“ (Anzeigename und Rolle, die des Einladungscodes vorausgewählt) und „Ablehnen“,
  * darunter alle Konten der Stadt mit Rollenfilter, sortierbar wie im Explorer (am Handy Karten mit
- * Sortier-Knöpfen). Kästchen je Konto (nicht am eigenen) für „Rolle zuweisen …“ (F6). Der Stift
+ * Sortier-Knöpfen; ein Klick in die Zeile öffnet „Bearbeiten“ wie der Knopf, A2). Kästchen je Konto (nicht am eigenen) für „Rolle zuweisen …“ (F6). Der Stift
  * öffnet Anzeigename und Rolle, abseits Sperren/Entsperren und Löschen (= anonymisieren). Welche
  * Rollen es gibt, legt der Super-Admin fest; welche das Konto vergeben darf, sagt der Server (F5).
  * Zweiter Reiter „Einladungscodes“ (`?ansicht=einladungscodes`, InvitationCodesPanel).
@@ -175,6 +184,10 @@ function roleSees(role: AssignableRole): string {
     return catalog.value === null ? '' : seesText(catalog.value, role);
 }
 
+function roleMay(role: AssignableRole): string {
+    return catalog.value === null ? '' : mayText(catalog.value, role);
+}
+
 const busy = ref(false);
 const success = ref<string | null>(null);
 const pageError = ref<ApiError | null>(null);
@@ -214,6 +227,14 @@ const initial = computed((): { displayName: string; roleId: number | null } => (
     roleId: target.value?.roleId ?? null,
 }));
 const chosenRole = computed(() => roles.value.find((role) => role.id === roleId.value) ?? null);
+/** Vorgewählte Rolle beim Freischalten (A3); null, solange die Rollen nicht geladen sind. */
+const preselect = computed(() => {
+    const user = target.value;
+    const role = roles.value.find((entry) => entry.id === initial.value.roleId);
+    return mode.value !== 'approve' || user === null || role === undefined
+        ? null
+        : preselectText(user, role.name);
+});
 const roleChanged = computed(() => roleId.value !== initial.value.roleId);
 /** Auswahl des Claude-Zugangs im Fenster „Bearbeiten“ (nur mit managesClaude). */
 const showsClaude = computed(() => mode.value === 'edit' && managesClaude.value);
@@ -563,6 +584,17 @@ async function unlock(): Promise<void> {
     dialogOpen.value = false;
 }
 
+/**
+ * „Sperren oder löschen ↓“ oben im Fenster „Bearbeiten“ (Benutzertest Admin A1): Der Abschnitt
+ * „Konto beenden“ liegt abseits unter „Speichern“; der Knopf scrollt das Fenster dorthin und
+ * fokussiert die Überschrift (wie die Sprunglinks auf „Verleih“, U6).
+ */
+function jumpToEnd(): void {
+    const heading = document.getElementById(`${id}-end`);
+    heading?.scrollIntoView({ block: 'start' });
+    heading?.focus({ preventScroll: true });
+}
+
 function retry(): void {
     void userStore.refresh('changed');
 }
@@ -806,6 +838,7 @@ onMounted(() => {
                         <tr
                             v-for="user in rows"
                             :key="user.id"
+                            v-row-link
                             :class="{ 'row-locked': user.locked }"
                             :data-testid="`user-${String(user.id)}`"
                         >
@@ -874,10 +907,10 @@ onMounted(() => {
                                 </button>
                                 <button
                                     v-else
-                                    class="icon-btn"
+                                    class="btn small-btn edit-btn"
                                     type="button"
                                     :aria-label="`${user.label} bearbeiten`"
-                                    :title="`${user.label} bearbeiten`"
+                                    data-row-link
                                     @click="openDialog(user, 'edit', $event)"
                                 >
                                     <svg
@@ -892,6 +925,7 @@ onMounted(() => {
                                         <path d="M4 20h4L19 9l-4-4L4 16z" />
                                         <path d="M13.5 6.5l4 4" />
                                     </svg>
+                                    <span aria-hidden="true">Bearbeiten</span>
                                 </button>
                             </td>
                         </tr>
@@ -920,6 +954,15 @@ onMounted(() => {
         :return-focus="opener"
         @submit="submit"
     >
+        <button
+            v-if="mode === 'edit' && target !== null && !isOwn"
+            class="btn end-jump"
+            type="button"
+            data-testid="end-jump"
+            @click="jumpToEnd"
+        >
+            Sperren oder löschen (z. B. bei Austritt) ↓
+        </button>
         <p v-if="mode === 'edit' && isOwn" class="notice notice-info" data-testid="own-account">
             Das ist Ihr eigenes Konto. Rolle, Sperren und Löschen sind hier nicht möglich; das
             übernimmt bei Bedarf ein anderer Admin.
@@ -960,6 +1003,9 @@ onMounted(() => {
             <p v-else-if="roleState.data === null" class="field-hint" role="status">
                 Rollen werden geladen …
             </p>
+            <p v-if="preselect !== null" class="notice notice-info" data-testid="preselect-hint">
+                {{ preselect }}
+            </p>
             <label
                 v-for="role in roles"
                 :key="role.id"
@@ -977,10 +1023,11 @@ onMounted(() => {
                 />
                 <span :id="`${id}-role0-${String(role.id)}`" class="role-text">
                     <strong>{{ role.name }}</strong>
-                    <span v-if="role.description !== null" class="field-hint">{{
-                        role.description
+                    <span v-if="roleDescription(role) !== null" class="field-hint">{{
+                        roleDescription(role)
                     }}</span>
                     <span class="field-hint">Sieht: {{ roleSees(role) }}</span>
+                    <span class="field-hint">Darf: {{ roleMay(role) }}</span>
                     <span v-if="roleFilterText(role) !== null" class="field-hint">{{
                         roleFilterText(role)
                     }}</span>
@@ -1048,7 +1095,7 @@ onMounted(() => {
             </fieldset>
         </details>
         <template v-if="mode === 'edit' && target !== null && !isOwn" #extra>
-            <h3 class="end-title">Konto beenden</h3>
+            <h3 :id="`${id}-end`" class="end-title" tabindex="-1">Konto beenden</h3>
             <p class="field-hint">
                 Gesperrt: kann sich nicht mehr anmelden, lässt sich wieder entsperren. Gelöscht (z.
                 B. bei Austritt): die persönlichen Daten werden entfernt, im Verlauf bleibt
@@ -1124,10 +1171,11 @@ onMounted(() => {
                 />
                 <span :id="`${id}-role1-${String(role.id)}`" class="role-text">
                     <strong>{{ role.name }}</strong>
-                    <span v-if="role.description !== null" class="field-hint">{{
-                        role.description
+                    <span v-if="roleDescription(role) !== null" class="field-hint">{{
+                        roleDescription(role)
                     }}</span>
                     <span class="field-hint">Sieht: {{ roleSees(role) }}</span>
+                    <span class="field-hint">Darf: {{ roleMay(role) }}</span>
                     <span v-if="roleFilterText(role) !== null" class="field-hint">{{
                         roleFilterText(role)
                     }}</span>
@@ -1302,7 +1350,7 @@ onMounted(() => {
 }
 
 .col-actions {
-    width: 72px;
+    width: 1%;
     text-align: right;
     white-space: nowrap;
 }
@@ -1310,6 +1358,13 @@ onMounted(() => {
 .small-btn {
     min-height: var(--touch-min);
     padding: 0 12px;
+}
+
+/* Stift mit Text (Benutzertest Admin, A2); ein Klick in die Zeile tut dasselbe (v-row-link). */
+.edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .roles {
@@ -1381,6 +1436,10 @@ onMounted(() => {
 .end-title {
     margin: 0;
     font-size: 16px;
+}
+
+.end-jump {
+    align-self: flex-start;
 }
 
 .claude-connections {

@@ -271,7 +271,7 @@ test.describe('Benutzer', () => {
         await expect(pending.locator('.user-name')).toHaveText(['Erika Neu', 'Max Neu']);
         await expect(pending).toContainText('erika@example.org');
         await expect(page.getByTestId('pending-21')).toContainText(
-            'mit dem Aushang „Aushang Wart“; die Rolle ist vorausgewählt.',
+            'mit dem Aushang „Aushang Wart“.',
         );
         await expect(page.getByTestId('pending-21')).toContainText('Rolle: Gerätewart');
         await expect(page.getByTestId('user-7').locator('.col-role')).toHaveText('Admin');
@@ -352,6 +352,13 @@ test.describe('Benutzer', () => {
         await expect(dialog.getByRole('radio', { name: 'Kasse' })).toBeDisabled();
         await expect(dialog).toContainText('Sie können sie daher nicht vergeben.');
         await expect(dialog).toContainText('Sieht: Dashboard, Suchen, Ausrüstung, Termine, Profil');
+        // A3: Herkunft der Vorwahl, Bitte um Prüfung, „Darf“ und eine Beschreibung für Admins.
+        await expect(dialog.getByTestId('preselect-hint')).toHaveText(
+            'Vorgewählt ist „Gerätewart“, die Rolle des Aushangs „Aushang Wart“. Bitte prüfen Sie, ob sie passt.',
+        );
+        await expect(dialog).toContainText('Darf: ');
+        await expect(dialog).toContainText('Standard-Rolle für neue Mitglieder.');
+        await expect(dialog).not.toContainText('Wie bisher; bekommt jede neue Stadt');
         const name = dialog.getByLabel('Anzeigename');
         await expect(name).toHaveValue('Max Neu');
         await name.fill('  ');
@@ -401,6 +408,38 @@ test.describe('Benutzer', () => {
         await page.getByRole('alertdialog').getByRole('button', { name: 'Ablehnen' }).click();
         await expect(page.getByTestId('user-23')).toHaveCount(0);
         expect(sent(apiRequests, 'POST', 'api/v1/users/23/reject')).toEqual([{}]);
+    });
+
+    test('ein Klick in die Zeile öffnet „Bearbeiten“, das Kästchen nur die Auswahl (A2)', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        await open(page);
+        const row = page.getByTestId('user-8');
+        await expect(row.getByRole('button', { name: 'Anna Berg bearbeiten' })).toHaveText(
+            'Bearbeiten',
+        );
+        // Kästchen: nur auswählen, kein Fenster.
+        await row.getByRole('checkbox', { name: 'Anna Berg auswählen' }).check();
+        await expect(page.getByTestId('selection-bar')).toBeVisible();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        // Andere Zelle (E-Mail) wie der Knopf.
+        await row.locator('.col-email').click();
+        const dialog = page.getByRole('dialog', { name: 'Anna Berg bearbeiten' });
+        await expect(dialog).toBeVisible();
+        await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+        await expect(dialog).toBeHidden();
+        // Unbestätigte Konten haben keinen Link: Klick in die Zeile tut nichts.
+        await page.getByTestId('user-23').locator('.col-email').click();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    });
+
+    test('Handy: ein Klick auf die Karte öffnet „Bearbeiten“ (A2)', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await open(page);
+        await page.getByTestId('user-8').locator('.col-name').click();
+        await expect(page.getByRole('dialog', { name: 'Anna Berg bearbeiten' })).toBeVisible();
     });
 
     test('Anzeigename und Rolle ändern, nur Geändertes senden', async ({ page, apiRequests }) => {
@@ -582,6 +621,17 @@ test.describe('Fenster „Bearbeiten“ (U7)', () => {
             await expect
                 .poll(() => dialog.evaluate((element) => element.scrollTop))
                 .toBeGreaterThan(0);
+            // Firefox scrollt je Ereignis nur ein Stück (seit A1/A3 ist das Fenster länger): weiter
+            // drehen bis zum Ende des Fensters.
+            await expect(async () => {
+                await page.mouse.wheel(0, 2000);
+                expect(
+                    await dialog.evaluate(
+                        (element) =>
+                            element.scrollHeight - element.clientHeight - element.scrollTop,
+                    ),
+                ).toBeLessThanOrEqual(1);
+            }).toPass({ timeout: 5000 });
             const end = dialog.getByRole('heading', { name: 'Konto beenden' });
             await expect(end).toBeInViewport();
             await expect(
@@ -597,6 +647,30 @@ test.describe('Fenster „Bearbeiten“ (U7)', () => {
             ).toBeLessThanOrEqual(0);
         });
     }
+
+    test('„Sperren oder löschen ↓“ oben im Fenster führt zu „Konto beenden“ (A1)', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1093, height: 614 });
+        await open(page);
+        await page.getByRole('button', { name: 'Anna Berg bearbeiten' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Anna Berg bearbeiten' });
+        const jump = dialog.getByRole('button', {
+            name: 'Sperren oder löschen (z. B. bei Austritt) ↓',
+        });
+        await expect(jump).toBeInViewport();
+        const remove = dialog.getByRole('button', { name: 'Anna Berg löschen (ausgetreten) …' });
+        await expect(remove).not.toBeInViewport();
+        await jump.click();
+        await expect(dialog.getByRole('heading', { name: 'Konto beenden' })).toBeFocused();
+        await expect(remove).toBeInViewport();
+        // Am eigenen Konto gibt es weder den Knopf noch den Abschnitt.
+        await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+        await page.getByRole('button', { name: 'Thomas Keller bearbeiten' }).click();
+        const own = page.getByRole('dialog', { name: 'Thomas Keller bearbeiten' });
+        await expect(own.getByTestId('own-account')).toBeVisible();
+        await expect(own.getByTestId('end-jump')).toHaveCount(0);
+    });
 
     test('Claude-Zugang ist bei „Aus“ eingeklappt und lässt sich aufklappen', async ({ page }) => {
         await open(page);

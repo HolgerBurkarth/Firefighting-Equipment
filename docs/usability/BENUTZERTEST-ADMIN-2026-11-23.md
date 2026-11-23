@@ -64,7 +64,20 @@ Zähler des Codes zu erhöhen. In der echten Registrierung zählt `UserRepositor
 - Rückgabe-Aushang erneuern: Sprungknopf auf „Verleih“, Rückfrage „Der bisherige Aushang gilt danach nicht mehr“.
 - Admin-Anleitung (erweitert am 23.11.): deckt Freischalten, Einladung, Benutzer bearbeiten und Einstellungen ab.
 
-## Vorschläge (nicht umgesetzt, nach `docs/TODO-SPAETER.md`, T27)
+## Umgesetzt (23.11.2026, gleiche Runde)
+
+- **A2** Benutzerliste: Ein Klick in die Zeile bzw. Karte öffnet „Bearbeiten“ (`v-row-link`), der Stift heißt „Bearbeiten“.
+- **A1** Fenster „Bearbeiten“: oben der Knopf „Sperren oder löschen (z. B. bei Austritt) ↓“, er scrollt zu „Konto beenden“.
+- **A3** Freischalten: Satz „Vorgewählt ist „…“, die Rolle des Aushangs „…“. Bitte prüfen Sie, ob sie passt.“; je Rolle „Darf: …“
+  neben „Sieht: …“ (auch bei den Einladungscodes); die Standard-Rollen zeigen statt „Wie bisher; bekommt jede neue Stadt“ bzw.
+  „Alle Rechte, nicht änderbar“ einen Satz für Admins.
+- **A4** Einladungscode: aufklappbar „Vorschau des Aushangs (A4)“ unter den Knöpfen.
+- **A5** Einstellungen: Die Meldung nach „Farbe speichern“ steht an der Stelle der Knöpfe, gleich hoch; „Logo hochladen …“ bleibt, wo
+  es war.
+
+Offen (T27): A6–A9 und die Vorschläge 5 (zweiter Teil), 6 und 7.
+
+## Vorschläge (Stand des Tests; 1–4 und 5 erster Teil umgesetzt, siehe oben)
 
 1. Benutzerliste: Klick auf Zeile bzw. Name öffnet „Bearbeiten“ (wie `v-row-link` der anderen Listen); Stift mit Text „Bearbeiten“.
 2. Fenster „Bearbeiten“: „Konto beenden“ (Sperren, Löschen) sichtbar ohne Scrollen, z. B. als eigener Knopf in der Zeile oder

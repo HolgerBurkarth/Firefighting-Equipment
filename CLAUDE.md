@@ -974,11 +974,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Freischaltung“ (`pendingUsers`: Status `pending`, älteste zuerst) als Karten mit „Freischalten …“
   (`FormDialog`: Anzeigename vorbelegt mit dem Namen, Prüfung `displayNameProblem` wie `PersonName`;
   Rolle vorgewählt die des Kontos, also die des Einladungscodes; Karte und Fenster nennen den Aushang,
-  `registrationText`) und „Ablehnen …“ (`ConfirmDialog`, nennt die Mail). Rollen (Schritt 1.6):
+  `registrationText`; über den Rollen „Vorgewählt ist „…“, die Rolle des Aushangs „…“. Bitte prüfen
+  Sie, ob sie passt.“, `preselectText`, Benutzertest Admin A3) und „Ablehnen …“ (`ConfirmDialog`, nennt die Mail). Rollen (Schritt 1.6):
   `assignableRoleStore` (`AssignableRoleStore`, `src/data/assignableRoles.ts`, `GET roles` mit
   Katalog, in `installDataLayer`; nach jeder Änderung an Konten neu, wenn geladen). Auswahl der Rolle
-  überall als Liste von Radioknöpfen (Name als `aria-label`, darunter Kurzbeschreibung, „Sieht: …“
-  aus `roleSummary` und „Sieht nur: …“ mit Namen aus `adminLocationStore`/`deviceTypeStore`,
+  überall als Liste von Radioknöpfen (Name als `aria-label`, darunter Kurzbeschreibung
+  (`roleDescription`: bei den Standard-Rollen mit der unveränderten Beschreibung des Super-Admins,
+  `DEFAULT_ROLE_DESCRIPTIONS` = `DefaultRoles`, ein Satz für Admins, A3), „Sieht: …“ und „Darf: …“
+  (`seesText`, `mayText`) aus `roleSummary` (auch bei den Einladungscodes) und „Sieht nur: …“ mit Namen aus `adminLocationStore`/`deviceTypeStore`,
   `filterText`; die Listen lädt die Seite nur, wenn eine Rolle filtert); nicht vergebbare
   (`assignable` false) gesperrt mit `assign_blocker`, die bisherige bleibt sichtbar gewählt. Im
   Fenster „Bearbeiten“ bei *Admin* der Hinweis „Admins haben alle Rechte …“, bei geänderter Rolle
@@ -1025,7 +1028,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   ungespeicherte Eingabe, bis „Schließen“ oder Widerrufen): groß, QR-Code (`QrCode`, `qrShape` in
   `src/components/qrCode.ts`: `uqr`, Fehlerkorrektur M, ein SVG-Pfad, Ruhezone 4 Module, dunkel auf
   hell über `--ink`/`--paper`) mit dem Link `registerLink` = `registrieren#code=XXXX-XXXX-XXXX`
-  (Code nur im Fragment), „Aushang drucken“ (`window.print()`), „Link teilen“ (`shareLink`: Web Share
+  (Code nur im Fragment), „Aushang drucken“ (`window.print()`; darunter aufklappbar „Vorschau des Aushangs (A4)“ = `InvitationPoster` mit `preview`: an Ort und Stelle, per `zoom` verkleinert, druckt nicht, Benutzertest Admin A4), „Link teilen“ (`shareLink`: Web Share
   API, abgebrochen = nichts, sonst oder ohne API Link in die Zwischenablage) und „Code kopieren“
   (`copyText`). Aushang `InvitationPoster` (Teleport nach `body`, auf dem Bildschirm unsichtbar;
   solange er besteht, trägt `<html>` die Klasse `has-print-poster`, und das Druck-CSS in `base.css`
@@ -1118,7 +1121,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   gespeichert erst mit „Logo speichern“ (`saveLogo`, Base64 per `toBase64`), „Logo entfernen …“ nach
   `ConfirmDialog` (`removeLogo` → `DELETE tenant/logo`). Nach Erfolg `setTenant`
   (`applyTenantAppearance`: Farbe, Titel, `icon`/`apple-touch-icon` mit Logo bzw. ohne Logo wieder
-  `DEFAULT_ICON_HREFS` wie in `index.html`, per Test) und `success-notice`; Fehler als `ErrorNotice`.
+  `DEFAULT_ICON_HREFS` wie in `index.html`, per Test) und `success-notice` an Ort und Stelle (Farbe: an der Stelle der Knöpfe, gleich hoch, `saved-note`; Logo: unter dessen Knöpfen; nichts darunter verrutscht, Benutzertest Admin A5); Fehler als `ErrorNotice`.
   Ungespeichert = Farbe geändert oder neues Logo noch nicht gespeichert. `NotificationSetting`:
   `fetchNotifications`/`saveNotifications` (`src/api/auth.ts`, `GET`/`POST auth/notifications`),
   Kästchen wirkt sofort, Fehler → bisheriger Stand und `ErrorNotice`. Browser-Tests
@@ -1482,8 +1485,9 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   nur mit Link (`[data-row-open]:has([data-row-link])` in `base.css`). Bisher: Geräteliste,
   `TenantTable` (Dashboard und „Städte“ des Super-Admins), Rollen im Stadtdetail, Gerätetypen,
   Standorte (Ebene 1 und Fächer), „Letzte Aktivitäten“ des Dashboards; „Nicht einsatzbereit“,
-  Hinweise und `DeviceCard` sind schon ganz ein Link. Nicht in der Benutzerliste (Name ist kein Link,
-  dort der Stift). Neue Listen dieser Art in `tests/unit/rowLinkLists.spec.ts` eintragen (prüft auch
+  Hinweise und `DeviceCard` sind schon ganz ein Link. Benutzerliste (seit 23.11.2026, Benutzertest
+  Admin A2): Ziel ist der Knopf „Bearbeiten“ (Stift mit Text, `data-row-link`), ein Klick in die Zeile
+  öffnet das Fenster; unbestätigte Konten (nur „Ablehnen …“) haben keinen Link. Neue Listen dieser Art in `tests/unit/rowLinkLists.spec.ts` eintragen (prüft auch
   je Zeile genau einen Link); je Liste ein Browser-Test am PC (Tabelle) und in Handy-Breite (Karte):
   Klick in eine andere Zelle öffnet das Ziel, ein Knopf der Zeile nur sein Eigenes. Unit-Test
   `rowLink.spec.ts`.

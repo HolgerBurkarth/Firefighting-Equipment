@@ -10,7 +10,13 @@ import {
     invitationCodeStore,
     revokeInvitationCode,
 } from '../data';
-import { codeRoles, defaultRole } from '../data/assignableRoles';
+import {
+    codeRoles,
+    defaultRole,
+    mayText,
+    roleDescription,
+    seesText,
+} from '../data/assignableRoles';
 import {
     codeTitle,
     dateText,
@@ -94,6 +100,7 @@ const shown = computed(() => (touched.value ? problems.value : {}));
 const preview = computed(() => expiryPreview(form.value, new Date()));
 const roleState = computed(() => assignableRoleStore.state);
 const roles = computed(() => codeRoles(roleState.value.data?.roles ?? []));
+const catalog = computed(() => roleState.value.data?.catalog ?? null);
 const initialRoleId = computed(() => defaultRole(roles.value)?.id ?? null);
 
 // Rollen kommen nach dem Öffnen an: die Vorwahl nachziehen, solange nichts gewählt ist.
@@ -209,9 +216,13 @@ function printPoster(): void {
     window.print();
 }
 
+/** Vorschau des Aushangs (A4); erst beim Aufklappen gezeichnet, damit sie nichts doppelt im DOM hat. */
+const previewOpen = ref(false);
+
 function closeFresh(): void {
     fresh.value = null;
     feedback.value = null;
+    previewOpen.value = false;
 }
 
 // Widerrufen mit Rückfrage.
@@ -313,6 +324,24 @@ function retry(): void {
                     </p>
                 </div>
             </div>
+            <details
+                class="poster-details"
+                :open="previewOpen"
+                data-testid="poster-details"
+                @toggle="previewOpen = ($event.target as HTMLDetailsElement).open"
+            >
+                <summary>Vorschau des Aushangs (A4)</summary>
+                <InvitationPoster
+                    v-if="previewOpen"
+                    preview
+                    :tenant-name="tenantName"
+                    :logo-url="logoUrl"
+                    :code="fresh.code"
+                    :link="link"
+                    :address="address"
+                    :expires-text="freshExpires"
+                />
+            </details>
             <InvitationPoster
                 v-if="active"
                 :tenant-name="tenantName"
@@ -520,9 +549,13 @@ function retry(): void {
                 />
                 <span :id="`${id}-role0-${String(role.id)}`" class="role-text">
                     <strong>{{ role.name }}</strong>
-                    <span v-if="role.description !== null" class="field-hint">{{
-                        role.description
+                    <span v-if="roleDescription(role) !== null" class="field-hint">{{
+                        roleDescription(role)
                     }}</span>
+                    <template v-if="catalog !== null">
+                        <span class="field-hint">Sieht: {{ seesText(catalog, role) }}</span>
+                        <span class="field-hint">Darf: {{ mayText(catalog, role) }}</span>
+                    </template>
                     <span v-if="!role.assignable" class="field-hint">{{ role.assignBlocker }}</span>
                 </span>
             </label>
@@ -624,6 +657,14 @@ function retry(): void {
     font-size: var(--font-size-sm);
     overflow-wrap: anywhere;
     user-select: all;
+}
+
+.poster-details > summary {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    cursor: pointer;
+    font-weight: var(--font-weight-semibold);
 }
 
 .fresh-actions {

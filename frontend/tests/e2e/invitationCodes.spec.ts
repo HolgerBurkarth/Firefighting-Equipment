@@ -263,6 +263,23 @@ test.describe('Einladungscodes', () => {
         await page.emulateMedia({ media: 'screen' });
         await expect(page.locator('#app')).toBeVisible();
 
+        // Vorschau des Aushangs vor dem Drucken (A4): verkleinert an Ort und Stelle, druckt nicht.
+        const preview = page.getByTestId('invitation-poster-preview');
+        await expect(preview).toHaveCount(0);
+        await fresh.getByText('Vorschau des Aushangs (A4)').click();
+        await expect(preview).toBeVisible();
+        await expect(preview.getByTestId('poster-code')).toHaveText(NEW_CODE);
+        await expect(preview).toContainText('Jetzt registrieren');
+        const width = await preview.evaluate((element) => element.getBoundingClientRect().width);
+        expect(width).toBeGreaterThan(250);
+        expect(width).toBeLessThan(400);
+        expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+        // Beim Drucken nur der eigentliche Aushang, nicht die Vorschau.
+        await page.emulateMedia({ media: 'print' });
+        await expect(poster).toBeVisible();
+        await expect(preview).toBeHidden();
+        await page.emulateMedia({ media: 'screen' });
+
         // Schließen: der Code ist weg, die Seite druckt wieder normal.
         await fresh.getByRole('button', { name: 'Schließen' }).click();
         await expect(fresh).toHaveCount(0);
