@@ -6,7 +6,9 @@ import { deviceStore, lendEquipment } from '../data';
 import { MAX_COMMENT_LENGTH } from '../data/booking';
 import type { BulkRun } from '../data/deviceBulk';
 import { DATE_MAX, DATE_MIN, dateProblem, parseDateInput } from '../data/deviceForm';
+import { localDateKey } from '../data/changeTime';
 import { lendProblem, type LendCandidate } from '../data/loans';
+import { useNow } from '../runtime/now';
 import { useUnsavedInput } from '../runtime/unsavedInput';
 import AppSelect, { type SelectOption } from './AppSelect.vue';
 import ErrorNotice from './ErrorNotice.vue';
@@ -67,6 +69,12 @@ const options = computed((): SelectOption[] =>
     props.borrowers.map((place) => ({ value: String(place.id), label: place.name })),
 );
 const dueProblem = computed(() => dateProblem(due.value));
+const now = useNow();
+/** Nur ein Hinweis, kein Fehler (Benutzertest Gerätewart am Handy, G6): z. B. ein Tippfehler im Jahr. */
+const duePast = computed(() => {
+    const date = parseDateInput(due.value);
+    return typeof date === 'string' && date < localDateKey(now.value);
+});
 const problem = computed(
     () => lendProblem(candidates.value, borrowerId.value, contact.value) ?? dueProblem.value,
 );
@@ -257,6 +265,9 @@ async function submit(): Promise<void> {
                 :aria-invalid="touched && dueProblem !== null"
             />
             <p v-if="touched && dueProblem !== null" class="field-error">{{ dueProblem }}</p>
+            <p v-else-if="duePast" class="field-warning" data-testid="due-past">
+                Dieses Datum liegt in der Vergangenheit.
+            </p>
         </label>
         <label class="field">
             <span class="field-label">Kommentar für den Verlauf (optional)</span>
@@ -325,6 +336,11 @@ async function submit(): Promise<void> {
 
 .progress {
     margin: 0;
+    font-weight: var(--font-weight-semibold);
+}
+.field-warning {
+    margin: 4px 0 0;
+    color: var(--status-maintenance-fg);
     font-weight: var(--font-weight-semibold);
 }
 </style>

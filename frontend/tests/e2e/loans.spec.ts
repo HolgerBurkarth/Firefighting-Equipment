@@ -280,6 +280,13 @@ test.describe('Verleih mit Recht „Ändern“', () => {
         await dialog.getByRole('combobox', { name: 'Ausgeliehen an' }).click();
         await page.getByRole('option', { name: 'Schule' }).click();
         await dialog.getByLabel('Ansprechpartner (optional)').fill('Frau Weber');
+        // G6: ein Datum in der Vergangenheit ist nur ein Hinweis, kein Fehler.
+        await dialog.getByLabel('Rückgabe bis (optional)').fill('2020-11-20');
+        await expect(dialog.getByTestId('due-past')).toHaveText(
+            'Dieses Datum liegt in der Vergangenheit.',
+        );
+        await dialog.getByLabel('Rückgabe bis (optional)').fill('2099-12-31');
+        await expect(dialog.getByTestId('due-past')).toHaveCount(0);
         await dialog.getByLabel('Rückgabe bis (optional)').fill('2026-12-01');
         await dialog.getByRole('button', { name: 'Verleihen', exact: true }).click();
 
