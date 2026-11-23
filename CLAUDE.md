@@ -1121,7 +1121,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   gespeichert erst mit „Logo speichern“ (`saveLogo`, Base64 per `toBase64`), „Logo entfernen …“ nach
   `ConfirmDialog` (`removeLogo` → `DELETE tenant/logo`). Nach Erfolg `setTenant`
   (`applyTenantAppearance`: Farbe, Titel, `icon`/`apple-touch-icon` mit Logo bzw. ohne Logo wieder
-  `DEFAULT_ICON_HREFS` wie in `index.html`, per Test) und `success-notice`; Fehler als `ErrorNotice`.
+  `DEFAULT_ICON_HREFS` wie in `index.html`, per Test) und `success-notice` an Ort und Stelle (Farbe: an der Stelle der Knöpfe, gleich hoch, `saved-note`; Logo: unter dessen Knöpfen; nichts darunter verrutscht, Benutzertest Admin A5); Fehler als `ErrorNotice`.
   Ungespeichert = Farbe geändert oder neues Logo noch nicht gespeichert. `NotificationSetting`:
   `fetchNotifications`/`saveNotifications` (`src/api/auth.ts`, `GET`/`POST auth/notifications`),
   Kästchen wirkt sofort, Fehler → bisheriger Stand und `ErrorNotice`. Browser-Tests

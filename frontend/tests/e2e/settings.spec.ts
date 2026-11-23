@@ -257,6 +257,33 @@ test.describe('Einstellungen', () => {
         await expect(page.getByTestId('logo-default')).toBeVisible();
     });
 
+    for (const [width, height] of [
+        [1366, 768],
+        [1093, 614],
+        [390, 844],
+    ] as const) {
+        test(`${String(width)} px: nach „Farbe speichern“ verrutscht „Logo hochladen …“ nicht (A5)`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height });
+            await page.goto(SETTINGS);
+            await pickSwatch(page, 'Dunkelblau');
+            const save = page.getByRole('button', { name: 'Farbe speichern' });
+            const upload = page.getByRole('button', { name: 'Logo hochladen …' });
+            const top = (): Promise<number> =>
+                upload.evaluate((element) => element.getBoundingClientRect().top + window.scrollY);
+            await save.scrollIntoViewIfNeeded();
+            const before = await top();
+            await save.click();
+            const notice = page.getByTestId('success-notice');
+            await expect(notice).toHaveText(
+                'Akzentfarbe gespeichert. Sie gilt ab jetzt für alle Benutzer der Stadt.',
+            );
+            expect(Math.abs((await top()) - before)).toBeLessThanOrEqual(1);
+            await expect(save).toHaveCount(0);
+        });
+    }
+
     test('Akzentfarbe: Vorschau beim Wählen, gilt erst nach dem Speichern', async ({
         page,
         apiRequests,
