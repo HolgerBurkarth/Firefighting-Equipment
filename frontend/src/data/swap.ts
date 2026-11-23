@@ -1,7 +1,7 @@
 import type { DeviceListItem } from '../api/devices';
 import type { Location } from '../api/locations';
 import type { StockState } from '../api/stock';
-import { searchDevices } from './deviceSearch';
+import { rankDevices } from './deviceSearch';
 
 /** Ausrüstung, die herausgeht: Status danach (POST devices/swap `out_status`). */
 export type SwapOutStatus = 'used' | 'defective' | 'maintenance';
@@ -148,7 +148,8 @@ export function swapCandidates(
             entry.status === 'ready' &&
             wanted.includes(entry.deviceType.id),
     );
-    const found = query.trim() === '' ? ready : searchDevices(ready, query, ready.length).hits;
+    const found =
+        query.trim() === '' ? ready : rankDevices(ready, query).map((entry) => entry.device);
     const suggested: SwapCandidate[] = [];
     const others: SwapCandidate[] = [];
     for (const entry of found) {
