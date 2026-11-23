@@ -481,6 +481,19 @@ body:has([data-dialog-passthrough]) [data-form-dialog] {
     display: none;
 }
 
+/* Verkleinerte Vorschau des Aushangs auf dem Bildschirm (Benutzertest Admin A4): Seite A4 ohne Rand
+   (186 mm wie beim Druck) mit 12 mm Papierrand, per zoom auf rund 320 px Breite. */
+.print-poster.poster-preview {
+    display: flex;
+    box-sizing: content-box;
+    width: 186mm;
+    padding: 12mm;
+    margin-top: 8px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-raised);
+    zoom: 0.4;
+}
+
 @media print {
     html.has-print-poster body > :not(.print-poster) {
         display: none !important;

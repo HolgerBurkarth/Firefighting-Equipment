@@ -1028,7 +1028,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   ungespeicherte Eingabe, bis „Schließen“ oder Widerrufen): groß, QR-Code (`QrCode`, `qrShape` in
   `src/components/qrCode.ts`: `uqr`, Fehlerkorrektur M, ein SVG-Pfad, Ruhezone 4 Module, dunkel auf
   hell über `--ink`/`--paper`) mit dem Link `registerLink` = `registrieren#code=XXXX-XXXX-XXXX`
-  (Code nur im Fragment), „Aushang drucken“ (`window.print()`), „Link teilen“ (`shareLink`: Web Share
+  (Code nur im Fragment), „Aushang drucken“ (`window.print()`; darunter aufklappbar „Vorschau des Aushangs (A4)“ = `InvitationPoster` mit `preview`: an Ort und Stelle, per `zoom` verkleinert, druckt nicht, Benutzertest Admin A4), „Link teilen“ (`shareLink`: Web Share
   API, abgebrochen = nichts, sonst oder ohne API Link in die Zwischenablage) und „Code kopieren“
   (`copyText`). Aushang `InvitationPoster` (Teleport nach `body`, auf dem Bildschirm unsichtbar;
   solange er besteht, trägt `<html>` die Klasse `has-print-poster`, und das Druck-CSS in `base.css`

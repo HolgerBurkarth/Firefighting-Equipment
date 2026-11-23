@@ -8,9 +8,10 @@ import QrCode from './QrCode.vue';
  * Aushang eines Einladungscodes für die Wache (A4, KONZEPT.md "Admin-Konsole – Entscheidungen", 30):
  * Name und Logo der Feuerwehr, großer QR-Code mit dem Link, Code in Klarschrift, Adresse zum
  * Abtippen, drei Schritte, „gültig bis“ und Spam-Hinweis. Auf dem Bildschirm unsichtbar; solange er
- * besteht, druckt die Seite nur ihn (Druck-CSS in base.css über die Klasse am <html>).
+ * besteht, druckt die Seite nur ihn (Druck-CSS in base.css über die Klasse am <html>). Mit `preview`
+ * (Benutzertest Admin A4) dieselbe Seite verkleinert an Ort und Stelle (kein Teleport, druckt nicht).
  */
-defineProps<{
+const props = defineProps<{
     tenantName: string;
     /** Logo 512 px oder das Standard-Symbol (relativ zu <base>). */
     logoUrl: string;
@@ -18,22 +19,32 @@ defineProps<{
     link: string;
     address: string;
     expiresText: string;
+    /** Verkleinerte Vorschau auf dem Bildschirm statt der Druckseite. */
+    preview?: boolean;
 }>();
 
 const PRINT_CLASS = 'has-print-poster';
 
 onMounted(() => {
-    document.documentElement.classList.add(PRINT_CLASS);
+    if (!props.preview) {
+        document.documentElement.classList.add(PRINT_CLASS);
+    }
 });
 
 onBeforeUnmount(() => {
-    document.documentElement.classList.remove(PRINT_CLASS);
+    if (!props.preview) {
+        document.documentElement.classList.remove(PRINT_CLASS);
+    }
 });
 </script>
 
 <template>
-    <Teleport to="body">
-        <article class="print-poster" data-testid="invitation-poster">
+    <Teleport to="body" :disabled="preview">
+        <article
+            class="print-poster"
+            :class="{ 'poster-preview': preview }"
+            :data-testid="preview ? 'invitation-poster-preview' : 'invitation-poster'"
+        >
             <header class="poster-brand">
                 <img class="poster-logo" :src="logoUrl" alt="" width="512" height="512" />
                 <div>

@@ -216,9 +216,13 @@ function printPoster(): void {
     window.print();
 }
 
+/** Vorschau des Aushangs (A4); erst beim Aufklappen gezeichnet, damit sie nichts doppelt im DOM hat. */
+const previewOpen = ref(false);
+
 function closeFresh(): void {
     fresh.value = null;
     feedback.value = null;
+    previewOpen.value = false;
 }
 
 // Widerrufen mit Rückfrage.
@@ -320,6 +324,24 @@ function retry(): void {
                     </p>
                 </div>
             </div>
+            <details
+                class="poster-details"
+                :open="previewOpen"
+                data-testid="poster-details"
+                @toggle="previewOpen = ($event.target as HTMLDetailsElement).open"
+            >
+                <summary>Vorschau des Aushangs (A4)</summary>
+                <InvitationPoster
+                    v-if="previewOpen"
+                    preview
+                    :tenant-name="tenantName"
+                    :logo-url="logoUrl"
+                    :code="fresh.code"
+                    :link="link"
+                    :address="address"
+                    :expires-text="freshExpires"
+                />
+            </details>
             <InvitationPoster
                 v-if="active"
                 :tenant-name="tenantName"
@@ -635,6 +657,14 @@ function retry(): void {
     font-size: var(--font-size-sm);
     overflow-wrap: anywhere;
     user-select: all;
+}
+
+.poster-details > summary {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-min);
+    cursor: pointer;
+    font-weight: var(--font-weight-semibold);
 }
 
 .fresh-actions {
