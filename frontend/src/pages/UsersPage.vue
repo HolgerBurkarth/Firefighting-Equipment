@@ -564,6 +564,17 @@ async function unlock(): Promise<void> {
     dialogOpen.value = false;
 }
 
+/**
+ * „Sperren oder löschen ↓“ oben im Fenster „Bearbeiten“ (Benutzertest Admin A1): Der Abschnitt
+ * „Konto beenden“ liegt abseits unter „Speichern“; der Knopf scrollt das Fenster dorthin und
+ * fokussiert die Überschrift (wie die Sprunglinks auf „Verleih“, U6).
+ */
+function jumpToEnd(): void {
+    const heading = document.getElementById(`${id}-end`);
+    heading?.scrollIntoView({ block: 'start' });
+    heading?.focus({ preventScroll: true });
+}
+
 function retry(): void {
     void userStore.refresh('changed');
 }
@@ -923,6 +934,15 @@ onMounted(() => {
         :return-focus="opener"
         @submit="submit"
     >
+        <button
+            v-if="mode === 'edit' && target !== null && !isOwn"
+            class="btn end-jump"
+            type="button"
+            data-testid="end-jump"
+            @click="jumpToEnd"
+        >
+            Sperren oder löschen (z. B. bei Austritt) ↓
+        </button>
         <p v-if="mode === 'edit' && isOwn" class="notice notice-info" data-testid="own-account">
             Das ist Ihr eigenes Konto. Rolle, Sperren und Löschen sind hier nicht möglich; das
             übernimmt bei Bedarf ein anderer Admin.
@@ -1051,7 +1071,7 @@ onMounted(() => {
             </fieldset>
         </details>
         <template v-if="mode === 'edit' && target !== null && !isOwn" #extra>
-            <h3 class="end-title">Konto beenden</h3>
+            <h3 :id="`${id}-end`" class="end-title" tabindex="-1">Konto beenden</h3>
             <p class="field-hint">
                 Gesperrt: kann sich nicht mehr anmelden, lässt sich wieder entsperren. Gelöscht (z.
                 B. bei Austritt): die persönlichen Daten werden entfernt, im Verlauf bleibt
@@ -1391,6 +1411,10 @@ onMounted(() => {
 .end-title {
     margin: 0;
     font-size: 16px;
+}
+
+.end-jump {
+    align-self: flex-start;
 }
 
 .claude-connections {

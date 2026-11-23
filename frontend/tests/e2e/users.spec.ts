@@ -630,6 +630,30 @@ test.describe('Fenster „Bearbeiten“ (U7)', () => {
         });
     }
 
+    test('„Sperren oder löschen ↓“ oben im Fenster führt zu „Konto beenden“ (A1)', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1093, height: 614 });
+        await open(page);
+        await page.getByRole('button', { name: 'Anna Berg bearbeiten' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Anna Berg bearbeiten' });
+        const jump = dialog.getByRole('button', {
+            name: 'Sperren oder löschen (z. B. bei Austritt) ↓',
+        });
+        await expect(jump).toBeInViewport();
+        const remove = dialog.getByRole('button', { name: 'Anna Berg löschen (ausgetreten) …' });
+        await expect(remove).not.toBeInViewport();
+        await jump.click();
+        await expect(dialog.getByRole('heading', { name: 'Konto beenden' })).toBeFocused();
+        await expect(remove).toBeInViewport();
+        // Am eigenen Konto gibt es weder den Knopf noch den Abschnitt.
+        await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+        await page.getByRole('button', { name: 'Thomas Keller bearbeiten' }).click();
+        const own = page.getByRole('dialog', { name: 'Thomas Keller bearbeiten' });
+        await expect(own.getByTestId('own-account')).toBeVisible();
+        await expect(own.getByTestId('end-jump')).toHaveCount(0);
+    });
+
     test('Claude-Zugang ist bei „Aus“ eingeklappt und lässt sich aufklappen', async ({ page }) => {
         await open(page);
         await page.getByRole('button', { name: 'Zoë Kraus bearbeiten' }).click();
