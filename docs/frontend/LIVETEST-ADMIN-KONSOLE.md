@@ -266,3 +266,10 @@ kommen nach `docs/TODO-SPAETER.md`.
 - ☑ G5 Standorte: Chips „Werkstatt“, „Ausgeliehen an“, „Rückgabe“, „Sammelstelle“ stehen unter dem Namen.
 - ☑ G6 Verleih: im Fenster „Verleihen“ bei „Rückgabe bis“ 20.11.2026 „Dieses Datum liegt in der Vergangenheit.“, bei 20.12.2026 kein Hinweis; mit „Abbrechen“ geschlossen, nichts verliehen.
 - ☐ Offen für Holger (das Chrome-Fenster ließ sich nicht schmal stellen): am Handy „Alle angezeigten Ausrüstungen auswählen“ über den Karten (G1), feste Kopfleiste mit ☰ beim Scrollen (G3), Auswahl-Leiste am Handy (G2), „Transportliste teilen …“ öffnet das Teilen-Menü des Handys (G4), Standortnamen ohne Umbruch mitten im Wort (G5).
+
+## Gestufte Suche, Termine und Profil im Menü, ☰ auf den Handy-Seiten (23.11.2026, Build `b5374adf161c`, Test-Stadt, Chrome am PC)
+- ☑ Update: Der offene Tab lud beim Seitenwechsel auf „Termine“ die neue Version.
+- ☑ ☰ auf „Termine“, „Profil“ (und „Suchen“) oben links (16/18 px, 44 × 44 px, links vom Namen der Stadt); die Schublade zeigt Dashboard, Suchen, Termine, Ausrüstung, Standorte, Ausrüstungstypen, Wartung, Verleih, Benutzer, Protokoll (4), Profil, Einstellungen; die aktuelle Seite ist markiert, ein Eintrag schließt die Schublade.
+- ☑ Seitenleiste am PC (Dashboard, 1826 px) mit „Termine“ und „Profil“.
+- ☑ Suche (nur gelesen): „8“ → HRT 8, M8, PA 8 (3 Treffer, 2 weitere aufklappbar); „m8“ → M8; „m 8“ → M8 (4 weitere); „3“ → HRT 3, M3, PA 3, WBK 3 (13 weitere); „hlf“ → 25 Treffer über den Standort.
+- ☐ Offen für Holger: am Handy ☰ auf Suchen/Termine/Profil antippen, Suche mit eigenen Beispielen („8“, Seriennummer ab 3 Ziffern), „Weitere Treffer anzeigen“.
