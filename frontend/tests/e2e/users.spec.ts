@@ -271,7 +271,7 @@ test.describe('Benutzer', () => {
         await expect(pending.locator('.user-name')).toHaveText(['Erika Neu', 'Max Neu']);
         await expect(pending).toContainText('erika@example.org');
         await expect(page.getByTestId('pending-21')).toContainText(
-            'mit dem Aushang „Aushang Wart“; die Rolle ist vorausgewählt.',
+            'mit dem Aushang „Aushang Wart“.',
         );
         await expect(page.getByTestId('pending-21')).toContainText('Rolle: Gerätewart');
         await expect(page.getByTestId('user-7').locator('.col-role')).toHaveText('Admin');
@@ -352,6 +352,13 @@ test.describe('Benutzer', () => {
         await expect(dialog.getByRole('radio', { name: 'Kasse' })).toBeDisabled();
         await expect(dialog).toContainText('Sie können sie daher nicht vergeben.');
         await expect(dialog).toContainText('Sieht: Dashboard, Suchen, Ausrüstung, Termine, Profil');
+        // A3: Herkunft der Vorwahl, Bitte um Prüfung, „Darf“ und eine Beschreibung für Admins.
+        await expect(dialog.getByTestId('preselect-hint')).toHaveText(
+            'Vorgewählt ist „Gerätewart“, die Rolle des Aushangs „Aushang Wart“. Bitte prüfen Sie, ob sie passt.',
+        );
+        await expect(dialog).toContainText('Darf: ');
+        await expect(dialog).toContainText('Standard-Rolle für neue Mitglieder.');
+        await expect(dialog).not.toContainText('Wie bisher; bekommt jede neue Stadt');
         const name = dialog.getByLabel('Anzeigename');
         await expect(name).toHaveValue('Max Neu');
         await name.fill('  ');

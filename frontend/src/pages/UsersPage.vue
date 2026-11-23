@@ -32,7 +32,14 @@ import {
     userStore,
     type BulkRoleRun,
 } from '../data';
-import { filterText, roleFilterOptions, roleNameOf, seesText } from '../data/assignableRoles';
+import {
+    filterText,
+    mayText,
+    roleDescription,
+    roleFilterOptions,
+    roleNameOf,
+    seesText,
+} from '../data/assignableRoles';
 import { phpTrim } from '../data/masterData';
 import {
     bulkRoleText,
@@ -44,6 +51,7 @@ import {
     nameHint,
     pendingText,
     pendingUsers,
+    preselectText,
     registrationText,
     selectable,
     selectedText,
@@ -176,6 +184,10 @@ function roleSees(role: AssignableRole): string {
     return catalog.value === null ? '' : seesText(catalog.value, role);
 }
 
+function roleMay(role: AssignableRole): string {
+    return catalog.value === null ? '' : mayText(catalog.value, role);
+}
+
 const busy = ref(false);
 const success = ref<string | null>(null);
 const pageError = ref<ApiError | null>(null);
@@ -215,6 +227,14 @@ const initial = computed((): { displayName: string; roleId: number | null } => (
     roleId: target.value?.roleId ?? null,
 }));
 const chosenRole = computed(() => roles.value.find((role) => role.id === roleId.value) ?? null);
+/** Vorgewählte Rolle beim Freischalten (A3); null, solange die Rollen nicht geladen sind. */
+const preselect = computed(() => {
+    const user = target.value;
+    const role = roles.value.find((entry) => entry.id === initial.value.roleId);
+    return mode.value !== 'approve' || user === null || role === undefined
+        ? null
+        : preselectText(user, role.name);
+});
 const roleChanged = computed(() => roleId.value !== initial.value.roleId);
 /** Auswahl des Claude-Zugangs im Fenster „Bearbeiten“ (nur mit managesClaude). */
 const showsClaude = computed(() => mode.value === 'edit' && managesClaude.value);
@@ -983,6 +1003,9 @@ onMounted(() => {
             <p v-else-if="roleState.data === null" class="field-hint" role="status">
                 Rollen werden geladen …
             </p>
+            <p v-if="preselect !== null" class="notice notice-info" data-testid="preselect-hint">
+                {{ preselect }}
+            </p>
             <label
                 v-for="role in roles"
                 :key="role.id"
@@ -1000,10 +1023,11 @@ onMounted(() => {
                 />
                 <span :id="`${id}-role0-${String(role.id)}`" class="role-text">
                     <strong>{{ role.name }}</strong>
-                    <span v-if="role.description !== null" class="field-hint">{{
-                        role.description
+                    <span v-if="roleDescription(role) !== null" class="field-hint">{{
+                        roleDescription(role)
                     }}</span>
                     <span class="field-hint">Sieht: {{ roleSees(role) }}</span>
+                    <span class="field-hint">Darf: {{ roleMay(role) }}</span>
                     <span v-if="roleFilterText(role) !== null" class="field-hint">{{
                         roleFilterText(role)
                     }}</span>
@@ -1147,10 +1171,11 @@ onMounted(() => {
                 />
                 <span :id="`${id}-role1-${String(role.id)}`" class="role-text">
                     <strong>{{ role.name }}</strong>
-                    <span v-if="role.description !== null" class="field-hint">{{
-                        role.description
+                    <span v-if="roleDescription(role) !== null" class="field-hint">{{
+                        roleDescription(role)
                     }}</span>
                     <span class="field-hint">Sieht: {{ roleSees(role) }}</span>
+                    <span class="field-hint">Darf: {{ roleMay(role) }}</span>
                     <span v-if="roleFilterText(role) !== null" class="field-hint">{{
                         roleFilterText(role)
                     }}</span>

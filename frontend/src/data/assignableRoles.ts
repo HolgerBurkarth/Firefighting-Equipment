@@ -73,6 +73,41 @@ export function roleNameOf(user: AdminUser): string {
     return user.roleName ?? user.roleLabel;
 }
 
+/**
+ * Beschreibungen der Standard-Rollen beim Anlegen einer Stadt (= `DefaultRoles::ADMIN_DESCRIPTION`
+ * und `USER_DESCRIPTION`, per Test gleich). Sie richten sich an den Super-Admin („Wie bisher;
+ * bekommt jede neue Stadt“); ein Admin verstand sie im Benutzertest nicht (A3).
+ */
+export const DEFAULT_ROLE_DESCRIPTIONS: Readonly<Record<'admin' | 'user', string>> = {
+    admin: 'Alle Rechte, nicht änderbar',
+    user: 'Wie bisher; bekommt jede neue Stadt',
+};
+
+/** Was der Admin stattdessen liest (die Rechte stehen darunter in „Sieht“ und „Darf“). */
+const ADMIN_FACING_DESCRIPTIONS: Readonly<Record<'admin' | 'user', string>> = {
+    admin: 'Alle Rechte, auch Benutzer und Einstellungen.',
+    user: 'Standard-Rolle für neue Mitglieder.',
+};
+
+/**
+ * Kurzbeschreibung einer Rolle in der Benutzerverwaltung: die gespeicherte, außer bei einer
+ * Standard-Rolle mit der unveränderten Beschreibung des Super-Admins (dann ein Satz für Admins).
+ */
+export function roleDescription(role: AssignableRole): string | null {
+    if (role.systemKey !== null && role.description === DEFAULT_ROLE_DESCRIPTIONS[role.systemKey]) {
+        return ADMIN_FACING_DESCRIPTIONS[role.systemKey];
+    }
+    return role.description;
+}
+
+/**
+ * „Darf: …“ unter einer Rolle in der Auswahl (A3: Benutzer und Geräteträger sehen dasselbe, dürfen
+ * aber anderes, z. B. „Benutzt melden“, „Tauschen“).
+ */
+export function mayText(catalog: PermissionCatalog, role: AssignableRole): string {
+    return roleSummary(catalog, role).may;
+}
+
 /** „Sieht: …“ unter einer Rolle in der Auswahl (Mockup „Benutzer-Rolle“). */
 export function seesText(catalog: PermissionCatalog, role: AssignableRole): string {
     return roleSummary(catalog, role).sees;

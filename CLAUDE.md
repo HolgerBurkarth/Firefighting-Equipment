@@ -974,11 +974,14 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Freischaltung“ (`pendingUsers`: Status `pending`, älteste zuerst) als Karten mit „Freischalten …“
   (`FormDialog`: Anzeigename vorbelegt mit dem Namen, Prüfung `displayNameProblem` wie `PersonName`;
   Rolle vorgewählt die des Kontos, also die des Einladungscodes; Karte und Fenster nennen den Aushang,
-  `registrationText`) und „Ablehnen …“ (`ConfirmDialog`, nennt die Mail). Rollen (Schritt 1.6):
+  `registrationText`; über den Rollen „Vorgewählt ist „…“, die Rolle des Aushangs „…“. Bitte prüfen
+  Sie, ob sie passt.“, `preselectText`, Benutzertest Admin A3) und „Ablehnen …“ (`ConfirmDialog`, nennt die Mail). Rollen (Schritt 1.6):
   `assignableRoleStore` (`AssignableRoleStore`, `src/data/assignableRoles.ts`, `GET roles` mit
   Katalog, in `installDataLayer`; nach jeder Änderung an Konten neu, wenn geladen). Auswahl der Rolle
-  überall als Liste von Radioknöpfen (Name als `aria-label`, darunter Kurzbeschreibung, „Sieht: …“
-  aus `roleSummary` und „Sieht nur: …“ mit Namen aus `adminLocationStore`/`deviceTypeStore`,
+  überall als Liste von Radioknöpfen (Name als `aria-label`, darunter Kurzbeschreibung
+  (`roleDescription`: bei den Standard-Rollen mit der unveränderten Beschreibung des Super-Admins,
+  `DEFAULT_ROLE_DESCRIPTIONS` = `DefaultRoles`, ein Satz für Admins, A3), „Sieht: …“ und „Darf: …“
+  (`seesText`, `mayText`) aus `roleSummary` (auch bei den Einladungscodes) und „Sieht nur: …“ mit Namen aus `adminLocationStore`/`deviceTypeStore`,
   `filterText`; die Listen lädt die Seite nur, wenn eine Rolle filtert); nicht vergebbare
   (`assignable` false) gesperrt mit `assign_blocker`, die bisherige bleibt sichtbar gewählt. Im
   Fenster „Bearbeiten“ bei *Admin* der Hinweis „Admins haben alle Rechte …“, bei geänderter Rolle
