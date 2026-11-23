@@ -107,11 +107,17 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* Am Handy fest oben (Benutzertest Gerätewart am Handy, G3): Das Menü bleibt auf langen Seiten
+   erreichbar. Höhe = --admin-sticky-top in App.vue; unter den Fenstern (Abdunklung 10). */
 .admin-topbar {
+    position: sticky;
+    z-index: 5;
+    top: 0;
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 8px;
+    height: var(--admin-sticky-top);
+    padding: 0 8px;
     background: var(--accent);
     color: var(--on-accent);
 }
@@ -147,6 +153,14 @@ onMounted(() => {
 .topbar-title {
     font-size: 18px;
     font-weight: var(--font-weight-bold);
+}
+
+/* Je eine Zeile, damit die feste Kopfleiste immer gleich hoch ist (--admin-sticky-top). */
+.topbar-title,
+.topbar-subtitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .topbar-subtitle {

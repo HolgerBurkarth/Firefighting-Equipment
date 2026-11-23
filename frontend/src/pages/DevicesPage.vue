@@ -651,6 +651,22 @@ const canBulk = computed(
         {{ filtered ? 'Keine Ausrüstung passt zu den Filtern.' : 'Noch keine Ausrüstung.' }}
     </p>
 
+    <!-- Karten am Handy haben keinen Tabellenkopf: dort steht „Alle auswählen“ über der Liste
+         (Benutzertest Gerätewart am Handy, G1). -->
+    <label
+        v-if="canBulk && visibleSelectable.length > 0"
+        class="check select-all-cards"
+        data-testid="select-all-cards"
+    >
+        <input
+            type="checkbox"
+            :checked="allVisibleSelected"
+            :indeterminate="someVisibleSelected"
+            @change="toggleVisible"
+        />
+        Alle angezeigten Ausrüstungen auswählen
+    </label>
+
     <div v-if="state.devices.length > 0" class="table-card">
         <table class="list-table" data-testid="device-table">
             <thead>
@@ -964,6 +980,13 @@ const canBulk = computed(
     gap: 12px;
 }
 
+/* Nur in der Kartenansicht (dort fehlt der Tabellenkopf mit seinem Kästchen). */
+.select-all-cards {
+    display: none;
+    align-self: flex-start;
+    font-weight: var(--font-weight-semibold);
+}
+
 /* Am PC sortieren die Spaltenköpfe; Auswahl und Richtung gibt es nur am Handy. */
 .sort-mobile {
     display: none;
@@ -989,6 +1012,10 @@ const canBulk = computed(
 
     .sort-mobile {
         display: flex;
+    }
+
+    .select-all-cards {
+        display: inline-flex;
     }
 
     .table-card {
@@ -1063,5 +1090,13 @@ const canBulk = computed(
     .due-label {
         display: inline;
     }
+}
+
+/* Bleibt beim Scrollen sichtbar (G2): klebt unter der Kopfleiste. */
+.selection-bar {
+    position: sticky;
+    z-index: 4;
+    top: calc(var(--admin-sticky-top, 0px) + 8px);
+    box-shadow: var(--shadow-raised);
 }
 </style>

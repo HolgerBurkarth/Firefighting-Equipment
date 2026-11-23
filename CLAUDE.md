@@ -1497,6 +1497,10 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   Einladungscodes und Rollen im Stadtdetail unter 1280 px. Jede Liste hat in ihrer Testdatei einen Test „Breiten
   (Runde 14)“ bei 390, 768 und 1024 px (`unreachableControls` und `horizontalOverflow` in `tests/e2e/support/layout.ts`:
   Mitte jedes Bedienelements liegt im Fenster und auf dem Element selbst). Neue Listen bekommen denselben Test.
+  Seit 23.11.2026 (Benutzertest Gerätewart am Handy, G1–G3): In der Kartenansicht (ohne Tabellenkopf) steht
+  „Alle angezeigten … auswählen“ über der Liste (`select-all-cards`; Ausrüstung, Benutzer); die Leiste „N ausgewählt“ klebt
+  beim Scrollen unter der Kopfleiste (`position: sticky`). Am Handy steht die Kopfleiste der Konsole fest oben, ihre Höhe ist
+  `--admin-sticky-top` (`App.vue`, ab 768 px 0); feste Leisten der Seiten kleben darunter.
 - Anleitungen als PDF (seit 12.11.2026, Runde 14, Punkt 4): `docs/anleitungen/anleitung-{benutzer,geraetetraeger,
   geraetewart,admin}.pdf`, erzeugt von `npm run docs:anleitungen` (in `frontend/`, nach `npm run build`;
   `playwright.docs.config.ts`, `tests/docs/anleitungen.spec.ts` und `guide.ts`; nur Chromium, nie in der CI und nicht
