@@ -227,6 +227,22 @@ test.describe('Aufgabe im Fenster „Bearbeiten“ (Admin)', () => {
         ]);
     });
 
+    test('390 px: Chip der Aufgabe steht unter dem Namen, nicht daneben (G5)', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto('/firefighting/test/standorte');
+        await page.getByRole('button', { name: 'Gerätehaus bearbeiten' }).click();
+        await page.getByTestId('task-fieldset').getByLabel('Lager', { exact: true }).check();
+        await dialog(page).getByRole('button', { name: 'Speichern' }).click();
+        const chip = page.getByTestId('task-chip');
+        await expect(chip).toHaveText('Standard-Lager');
+        const name = page.locator('.node-name', { hasText: 'Gerätehaus' }).first();
+        const nameBox = await name.boundingBox();
+        const chipBox = await chip.boundingBox();
+        expect(chipBox?.y ?? 0).toBeGreaterThanOrEqual(
+            (nameBox?.y ?? 0) + (nameBox?.height ?? 0) - 1,
+        );
+    });
+
     test('Sammelstelle mit Annahme; Aufgabe entfernen', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
         await page.goto('/firefighting/test/standorte');

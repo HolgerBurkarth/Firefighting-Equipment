@@ -824,7 +824,8 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   verbindlich bleibt der Server (409 `name_taken` am Feld). Standorte als Baum (`filterLocationTree`:
   Wörter mit UND im Namen bzw. Pfad, gesperrte nur mit „Gesperrte anzeigen (N)“), Symbol je Art
   (`src/components/locationIcons.ts`, auch in `LocationPicker`), Gerätezahl (Ebene 1
-  `device_count_total`); Knöpfe „Fach in … anlegen“ (nur aktive Ebene 1) und „… bearbeiten“
+  `device_count_total`); Chips (Aufgabe, außer Betrieb, gesperrt) unter dem Namen (`node-chips`, G5, 23.11.2026: sonst
+  brach der Name am Handy Buchstabe für Buchstabe um); Knöpfe „Fach in … anlegen“ (nur aktive Ebene 1) und „… bearbeiten“
   (Stift). Fenster `FormDialog` (Reka UI `Dialog`, Slot `extra` für Sperren/Deaktivieren abseits,
   `returnFocus` = öffnender Knopf, da WebKit beim Klick nicht fokussiert; `variant="danger"` = roter
   Knopf, z. B. Aussondern; `unsaved` siehe „Fenster mit Eingaben“ unten). Sperren nur leer
