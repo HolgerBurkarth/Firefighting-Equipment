@@ -250,3 +250,12 @@ Prüfung des Updates am PC (A1). Ergebnisse je Punkt bitte hier eintragen (☑ b
 Die Admin-Konsole ist seit 31.10.2026 abgeschlossen (KONZEPT.md). Nach dem Durchlauf trägt der
 Agent das Ergebnis hier und kurz in KONZEPT.md ("Admin-Konsole") ein; Fehler werden behoben, Wünsche
 kommen nach `docs/TODO-SPAETER.md`.
+
+## Benutzertest Admin A1–A5 (23.11.2026, Build `51f9d098ce84`, Test-Stadt, Chrome)
+- ☑ A2 Benutzer: Knöpfe „Bearbeiten“ (Stift mit Text); Klick in die E-Mail-Zelle von „Holger Test 1“ öffnet das Fenster „Holger Test 1 bearbeiten“.
+- ☑ A1 Fenster „Bearbeiten“: oben „Sperren oder löschen (z. B. bei Austritt) ↓“; Klick fokussiert „Konto beenden“. Abgebrochen, nichts geändert.
+- ☑ A3 Rollen im Fenster „Bearbeiten“ und „Neuer Einladungscode“: je Rolle „Sieht“ und „Darf“; Admin „Alle Rechte, auch Benutzer und Einstellungen.“, Benutzer „Standard-Rolle für neue Mitglieder.“ (statt der Texte für den Super-Admin). Freischalten nicht live geprüft (keine wartende Registrierung).
+- ☑ A4 Testcode „Live-Test A4 (wird widerrufen)“ (1 Tag, 1 Registrierung) erzeugt, „Vorschau des Aushangs (A4)“ aufgeklappt: verkleinerte A4-Seite mit Name, QR-Code, Schritten und Code, auch im dunklen Modus auf weißem Papier. Danach widerrufen. Befund: Die Zeile zum Aufklappen hatte keinen Pfeil; nachgebessert (▸/▾).
+- ☑ A5 Einstellungen: Farbe #1A3A6B gespeichert, „Anderes Logo hochladen …“ blieb an derselben Stelle (Seitenposition 699,7 px vorher und nachher), Meldung an der Stelle der Knöpfe. Danach zurück auf #C62828 gespeichert.
+- ☐ Offen für Holger: Freischalten einer echten Registrierung (Satz „Vorgewählt ist …“), Fenster am iPhone, Druck des Aushangs.
+- Hinweis: Der Tab mit der alten Version zeigte nach dem Deploy auf `benutzer` zuerst eine leere Seite mit „Neue Version verfügbar“ und „Jetzt aktualisieren“; danach lief alles.
