@@ -48,9 +48,9 @@ describe('Fenster mit Eingaben', () => {
             .map((file) => file.name)
             .sort();
         expect(own).toEqual([
-            'components/AdminMenu.vue',
             'components/ConfirmDialog.vue',
             'components/FormDialog.vue',
+            'components/MenuDrawer.vue',
         ]);
     });
 });

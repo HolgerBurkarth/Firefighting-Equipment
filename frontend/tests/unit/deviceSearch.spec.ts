@@ -7,6 +7,7 @@ import {
     identifierKey,
     isPossibleScanCode,
     MAX_SEARCH_HITS,
+    rankDevices,
     searchDevices,
     searchKey,
     searchTokens,
@@ -34,6 +35,11 @@ function ids(query: string): number[] {
     return searchDevices(LIST, query).hits.map((d) => d.id);
 }
 
+/** Alle Treffer in der Reihenfolge der Stufen (Treffer, dann weitere). */
+function allIds(query: string, list = LIST): number[] {
+    return rankDevices(list, query).map((entry) => entry.device.id);
+}
+
 describe('searchKey', () => {
     it('ohne Groß-/Kleinschreibung und Akzente, ß = ss', () => {
         expect(searchKey('Dräger')).toBe('drager');
@@ -50,7 +56,7 @@ describe('searchKey', () => {
 
 describe('searchDevices', () => {
     it('leere Eingabe sucht nicht', () => {
-        expect(searchDevices(LIST, '  ')).toEqual({ hits: [], total: 0 });
+        expect(searchDevices(LIST, '  ')).toEqual({ hits: [], total: 0, more: [], moreTotal: 0 });
     });
 
     it.each([
@@ -74,7 +80,12 @@ describe('searchDevices', () => {
 
     it('Nummer gleich der Eingabe zuerst, dann Nummer beginnt damit, dann der Rest', () => {
         // „m1“: M1 genau, M10 beginnt damit, XM1 enthält es nur.
-        expect(ids('m1')).toEqual([1, 3, 7]);
+        expect(ids('m1')).toEqual([1]);
+        expect(allIds('m1')).toEqual([1, 3, 7]);
+        const result = searchDevices(LIST, 'm1');
+        expect(result.total).toBe(1);
+        expect(result.more.map((d) => d.id)).toEqual([3, 7]);
+        expect(result.moreTotal).toBe(2);
     });
 
     it('begrenzt auf 50 Treffer, total zählt alle', () => {
@@ -197,5 +208,72 @@ describe('isPossibleScanCode', () => {
         ['a\u2028b', false],
     ])('%j → %s', (code, expected) => {
         expect(isPossibleScanCode(code)).toBe(expected);
+    });
+});
+
+describe('gestufte Suche (T28)', () => {
+    const FLEET = [
+        device(1, { identifier: 'M8' }),
+        device(2, { identifier: 'M18' }),
+        device(3, { identifier: 'M80' }),
+        device(4, { identifier: 'HRT 8', device_type: { id: 3, name: 'Funkgerät' } }),
+        device(5, { identifier: 'M3', serial_number: 'SN-0815', model: 'FPS 8000' }),
+        device(6, {
+            identifier: 'PA 1',
+            device_type: { id: 2, name: 'Atemschutzgerät' },
+            location: { id: 30, name: 'LF 8', path: 'LF 8' },
+        }),
+        device(7, { identifier: 'M008' }),
+        device(8, { identifier: 'M9', scan_code: '4006381333938' }),
+        device(9, { identifier: 'Lager-12/3' }),
+    ];
+
+    function tiers(query: string): [number, number][] {
+        return rankDevices(FLEET, query).map((entry) => [entry.device.id, entry.tier]);
+    }
+
+    it.each([
+        ['„8“: Zahl der Nummer genau, Seriennummer nie', '8', [1, 4, 7], [3, 6, 2]],
+        ['„08“ wie „8“', '08', [1, 4, 7], [6]],
+        ['„m8“: Nummer genau', 'm8', [1], [7, 3]],
+        ['„m 8“ = „M8“', 'm 8', [1], [7, 3, 2, 6]],
+        ['„m08“: ohne führende Nullen', 'm08', [1, 7], []],
+        ['„hrt8“ ohne Leerzeichen', 'hrt8', [4], []],
+        ['„m1“: Nummer beginnt damit', 'm1', [2], []],
+        ['„maske 8“: Typ und Zahl der Nummer', 'maske 8', [1, 7], [2, 3]],
+        ['„lf 8“: Standort LF 8, nicht HLF 20', 'lf 8', [6], [1, 2, 3, 4, 7]],
+        ['„0815“: erst dann die Seriennummer', '0815', [5], []],
+        ['Scan-Code genau', '4006381333938', [8], []],
+        ['Zahl in einer Nummer mit Trennzeichen', '12', [9], []],
+    ])('%s', (_label, query, hits, more) => {
+        const result = searchDevices(FLEET, query);
+        expect(result.hits.map((d) => d.id)).toEqual(hits);
+        expect(result.more.map((d) => d.id)).toEqual(more);
+        expect(result.total).toBe(hits.length);
+        expect(result.moreTotal).toBe(more.length);
+    });
+
+    it('kurze Zahlen suchen in Stufe 6 nur in der Nummer', () => {
+        // „81“ steckt nur in der Seriennummer SN-0815 von M3.
+        expect(allIds('81', FLEET)).toEqual([]);
+        // Ab drei Ziffern auch dort.
+        expect(allIds('815', FLEET)).toEqual([5]);
+    });
+
+    it('Stufen in der Reihenfolge 1 bis 6', () => {
+        expect(tiers('m8')).toEqual([
+            [1, 1],
+            [7, 2],
+            [3, 3],
+        ]);
+        expect(tiers('8')).toEqual([
+            [1, 2],
+            [4, 2],
+            [7, 2],
+            [3, 3],
+            [6, 4],
+            [2, 5],
+        ]);
+        expect(tiers('0815')).toEqual([[5, 6]]);
     });
 });

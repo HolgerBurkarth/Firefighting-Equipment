@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { userLabel } from './api/auth';
+import { consoleRoute } from './auth/redirect';
 import { session } from './auth/session';
 import AdminMenu from './components/AdminMenu.vue';
 import AppNotices from './components/AppNotices.vue';
+import MenuDrawer from './components/MenuDrawer.vue';
 import UserTabBar from './components/UserTabBar.vue';
 import type { AppBase } from './runtime/appBase';
 import type { AppUpdater } from './runtime/appUpdate';
@@ -13,6 +15,7 @@ import { loadTenant, tenantState } from './runtime/tenantState';
 const props = defineProps<{ base: AppBase; updater: AppUpdater }>();
 
 const route = useRoute();
+const router = useRouter();
 /** Darstellung der Seite (RouteMeta.layout in src/router/index.ts). */
 const layout = computed(() => route.meta.layout ?? 'standard');
 /** Handy-Seiten: „Hallo <Anzeigename>“ statt „Geräteverwaltung“ (Mockup UserStart). */
@@ -20,6 +23,18 @@ const subtitle = computed(() =>
     layout.value === 'user' && session.value !== null
         ? `Hallo ${userLabel(session.value.user)}`
         : 'Ausrüstungsverwaltung',
+);
+
+/**
+ * Handy-Seiten (Suchen, Termine, Profil) von Konten mit Konsole: oben links ☰ mit dem Menü der
+ * Konsole (Wunsch Holger 23.11.2026), statt des Wappens.
+ */
+const showMenu = computed(
+    () =>
+        layout.value === 'user' &&
+        !props.base.isService &&
+        session.value !== null &&
+        consoleRoute(router, session.value) !== null,
 );
 
 onMounted(() => {
@@ -42,7 +57,8 @@ onMounted(() => {
     <template v-else>
         <!-- Bildschirmfüllende Seiten (focus) zeigen ihre eigene Kopfzeile mit Zurück-Knopf. -->
         <header v-if="layout !== 'focus'" class="app-header">
-            <div class="app-header-icon">
+            <MenuDrawer v-if="showMenu" :service="false" />
+            <div v-else class="app-header-icon">
                 <svg
                     width="22"
                     height="22"

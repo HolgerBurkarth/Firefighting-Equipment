@@ -18,7 +18,13 @@ export function searchTokens(query: string): string[] {
         .filter((token) => token !== '');
 }
 
-function haystack(device: DeviceListItem): string {
+function nameText(device: DeviceListItem): string {
+    return [device.identifier, device.deviceType.name, device.location.path]
+        .map(searchKey)
+        .join('\n');
+}
+
+function allText(device: DeviceListItem): string {
     return [
         device.identifier,
         device.scanCode,
@@ -33,46 +39,163 @@ function haystack(device: DeviceListItem): string {
         .join('\n');
 }
 
-export interface SearchResult {
-    /** Höchstens `limit` Treffer. */
-    readonly hits: readonly DeviceListItem[];
-    /** Anzahl aller Treffer (mehr als `hits` → „weiter eingrenzen“). */
-    readonly total: number;
+/** Vergleichsform einer Nummer ohne Leerzeichen („m 8“ = „M8“). */
+function compactKey(value: string): string {
+    return searchKey(value).replace(/\s+/gu, '');
 }
 
+/** Ohne führende Nullen in jeder Zahl („m08“ = „m8“, „007“ = „7“). */
+function withoutLeadingZeros(value: string): string {
+    return value.replace(/\d+/g, (digits) => digits.replace(/^0+(?=\d)/, ''));
+}
+
+/** Zahlen einer Nummer („HRT 8“ → 8, „M8-2“ → 8 und 2), ohne führende Nullen. */
+function numbersOf(identifier: string): string[] {
+    return (identifier.match(/\d+/g) ?? []).map(withoutLeadingZeros);
+}
+
+/** Wortteile einer Nummer: an Leerzeichen, -, /, . und am Wechsel von Buchstaben und Ziffern. */
+function identifierParts(identifier: string): string[] {
+    return searchKey(identifier)
+        .split(/[\s\-/.]+/u)
+        .flatMap((part) => part.match(/\d+|\D+/gu) ?? [])
+        .filter((part) => part !== '');
+}
+
+/** Wörter eines Namens bzw. Standortpfads in Vergleichsform. */
+function wordsOf(value: string): string[] {
+    return searchKey(value)
+        .split(/[\s\-/.]+/u)
+        .filter((word) => word !== '');
+}
+
+const DIGITS = /^\d+$/;
+
+/** Ab dieser Länge zählt ein Wort in Stufe 4 auch mitten im Wort („maske“ in „Atemschutzmaske“). */
+export const WORD_PART_LENGTH = 3;
+
 /**
- * Lokale Suche: Jedes Wort muss in Kennung, Scan-Code, Seriennummer, Hersteller, Modell, Gerätetyp
- * oder Standortpfad vorkommen (UND). Reihenfolge: Kennung gleich der Eingabe, dann Kennung beginnt
- * mit dem ersten Wort, dann der Rest; jeweils in der Reihenfolge der Liste (natürlich nach Kennung).
+ * Stufen der Suche (T28, Wunsch Holger 23.11.2026), die erste mit Treffern gewinnt, die übrigen
+ * sind aufklappbar:
+ * 1 Nummer genau (ohne Groß-/Kleinschreibung und Leerzeichen, „m 8“ = „M8“) oder Scan-Code genau;
+ * 2 Nummer ohne führende Nullen genau („m08“ = „M8“) bzw. bei reinen Ziffern eine Zahl der Nummer
+ *   genau („8“ → M8, HRT 8, nicht M18);
+ * 3 Nummer oder ein Wortteil der Nummer beginnt mit der Eingabe („m1“ → M10, „12“ → Lager-12/3);
+ * 4 jedes Wort steht in einem Wort von Nummer, Ausrüstungstyp oder Standort, kurze Wörter (unter
+ *   `WORD_PART_LENGTH` Zeichen) am Wortanfang („lf 8“ → LF 8, nicht HLF 20; „maske 8“ → M8), Zahlen
+ *   als Zahl der Nummer genau bzw. als Zahl im Standort am Anfang, ohne führende Nullen;
+ * 5 jedes Wort steht irgendwo in Nummer, Ausrüstungstyp oder Standort („maske 8“ → M18);
+ * 6 jedes Wort steht irgendwo, auch in Scan-Code, Seriennummer, Hersteller und Modell; kurze Zahlen
+ *   (bis `SHORT_NUMBER_LENGTH` Ziffern) dabei nur in der Nummer, sie stecken sonst in fast jeder
+ *   Seriennummer.
  */
+export type SearchTier = 1 | 2 | 3 | 4 | 5 | 6;
+
+function tierOf(
+    device: DeviceListItem,
+    query: string,
+    tokens: readonly string[],
+): SearchTier | null {
+    const compact = compactKey(query);
+    const identifier = compactKey(device.identifier);
+    if (
+        identifier === compact ||
+        (device.scanCode !== null && device.scanCode === trimCode(query))
+    ) {
+        return 1;
+    }
+    const numbers = numbersOf(device.identifier);
+    const number = withoutLeadingZeros(compact);
+    if (
+        withoutLeadingZeros(identifier) === number ||
+        (DIGITS.test(compact) && numbers.includes(number))
+    ) {
+        return 2;
+    }
+    const parts = identifierParts(device.identifier);
+    if (identifier.startsWith(compact) || parts.some((part) => part.startsWith(compact))) {
+        return 3;
+    }
+    const nameWords = [...wordsOf(device.deviceType.name), ...wordsOf(device.location.path)];
+    const words = [...parts, ...nameWords];
+    const atWordStart = (token: string): boolean =>
+        DIGITS.test(token)
+            ? numbers.includes(withoutLeadingZeros(token)) ||
+              nameWords.some(
+                  (word) =>
+                      DIGITS.test(word) &&
+                      withoutLeadingZeros(word).startsWith(withoutLeadingZeros(token)),
+              )
+            : words.some((word) =>
+                  token.length >= WORD_PART_LENGTH ? word.includes(token) : word.startsWith(token),
+              );
+    if (tokens.every(atWordStart)) {
+        return 4;
+    }
+    const names = nameText(device);
+    if (tokens.every((token) => names.includes(token))) {
+        return 5;
+    }
+    const text = allText(device);
+    const short = (token: string): boolean =>
+        DIGITS.test(token) && token.length <= SHORT_NUMBER_LENGTH;
+    return tokens.every((token) =>
+        short(token) ? searchKey(device.identifier).includes(token) : text.includes(token),
+    )
+        ? 6
+        : null;
+}
+
+/** Zahlen bis zu dieser Länge sucht Stufe 6 nur in der Nummer (stecken in fast jeder Seriennummer). */
+export const SHORT_NUMBER_LENGTH = 2;
+
+export interface SearchResult {
+    /** Treffer der besten Stufe, höchstens `limit`. */
+    readonly hits: readonly DeviceListItem[];
+    /** Anzahl aller Treffer der besten Stufe (mehr als `hits` → „weiter eingrenzen“). */
+    readonly total: number;
+    /** Treffer der schwächeren Stufen (aufklappbar), höchstens `limit`. */
+    readonly more: readonly DeviceListItem[];
+    /** Anzahl aller Treffer der schwächeren Stufen. */
+    readonly moreTotal: number;
+}
+
+/** Alle Treffer nach Stufe, innerhalb einer Stufe in der Reihenfolge der Liste. */
+export function rankDevices(
+    devices: readonly DeviceListItem[],
+    query: string,
+): { readonly device: DeviceListItem; readonly tier: SearchTier }[] {
+    const tokens = searchTokens(query);
+    if (tokens.length === 0) {
+        return [];
+    }
+    const ranked: { device: DeviceListItem; tier: SearchTier; index: number }[] = [];
+    devices.forEach((device, index) => {
+        const tier = tierOf(device, query, tokens);
+        if (tier !== null) {
+            ranked.push({ device, tier, index });
+        }
+    });
+    ranked.sort((a, b) => a.tier - b.tier || a.index - b.index);
+    return ranked.map(({ device, tier }) => ({ device, tier }));
+}
+
+/** Gestufte Suche (siehe `SearchTier`): die beste Stufe als Treffer, die übrigen als `more`. */
 export function searchDevices(
     devices: readonly DeviceListItem[],
     query: string,
     limit = MAX_SEARCH_HITS,
 ): SearchResult {
-    const tokens = searchTokens(query);
-    if (tokens.length === 0) {
-        return { hits: [], total: 0 };
-    }
-    const whole = tokens.join(' ');
-    const first = tokens[0] ?? '';
-    const ranked: { device: DeviceListItem; rank: number; index: number }[] = [];
-    devices.forEach((device, index) => {
-        const text = haystack(device);
-        if (!tokens.every((token) => text.includes(token))) {
-            return;
-        }
-        const identifier = searchKey(device.identifier);
-        let rank = 2;
-        if (identifier === whole) {
-            rank = 0;
-        } else if (identifier.startsWith(first)) {
-            rank = 1;
-        }
-        ranked.push({ device, rank, index });
-    });
-    ranked.sort((a, b) => a.rank - b.rank || a.index - b.index);
-    return { hits: ranked.slice(0, limit).map((entry) => entry.device), total: ranked.length };
+    const ranked = rankDevices(devices, query);
+    const best = ranked[0]?.tier;
+    const primary = ranked.filter((entry) => entry.tier === best).map((entry) => entry.device);
+    const rest = ranked.filter((entry) => entry.tier !== best).map((entry) => entry.device);
+    return {
+        hits: primary.slice(0, limit),
+        total: primary.length,
+        more: rest.slice(0, limit),
+        moreTotal: rest.length,
+    };
 }
 
 /**

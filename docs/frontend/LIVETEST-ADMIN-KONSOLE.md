@@ -259,3 +259,10 @@ kommen nach `docs/TODO-SPAETER.md`.
 - ☑ A5 Einstellungen: Farbe #1A3A6B gespeichert, „Anderes Logo hochladen …“ blieb an derselben Stelle (Seitenposition 699,7 px vorher und nachher), Meldung an der Stelle der Knöpfe. Danach zurück auf #C62828 gespeichert.
 - ☐ Offen für Holger: Freischalten einer echten Registrierung (Satz „Vorgewählt ist …“), Fenster am iPhone, Druck des Aushangs.
 - Hinweis: Der Tab mit der alten Version zeigte nach dem Deploy auf `benutzer` zuerst eine leere Seite mit „Neue Version verfügbar“ und „Jetzt aktualisieren“; danach lief alles.
+
+## Benutzertest Gerätewart am Handy G1–G6 (23.11.2026, Build `635bd91a3c1e`, Test-Stadt, Chrome am PC)
+- ☑ G2 Ausrüstung: ein Kästchen angekreuzt, auf 1500 px gescrollt: „1 Ausrüstung ausgewählt · Wartungsdatum setzen … · Umbuchen / Status …“ bleibt 8 px unter dem oberen Rand (`position: sticky`). Danach abgewählt.
+- ☑ G4 Wartung: je Stufe „Transportliste kopieren“ und „Transportliste teilen …“ (Chrome unter Windows kennt `navigator.share`); Knopfleiste `sticky`. Teilen selbst nicht ausgelöst.
+- ☑ G5 Standorte: Chips „Werkstatt“, „Ausgeliehen an“, „Rückgabe“, „Sammelstelle“ stehen unter dem Namen.
+- ☑ G6 Verleih: im Fenster „Verleihen“ bei „Rückgabe bis“ 20.11.2026 „Dieses Datum liegt in der Vergangenheit.“, bei 20.12.2026 kein Hinweis; mit „Abbrechen“ geschlossen, nichts verliehen.
+- ☐ Offen für Holger (das Chrome-Fenster ließ sich nicht schmal stellen): am Handy „Alle angezeigten Ausrüstungen auswählen“ über den Karten (G1), feste Kopfleiste mit ☰ beim Scrollen (G3), Auswahl-Leiste am Handy (G2), „Transportliste teilen …“ öffnet das Teilen-Menü des Handys (G4), Standortnamen ohne Umbruch mitten im Wort (G5).

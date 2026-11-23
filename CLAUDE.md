@@ -576,11 +576,18 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   genaue Vergleich in der App. `fetchCurrent(id)`
   (`GET devices/{id}`, übernimmt den Stand per `upsert`) und `book(id, request)` (siehe Umbuchen).
 - Suchen (`SearchPage`, KONZEPT.md Entscheidungen 14, 16, 17, 20, 24, 27): lokale Suche
-  `searchDevices` (`src/data/deviceSearch.ts`): Wörter mit UND über Kennung, Scan-Code,
-  Seriennummer, Hersteller, Modell, Gerätetyp, Standortpfad; Vergleichsform `searchKey` (ohne
-  Groß-/Kleinschreibung und Akzente, ß = ss); Reihenfolge Kennung genau, Kennung beginnt mit dem
-  ersten Wort, Rest (je in der Reihenfolge der Liste); höchstens `MAX_SEARCH_HITS` (50), darüber
-  „Mehr als 50 Treffer – bitte weiter eingrenzen.“. Modus `server`: 300 ms nach dem letzten
+  `searchDevices` (`src/data/deviceSearch.ts`), gestuft (seit 23.11.2026, T28, `SearchTier`,
+  `rankDevices`): 1 Nummer genau (ohne Groß-/Kleinschreibung und Leerzeichen) oder Scan-Code genau,
+  2 Nummer ohne führende Nullen bzw. bei reinen Ziffern eine Zahl der Nummer genau („8“ → M8, HRT 8),
+  3 Nummer bzw. ein Wortteil beginnt damit, 4 jedes Wort in einem Wort von Nummer, Typ oder Standort
+  (unter `WORD_PART_LENGTH` = 3 Zeichen am Wortanfang, Zahlen als Zahl), 5 irgendwo in Nummer, Typ
+  oder Standort, 6 auch Scan-Code, Seriennummer, Hersteller, Modell (Zahlen bis
+  `SHORT_NUMBER_LENGTH` = 2 Ziffern dort nur in der Nummer); Vergleichsform `searchKey` (ohne
+  Groß-/Kleinschreibung und Akzente, ß = ss). Treffer = die beste Stufe mit Treffern, die übrigen
+  unter „Weitere Treffer anzeigen (N)“ (`search-more`, bis zur nächsten Eingabe); je Stufe in der
+  Reihenfolge der Liste; höchstens `MAX_SEARCH_HITS` (50), darüber „Mehr als 50 Treffer – bitte
+  weiter eingrenzen.“. Im Modus `server` dieselben Stufen auf die Treffer von `q`; der Tausch
+  (`swapCandidates`) ordnet nach `rankDevices`. Modus `server`: 300 ms nach dem letzten
   Tastendruck `searchServer`, ältere Antworten verworfen. Enter (auch USB-Scanner) wie ein Scan:
   `findByCode` (Scan-Code exakt, Rand ohne Leerzeichen/Tab/CR/LF wie `ScanCode`, dann Kennung per
   `codeKey`: zusammengesetzte Form, Leerraum am Rand weg, mehrere Leerzeichen wie eines, dann
@@ -783,8 +790,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`AdminMenuNav`, Einträge in `ADMIN_MENU`, `src/router/adminMenu.ts`, jeder Eintrag kommt mit
   seiner Seite; Symbole `AdminMenuIcon`): ab 1024 px links mit Text (240 px), 768–1023 px eingeklappt
   auf Symbole (Text nur für Bildschirmleser, Tooltip über `title`), darunter Kopfleiste in der
-  Stadtfarbe mit „Menü öffnen“ (☰) und einer Schublade (Reka UI `Dialog` „Menü“, Escape und „Menü
-  schließen“, ein Seitenwechsel schließt sie). Oben Logo (192 px) bzw. Standard-Symbol und Name der
+  Stadtfarbe mit „Menü öffnen“ (☰) und einer Schublade (`MenuDrawer`, Reka UI `Dialog` „Menü“,
+  Escape und „Menü schließen“, ein Seitenwechsel schließt sie). Einträge (seit 23.11.2026, Wunsch
+  Holger): Dashboard, Suchen, Termine, Ausrüstung, Standorte, Ausrüstungstypen, Wartung, Verleih,
+  Benutzer, Protokoll, Profil; Suchen, Termine und Profil sind Handy-Seiten (`HANDY_MENU_ROUTES`,
+  ergeben allein keine Konsole, `consoleRoute`). Auf diesen Handy-Seiten zeigen Konten mit Konsole
+  oben links ebenfalls ☰ mit derselben Schublade statt des Wappens (`App.vue`, `showMenu`; die
+  Zähler lädt erst das Öffnen); die Leiste unten bleibt. Oben Logo (192 px) bzw. Standard-Symbol und Name der
   Stadt, unten „Einstellungen“ (`ADMIN_SETTINGS`), der Name des Kontos als Text und „Abmelden“;
   Zähler an Einträgen (`badge`:
   `pendingUsers`, `openNotices`) aus `adminOverview`; `sections` hebt einen Eintrag auch auf
@@ -1184,7 +1196,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (Kästchen je Gruppe, grau mit „braucht „…: …““ ohne den Bereich, `actionState`), „4 · Sieht nur
   …“ (Standorte als Baum und Ausrüstungstypen, je „Alle“/„Nur ausgewählte“, gesperrte bzw.
   deaktivierte markiert; „3 · Einschränkungen“ erst ab Phase 2), rechts „So sieht es die Rolle“
-  (`rolePreview`: Menü am PC mit „Einstellungen“ bei jeder Konsole wie die App seit 1.7b, Leiste am
+  (`rolePreview`: Menü am PC mit „Profil“ und „Einstellungen“ bei jeder Konsole wie die App seit 1.7b, Leiste am
   Handy, Darf, Sieht Ausrüstung; Suchen und Termine allein sind
   keine Konsole, wie heute *Benutzer*, F8) und „Die Änderung gilt sofort
   für N Personen …“. F3 im Editor: mit „Sieht nur …“ sind die Stufen und Aktionen grau, die es dann
@@ -1514,7 +1526,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`src/runtime/unsavedInput.ts`) melden: true, solange etwas eingegeben und nicht gespeichert ist;
   nach dem Speichern oder Leeren false. Nur so lädt die App nie mitten in einer Eingabe neu.
 - Fenster mit Eingaben NUR über `FormDialog` (eigene Reka-UI-Fenster gibt es nur für das Menü
-  `AdminMenu` und Rückfragen `ConfirmDialog`, per Test `formDialogs.spec.ts`), immer mit
+  `MenuDrawer` und Rückfragen `ConfirmDialog`, per Test `formDialogs.spec.ts`), immer mit
   `:unsaved` = derselbe Wert wie für `useUnsavedInput` (`const unsaved = computed(…)`, per Test).
   Mit ungespeicherten Eingaben schließt ein Klick bzw. Fokus daneben (`interact-outside`) das
   Fenster nicht, Escape fragt nach (`ConfirmDialog` „Eingaben verwerfen?“, „Weiter bearbeiten“

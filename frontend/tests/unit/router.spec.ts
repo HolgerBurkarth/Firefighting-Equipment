@@ -18,7 +18,12 @@ import {
     takeLoginNotice,
 } from '../../src/auth/session';
 import { createAppRouter, preloadPage } from '../../src/router';
-import { ADMIN_MENU, ADMIN_SETTINGS, SERVICE_MENU } from '../../src/router/adminMenu';
+import {
+    ADMIN_MENU,
+    ADMIN_SETTINGS,
+    HANDY_MENU_ROUTES,
+    SERVICE_MENU,
+} from '../../src/router/adminMenu';
 import { parseAppBase, type AppBase } from '../../src/runtime/appBase';
 import { respond } from './support/fetch';
 import { meBody, permissionsJson } from './support/me';
@@ -235,9 +240,10 @@ describe('Wächter', () => {
         const router = await routerAt('/dashboard');
         for (const entry of [...ADMIN_MENU, ADMIN_SETTINGS]) {
             const route = router.resolve({ name: entry.route });
-            // Suchen ist eine Handy-Seite (Leiste unten), alle anderen gehören zur Konsole.
+            // Suchen, Termine und Profil sind Handy-Seiten (Leiste unten), alle anderen gehören zur
+            // Konsole.
             expect(route.meta.layout, entry.route).toBe(
-                entry.route === 'search' ? 'user' : 'admin',
+                HANDY_MENU_ROUTES.includes(entry.route) ? 'user' : 'admin',
             );
             expect(route.meta.roles, entry.route).toContain('admin');
         }

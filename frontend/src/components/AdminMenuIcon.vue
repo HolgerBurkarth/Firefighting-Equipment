@@ -54,6 +54,17 @@ defineProps<{ name: AdminMenuIconName }>();
                 d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"
             />
         </template>
+        <template v-else-if="name === 'calendar'">
+            <rect x="3" y="5" width="18" height="16" rx="2" />
+            <path d="M3 10h18" />
+            <path d="M8 3v4" />
+            <path d="M16 3v4" />
+        </template>
+        <template v-else-if="name === 'profile'">
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="10" r="3" />
+            <path d="M6.5 18.5c1.2-2 3.2-3 5.5-3s4.3 1 5.5 3" />
+        </template>
         <template v-else-if="name === 'loan'">
             <path d="M4 8h13l-3-3" />
             <path d="M20 16H7l3 3" />

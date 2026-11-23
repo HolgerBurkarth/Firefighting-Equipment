@@ -66,9 +66,21 @@ test.describe('Suchen (lokal)', () => {
 
         await search.fill('m1');
         const cards = page.getByTestId('device-card');
-        // Nummer genau zuerst, dann Nummer beginnt damit.
+        // Gestufte Suche (T28): Nummer genau; „M10“ beginnt nur damit und steht unter „Weitere“.
+        await expect(cards.locator('.device-identifier')).toHaveText(['M1']);
+        await expect(page.getByTestId('search-count')).toHaveText('1 Treffer');
+        const more = page.getByTestId('search-more');
+        await expect(more).toHaveText('Weitere Treffer anzeigen (1)');
+        await expect(more).toHaveAttribute('aria-expanded', 'false');
+        await more.click();
+        await expect(more).toHaveAttribute('aria-expanded', 'true');
         await expect(cards.locator('.device-identifier')).toHaveText(['M1', 'M10']);
-        await expect(page.getByTestId('search-count')).toHaveText('2 Treffer');
+        await expect(page.getByTestId('search-more-list')).toContainText('M10');
+
+        // Kurze Zahl: nur die Zahl der Nummer, nicht der Scan-Code von HRT 5 (…333931).
+        await search.fill('3');
+        await expect(cards.locator('.device-identifier')).toHaveText(['PA 3']);
+        await expect(page.getByTestId('search-more')).toHaveCount(0);
 
         await search.fill('hlf g2');
         await expect(cards).toHaveCount(1);

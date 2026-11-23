@@ -75,6 +75,8 @@ const hasQuery = computed(() => searchTokens(query.value).length > 0);
 const serverResult = shallowRef<SearchResult | null>(null);
 const serverError = shallowRef<ApiError | null>(null);
 const serverBusy = ref(false);
+/** Der Server kennt mehr Treffer, als er geliefert hat (dann „weiter eingrenzen“). */
+const serverMore = ref(false);
 let serverTimer: ReturnType<typeof setTimeout> | undefined;
 let serverSequence = 0;
 
@@ -86,7 +88,9 @@ async function runServerSearch(text: string): Promise<SearchResult | null> {
         return null;
     }
     serverBusy.value = false;
-    serverResult.value = result.ok ? result.data : null;
+    // Die Treffer des Servers (Teiltext in allen Feldern) in Stufen wie die lokale Suche.
+    serverResult.value = result.ok ? searchDevices(result.data.hits, text) : null;
+    serverMore.value = result.ok && result.data.total > result.data.hits.length;
     serverError.value = result.ok ? null : result.error;
     return serverResult.value;
 }
@@ -97,6 +101,7 @@ watch([query, () => list.value.mode], ([text, mode]) => {
         serverSequence += 1;
         serverBusy.value = false;
         serverResult.value = null;
+        serverMore.value = false;
         serverError.value = null;
         return;
     }
@@ -159,6 +164,18 @@ onBeforeUnmount(() => {
     clearTimeout(serverTimer);
     serverSequence += 1;
 });
+
+/** „Weitere Treffer anzeigen“ (schwächere Stufen der Suche), bis zur nächsten Eingabe. */
+const showMore = ref(false);
+watch(query, () => {
+    showMore.value = false;
+});
+const narrow = computed(
+    () =>
+        result.value !== null &&
+        (result.value.total > result.value.hits.length ||
+            (list.value.mode === 'server' && serverMore.value)),
+);
 
 function onInput(): void {
     notFound.value = false;
@@ -351,18 +368,34 @@ function retry(): void {
                     <template v-else-if="result.total === 1">1 Treffer</template>
                     <template v-else>{{ result.total }} Treffer</template>
                 </p>
-                <p
-                    v-if="result.total > result.hits.length"
-                    class="notice notice-info"
-                    data-testid="search-narrow"
-                >
+                <p v-if="narrow" class="notice notice-info" data-testid="search-narrow">
                     Mehr als {{ result.hits.length }} Treffer – bitte weiter eingrenzen.
                 </p>
-                <ul class="device-list">
+                <ul class="device-list" data-testid="search-hits">
                     <li v-for="device in result.hits" :key="device.id">
                         <DeviceCard :device="device" />
                     </li>
                 </ul>
+                <template v-if="result.moreTotal > 0">
+                    <button
+                        class="btn more-button"
+                        type="button"
+                        :aria-expanded="showMore"
+                        data-testid="search-more"
+                        @click="showMore = !showMore"
+                    >
+                        {{ showMore ? 'Weitere Treffer ausblenden' : 'Weitere Treffer anzeigen' }}
+                        ({{ result.moreTotal }})
+                    </button>
+                    <template v-if="showMore">
+                        <p class="hint">Diese Treffer passen weniger genau zur Eingabe.</p>
+                        <ul class="device-list" data-testid="search-more-list">
+                            <li v-for="device in result.more" :key="device.id">
+                                <DeviceCard :device="device" />
+                            </li>
+                        </ul>
+                    </template>
+                </template>
             </template>
         </section>
 
@@ -437,6 +470,10 @@ function retry(): void {
     margin: 0;
     padding: 0;
     list-style: none;
+}
+
+.more-button {
+    align-self: flex-start;
 }
 
 .hint {
