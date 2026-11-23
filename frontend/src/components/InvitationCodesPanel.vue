@@ -667,6 +667,17 @@ function retry(): void {
     font-weight: var(--font-weight-semibold);
 }
 
+/* Pfeil zeigt, dass es sich aufklappen lässt (display: flex nimmt den Standard-Pfeil weg). */
+.poster-details > summary::before {
+    content: '▸';
+    width: 1.2em;
+    color: var(--muted);
+}
+
+.poster-details[open] > summary::before {
+    content: '▾';
+}
+
 .fresh-actions {
     display: flex;
     flex-wrap: wrap;
