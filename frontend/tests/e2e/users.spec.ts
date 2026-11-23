@@ -621,6 +621,17 @@ test.describe('Fenster „Bearbeiten“ (U7)', () => {
             await expect
                 .poll(() => dialog.evaluate((element) => element.scrollTop))
                 .toBeGreaterThan(0);
+            // Firefox scrollt je Ereignis nur ein Stück (seit A1/A3 ist das Fenster länger): weiter
+            // drehen bis zum Ende des Fensters.
+            await expect(async () => {
+                await page.mouse.wheel(0, 2000);
+                expect(
+                    await dialog.evaluate(
+                        (element) =>
+                            element.scrollHeight - element.clientHeight - element.scrollTop,
+                    ),
+                ).toBeLessThanOrEqual(1);
+            }).toPass({ timeout: 5000 });
             const end = dialog.getByRole('heading', { name: 'Konto beenden' });
             await expect(end).toBeInViewport();
             await expect(
