@@ -790,8 +790,13 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`AdminMenuNav`, Einträge in `ADMIN_MENU`, `src/router/adminMenu.ts`, jeder Eintrag kommt mit
   seiner Seite; Symbole `AdminMenuIcon`): ab 1024 px links mit Text (240 px), 768–1023 px eingeklappt
   auf Symbole (Text nur für Bildschirmleser, Tooltip über `title`), darunter Kopfleiste in der
-  Stadtfarbe mit „Menü öffnen“ (☰) und einer Schublade (Reka UI `Dialog` „Menü“, Escape und „Menü
-  schließen“, ein Seitenwechsel schließt sie). Oben Logo (192 px) bzw. Standard-Symbol und Name der
+  Stadtfarbe mit „Menü öffnen“ (☰) und einer Schublade (`MenuDrawer`, Reka UI `Dialog` „Menü“,
+  Escape und „Menü schließen“, ein Seitenwechsel schließt sie). Einträge (seit 23.11.2026, Wunsch
+  Holger): Dashboard, Suchen, Termine, Ausrüstung, Standorte, Ausrüstungstypen, Wartung, Verleih,
+  Benutzer, Protokoll, Profil; Suchen, Termine und Profil sind Handy-Seiten (`HANDY_MENU_ROUTES`,
+  ergeben allein keine Konsole, `consoleRoute`). Auf diesen Handy-Seiten zeigen Konten mit Konsole
+  oben links ebenfalls ☰ mit derselben Schublade statt des Wappens (`App.vue`, `showMenu`; die
+  Zähler lädt erst das Öffnen); die Leiste unten bleibt. Oben Logo (192 px) bzw. Standard-Symbol und Name der
   Stadt, unten „Einstellungen“ (`ADMIN_SETTINGS`), der Name des Kontos als Text und „Abmelden“;
   Zähler an Einträgen (`badge`:
   `pendingUsers`, `openNotices`) aus `adminOverview`; `sections` hebt einen Eintrag auch auf
@@ -1191,7 +1196,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (Kästchen je Gruppe, grau mit „braucht „…: …““ ohne den Bereich, `actionState`), „4 · Sieht nur
   …“ (Standorte als Baum und Ausrüstungstypen, je „Alle“/„Nur ausgewählte“, gesperrte bzw.
   deaktivierte markiert; „3 · Einschränkungen“ erst ab Phase 2), rechts „So sieht es die Rolle“
-  (`rolePreview`: Menü am PC mit „Einstellungen“ bei jeder Konsole wie die App seit 1.7b, Leiste am
+  (`rolePreview`: Menü am PC mit „Profil“ und „Einstellungen“ bei jeder Konsole wie die App seit 1.7b, Leiste am
   Handy, Darf, Sieht Ausrüstung; Suchen und Termine allein sind
   keine Konsole, wie heute *Benutzer*, F8) und „Die Änderung gilt sofort
   für N Personen …“. F3 im Editor: mit „Sieht nur …“ sind die Stufen und Aktionen grau, die es dann
@@ -1521,7 +1526,7 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   (`src/runtime/unsavedInput.ts`) melden: true, solange etwas eingegeben und nicht gespeichert ist;
   nach dem Speichern oder Leeren false. Nur so lädt die App nie mitten in einer Eingabe neu.
 - Fenster mit Eingaben NUR über `FormDialog` (eigene Reka-UI-Fenster gibt es nur für das Menü
-  `AdminMenu` und Rückfragen `ConfirmDialog`, per Test `formDialogs.spec.ts`), immer mit
+  `MenuDrawer` und Rückfragen `ConfirmDialog`, per Test `formDialogs.spec.ts`), immer mit
   `:unsaved` = derselbe Wert wie für `useUnsavedInput` (`const unsaved = computed(…)`, per Test).
   Mit ungespeicherten Eingaben schließt ein Klick bzw. Fokus daneben (`interact-outside`) das
   Fenster nicht, Escape fragt nach (`ConfirmDialog` „Eingaben verwerfen?“, „Weiter bearbeiten“

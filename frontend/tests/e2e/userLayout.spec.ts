@@ -44,6 +44,8 @@ test.describe('Handy-Seiten als User', () => {
             window: window.innerHeight,
         }));
         expect(bottom.nav).toBe(bottom.window);
+        // Ohne Konsole kein ☰ (nur Konten mit Konsole, App.vue).
+        await expect(page.getByRole('button', { name: 'Menü öffnen' })).toHaveCount(0);
     });
 
     test('wechselt zwischen Suchen, Termine und Profil', async ({ page, apiCalls }) => {
@@ -105,6 +107,7 @@ test.describe('Handy-Seiten als Admin', () => {
             'GET api/v1/auth/me': { status: 200, body: meBody('admin') },
             ...NO_DEVICES,
             ...ADMIN_OVERVIEW,
+            ...CURRENT_SESSION_ONLY,
             ...deviceDetail(deviceJson(5)),
             ...LOCATIONS,
         },
@@ -132,6 +135,49 @@ test.describe('Handy-Seiten als Admin', () => {
             await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
             // Auf dem Dashboard keine Leiste unten mehr, sondern das Menü der Konsole.
             await expect(page.locator('.tab-bar')).toHaveCount(0);
+        });
+    }
+
+    // ☰ oben links auf Suchen, Termine und Profil (Wunsch Holger 23.11.2026), in jeder Breite.
+    for (const [label, width, height] of [
+        ['Handy-Breite', 390, 844],
+        ['PC-Breite', 1280, 800],
+    ] as const) {
+        test(`${label}: ☰ oben links öffnet das Menü der Konsole mit Termine und Profil`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height });
+            await page.goto('/firefighting/test/suchen');
+            await expect(page.getByRole('heading', { level: 1, name: 'Suchen' })).toBeVisible();
+            const open = page.getByRole('button', { name: 'Menü öffnen' });
+            await expect(open).toBeVisible();
+            // Oben links: links neben dem Namen der Stadt.
+            const button = await open.boundingBox();
+            const title = await page.getByTestId('app-title').boundingBox();
+            expect(button?.x ?? 999).toBeLessThan(title?.x ?? 0);
+            expect(button?.y ?? 999).toBeLessThan(80);
+            expect(Math.round(button?.height ?? 0)).toBeGreaterThanOrEqual(44);
+
+            await open.click();
+            const drawer = page.getByTestId('menu-drawer');
+            await expect(drawer).toBeVisible();
+            await expect(drawer.getByRole('link', { name: 'Suchen' })).toHaveAttribute(
+                'aria-current',
+                'page',
+            );
+            await drawer.getByRole('link', { name: 'Termine' }).click();
+            await expect(drawer).toHaveCount(0);
+            await expect(page).toHaveURL(/\/firefighting\/test\/prueffristen$/);
+            await expect(page.getByRole('heading', { level: 1, name: 'Termine' })).toBeVisible();
+
+            await page.getByRole('button', { name: 'Menü öffnen' }).click();
+            await page.getByTestId('menu-drawer').getByRole('link', { name: 'Profil' }).click();
+            await expect(page).toHaveURL(/\/firefighting\/test\/profil$/);
+            await expect(page.getByRole('button', { name: 'Menü öffnen' })).toBeVisible();
+
+            await page.getByRole('button', { name: 'Menü öffnen' }).click();
+            await page.getByTestId('menu-drawer').getByRole('link', { name: 'Dashboard' }).click();
+            await expect(page).toHaveURL(/\/firefighting\/test\/dashboard$/);
         });
     }
 

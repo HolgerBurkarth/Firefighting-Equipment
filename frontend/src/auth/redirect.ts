@@ -1,7 +1,7 @@
 import type { RouteLocationRaw, RouteMeta, Router } from 'vue-router';
 import type { AuthState } from '../api/auth';
 import { permissionsOf } from '../api/permissions';
-import { ADMIN_MENU, ADMIN_SETTINGS } from '../router/adminMenu';
+import { ADMIN_MENU, ADMIN_SETTINGS, HANDY_MENU_ROUTES } from '../router/adminMenu';
 
 /** Darf das Konto die Seite öffnen (Rolle und unter einer Stadt die Rechte, `meta.rights`)? */
 export function canOpen(meta: RouteMeta, state: AuthState): boolean {
@@ -29,7 +29,7 @@ export function canOpenRoute(router: Router, name: string, state: AuthState): bo
 export function consoleRoute(router: Router, state: AuthState): RouteLocationRaw | null {
     const names = [...ADMIN_MENU, ADMIN_SETTINGS]
         .map((entry) => entry.route)
-        .filter((name) => name !== 'search');
+        .filter((name) => !HANDY_MENU_ROUTES.includes(name));
     const name = names.find((candidate) => canOpenRoute(router, candidate, state));
     return name === undefined ? null : { name };
 }

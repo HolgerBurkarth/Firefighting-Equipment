@@ -9,6 +9,8 @@ export type AdminMenuIconName =
     | 'list'
     | 'wrench'
     | 'loan'
+    | 'calendar'
+    | 'profile'
     | 'settings'
     | 'logout'
     | 'city'
@@ -29,13 +31,15 @@ export interface AdminMenuEntry {
 
 /**
  * Menü der Admin-Konsole (KONZEPT.md, "Admin-Konsole – Entscheidungen", 34), in dieser
- * Reihenfolge: Dashboard, Suchen, Geräte, Standorte, Gerätetypen, Benutzer, Protokoll. Jeder
- * Eintrag kommt mit seiner Seite hinzu; unten stehen „Einstellungen“ (ADMIN_SETTINGS) und
- * „Abmelden“.
+ * Reihenfolge: Dashboard, Suchen, Termine, Ausrüstung, Standorte, Ausrüstungstypen, Wartung,
+ * Verleih, Benutzer, Protokoll, Profil. Suchen, Termine und Profil sind die Handy-Seiten
+ * (`HANDY_MENU_ROUTES`, seit 23.11.2026 auch im Menü, Wunsch Holger). Jeder Eintrag kommt mit seiner
+ * Seite hinzu; unten stehen „Einstellungen“ (ADMIN_SETTINGS) und „Abmelden“.
  */
 export const ADMIN_MENU: readonly AdminMenuEntry[] = [
     { route: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     { route: 'search', label: 'Suchen', icon: 'search' },
+    { route: 'inspections', label: 'Termine', icon: 'calendar' },
     {
         route: 'devices',
         label: 'Ausrüstung',
@@ -54,7 +58,14 @@ export const ADMIN_MENU: readonly AdminMenuEntry[] = [
         badge: 'openNotices',
         sections: ['notice'],
     },
+    { route: 'profile', label: 'Profil', icon: 'profile' },
 ];
+
+/**
+ * Handy-Seiten im Menü (Layout `user`): Sie allein ergeben keine Konsole (`consoleRoute`, F8), jedes
+ * Konto einer Stadt hat sie je nach Rechten in der Leiste unten.
+ */
+export const HANDY_MENU_ROUTES: readonly string[] = ['search', 'inspections', 'profile'];
 
 /** Unten im Menü über dem Namen des Kontos: Einstellungen (Anzeigemodus, Erscheinungsbild …). */
 export const ADMIN_SETTINGS: AdminMenuEntry = {

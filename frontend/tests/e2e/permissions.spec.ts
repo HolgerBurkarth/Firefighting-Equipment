@@ -77,10 +77,12 @@ test.describe('Gerätewart: alles zu Geräten, keine Benutzer, kein Import', () 
         expect(await menuLabels(page)).toEqual([
             'Dashboard',
             'Suchen',
+            'Termine',
             'Ausrüstung',
             'Standorte',
             'Ausrüstungstypen',
             'Protokoll',
+            'Profil',
             'Einstellungen',
         ]);
 
@@ -115,7 +117,7 @@ test.describe('Nur ansehen: Ausrüstungsliste und Gerätedetail ohne Aktionen', 
         await page.setViewportSize({ width: 1280, height: 800 });
         await page.goto('/firefighting/test/');
         await expect(page).toHaveURL(/\/firefighting\/test\/geraete$/);
-        expect(await menuLabels(page)).toEqual(['Ausrüstung', 'Einstellungen']);
+        expect(await menuLabels(page)).toEqual(['Ausrüstung', 'Profil', 'Einstellungen']);
         await expect(page.getByRole('row', { name: /M1/ })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Export (CSV)' })).toHaveCount(0);
         await expect(page.getByRole('link', { name: 'Neue Ausrüstung' })).toHaveCount(0);

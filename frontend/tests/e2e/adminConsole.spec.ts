@@ -55,11 +55,13 @@ const OVERVIEW = adminOverview({
 const MENU_LABELS = [
     'Dashboard',
     'Suchen',
+    'Termine',
     'Ausrüstung',
     'Standorte',
     'Ausrüstungstypen',
     /^Benutzer\s*2$/,
     /^Protokoll\s*1$/,
+    'Profil',
     'Einstellungen',
 ];
 

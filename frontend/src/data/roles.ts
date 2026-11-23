@@ -339,6 +339,7 @@ export function rolePreview(
               ...visible
                   .filter((area) => area.key !== 'search' && area.key !== 'settings')
                   .map(menuLabel),
+              'Profil',
               AREA_MENU_LABELS['settings'] ?? 'Einstellungen',
           ]
         : [];

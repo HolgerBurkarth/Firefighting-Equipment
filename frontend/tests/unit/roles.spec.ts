@@ -275,7 +275,7 @@ describe('Vorschau und Tabelle', () => {
         expect(
             rolePreview(catalog(), form({ areas: { due: 'write', log: 'read' } }), null),
         ).toMatchObject({
-            menu: ['Termine', 'Protokoll', 'Einstellungen'],
+            menu: ['Termine', 'Protokoll', 'Profil', 'Einstellungen'],
             bar: ['Termine', 'Dashboard', 'Profil'],
         });
     });
@@ -333,7 +333,7 @@ describe('Vorschau und Tabelle', () => {
             ),
         ).toEqual({
             // Benutzer gibt es mit „Sieht nur …“ nicht (F3).
-            menu: ['Dashboard', 'Termine', 'Einstellungen'],
+            menu: ['Dashboard', 'Termine', 'Profil', 'Einstellungen'],
             bar: ['Termine', 'Dashboard', 'Profil'],
             may: 'nichts ändern, nur ansehen',
             sees: '1 von 2 Standorten, alle Ausrüstungstypen',
