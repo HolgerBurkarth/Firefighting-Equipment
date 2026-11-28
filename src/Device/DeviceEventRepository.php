@@ -109,6 +109,40 @@ final readonly class DeviceEventRepository
     }
 
     /**
+     * Je Gerät der neueste übernommene Eintrag, der es an einen Standort brachte (state_changed mit
+     * Ziel-Standort, applied = 1): wer es wann mit welchem Kommentar dorthin brachte, z. B. die Rückgabe
+     * ohne Anmeldung (G13, „In der Rückgabe“). Geräte ohne solchen Eintrag fehlen im Ergebnis. Ob die
+     * Geräte sichtbar sind, prüft der Aufrufer.
+     *
+     * @param list<int> $deviceIds
+     *
+     * @return array<int, DeviceEvent> Geräte-ID → Eintrag
+     */
+    public function latestArrivals(Tenant $tenant, array $deviceIds): array
+    {
+        if ($deviceIds === []) {
+            return [];
+        }
+        $marks = implode(', ', array_fill(0, count($deviceIds), '?'));
+        $stmt = $this->pdo->prepare(sprintf(
+            '%s, e.device_id AS arrival_device_id%s WHERE e.tenant_id = ? AND e.id IN ('
+            . 'SELECT MAX(a.id) FROM fe_device_events a WHERE a.tenant_id = ? AND a.device_id IN (%s)'
+            . " AND a.event_type = 'state_changed' AND a.applied = 1 AND a.to_location_id IS NOT NULL"
+            . ' GROUP BY a.device_id)',
+            self::SELECT,
+            self::JOINS,
+            $marks,
+        ));
+        $stmt->execute([$tenant->id, $tenant->id, ...$deviceIds]);
+        $events = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $events[(int) $row['arrival_device_id']] = $this->event($row);
+        }
+
+        return $events;
+    }
+
+    /**
      * Anzahl der Einträge, die export() mit diesem Filter liefern würde.
      */
     public function countHistory(Tenant $tenant, DeviceHistoryFilter $filter): int

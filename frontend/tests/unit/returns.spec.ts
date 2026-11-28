@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     checkReturn,
     parseLoans,
+    parseReturnedBy,
     postProcessReturns,
     postReturn,
     renewReturnKey,
@@ -44,6 +45,54 @@ describe('Rückgabe: Liste', () => {
         const state = parseLoans({ ...BASE, returns: [{ id: 7, name: 'Rückgabe' }] });
         expect(state?.returns[0]?.linkCreatedAt).toBeNull();
         expect(state?.inReturns).toEqual([]);
+    });
+
+    it('Überbringer der Ausrüstung in der Rückgabe (G13)', () => {
+        const state = parseLoans({
+            ...BASE,
+            returns: [],
+            in_returns: [
+                {
+                    ...deviceJson(1),
+                    returned: {
+                        by: 'Herr Maier (ohne Anmeldung)',
+                        at: '2026-11-09T09:00:00Z',
+                        comment: 'Danke',
+                        without_login: true,
+                    },
+                },
+                deviceJson(2),
+            ],
+        });
+        expect(state?.inReturns.map((device) => device.returned)).toEqual([
+            {
+                by: 'Herr Maier (ohne Anmeldung)',
+                at: '2026-11-09T09:00:00Z',
+                comment: 'Danke',
+                withoutLogin: true,
+            },
+            null,
+        ]);
+    });
+
+    it.each([
+        ['kein Objekt', 'x'],
+        ['ohne Name', { at: '2026-11-09T09:00:00Z', comment: null }],
+        ['Zeit falsch', { by: 'A', at: '09.11.2026', comment: null }],
+        ['Kommentar keine Zeichenkette', { by: 'A', at: '2026-11-09T09:00:00Z', comment: 5 }],
+    ])('Überbringer unbrauchbar → null: %s', (_label, json) => {
+        expect(parseReturnedBy(json)).toBeNull();
+    });
+
+    it('leerer Kommentar zählt als keiner', () => {
+        expect(
+            parseReturnedBy({
+                by: 'A',
+                at: '2026-11-09T09:00:00Z',
+                comment: '',
+                without_login: false,
+            })?.comment,
+        ).toBeNull();
     });
 
     it.each([

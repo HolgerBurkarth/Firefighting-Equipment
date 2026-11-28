@@ -985,3 +985,17 @@ jetzt auf `listItem` auf, seine Felder sind dieselben.
 „Buchung kam zu spät – Stand nicht geändert“ (vorher „Nur Historie (neuerer Stand vorhanden)“). Der Wert `kind`
 (`history_only`) und alle anderen Felder bleiben. Wirkt in der Hinweisliste, im Hinweis, in der Mail „Log“
 (Zeile „Hinweis: …“) und in den Claude-Werkzeugen. Test: `MailTemplatesTest`, Browser `notices.spec.ts`.
+
+## 2026-11-28 – „In der Rückgabe (G13): wer die Ausrüstung brachte, mit Zeit und Kommentar“
+
+`GET loans`, nur Erweiterung: Jeder Eintrag von `in_returns` (sonst wie GET devices) trägt zusätzlich
+`returned {by, at, comment, without_login}` oder `null`.
+
+- Quelle: der neueste übernommene Eintrag des Verlaufs, der die Ausrüstung an einen Standort brachte
+  (`state_changed` mit Ziel-Standort, `applied = 1`; `DeviceEventRepository::latestArrivals`, eine Abfrage für alle).
+- `by` wie im Verlauf (Anzeigename; Rückgabe ohne Anmeldung „Herr Maier (ohne Anmeldung)“, anonymisiert „Gelöschter
+  Benutzer #ID“, nie die E-Mail), `at` = Aktionszeit (UTC `…Z`), `comment` der Kommentar der Buchung, `without_login`
+  true bei der Rückgabe ohne Anmeldung. `null`, wenn es keinen solchen Eintrag gibt (z. B. dort angelegt).
+- Warum: Benutzertest Gerätewart am Handy (G13). „In der Rückgabe“ zeigte nicht, wer was zurückgab und welchen
+  Hinweis der Bote schrieb (stand nur in „Letzte Aktivitäten“).
+- Tests: `ReturnTest::testListNamesWhoBroughtTheEquipmentIntoTheReturn`, Unit `returns.spec.ts`, Browser `loans.spec.ts`.

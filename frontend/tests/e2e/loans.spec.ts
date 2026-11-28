@@ -415,10 +415,23 @@ function returnsServer() {
             status: 'defective',
             status_label: 'defekt',
             location: { id: 90, name: 'Rückgabe', path: 'Rückgabe' },
+            // G13: wer sie brachte, mit Kommentar.
+            returned: {
+                by: 'Herr Maier (ohne Anmeldung)',
+                at: '2026-11-08T13:02:00Z',
+                comment: 'Akku hält nicht mehr',
+                without_login: true,
+            },
         }),
         deviceJson(22, {
             identifier: 'HRT 20',
             location: { id: 90, name: 'Rückgabe', path: 'Rückgabe' },
+            returned: {
+                by: 'Thomas Keller',
+                at: '2026-10-12T08:00:00Z',
+                comment: null,
+                without_login: false,
+            },
         }),
         deviceJson(23, {
             identifier: 'HRT 3',
@@ -604,6 +617,19 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
         const list = page.getByTestId('in-returns');
         await expect(list.getByTestId('return-device')).toHaveCount(3);
         await expect(list.getByTestId('to-store')).toBeDisabled();
+        // G13: Überbringer, Zeit und Kommentar; ohne Angabe wie bisher nur die Zeit.
+        const hrt16 = list.getByTestId('return-device').filter({ hasText: 'HRT 16' });
+        await expect(hrt16.getByTestId('return-by')).toContainText(
+            'von Herr Maier (ohne Anmeldung) ·',
+        );
+        await expect(hrt16.getByTestId('return-comment')).toHaveText('„Akku hält nicht mehr“');
+        const hrt20 = list.getByTestId('return-device').filter({ hasText: 'HRT 20' });
+        await expect(hrt20.getByTestId('return-by')).toHaveText(
+            /^von Thomas Keller · 12\.10\.2026$/,
+        );
+        await expect(hrt20.getByTestId('return-comment')).toHaveCount(0);
+        const hrt3 = list.getByTestId('return-device').filter({ hasText: 'HRT 3' });
+        await expect(hrt3.getByTestId('return-by')).toHaveCount(0);
 
         await list.getByLabel('HRT 16 auswählen').check();
         await list.getByLabel('HRT 3 auswählen').check();

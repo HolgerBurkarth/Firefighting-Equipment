@@ -45,11 +45,43 @@ export interface LoanState {
     readonly borrowers: readonly LoanPlace[];
     /** Standorte mit der Aufgabe „Rückgabe“, danach Sammelstellen, und der Stand ihres Aushangs. */
     readonly returns: readonly ReturnPlace[];
-    /** Ausrüstung in der Rückgabe, am längsten wartende zuerst (P2.6). */
-    readonly inReturns: readonly DeviceListItem[];
+    /** Ausrüstung in der Rückgabe, am längsten wartende zuerst (P2.6), mit Überbringer (G13). */
+    readonly inReturns: readonly InReturnDevice[];
     /** Anzeigenamen der Aufgaben in der Stadt. */
     readonly borrowerLabel: string;
     readonly returnsLabel: string;
+}
+
+/** Wer die Ausrüstung in die Rückgabe brachte (G13): `by` samt „(ohne Anmeldung)“, `at` UTC `…Z`. */
+export interface ReturnedBy {
+    readonly by: string;
+    readonly at: string;
+    readonly comment: string | null;
+    readonly withoutLogin: boolean;
+}
+
+export interface InReturnDevice extends DeviceListItem {
+    /** null = unbekannt (z. B. dort angelegt, oder ein Server vor G13 ohne das Feld). */
+    readonly returned: ReturnedBy | null;
+}
+
+/** Feld `returned` eines Eintrags von `in_returns`; fehlt oder ungültig = null (nur eine Zusatzangabe). */
+export function parseReturnedBy(json: unknown): ReturnedBy | null {
+    if (
+        !isRecord(json) ||
+        typeof json['by'] !== 'string' ||
+        typeof json['at'] !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(json['at']) ||
+        (json['comment'] !== null && typeof json['comment'] !== 'string')
+    ) {
+        return null;
+    }
+    return {
+        by: json['by'],
+        at: json['at'],
+        comment: json['comment'] === '' ? null : json['comment'],
+        withoutLogin: json['without_login'] === true,
+    };
 }
 
 function parsePlace(json: unknown): LoanPlace | null {
@@ -163,13 +195,16 @@ export function parseLoans(json: unknown): LoanState | null {
         }
         loans.push(loan);
     }
-    const inReturns: DeviceListItem[] = [];
+    const inReturns: InReturnDevice[] = [];
     for (const entry of Array.isArray(json['in_returns']) ? json['in_returns'] : []) {
         const device = parseDeviceListItem(entry);
         if (device === null) {
             return null;
         }
-        inReturns.push(device);
+        inReturns.push({
+            ...device,
+            returned: parseReturnedBy(isRecord(entry) ? entry['returned'] : null),
+        });
     }
     return {
         today: json['today'],

@@ -555,11 +555,22 @@ function printPoster(): void {
                         >
                         <span class="type">{{ device.deviceType.name }}</span>
                         <StatusBadge :status="device.status" :label="device.statusLabel" />
-                        <span class="since">{{
+                        <span v-if="device.returned !== null" class="since" data-testid="return-by"
+                            >von {{ device.returned.by }} ·
+                            {{ changeTimeText(device.returned.at, now) }}</span
+                        >
+                        <span v-else class="since">{{
                             device.stateChangedAt === null
                                 ? '–'
                                 : changeTimeText(device.stateChangedAt, now)
                         }}</span>
+                        <p
+                            v-if="device.returned?.comment != null"
+                            class="return-comment"
+                            data-testid="return-comment"
+                        >
+                            „{{ device.returned.comment }}“
+                        </p>
                     </li>
                 </ul>
             </template>
@@ -719,5 +730,12 @@ function printPoster(): void {
 .failures {
     margin: 0 0 16px;
     padding-left: 20px;
+}
+.return-comment {
+    flex-basis: 100%;
+    margin: 0;
+    padding-left: 4px;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
 }
 </style>
