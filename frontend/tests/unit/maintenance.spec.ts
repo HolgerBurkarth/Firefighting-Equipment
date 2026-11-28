@@ -6,7 +6,15 @@ import {
     postToWorkshop,
 } from '../../src/api/maintenance';
 import { parseDeviceListItem } from '../../src/api/devices';
-import { sinceText, transportLine, transportText } from '../../src/data/maintenance';
+import {
+    orderWorkshop,
+    sinceText,
+    transportLine,
+    transportText,
+    workshopSinceText,
+    workshopState,
+    workshopSummary,
+} from '../../src/data/maintenance';
 import { deviceJson } from './support/devices';
 import { respond } from './support/fetch';
 
@@ -115,5 +123,56 @@ describe('Seite Wartung: seit und Transportliste', () => {
         expect(transportText('Sammelstelle', [device, device])).toBe(
             'Sammelstelle (2)\nM1 · Atemschutzmaske · defekt · HLF 20 / G1\nM1 · Atemschutzmaske · defekt · HLF 20 / G1',
         );
+    });
+});
+
+describe('Werkstatt: fertig und in Arbeit (G9)', () => {
+    const NOW = new Date('2026-11-09T12:00:00');
+    function item(id: number, status: string, label: string, time = '2026-11-09T09:00:00') {
+        const device = parseDeviceListItem(
+            deviceJson(id, {
+                identifier: `M${String(id)}`,
+                status,
+                status_label: label,
+                state_changed_at: new Date(time).toISOString().slice(0, 19) + 'Z',
+            }),
+        );
+        if (device === null) {
+            throw new Error('Gerät');
+        }
+        return device;
+    }
+    const working = item(1, 'maintenance', 'in Wartung', '2026-11-06T09:00:00');
+    const defective = item(2, 'defective', 'defekt');
+    const done = item(3, 'ready', 'einsatzbereit');
+    const used = item(4, 'used', 'benutzt');
+
+    it('Zustand nach Status', () => {
+        expect([working, defective, done, used].map(workshopState)).toEqual([
+            'working',
+            'defective',
+            'done',
+            'working',
+        ]);
+    });
+
+    it('fertige zuerst, dann in Arbeit, dann defekte; sonst die Reihenfolge des Servers', () => {
+        expect(
+            orderWorkshop([defective, working, done, used]).map((device) => device.identifier),
+        ).toEqual(['M3', 'M1', 'M4', 'M2']);
+    });
+
+    it('Zusammenfassung ohne leere Stufen', () => {
+        expect(workshopSummary([defective, working, done, used])).toBe(
+            '1 fertig · 2 in Wartung · 1 defekt',
+        );
+        expect(workshopSummary([done])).toBe('1 fertig');
+        expect(workshopSummary([])).toBe('');
+    });
+
+    it('„seit“ mit dem Zustand', () => {
+        expect(workshopSinceText(done, NOW)).toBe('fertig seit 3 Std.');
+        expect(workshopSinceText(working, NOW)).toBe('in Wartung seit 3 Tagen');
+        expect(workshopSinceText(defective, NOW)).toBe('defekt seit 3 Std.');
     });
 });

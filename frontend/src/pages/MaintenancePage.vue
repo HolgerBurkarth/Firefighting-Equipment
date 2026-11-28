@@ -3,12 +3,12 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import type { ApiError } from '../api/client';
 import type { DeviceListItem } from '../api/devices';
 import { fetchMaintenance, type MaintenanceStage, type MaintenanceState } from '../api/maintenance';
-import { allows } from '../api/permissions';
+import { allows, can } from '../api/permissions';
 import { currentPermissions } from '../auth/session';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
-import { maintenanceBack, maintenanceToWorkshop } from '../data';
+import { maintenanceBack, maintenanceToWorkshop, markMaintained } from '../data';
 import {
     bulkCounts,
     bulkErrorText,
@@ -16,7 +16,14 @@ import {
     type BulkAction,
     type BulkRun,
 } from '../data/deviceBulk';
-import { sinceText, transportText } from '../data/maintenance';
+import {
+    orderWorkshop,
+    sinceText,
+    transportText,
+    workshopSinceText,
+    workshopState,
+    workshopSummary,
+} from '../data/maintenance';
 import { useNow } from '../runtime/now';
 import { canShareText, copyText, shareText, type ShareOutcome } from '../runtime/share';
 import { useUnsavedInput } from '../runtime/unsavedInput';
@@ -28,6 +35,8 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
  * Transportliste zum Kopieren. Einmalgeräte werden nicht gewartet und lassen sich nicht wählen.
  */
 const canChange = computed(() => allows(currentPermissions.value, 'maintenance', 'write'));
+/** „Fertig gewartet“ setzt nur den Status (wie Umbuchen), braucht also `book.status` (G9). */
+const canMarkDone = computed(() => can(currentPermissions.value, 'book.status'));
 const now = useNow();
 
 const state = shallowRef<MaintenanceState | null>(null);
@@ -57,10 +66,40 @@ const confirmOpen = ref(false);
 const pending = ref<StageKey>('collection');
 
 // Während ein Lauf sendet, lädt die App nie neu.
-useUnsavedInput(() => busy.value);
+useUnsavedInput(() => busy.value || marking.value !== null);
 
 function stage(key: StageKey): MaintenanceStage | null {
     return state.value?.[key] ?? null;
+}
+
+/** Werkstatt: fertige zuerst, dann in Arbeit, dann defekte (G9); die Sammelstelle wie der Server. */
+function shownDevices(key: StageKey): DeviceListItem[] {
+    const devices = stage(key)?.devices ?? [];
+    return key === 'workshop' ? orderWorkshop(devices) : [...devices];
+}
+
+function doneDevices(): DeviceListItem[] {
+    return (stage('workshop')?.devices ?? []).filter((device) => workshopState(device) === 'done');
+}
+
+/** Nur die fertig gewarteten wählen (G9), z. B. wenn noch andere in Arbeit sind. */
+function pickDone(): void {
+    picked.value = { ...picked.value, workshop: doneDevices().map((device) => device.id) };
+}
+
+/** Gerade gesendetes „Fertig gewartet“ bzw. sein Fehler, an der Zeile der Ausrüstung (G9). */
+const marking = ref<number | null>(null);
+const markFailure = shallowRef<{ id: number; error: ApiError } | null>(null);
+
+async function markDone(device: DeviceListItem): Promise<void> {
+    marking.value = device.id;
+    markFailure.value = null;
+    const result = await markMaintained(device);
+    marking.value = null;
+    if (!result.ok) {
+        markFailure.value = { id: device.id, error: result.error };
+    }
+    await load();
 }
 
 function selectable(device: DeviceListItem, key: StageKey): boolean {
@@ -161,11 +200,20 @@ const confirmDescription = computed(() => {
         confirmDefective.value.length === 0
             ? ''
             : ` Achtung: ${confirmDefective.value.map((device) => device.identifier).join(', ')} ${confirmDefective.value.length === 1 ? 'ist' : 'sind'} noch defekt und gilt danach als einsatzbereit.`;
+    const unfinished =
+        pending.value === 'workshop'
+            ? pickedDevices('workshop').filter((device) => workshopState(device) === 'working')
+            : [];
+    const notDone =
+        unfinished.length === 0 || unfinished.length === confirmCount.value
+            ? ''
+            : ` Noch nicht als fertig gemeldet: ${unfinished.map((device) => device.identifier).join(', ')}.`;
     return (
         (pending.value === 'collection'
             ? `${they} dann in „${stage('workshop')?.locations[0]?.name ?? 'der Werkstatt'}“ mit dem Status „in Wartung“.`
             : `${they} dann in „${state.value?.defaultStore?.name ?? 'dem Lager'}“ mit dem Status „einsatzbereit“.`) +
-        warning
+        warning +
+        notDone
     );
 });
 
@@ -314,6 +362,13 @@ function showOutcome(
                 <p v-if="state[key].locations.length > 0" class="places">
                     {{ state[key].locations.map((place) => place.name).join(', ') }}
                 </p>
+                <p
+                    v-if="key === 'workshop' && state.workshop.devices.length > 0"
+                    class="workshop-summary"
+                    data-testid="workshop-summary"
+                >
+                    {{ workshopSummary(state.workshop.devices) }}
+                </p>
             </header>
 
             <p v-if="state[key].locations.length === 0" class="hint" data-testid="stage-empty">
@@ -407,9 +462,23 @@ function showOutcome(
                             />
                             Alle auswählen
                         </label>
+                        <button
+                            v-if="
+                                key === 'workshop' &&
+                                doneDevices().length > 0 &&
+                                doneDevices().length < state.workshop.devices.length
+                            "
+                            class="btn btn-small"
+                            type="button"
+                            :disabled="busy"
+                            data-testid="pick-done"
+                            @click="pickDone"
+                        >
+                            Nur fertige auswählen ({{ doneDevices().length }})
+                        </button>
                     </li>
                     <li
-                        v-for="device in state[key].devices"
+                        v-for="device in shownDevices(key)"
                         :key="device.id"
                         class="device"
                         data-testid="maintenance-device"
@@ -438,7 +507,37 @@ function showOutcome(
                         </span>
                         <StatusBadge :status="device.status" :label="device.statusLabel" />
                         <span class="place">{{ device.location.path }}</span>
-                        <span class="since">{{ sinceText(device.stateChangedAt, now) }}</span>
+                        <span
+                            v-if="key === 'workshop' && workshopState(device) === 'done'"
+                            class="badge badge-ready"
+                            data-testid="workshop-done"
+                            >fertig – kann ins Lager</span
+                        >
+                        <span class="since">{{
+                            key === 'workshop'
+                                ? workshopSinceText(device, now)
+                                : sinceText(device.stateChangedAt, now)
+                        }}</span>
+                        <button
+                            v-if="
+                                key === 'workshop' &&
+                                canMarkDone &&
+                                workshopState(device) === 'working'
+                            "
+                            class="btn btn-small"
+                            type="button"
+                            :disabled="busy || marking !== null"
+                            :aria-label="`${device.identifier} fertig gewartet`"
+                            data-testid="mark-done"
+                            @click="markDone(device)"
+                        >
+                            {{ marking === device.id ? 'Wird gespeichert …' : 'Fertig gewartet' }}
+                        </button>
+                        <ErrorNotice
+                            v-if="markFailure?.id === device.id"
+                            class="mark-error"
+                            :error="markFailure.error"
+                        />
                         <span
                             v-if="staysInWorkshop(device, key)"
                             class="stays"
@@ -510,6 +609,16 @@ function showOutcome(
     width: 100%;
     font: inherit;
     font-weight: normal;
+}
+
+.workshop-summary {
+    flex-basis: 100%;
+    margin: 0;
+    font-weight: var(--font-weight-semibold);
+}
+
+.mark-error {
+    flex-basis: 100%;
 }
 
 .stays {

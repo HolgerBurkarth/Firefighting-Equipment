@@ -17,6 +17,7 @@ import {
     postRetire,
     type DeviceActionBase,
     type BookableStatus,
+    type BookingResponse,
     type DeviceDetail,
     type DeviceFieldChanges,
     type DeviceListItem,
@@ -402,6 +403,28 @@ export async function maintenanceBack(
 ): Promise<BulkRun> {
     const entries = devices.map((device) => ({ id: device.id, version: device.version }));
     return afterBulk(await runInBlocks(entries, (block) => postBack(block), onProgress));
+}
+
+/**
+ * „Fertig gewartet“ (Seite Wartung, Werkstatt; G9): Status einsatzbereit, der Standort bleibt (die Ausrüstung
+ * wartet in der Werkstatt aufs „Ins Lager bringen“). Wie Umbuchen nur den Status (POST devices/{id}/state).
+ */
+export async function markMaintained(device: DeviceListItem): Promise<ApiResult<BookingResponse>> {
+    const result = await postDeviceState(device.id, {
+        version: device.version,
+        status: 'ready',
+        clientRef: newClientRef(),
+    });
+    if (result.ok) {
+        deviceStore.upsert(result.data.device);
+        refreshDeviceLists();
+    } else if (result.error.code === 'version_conflict') {
+        const current = conflictDevice(result.error.details);
+        if (current !== null) {
+            deviceStore.upsert(current);
+        }
+    }
+    return result;
 }
 
 function afterBulk(run: BulkRun): BulkRun {
