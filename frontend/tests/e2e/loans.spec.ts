@@ -346,11 +346,12 @@ test.describe('Verleih mit Recht „Ändern“', () => {
         await page.goto('/firefighting/test/verleih');
         await page.getByTestId('lend-open').click();
         const dialog = page.getByTestId('form-dialog');
-        for (const code of ['M1', 'M2']) {
+        // Je Nummer warten, bis sie in der Liste steht (sonst läuft die Suche der vorigen noch).
+        for (const [index, code] of ['M1', 'M2'].entries()) {
             await dialog.getByTestId('lend-code').fill(code);
             await dialog.getByTestId('lend-code').press('Enter');
+            await expect(dialog.getByTestId('lend-list').locator('li')).toHaveCount(index + 1);
         }
-        await expect(dialog.getByTestId('lend-list').locator('li')).toHaveCount(2);
         const right = 312;
         for (const control of [
             dialog.getByTestId('lend-add'),
