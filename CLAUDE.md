@@ -847,7 +847,12 @@ committen, pushen, CI grün bekommen, deployen. Ersetzt die frühere Regel „Pu
   `Intl.Collator` mit `numeric`, Gerätezahl, Gleichstand nach Name; Spaltenköpfe mit `aria-sort`, am
   Handy Karten und Knöpfe „Sortieren“ statt `<select>`, siehe CSP), Deaktivieren mit Rückfrage
   (vorhandene Geräte behalten den Typ). Erfolg als `success-notice`. Der Name eines Standorts bzw.
-  Typs führt zur Geräteliste (`geraete?standort=<id>` bzw. `?typ=<id>`). Browser-Tests
+  Typs führt zur Geräteliste (`geraete?standort=<id>` bzw. `?typ=<id>`). „Ausrüstung anzeigen“ (seit 28.11.2026,
+  Wunsch Holger; Kästchen `show-devices`, nur mit Recht `search` oder `devices`, in der Adresse `standorte?ausruestung=1`):
+  die Ausrüstung je Standort eingerückt unter seiner Zeile (Ebene 1 ohne Fach unter dem Fahrzeug, sonst unter dem Fach;
+  `LocationDeviceList` mit Nummer, Typ, Status, Link aufs Gerätedetail bzw. ohne `devices` aufs Umbuchen), Quelle
+  `deviceStore` (`devicesByLocation` in `src/data/locationDevices.ts`, natürlich nach Nummer; erst geladen, wenn die
+  Option an ist; im Modus `server` nur ein Hinweis). Browser-Tests
   `tests/e2e/locations.spec.ts`,
   `tests/e2e/deviceTypes.spec.ts` mit zustandsbehafteten Servern (`locationServer`,
   `deviceTypeServer`, je Test neu über `delegate` und `test.beforeEach`;

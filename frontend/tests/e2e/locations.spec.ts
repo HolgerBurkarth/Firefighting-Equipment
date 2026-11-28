@@ -9,6 +9,7 @@ import {
 } from './fixtures';
 import { ADMIN_OVERVIEW } from './support/admin';
 import { horizontalOverflow, unreachableControls } from './support/layout';
+import { deviceDetail, deviceJson, devicesEndpoint, eventsEndpoint } from './support/devices';
 import { delegate, locationServer, type TestLocation } from './support/masterData';
 
 /**
@@ -380,6 +381,90 @@ test('Handy: Baum ohne waagerechtes Scrollen, Knöpfe mindestens 44 px', async (
     const box = await dialog(page).boundingBox();
     expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
     expect((box?.x ?? 0) + (box?.width ?? 1000)).toBeLessThanOrEqual(390);
+});
+
+/** Ausrüstung für „Ausrüstung anzeigen“: drei in G1 (11), zwei auf LF 10 (20) ohne Fach. */
+const LOCATION_DEVICES = [
+    deviceJson(5, { identifier: 'M10' }),
+    deviceJson(6, { identifier: 'M2', status: 'defective', status_label: 'defekt' }),
+    deviceJson(7, { identifier: 'M1' }),
+    deviceJson(8, {
+        identifier: 'HRT 1',
+        device_type: { id: 3, name: 'Funkgerät' },
+        location: { id: 20, name: 'LF 10', path: 'LF 10' },
+    }),
+    deviceJson(9, {
+        identifier: 'HRT 2',
+        device_type: { id: 3, name: 'Funkgerät' },
+        location: { id: 20, name: 'LF 10', path: 'LF 10' },
+    }),
+];
+
+test.describe('Ausrüstung anzeigen', () => {
+    test.use({
+        api: {
+            'GET api/v1/auth/me': { status: 200, body: meBody('admin', 'Thomas Keller') },
+            ...ADMIN_OVERVIEW,
+            ...delegate(() => server.api),
+            'GET api/v1/device-types': { status: 200, body: { device_types: [] } },
+            'GET api/v1/devices': devicesEndpoint(LOCATION_DEVICES),
+            ...deviceDetail(LOCATION_DEVICES[1] ?? {}),
+            'GET api/v1/devices/6/events': eventsEndpoint([]),
+        },
+    });
+
+    test('Ausrüstung eingerückt unter Fahrzeug und Fach, in der Adresse gemerkt', async ({
+        page,
+        apiRequests,
+    }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await open(page);
+        // Ohne die Option lädt die Seite keine Ausrüstungsliste (das Menü fragt nur „nicht einsatzbereit“).
+        const fullList = (): boolean =>
+            apiRequests.some(
+                (r) => r.path === 'api/v1/devices' && !new URL(r.url).searchParams.has('status'),
+            );
+        expect(fullList()).toBe(false);
+        await expect(page.getByTestId('location-devices')).toHaveCount(0);
+
+        await page.getByTestId('show-devices').check();
+        await expect.poll(fullList).toBe(true);
+        await expect(page).toHaveURL(/\/standorte\?ausruestung=1$/);
+        const g1 = page.getByRole('list', { name: 'Ausrüstung in HLF 20 / G1' });
+        await expect(g1.getByRole('link')).toHaveText([
+            /M1\s*Atemschutzmaske\s*✓\s*einsatzbereit/,
+            /M2\s*Atemschutzmaske\s*✕\s*defekt/,
+            /M10\s*Atemschutzmaske/,
+        ]);
+        const lf = page.getByRole('list', { name: 'Ausrüstung in LF 10' });
+        await expect(lf.getByRole('link')).toHaveText([/HRT 1\s*Funkgerät/, /HRT 2\s*Funkgerät/]);
+        // Eingerückt: rechts vom Namen des Fachs.
+        const fachBox = await node(page, 11).locator('.node-name').boundingBox();
+        const deviceBox = await g1.getByRole('link').first().boundingBox();
+        expect(deviceBox?.x ?? 0).toBeGreaterThan(fachBox?.x ?? 1000);
+        // Leere Fächer zeigen nichts.
+        await expect(page.getByRole('list', { name: 'Ausrüstung in HLF 20 / G2' })).toHaveCount(0);
+
+        await page.reload();
+        await expect(page.getByTestId('show-devices')).toBeChecked();
+        await expect(g1.getByRole('link')).toHaveCount(3);
+
+        await g1.getByRole('link', { name: /M2/ }).click();
+        await expect(page).toHaveURL(/\/geraete\/6\/details$/);
+        await page.goBack();
+        await expect(g1.getByRole('link')).toHaveCount(3);
+
+        await page.getByTestId('show-devices').uncheck();
+        await expect(page).toHaveURL(/\/standorte$/);
+        await expect(page.getByTestId('location-devices')).toHaveCount(0);
+    });
+
+    test('Handy: ohne waagerechtes Scrollen', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto('/firefighting/test/standorte?ausruestung=1');
+        await expect(page.getByRole('list', { name: 'Ausrüstung in HLF 20 / G1' })).toBeVisible();
+        expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+    });
 });
 
 test.describe('Breiten (Runde 14, Punkt 2)', () => {
