@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import type { ApiError } from '../api/client';
+import type { DeviceListItem } from '../api/devices';
 import {
     COLLECTION_ACCEPTS,
     fetchLocationTasks,
@@ -18,15 +20,18 @@ import type { StockState } from '../api/stock';
 import StockPanel from '../components/StockPanel.vue';
 import ErrorNotice from '../components/ErrorNotice.vue';
 import FormDialog from '../components/FormDialog.vue';
+import LocationDeviceList from '../components/LocationDeviceList.vue';
 import { KIND_ICONS, SUB_ICON } from '../components/locationIcons';
 import { vRowLink } from '../components/rowLink';
 import {
     addLocation,
     adminLocationStore,
+    deviceStore,
     renameLocation,
     setLocationActive,
     setLocationTask,
 } from '../data';
+import { devicesByLocation, SHOW_DEVICES_QUERY } from '../data/locationDevices';
 import { deviceCountText } from '../data/locationSearch';
 import {
     filterLocationTree,
@@ -41,6 +46,40 @@ import { useUnsavedInput } from '../runtime/unsavedInput';
 /** Ändern nur mit „Standorte: Ändern“; der Name führt nur mit Recht zur Geräteliste (1.7b). */
 const canWrite = computed(() => allows(currentPermissions.value, 'locations', 'write'));
 const canListDevices = computed(() => allows(currentPermissions.value, 'devices'));
+/**
+ * „Ausrüstung anzeigen“: die Ausrüstung je Standort eingerückt unter seiner Zeile (Wunsch Holger,
+ * 28.11.2026). Quelle ist die Liste von „Suchen“ (`deviceStore`, GET devices: Recht `search` oder
+ * `devices`); die Wahl steht in der Adresse (`?ausruestung=1`).
+ */
+const canShowDevices = computed(
+    () => canListDevices.value || allows(currentPermissions.value, 'search'),
+);
+const deviceTarget = computed(() => (canListDevices.value ? 'device-details' : 'device'));
+const route = useRoute();
+const router = useRouter();
+const showDevices = computed({
+    get: () => canShowDevices.value && route.query[SHOW_DEVICES_QUERY] === '1',
+    set: (value: boolean) => {
+        const rest = Object.fromEntries(
+            Object.entries(route.query).filter(([key]) => key !== SHOW_DEVICES_QUERY),
+        );
+        void router.replace({ query: value ? { ...rest, [SHOW_DEVICES_QUERY]: '1' } : rest });
+    },
+});
+const deviceList = computed(() => deviceStore.state);
+const byLocation = computed(() => devicesByLocation(deviceList.value.devices));
+function devicesAt(id: number): readonly DeviceListItem[] {
+    return showDevices.value ? (byLocation.value.get(id) ?? []) : [];
+}
+watch(
+    showDevices,
+    (show) => {
+        if (show) {
+            void deviceStore.refresh('open');
+        }
+    },
+    { immediate: true },
+);
 /** Sollbestand (P2.7): lesen mit dem Bereich, ändern nur mit Ändern (StockPanel). */
 const canListStock = computed(() => allows(currentPermissions.value, 'locations'));
 /** Standorte unter Sollbestand (T21): Chip „außer Betrieb“ am Fahrzeug bzw. Fach, sonst keiner. */
@@ -449,7 +488,31 @@ onMounted(() => {
             <input v-model="showLocked" type="checkbox" />
             Gesperrte anzeigen ({{ locked }})
         </label>
+        <label v-if="canShowDevices" class="check">
+            <input v-model="showDevices" type="checkbox" data-testid="show-devices" />
+            Ausrüstung anzeigen
+        </label>
     </div>
+
+    <template v-if="showDevices">
+        <p
+            v-if="deviceList.mode === null && deviceList.error === null"
+            class="hint"
+            role="status"
+            data-testid="location-devices-loading"
+        >
+            Ausrüstung wird geladen …
+        </p>
+        <p
+            v-else-if="deviceList.mode === 'server'"
+            class="hint"
+            data-testid="location-devices-too-many"
+        >
+            Zu viel Ausrüstung für diese Ansicht. Ein Klick auf den Namen eines Standorts zeigt
+            seine Ausrüstung in der Ausrüstungsliste.
+        </p>
+        <ErrorNotice v-else-if="deviceList.error !== null" :error="deviceList.error" />
+    </template>
 
     <ErrorNotice v-if="state.error !== null" :error="state.error">
         <button class="btn retry" type="button" :disabled="state.loading" @click="retry">
@@ -562,69 +625,84 @@ onMounted(() => {
                     </svg>
                 </button>
             </div>
+            <LocationDeviceList
+                v-if="devicesAt(group.location.id).length > 0"
+                :devices="devicesAt(group.location.id)"
+                :target="deviceTarget"
+                :label="`Ausrüstung in ${group.location.name}`"
+            />
             <ul v-if="group.children.length > 0" class="children">
-                <li
-                    v-for="child in group.children"
-                    :key="child.id"
-                    v-row-link
-                    class="node node-child"
-                    :class="{ 'node-locked': !child.active }"
-                    :data-testid="`location-${String(child.id)}`"
-                >
-                    <svg
-                        class="node-icon"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        aria-hidden="true"
-                    >
-                        <path v-for="d in SUB_ICON" :key="d" :d="d" />
-                    </svg>
-                    <span class="node-text">
-                        <RouterLink
-                            v-if="canListDevices"
-                            class="node-name"
-                            data-row-link
-                            :to="{ name: 'devices', query: { standort: String(child.id) } }"
-                            :title="`Ausrüstung in ${group.location.name} / ${child.name}`"
-                            >{{ child.name }}</RouterLink
-                        ><span v-else class="node-name">{{ child.name }}</span>
-                        <span class="node-meta">{{ deviceCountText(child.deviceCount) }}</span>
-                        <span class="node-chips">
-                            <span
-                                v-if="outOfService.has(child.id)"
-                                class="badge badge-defective"
-                                data-testid="location-out-of-service"
-                                >außer Betrieb</span
-                            >
-                            <span v-if="!child.active" class="badge badge-retired">gesperrt</span>
-                        </span>
-                    </span>
-                    <button
-                        v-if="canWrite"
-                        class="icon-btn"
-                        type="button"
-                        :aria-label="`${group.location.name} / ${child.name} bearbeiten`"
-                        :title="`${child.name} bearbeiten`"
-                        @click="editTarget($event, group.location, child)"
+                <template v-for="child in group.children" :key="child.id">
+                    <li
+                        v-row-link
+                        class="node node-child"
+                        :class="{ 'node-locked': !child.active }"
+                        :data-testid="`location-${String(child.id)}`"
                     >
                         <svg
-                            width="18"
-                            height="18"
+                            class="node-icon"
+                            width="20"
+                            height="20"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
                             stroke-width="2"
                             aria-hidden="true"
                         >
-                            <path d="M4 20h4L19 9l-4-4L4 16z" />
-                            <path d="M13.5 6.5l4 4" />
+                            <path v-for="d in SUB_ICON" :key="d" :d="d" />
                         </svg>
-                    </button>
-                </li>
+                        <span class="node-text">
+                            <RouterLink
+                                v-if="canListDevices"
+                                class="node-name"
+                                data-row-link
+                                :to="{ name: 'devices', query: { standort: String(child.id) } }"
+                                :title="`Ausrüstung in ${group.location.name} / ${child.name}`"
+                                >{{ child.name }}</RouterLink
+                            ><span v-else class="node-name">{{ child.name }}</span>
+                            <span class="node-meta">{{ deviceCountText(child.deviceCount) }}</span>
+                            <span class="node-chips">
+                                <span
+                                    v-if="outOfService.has(child.id)"
+                                    class="badge badge-defective"
+                                    data-testid="location-out-of-service"
+                                    >außer Betrieb</span
+                                >
+                                <span v-if="!child.active" class="badge badge-retired"
+                                    >gesperrt</span
+                                >
+                            </span>
+                        </span>
+                        <button
+                            v-if="canWrite"
+                            class="icon-btn"
+                            type="button"
+                            :aria-label="`${group.location.name} / ${child.name} bearbeiten`"
+                            :title="`${child.name} bearbeiten`"
+                            @click="editTarget($event, group.location, child)"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                aria-hidden="true"
+                            >
+                                <path d="M4 20h4L19 9l-4-4L4 16z" />
+                                <path d="M13.5 6.5l4 4" />
+                            </svg>
+                        </button>
+                    </li>
+                    <li v-if="devicesAt(child.id).length > 0" class="child-devices">
+                        <LocationDeviceList
+                            :devices="devicesAt(child.id)"
+                            :target="deviceTarget"
+                            :label="`Ausrüstung in ${group.location.name} / ${child.name}`"
+                        />
+                    </li>
+                </template>
             </ul>
         </li>
     </ul>
@@ -790,8 +868,13 @@ onMounted(() => {
     border-left: 2px solid var(--border);
 }
 
-.node-child + .node-child {
+.node-child + .node-child,
+.child-devices + .node-child {
     border-top: 1px solid var(--border-subtle);
+}
+
+.child-devices :deep(.location-devices) {
+    margin-left: 48px;
 }
 
 .node-icon {
