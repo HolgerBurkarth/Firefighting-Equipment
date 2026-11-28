@@ -279,3 +279,8 @@ kommen nach `docs/TODO-SPAETER.md`.
 - ☑ Klick auf eine Ausrüstung öffnet ihr Gerätedetail (`geraete/89/details`), „Zurück“ führt auf `standorte?ausruestung=1` mit Liste.
 - ☑ Kästchen ab: Adresse ohne `?ausruestung=1`, keine Ausrüstung mehr. Nichts geändert.
 - ☐ Offen für Holger: am Handy ansehen; in Immendingen „1/44“ mit seinen 13 Ausrüstungen (dort prüfen Agenten nicht).
+
+## Benutzertest Gerätewart G7, G9, G13 (28.11.2026, Build `9392b4ef2688`, Test-Stadt, Chrome am PC)
+- ☑ G9 Wartung: Werkstatt „1 fertig · 5 in Wartung · 1 defekt“; M30 (einsatzbereit) oben mit „fertig – kann ins Lager“ und „fertig seit 29 Tagen“, dann M22, M23, PA 10, PA 12, WBK 4 je „in Wartung seit 29 Tagen“ mit „Fertig gewartet“, zuletzt PA 11 „defekt – bleibt in der Werkstatt“. „Nur fertige auswählen (1)“ wählte genau M30 („Ins Lager bringen … (1)“), danach wieder abgewählt. „Fertig gewartet“ nicht gedrückt (keine Testgeräte M90–M99 in der Werkstatt).
+- ☐ G13 Verleih: In der Rückgabe der Test-Stadt steht zurzeit nichts (`in_returns` leer); Anzeige von Name, Zeit und Kommentar nur in den Tests geprüft.
+- ☐ Offen für Holger: G7 am iPhone mit großer Schrift im Fenster „Verleihen“ zwei Nummern hinzufügen (Knöpfe ganz sichtbar); G9 „Fertig gewartet“ an einer Ausrüstung in der Werkstatt; G13 nach einer Rückgabe über den Aushang „von <Name> (ohne Anmeldung) · <Zeit>“ und der Kommentar unter „In der Rückgabe“.
