@@ -273,3 +273,9 @@ kommen nach `docs/TODO-SPAETER.md`.
 - ☑ Seitenleiste am PC (Dashboard, 1826 px) mit „Termine“ und „Profil“.
 - ☑ Suche (nur gelesen): „8“ → HRT 8, M8, PA 8 (3 Treffer, 2 weitere aufklappbar); „m8“ → M8; „m 8“ → M8 (4 weitere); „3“ → HRT 3, M3, PA 3, WBK 3 (13 weitere); „hlf“ → 25 Treffer über den Standort.
 - ☐ Offen für Holger: am Handy ☰ auf Suchen/Termine/Profil antippen, Suche mit eigenen Beispielen („8“, Seriennummer ab 3 Ziffern), „Weitere Treffer anzeigen“.
+
+## Standorte: „Ausrüstung anzeigen“ (28.11.2026, Build `7ff3d83ad2e1`, Test-Stadt, Chrome am PC)
+- ☑ `standorte?ausruestung=1` öffnet mit angehaktem Kästchen; 70 Ausrüstungen eingerückt unter Standort bzw. Fach (z. B. „HLF 20“ ohne Fach: M32, M93, WBK 1; „HLF 20 / Fahrerhaus“: HRT 1–4), je Nummer, Typ und Status, nach Nummer sortiert; kein waagerechtes Scrollen.
+- ☑ Klick auf eine Ausrüstung öffnet ihr Gerätedetail (`geraete/89/details`), „Zurück“ führt auf `standorte?ausruestung=1` mit Liste.
+- ☑ Kästchen ab: Adresse ohne `?ausruestung=1`, keine Ausrüstung mehr. Nichts geändert.
+- ☐ Offen für Holger: am Handy ansehen; in Immendingen „1/44“ mit seinen 13 Ausrüstungen (dort prüfen Agenten nicht).
