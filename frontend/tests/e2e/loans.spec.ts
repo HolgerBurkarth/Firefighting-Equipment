@@ -337,6 +337,33 @@ test.describe('Verleih mit Recht „Ändern“', () => {
         await expect(page.getByTestId('loan-row')).toHaveCount(2);
         expect(await horizontalOverflow(page)).toBe(0);
     });
+
+    test('Fenster „Verleihen“ bei 125 % Schrift (G7): Hinzufügen und Entfernen ganz sichtbar', async ({
+        page,
+    }) => {
+        // Wie der Benutzertest: iPhone 390 px mit 125 % Zoom = 312 CSS-Pixel breit.
+        await page.setViewportSize({ width: 312, height: 640 });
+        await page.goto('/firefighting/test/verleih');
+        await page.getByTestId('lend-open').click();
+        const dialog = page.getByTestId('form-dialog');
+        for (const code of ['M1', 'M2']) {
+            await dialog.getByTestId('lend-code').fill(code);
+            await dialog.getByTestId('lend-code').press('Enter');
+        }
+        await expect(dialog.getByTestId('lend-list').locator('li')).toHaveCount(2);
+        const right = 312;
+        for (const control of [
+            dialog.getByTestId('lend-add'),
+            dialog.getByRole('button', { name: 'M1 entfernen' }),
+            dialog.getByRole('button', { name: 'M2 entfernen' }),
+        ]) {
+            const box = await control.boundingBox();
+            expect(box).not.toBeNull();
+            expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(right);
+            expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+        }
+        expect(await unreachableControls(page, '[data-testid="lend-list"] li')).toEqual([]);
+    });
 });
 
 test.describe('Ohne Leihnehmer und nur ansehen', () => {

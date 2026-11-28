@@ -301,6 +301,13 @@ async function submit(): Promise<void> {
 
 .add-row .input {
     flex: 1 1 auto;
+    /* Ohne min-width: 0 behält das Feld seine Standardbreite und schiebt „Hinzufügen“ bei großer Schrift
+       aus dem Fenster (G7, 125 %). */
+    min-width: 0;
+}
+
+.add-row .btn {
+    flex: none;
 }
 
 .candidates {
@@ -313,6 +320,7 @@ async function submit(): Promise<void> {
 
 .candidates li {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px 12px;
     min-height: var(--touch-min);
@@ -325,7 +333,14 @@ async function submit(): Promise<void> {
 }
 
 .type {
-    flex: 1 1 auto;
+    flex: 1 1 6em;
+    min-width: 0;
+    overflow-wrap: break-word;
+}
+
+.candidates .btn {
+    flex: none;
+    margin-left: auto;
 }
 
 .field-hint {
