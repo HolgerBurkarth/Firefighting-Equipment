@@ -77,7 +77,7 @@ nahm das Fenster „Verleihen“ ohne Hinweis an.
 - **G5** Standorte: Chips stehen unter dem Namen, Namen brechen nur zwischen Wörtern bzw. wenn nötig.
 - **G6** Verleihen: Hinweis „Dieses Datum liegt in der Vergangenheit.“ unter „Rückgabe bis“ (kein Fehler).
 
-Offen (T29): G7–G14.
+Umgesetzt am 28.11.2026: G7, G9, G13. Offen (T29): G8, G10–G12, G14.
 
 ## Grenzen
 
