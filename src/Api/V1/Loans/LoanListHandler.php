@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace FirefightingEquipment\Api\V1\Loans;
 
+use FirefightingEquipment\Api\V1\Auth\AuthJson;
 use FirefightingEquipment\Api\V1\Devices\DeviceJson;
+use FirefightingEquipment\Device\Device;
+use FirefightingEquipment\Device\DeviceEventRepository;
 use FirefightingEquipment\Device\DeviceFilter;
 use FirefightingEquipment\Device\DeviceRepository;
 use FirefightingEquipment\Device\DeviceSort;
@@ -17,6 +20,7 @@ use FirefightingEquipment\Device\SortDirection;
 use FirefightingEquipment\Http\JsonResponse;
 use FirefightingEquipment\Http\RequestContext;
 use FirefightingEquipment\Http\RequestHandler;
+use FirefightingEquipment\Tenant\Tenant;
 use FirefightingEquipment\Time\Clock;
 use FirefightingEquipment\Time\LocalDate;
 use FirefightingEquipment\Time\SystemClock;
@@ -39,6 +43,35 @@ final readonly class LoanListHandler implements RequestHandler
 
     public function __construct(private Clock $clock = new SystemClock())
     {
+    }
+
+    /**
+     * Einträge von `in_returns` wie GET devices plus `returned` (G13): wer die Ausrüstung in die Rückgabe brachte
+     * {by, at, comment, without_login} aus dem neuesten übernommenen Eintrag, der sie dorthin brachte (bei der
+     * Rückgabe ohne Anmeldung der genannte Name mit „(ohne Anmeldung)“), sonst null.
+     *
+     * @param list<Device> $devices
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function inReturns(Tenant $tenant, \PDO $pdo, RequestContext $context, array $devices): array
+    {
+        $arrivals = new DeviceEventRepository($pdo, $context->visibility())
+            ->latestArrivals($tenant, array_map(static fn (Device $device): int => $device->id, $devices));
+
+        return array_map(static function (Device $device) use ($arrivals): array {
+            $event = $arrivals[$device->id] ?? null;
+
+            return [
+                ...DeviceJson::listItem($device),
+                'returned' => $event === null ? null : [
+                    'by' => $event->userName,
+                    'at' => AuthJson::time($event->occurredAt()),
+                    'comment' => $event->comment,
+                    'without_login' => $event->userId === null,
+                ],
+            ];
+        }, $devices);
     }
 
     public function handle(RequestContext $context): JsonResponse
@@ -85,7 +118,7 @@ final readonly class LoanListHandler implements RequestHandler
             $page = $devices->list($tenant, new DeviceFilter(locationId: $place['id'], includeSublocations: true), DeviceSort::Identifier, SortDirection::Asc, 200, 0);
             array_push($inReturns, ...$page->devices);
         }
-        usort($inReturns, static fn (\FirefightingEquipment\Device\Device $a, \FirefightingEquipment\Device\Device $b): int => ($a->stateChangedAt ?? $a->updatedAt) <=> ($b->stateChangedAt ?? $b->updatedAt) ?: strnatcasecmp($a->identifier->value, $b->identifier->value) ?: $a->id <=> $b->id);
+        usort($inReturns, static fn (Device $a, Device $b): int => ($a->stateChangedAt ?? $a->updatedAt) <=> ($b->stateChangedAt ?? $b->updatedAt) ?: strnatcasecmp($a->identifier->value, $b->identifier->value) ?: $a->id <=> $b->id);
         $labels = [];
         foreach (new LocationTaskRepository($pdo)->list($tenant) as $task) {
             $labels[$task['task']->value] = $task['label'];
@@ -98,7 +131,7 @@ final readonly class LoanListHandler implements RequestHandler
             'loans' => $items,
             'borrowers' => $locations->withTask($tenant, LocationTask::Borrower),
             'returns' => [...$returnPlaces, ...$collectionPlaces],
-            'in_returns' => array_map(DeviceJson::listItem(...), array_slice($inReturns, 0, 200)),
+            'in_returns' => $this->inReturns($tenant, $pdo, $context, array_slice($inReturns, 0, 200)),
             'labels' => ['borrower' => $labels[LocationTask::Borrower->value] ?? LocationTask::Borrower->label(), 'returns' => $labels[LocationTask::Returns->value] ?? LocationTask::Returns->label()],
         ]);
     }

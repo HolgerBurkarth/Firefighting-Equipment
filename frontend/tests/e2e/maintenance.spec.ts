@@ -57,7 +57,12 @@ interface Entry {
 
 /** Zustandsbehafteter Server: bucht wie MaintenanceMoveHandler (Version + 1, Fehler je Gerät). */
 function maintenanceServer(
-    options: { workshop?: boolean; store?: boolean; defectiveInWorkshop?: boolean } = {},
+    options: {
+        workshop?: boolean;
+        store?: boolean;
+        defectiveInWorkshop?: boolean;
+        doneInWorkshop?: boolean;
+    } = {},
 ) {
     const hasWorkshop = options.workshop ?? true;
     const hasStore = options.store ?? true;
@@ -99,6 +104,17 @@ function maintenanceServer(
                       status: 'defective',
                       status_label: 'defekt',
                       state_changed_at: ago(20),
+                  }),
+              ]
+            : []),
+        ...(options.doneInWorkshop === true
+            ? [
+                  deviceJson(6, {
+                      identifier: 'M6',
+                      location: { id: 60, name: 'Werkstatt', path: 'Werkstatt' },
+                      status: 'ready',
+                      status_label: 'einsatzbereit',
+                      state_changed_at: ago(2),
                   }),
               ]
             : []),
@@ -194,6 +210,42 @@ function maintenanceServer(
             }),
             'POST api/v1/maintenance/to-workshop': bookAll(WORKSHOP, 'maintenance', 'in Wartung'),
             'POST api/v1/maintenance/back': bookAll(STORE, 'ready', 'einsatzbereit'),
+            // „Fertig gewartet“ (G9): nur der Status, der Standort bleibt.
+            'POST api/v1/devices/4/state': (request: MockRequest): MockResponse => {
+                const sent = request.body as { version: number; status: string };
+                const current = devices.find((device) => device['id'] === 4);
+                if (current?.['version'] !== sent.version) {
+                    return {
+                        status: 409,
+                        body: { error: 'version_conflict', message: 'Geändert.' },
+                    };
+                }
+                const next = {
+                    ...current,
+                    version: sent.version + 1,
+                    status: 'ready',
+                    status_label: 'einsatzbereit',
+                    state_changed_at: ago(0),
+                };
+                devices = devices.map((device) => (device['id'] === 4 ? next : device));
+                return {
+                    status: 200,
+                    body: {
+                        device: fullDevice(next),
+                        result: {
+                            outcome: 'applied',
+                            outcome_label: 'übernommen',
+                            reason: null,
+                            reason_label: null,
+                            message: 'Übernommen.',
+                            stale_confirmed: false,
+                            client_ref: '00000000-0000-4000-8000-000000000000',
+                            replayed: false,
+                            notice_id: null,
+                        },
+                    },
+                };
+            },
         } as Record<string, (request: MockRequest) => MockResponse>,
     };
 }
@@ -518,6 +570,67 @@ test.describe('Wartung: Rückfragen und defekte Ausrüstung (U5, U10)', () => {
             .getByTestId('confirm-dialog')
             .getByRole('button', { name: 'Ins Lager bringen' })
             .click();
+    });
+});
+
+test.describe('Werkstatt: fertig gewartet und in Arbeit (G9)', () => {
+    test.use({
+        api: {
+            'GET api/v1/auth/me': admin(),
+            ...ADMIN_OVERVIEW,
+            ...delegate(() => server.api),
+        },
+    });
+
+    test.beforeEach(async ({ page }) => {
+        server = maintenanceServer({ defectiveInWorkshop: true, doneInWorkshop: true });
+        await page.clock.install({ time: NOW });
+        await page.setViewportSize({ width: 390, height: 900 });
+    });
+
+    test('fertige zuerst und gekennzeichnet, „Nur fertige auswählen“, „Fertig gewartet“', async ({
+        page,
+        apiRequests,
+    }) => {
+        await page.goto('/firefighting/test/wartung');
+        const workshop = page.getByTestId('stage-workshop');
+        await expect(workshop.getByTestId('workshop-summary')).toHaveText(
+            '1 fertig · 1 in Wartung · 1 defekt',
+        );
+        const rows = workshop.getByTestId('maintenance-device');
+        await expect(rows).toHaveCount(3);
+        await expect(rows.nth(0)).toContainText('M6');
+        await expect(rows.nth(0).getByTestId('workshop-done')).toHaveText(
+            'fertig – kann ins Lager',
+        );
+        await expect(rows.nth(0)).toContainText('fertig seit 2 Std.');
+        await expect(rows.nth(1)).toContainText('M4');
+        await expect(rows.nth(1)).toContainText('in Wartung seit 1 Tag');
+        await expect(rows.nth(2)).toContainText('PA 11');
+        // Nur die fertige gewählt; die Rückfrage warnt nicht.
+        await workshop.getByTestId('pick-done').click();
+        await expect(workshop.getByLabel('M6 auswählen')).toBeChecked();
+        await expect(workshop.getByLabel('M4 auswählen')).not.toBeChecked();
+        // Alle (außer defekt): die Rückfrage nennt die noch nicht fertige.
+        await workshop.getByLabel('M4 auswählen').check();
+        await workshop.getByTestId('back').click();
+        await expect(page.getByTestId('confirm-dialog')).toContainText(
+            'Noch nicht als fertig gemeldet: M4.',
+        );
+        await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Abbrechen' }).click();
+        await workshop.getByLabel('M4 auswählen').uncheck();
+
+        // M4 als fertig melden: nur der Status, danach oben bei den fertigen.
+        await workshop.getByRole('button', { name: 'M4 fertig gewartet' }).click();
+        await expect(workshop.getByTestId('workshop-summary')).toHaveText('2 fertig · 1 defekt');
+        await expect(workshop.getByTestId('workshop-done')).toHaveCount(2);
+        await expect(workshop.getByTestId('mark-done')).toHaveCount(0);
+        const sent = apiRequests.find((r) => r.path === 'api/v1/devices/4/state');
+        expect(sent?.body).toMatchObject({ version: 1, status: 'ready' });
+        expect(sent?.body).not.toHaveProperty('location_id');
+        // PA 11 (defekt) ist noch da, also bleibt „Nur fertige auswählen“.
+        await expect(workshop.getByTestId('pick-done')).toBeVisible();
+        expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
     });
 });
 

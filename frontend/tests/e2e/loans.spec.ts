@@ -337,6 +337,34 @@ test.describe('Verleih mit Recht „Ändern“', () => {
         await expect(page.getByTestId('loan-row')).toHaveCount(2);
         expect(await horizontalOverflow(page)).toBe(0);
     });
+
+    test('Fenster „Verleihen“ bei 125 % Schrift (G7): Hinzufügen und Entfernen ganz sichtbar', async ({
+        page,
+    }) => {
+        // Wie der Benutzertest: iPhone 390 px mit 125 % Zoom = 312 CSS-Pixel breit.
+        await page.setViewportSize({ width: 312, height: 640 });
+        await page.goto('/firefighting/test/verleih');
+        await page.getByTestId('lend-open').click();
+        const dialog = page.getByTestId('form-dialog');
+        // Je Nummer warten, bis sie in der Liste steht (sonst läuft die Suche der vorigen noch).
+        for (const [index, code] of ['M1', 'M2'].entries()) {
+            await dialog.getByTestId('lend-code').fill(code);
+            await dialog.getByTestId('lend-code').press('Enter');
+            await expect(dialog.getByTestId('lend-list').locator('li')).toHaveCount(index + 1);
+        }
+        const right = 312;
+        for (const control of [
+            dialog.getByTestId('lend-add'),
+            dialog.getByRole('button', { name: 'M1 entfernen' }),
+            dialog.getByRole('button', { name: 'M2 entfernen' }),
+        ]) {
+            const box = await control.boundingBox();
+            expect(box).not.toBeNull();
+            expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(right);
+            expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+        }
+        expect(await unreachableControls(page, '[data-testid="lend-list"] li')).toEqual([]);
+    });
 });
 
 test.describe('Ohne Leihnehmer und nur ansehen', () => {
@@ -388,10 +416,23 @@ function returnsServer() {
             status: 'defective',
             status_label: 'defekt',
             location: { id: 90, name: 'Rückgabe', path: 'Rückgabe' },
+            // G13: wer sie brachte, mit Kommentar.
+            returned: {
+                by: 'Herr Maier (ohne Anmeldung)',
+                at: '2026-11-08T13:02:00Z',
+                comment: 'Akku hält nicht mehr',
+                without_login: true,
+            },
         }),
         deviceJson(22, {
             identifier: 'HRT 20',
             location: { id: 90, name: 'Rückgabe', path: 'Rückgabe' },
+            returned: {
+                by: 'Thomas Keller',
+                at: '2026-10-12T08:00:00Z',
+                comment: null,
+                without_login: false,
+            },
         }),
         deviceJson(23, {
             identifier: 'HRT 3',
@@ -577,6 +618,19 @@ test.describe('Rückgabe: Aushang und Rückgaben bearbeiten', () => {
         const list = page.getByTestId('in-returns');
         await expect(list.getByTestId('return-device')).toHaveCount(3);
         await expect(list.getByTestId('to-store')).toBeDisabled();
+        // G13: Überbringer, Zeit und Kommentar; ohne Angabe wie bisher nur die Zeit.
+        const hrt16 = list.getByTestId('return-device').filter({ hasText: 'HRT 16' });
+        await expect(hrt16.getByTestId('return-by')).toContainText(
+            'von Herr Maier (ohne Anmeldung) ·',
+        );
+        await expect(hrt16.getByTestId('return-comment')).toHaveText('„Akku hält nicht mehr“');
+        const hrt20 = list.getByTestId('return-device').filter({ hasText: 'HRT 20' });
+        await expect(hrt20.getByTestId('return-by')).toHaveText(
+            /^von Thomas Keller · 12\.10\.2026$/,
+        );
+        await expect(hrt20.getByTestId('return-comment')).toHaveCount(0);
+        const hrt3 = list.getByTestId('return-device').filter({ hasText: 'HRT 3' });
+        await expect(hrt3.getByTestId('return-by')).toHaveCount(0);
 
         await list.getByLabel('HRT 16 auswählen').check();
         await list.getByLabel('HRT 3 auswählen').check();

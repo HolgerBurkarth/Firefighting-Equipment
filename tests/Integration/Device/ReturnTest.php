@@ -264,6 +264,29 @@ final class ReturnTest extends DeviceApiTestCase
         self::assertSame([$a['id']], array_column($list['in_returns'], 'id'));
     }
 
+    public function testListNamesWhoBroughtTheEquipmentIntoTheReturn(): void
+    {
+        // G13: „In der Rückgabe“ zeigt Name, Zeit und Kommentar des Überbringers.
+        [$a, $key] = $this->lentDevice('A-1');
+        $this->publicCall('returns', ['key' => $key, 'code' => 'A-1', 'name' => 'Herr Maier', 'condition' => 'used', 'comment' => 'Visier zerkratzt']);
+        $b = $this->createViaApi('B-1');
+        $booked = $this->api('POST', 'devices/' . $b['id'] . '/state', ['version' => $b['version'], 'location_id' => $this->returnBox, 'comment' => 'von Hand']);
+        self::assertSame(200, $booked->statusCode(), $booked->body());
+        $c = $this->createViaApi('C-1', ['location_id' => $this->returnPoint]);
+
+        $items = array_column(self::json($this->api('GET', 'loans'))['in_returns'], null, 'id');
+
+        $maier = $items[$a['id']]['returned'];
+        self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $maier['at']);
+        unset($maier['at']);
+        self::assertSame(['by' => 'Herr Maier (ohne Anmeldung)', 'comment' => 'Visier zerkratzt', 'without_login' => true], $maier);
+        $hand = $items[$b['id']]['returned'];
+        self::assertSame(['von Hand', false], [$hand['comment'], $hand['without_login']]);
+        self::assertNotSame('', $hand['by']);
+        self::assertNull($items[$c['id']]['returned'], 'nur angelegt, nie dorthin gebracht');
+        self::assertSame('A-1', $items[$a['id']]['identifier'], 'sonst wie GET devices');
+    }
+
     public function testProcessSendsUsedAndDefectiveToTheCollectionPointAndTheRestToTheStore(): void
     {
         $a = $this->lend('A-1');
